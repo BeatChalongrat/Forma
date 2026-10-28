@@ -13,6 +13,9 @@ import { ReviewCenter } from './pages/Review'
 import { Customers, CustomerPage } from './pages/Customers'
 import { DataEditor } from './pages/DataEditor'
 import { SettingsPage } from './pages/Settings'
+import { OpsPage } from './pages/Ops'
+import { AuthCallback } from './pages/AuthCallback'
+import { ensureAuthenticated } from './lib/auth'
 
 const qc = new QueryClient({ defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false, staleTime: 5000 } } })
 
@@ -31,16 +34,20 @@ const router = createBrowserRouter([
       { path: 'customers/:customerId', element: <CustomerPage /> },
       { path: 'datasets/:datasetId', element: <DataEditor /> },
       { path: 'settings', element: <SettingsPage /> },
+      { path: 'ops', element: <OpsPage /> },
     ],
   },
+  { path: '/auth/callback', element: <AuthCallback /> },
 ])
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <QueryClientProvider client={qc}>
-      <ToastProvider>
-        <RouterProvider router={router} />
-      </ToastProvider>
-    </QueryClientProvider>
-  </StrictMode>,
-)
+void ensureAuthenticated().finally(() => {
+  createRoot(document.getElementById('root')!).render(
+    <StrictMode>
+      <QueryClientProvider client={qc}>
+        <ToastProvider>
+          <RouterProvider router={router} />
+        </ToastProvider>
+      </QueryClientProvider>
+    </StrictMode>,
+  )
+})

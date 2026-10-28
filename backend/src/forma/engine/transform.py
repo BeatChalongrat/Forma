@@ -312,6 +312,12 @@ class TransformEngine:
             "duration_ms": round((time.perf_counter() - t0) * 1000, 1),
             "identity_keys": identity_cols,
         }
+        _observe_engine(
+            rows_in,
+            len(records),
+            time.perf_counter() - t0,
+            errors=sum(1 for f in findings if f.severity == "error"),
+        )
         return TransformResult(records, out, findings, stats)
 
     # ---- internals ----------------------------------------------------------------------
@@ -734,6 +740,23 @@ class TransformEngine:
 # --------------------------------------------------------------------------------------------
 # helpers
 # --------------------------------------------------------------------------------------------
+def _observe_engine(rows_in: int, rows_out: int, seconds: float, *, errors: int) -> None:
+    """Metrics + a span event per engine run (ADR-014); never fails the run."""
+    try:
+        from forma.core import metrics
+        from forma.core.telemetry import span
+
+        metrics.ENGINE_ROWS.labels(stage="in").inc(rows_in)
+        metrics.ENGINE_ROWS.labels(stage="out").inc(rows_out)
+        metrics.ENGINE_DURATION.observe(seconds)
+        with span(
+            "engine.run", rows_in=rows_in, rows_out=rows_out, duration_s=round(seconds, 3), errors=errors
+        ):
+            pass
+    except Exception:  # pragma: no cover - observability must never break the engine
+        return
+
+
 def ROW_COL_OF(frame: pl.DataFrame) -> str:
     for c in frame.columns:
         if c.endswith(f".{ROW_COL}") or c == ROW_COL:

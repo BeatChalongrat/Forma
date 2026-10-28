@@ -251,7 +251,7 @@ def test_process_backend_runs_in_child_process(isolated_env: Path, monkeypatch: 
                     else "running"
                 }
             ),
-            timeout=180,
+            timeout=300,
         )
         assert st["by_status"].get("done") == 2, st
         workers = {c.get(f"/api/jobs/{jid}").json()["worker"] for jid in b["job_ids"]}

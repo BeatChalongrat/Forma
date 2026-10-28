@@ -1,4 +1,5 @@
 /** Typed API client. All calls go through the Vite proxy (/api → FastAPI). */
+import { authHeaders, login } from './auth'
 
 export class ApiError extends Error {
   status: number
@@ -13,7 +14,10 @@ export class ApiError extends Error {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(path, { ...init, headers: { ...(init?.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }), ...(init?.headers ?? {}) } })
+  const res = await fetch(path, { ...init, headers: { ...(init?.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }), ...authHeaders(), ...(init?.headers ?? {}) } })
+  if (res.status === 401 && !path.startsWith('/api/auth/')) {
+    void login()
+  }
   if (!res.ok) {
     let body: { error?: string; message?: string; detail?: unknown; details?: unknown } = {}
     try {
@@ -84,7 +88,22 @@ export type DatasetVersion = {
 }
 export type ChangeSet = { id: string; dataset_version_id: string; result_version_id: string | null; kind: string; operations: Operation[]; impact: Impact; author: string; note: string | null; status: string; created_at: string }
 export type ExportArtifact = { id: string; dataset_version_id: string; fmt: string; row_count: number; sha256: string; created_at: string; path: string }
-export type Job = { id: string; kind: string; status: 'queued' | 'running' | 'done' | 'failed'; progress: number; message: string | null; result?: Record<string, unknown> | null; error?: string | null }
+export type Job = {
+  id: string; kind: string; status: 'queued' | 'running' | 'done' | 'failed'; progress: number; message: string | null; result?: Record<string, unknown> | null; error?: string | null
+  round_id?: string | null; batch_id?: string | null; attempts?: number; worker?: string | null; created_at?: string; started_at?: string | null; finished_at?: string | null; duration_ms?: number | null
+}
+export type BatchStatus = { batch_id: string; total: number; by_status: Record<string, number>; finished: number; progress: number; done: boolean; jobs: { id: string; round_id: string | null; status: string; progress: number; error: string | null; duration_ms: number | null }[] }
+export type QueueStats = { by_status: Record<string, number>; queued: number; running: number; failed: number; oldest_queued_age_s: number | null; limit: number; backend: string; workers?: number; inflight?: number; nodes?: number; error?: string }
+export type Ready = { status: 'ok' | 'degraded'; checks: Record<string, { ok: boolean; detail?: string }> }
+export type Me = { subject: string; name: string; roles: string[]; effective_roles: string[]; customers: string[] | null; mode: string }
+export type OpsSummary = {
+  queue: QueueStats; ready: Ready; review: { open: number; oldest_age_s: number | null }
+  failed_jobs: (Job & { customer_code?: string | null })[]
+  llm_spend_by_day: { day: string; calls: number; tokens: number; cost_usd: number }[]
+  slowest_rounds: { job_id: string; kind: string; round_id: string; customer_code: string | null; label: string | null; duration_ms: number | null; stages: { profile?: number | null; propose?: number | null; transform?: number | null } }[]
+  breaker: { open: boolean; failures: number; opened_at?: string | null } | null
+  storage: string; database: string; auth: string; tracing: boolean; schema_revision: string | null
+}
 export type FieldSpec = { pointer: string; name: string; json_type: string[]; semantic: string | null; risk: 'critical' | 'high' | 'medium' | 'low'; required: boolean; nullable: boolean; enum: unknown[] | null; format: string | null; synonyms_en: string[]; synonyms_th: string[]; description: string | null; description_th: string | null; in_collection: string | null; is_collection: boolean; system: boolean; default: unknown }
 export type SchemaSummary = { schema_id: string; version: number; ref: string; entity: string; status: string; title: string; description: string; identity_keys: string[]; field_count: number; fields?: FieldSpec[]; document?: unknown }
 export type Operation = { kind: 'set_cell' | 'set_field' | 'scale_field' | 'delete_rows' | 'delete_row' | 'set_item'; target?: string; identity?: string; value?: unknown; factor?: number; where?: Expr | null; explanation?: string }
@@ -122,6 +141,14 @@ export const api = {
   profile: (roundId: string) => post<{ job_id: string }>(`/api/rounds/${roundId}/profile`),
   transform: (roundId: string, mappingId?: string) => post<{ job_id: string }>(`/api/rounds/${roundId}/transform${mappingId ? `?mapping_version_id=${mappingId}` : ''}`),
   job: (id: string) => get<Job>(`/api/jobs/${id}`),
+  jobs: (q?: { status?: string; kind?: string; limit?: number }) => get<Job[]>('/api/jobs' + qs(q)),
+  jobStats: () => get<QueueStats>('/api/jobs/stats'),
+  batch: (id: string) => get<BatchStatus>(`/api/jobs/batch/${id}`),
+  batchRun: (round_ids: string[], b?: { use_llm?: boolean | null; force?: boolean }) => post<{ batch_id: string; job_ids: string[]; count: number }>('/api/rounds/batch-run', { round_ids, ...(b ?? {}) }),
+  retryJob: (id: string) => post<{ job_id: string }>(`/api/jobs/${id}/retry`),
+  me: () => get<Me>('/api/me'),
+  ready: () => get<Ready>('/ready'),
+  ops: () => get<OpsSummary>('/api/ops'),
 
   mapping: (id: string) => get<MappingVersion>(`/api/mappings/${id}`),
   approveMapping: (id: string, b: { actor: string; comment?: string }) => post<MappingVersion>(`/api/mappings/${id}/approve`, b),
