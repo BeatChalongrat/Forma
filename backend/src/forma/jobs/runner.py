@@ -475,10 +475,10 @@ def job_status(job_id: str) -> dict[str, Any]:
 
 
 def list_jobs(
-    *, status: str | None = None, kind: str | None = None, limit: int = 100
+    *, status: str | None = None, kind: str | None = None, limit: int = 100, offset: int = 0
 ) -> list[dict[str, Any]]:
     with session_scope() as s:
-        q = select(Job).order_by(Job.created_at.desc()).limit(limit)
+        q = select(Job).order_by(Job.created_at.desc()).limit(limit).offset(offset)
         if status:
             q = q.where(Job.status == status)
         if kind:

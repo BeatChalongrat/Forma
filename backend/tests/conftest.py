@@ -16,10 +16,12 @@ from pathlib import Path
 import polars as pl
 import pytest
 
+# setdefault: this module may be imported twice (as ``conftest`` by pytest and as ``tests.conftest`` by
+# tests that reuse ``clear_forma_caches``); a second import must never clobber a fixture's monkeypatch.
 _SESSION_TMP = Path(tempfile.mkdtemp(prefix="forma-tests-"))
-os.environ["FORMA_DATABASE_URL"] = f"sqlite:///{_SESSION_TMP}/session.db"
-os.environ["FORMA_DATA_DIR"] = str(_SESSION_TMP / "data")
-os.environ["FORMA_LLM_PROVIDER"] = "mock"
+os.environ.setdefault("FORMA_DATABASE_URL", f"sqlite:///{_SESSION_TMP}/session.db")
+os.environ.setdefault("FORMA_DATA_DIR", str(_SESSION_TMP / "data"))
+os.environ.setdefault("FORMA_LLM_PROVIDER", "mock")
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCHEMA_DIR = REPO_ROOT / "target_schema"

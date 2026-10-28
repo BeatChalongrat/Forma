@@ -8,7 +8,6 @@ from sqlalchemy import Engine, create_engine, event
 from sqlalchemy.orm import Session, sessionmaker
 
 from forma.core.settings import get_settings
-from forma.db.models import Base
 
 
 @lru_cache
@@ -32,7 +31,15 @@ def get_engine() -> Engine:
 
 
 def init_db() -> None:
-    Base.metadata.create_all(get_engine())
+    """Bring the schema up (ADR-011).
+
+    * dev + no ``alembic_version`` table → ``create_all`` (plus missing columns for legacy dev DBs) and
+      stamp ``head`` so later changes go through migrations;
+    * otherwise migrations are mandatory: a pending revision makes the API refuse to start.
+    """
+    from forma.db.migrate import ensure_schema
+
+    ensure_schema(get_engine(), dev=not get_settings().is_prod)
 
 
 @lru_cache
