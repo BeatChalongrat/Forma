@@ -21,7 +21,7 @@ from forma.ai.policy import DEFAULT_POLICY, _merge, file_policy, validate_policy
 from forma.core import secrets
 from forma.core.errors import NotFound, ValidationFailed
 from forma.core.settings import Settings
-from forma.db.models import AppSetting, StoredSchema
+from forma.db.models import AppSetting, LLMCall, StoredSchema
 from forma.db.session import session_scope
 from forma.schema_registry import SchemaRegistry, TargetSchema
 from forma.services.rounds import audit
@@ -275,3 +275,105 @@ def resolve_target_schema(
     except NotFound as e:
         raise ValidationFailed(f"target format {ref!r} does not exist", details={"target_schema": ref}) from e
     return ref
+
+
+# --------------------------------------------------------------------------------------------
+# one-step connect: paste a key, FORMA finds the provider, checks the key, then saves it
+# --------------------------------------------------------------------------------------------
+DEFAULT_MODELS = {"anthropic": "claude-opus-5-5", "openai": "gpt-4.1-mini"}
+
+
+def detect_provider(api_key: str) -> str | None:
+    """Anthropic keys start with ``sk-ant-``, OpenAI keys with ``sk-``; anything else is a gateway."""
+    k = api_key.strip()
+    if k.startswith("sk-ant-"):
+        return "anthropic"
+    if k.startswith("sk-"):
+        return "openai"
+    return None
+
+
+def _model_for(provider: str, current: str | None) -> str:
+    """Keep the chosen model when it belongs to the provider, else that provider's default."""
+    if current and provider == "openai_compatible":
+        return current
+    if current and (current.startswith("claude")) == (provider == "anthropic"):
+        return current
+    return DEFAULT_MODELS.get(provider, current or DEFAULT_MODELS["openai"])
+
+
+def probe(client: Any) -> dict[str, Any]:
+    """One tiny call straight to the provider (no retries, no circuit breaker): is this key usable?"""
+    import time
+
+    from forma.ai.llm import _parse_json
+
+    if client.is_mock:
+        return {"ok": False, "offline": True, "message": "AI is offline: no provider key"}
+    t0 = time.perf_counter()
+    try:
+        text, usage = client.provider.complete_json(
+            system="You are a connectivity check.",
+            user='Return {"ok": true}.',
+            schema={"type": "object", "properties": {"ok": {"type": "boolean"}}, "required": ["ok"]},
+            model=client.model,
+            temperature=client.temperature,
+        )
+        ok = bool(_parse_json(text).get("ok"))
+    except Exception as e:  # any provider/transport failure is the answer
+        return {"ok": False, "offline": False, "message": str(e)[:300], "model": client.model}
+    return {
+        "ok": ok,
+        "offline": False,
+        "message": "connected" if ok else "the provider answered, but not with the expected JSON",
+        "model": client.model,
+        "provider": client.provider.name,
+        "latency_ms": round((time.perf_counter() - t0) * 1000, 1),
+        "usage": {
+            "input_tokens": usage.input_tokens,
+            "output_tokens": usage.output_tokens,
+            "cost_usd": usage.cost_usd,
+        },
+    }
+
+
+def connect_ai(
+    session: Session, base: Settings, api_key: str, actor: str, provider: str | None = None
+) -> dict[str, Any]:
+    """Paste-a-key flow: detect the provider, pick a model, try the key, save it only if it works."""
+    from forma.ai.llm import LLMClient
+
+    key = api_key.strip()
+    if not key:
+        raise ValidationFailed("paste an API key")
+    chosen = provider or detect_provider(key)
+    if chosen is None or chosen == "mock" or chosen not in PROVIDERS:
+        raise ValidationFailed(
+            "cannot tell which provider this key belongs to: choose OpenAI, Anthropic or a gateway",
+            details={"needs_provider": True},
+        )
+    row = _row(session, AI_KEY)
+    ai = dict(row.value or {}) if row else {}
+    model = _model_for(chosen, ai.get("model") or (base.llm_model if base.llm_provider == chosen else None))
+    candidate = llm_settings(
+        base, {**{k: v for k, v in ai.items() if k != "api_key_enc"}, "provider": chosen, "model": model}
+    )
+    candidate = candidate.model_copy(update={"llm_api_key": key})
+    result = probe(LLMClient.from_settings(candidate))
+    if not result["ok"]:
+        raise ValidationFailed(
+            f"the key did not work: {result['message']}", details={"provider": chosen, "model": model}
+        )
+    session.add(
+        LLMCall(
+            agent="settings.connect",
+            model=model,
+            prompt_version="settings",
+            input_tokens=result["usage"]["input_tokens"],
+            output_tokens=result["usage"]["output_tokens"],
+            cost_usd=result["usage"]["cost_usd"],
+            latency_ms=result["latency_ms"],
+        )
+    )
+    update_ai(session, base, {"provider": chosen, "model": model, "api_key": key}, actor)
+    return result

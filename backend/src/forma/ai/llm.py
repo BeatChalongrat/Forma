@@ -23,6 +23,10 @@ PRICING: dict[str, tuple[float, float]] = {
     "gpt-4.1-mini": (0.4, 1.6),
     "gpt-4o": (2.5, 10.0),
     "gpt-4o-mini": (0.15, 0.6),
+    "claude-opus-5-5": (4.0, 20.0),
+    "claude-sonnet-5-5": (2.0, 10.0),
+    "claude-haiku-5-5": (0.1, 0.5),
+    "claude-fable-5-1": (10.0, 50.0),
     "claude-sonnet-4-5": (3.0, 15.0),
     "claude-haiku-4-5": (1.0, 5.0),
     "claude-opus-4-1": (15.0, 75.0),
@@ -118,7 +122,7 @@ class OpenAICompatibleProvider:
             "temperature": temperature,
             "response_format": {"type": "json_object"},
             "messages": [
-                {"role": "system", "content": system + "\n\nRespond with a single JSON object only."},
+                {"role": "system", "content": system + _json_instruction(schema)},
                 {"role": "user", "content": user},
             ],
         }
@@ -156,18 +160,13 @@ class AnthropicProvider:
             "anthropic-version": "2023-06-01",
             "content-type": "application/json",
         }
-        tool = {
-            "name": "emit",
-            "description": "Return the structured result.",
-            "input_schema": _loosen(schema),
-        }
+        # Current Claude models reject forced tool use and non-default sampling parameters, and the
+        # mapping schema is recursive (out of reach of structured outputs): the schema goes in the system
+        # prompt and the reply is parsed as JSON, with LLMClient.structured retrying on invalid output.
         body = {
             "model": model,
-            "max_tokens": 8192,
-            "temperature": temperature,
-            "system": system,
-            "tools": [tool],
-            "tool_choice": {"type": "tool", "name": "emit"},
+            "max_tokens": 16000,
+            "system": system + _json_instruction(schema),
             "messages": [{"role": "user", "content": user}],
         }
         t0 = time.perf_counter()
@@ -176,11 +175,13 @@ class AnthropicProvider:
         if r.status_code >= 400:
             raise LLMError(f"{self.name} HTTP {r.status_code}: {r.text[:500]}")
         data = r.json()
-        payload: Any = {}
-        for block in data.get("content", []):
-            if block.get("type") == "tool_use":
-                payload = block.get("input", {})
-                break
+        stop = data.get("stop_reason")
+        if stop == "refusal":
+            category = (data.get("stop_details") or {}).get("category")
+            raise LLMError(f"{self.name} declined the request (refusal: {category or 'unspecified'})")
+        if stop == "max_tokens":
+            raise LLMError(f"{self.name} reply was cut off at max_tokens")
+        text = "".join(b.get("text", "") for b in data.get("content", []) if b.get("type") == "text")
         u = data.get("usage", {})
         usage = Usage(
             int(u.get("input_tokens", 0)),
@@ -189,14 +190,17 @@ class AnthropicProvider:
             (time.perf_counter() - t0) * 1000,
             model,
         )
-        return json.dumps(payload, ensure_ascii=False), usage
+        return text, usage
 
 
-def _loosen(schema: dict[str, Any]) -> dict[str, Any]:
-    """Anthropic input_schema must be a plain object schema; keep $defs so refs resolve."""
-    out = dict(schema)
-    out.setdefault("type", "object")
-    return out
+def _json_instruction(schema: dict[str, Any]) -> str:
+    """The reply contract every provider gets: one JSON object, and the schema it must follow."""
+    if not schema:
+        return "\n\nRespond with a single JSON object only."
+    return (
+        "\n\nRespond with a single JSON object only (no prose, no code fence) that conforms to this "
+        "JSON Schema:\n" + json.dumps(schema, ensure_ascii=False, separators=(",", ":"))
+    )
 
 
 # --------------------------------------------------------------------------------------------
