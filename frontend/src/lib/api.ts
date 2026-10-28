@@ -80,7 +80,15 @@ export type SandboxReport = {
   baseline_id: string | null; baseline_version?: number; verdict?: 'pass' | 'fail' | 'n/a'; problems?: string[]; message?: string
   details?: Record<'price_changes' | 'changed' | 'lost' | 'gained', SandboxItem[]>
 }
-export type PolicyDecision = { decision: 'auto_approve' | 'review' | 'block'; priority: number; reasons: string[]; risk_score: number; checks: Record<string, unknown>; source?: string; simulation?: SimSummary | null; sandbox?: SandboxReport | null }
+export type RiskLevel = 'low' | 'medium' | 'high'
+export type PolicyDecision = { decision: 'auto_approve' | 'review' | 'block'; priority: number; reasons: string[]; risk_score: number; risk_level?: RiskLevel; risk_factors?: string[]; impact?: { affected_records: number; of_records: number; ratio: number | null; changed_prices: number; high?: boolean }; checks: Record<string, unknown>; source?: string; simulation?: SimSummary | null; sandbox?: SandboxReport | null }
+export type RelNode = { id: string; sheet: string | null; file: string | null; role: string; root: boolean; used: boolean; collections: string[]; rows: number; columns: { name: string; key: boolean; mapped: boolean }[]; source_spec?: SourceSpec }
+export type RelEdge = {
+  from: { node: string; column: string }; to: { node: string; column: string }; kind: 'link' | 'join' | 'suggested'; used: boolean; collection?: string; expected?: string; missing?: boolean
+  overlap?: number; cardinality?: string; from_match?: number; to_match?: number; from_orphan_rows?: number; to_orphan_rows?: number; from_unique?: boolean; to_unique?: boolean; score?: number; evidence?: string[]; warnings: string[]
+}
+export type Relationships = { root: string; rows_limit: number | null; nodes: RelNode[]; edges: RelEdge[]; problems: string[]; probe?: RelEdge }
+export type RelEnd = { node: string; column: string }
 export type MappingVersion = {
   id: string; customer_id: string; round_id: string | null; version: number; status: 'proposed' | 'approved' | 'rejected' | 'superseded'; target_schema: string
   confidence: number | null; created_by: string; model: string | null; policy: PolicyDecision; open_questions: string[]; validation: { ok: boolean; issues: { level: string; code: string; message: string; path: string }[] } | null
@@ -88,7 +96,7 @@ export type MappingVersion = {
 }
 export type ReviewTask = {
   id: string; round_id: string; customer_id: string; mapping_version_id: string | null; dataset_version_id: string | null; kind: string; priority: number; status: string
-  reasons: string[]; details: { decision?: string; open_questions?: string[]; findings?: Finding[] }; resolver: string | null; comment: string | null; created_at: string; resolved_at: string | null
+  reasons: string[]; details: { decision?: string; risk_level?: RiskLevel; risk_factors?: string[]; impact?: PolicyDecision['impact']; open_questions?: string[]; findings?: Finding[] }; resolver: string | null; comment: string | null; created_at: string; resolved_at: string | null
   customer?: { id: string; code: string; name: string } | null; round?: { id: string; label: string | null; status: string } | null
 }
 export type DatasetVersion = {
@@ -125,7 +133,7 @@ export type AISettings = {
 export type AISettingsPatch = Partial<{ provider: string | null; model: string | null; base_url: string | null; timeout_s: number | null; max_retries: number | null; api_key: string | null }>
 export type Policy = {
   auto_approve: { min_mapping_confidence: number; min_field_confidence_critical: number; min_field_confidence_high: number; max_warning_findings: number; allow_errors: boolean; allowed_drift: string[]; require_previous_approval_for_auto: boolean; max_row_change_ratio: number }
-  review: { priority_weights: Record<string, number> }
+  review: { priority_weights: Record<string, number>; high_impact_ratio?: number }
   block: Record<string, boolean>
   risk_overrides: Record<string, string>
   sandbox: { enabled: boolean; max_lost_records: number; max_new_errors: number; max_new_invalid_prices: number; max_new_duplicates: number; max_changed_prices_auto: number }
@@ -184,6 +192,7 @@ export const api = {
   mappingPreview: (roundId: string, document: MappingDocument, limit = 50) => post<{ ok: boolean; records: Record<string, unknown>[]; findings: Finding[]; validation?: { ok: boolean; issues: { level: string; code: string; message: string; path: string }[] }; errors?: string[]; stats?: Record<string, unknown> }>(`/api/rounds/${roundId}/mapping-preview`, { document, limit }),
   sourcePreview: (roundId: string, source: SourceSpec, limit = 60) => post<{ file: string; columns: string[]; rows: unknown[][]; n_rows_preview: number }>(`/api/rounds/${roundId}/source-preview`, { source, limit }),
   diagnose: (mappingId: string) => post<{ ai: boolean; findings: Finding[]; root_causes: { finding: string; cause: string; fix: string; fix_kind?: string; severity?: string; evidence?: string[] }[]; summary_th?: string; patched_mapping?: MappingDocument | null }>(`/api/mappings/${mappingId}/diagnose`),
+  relationships: (roundId: string, document?: MappingDocument, probe?: { from: RelEnd; to: RelEnd }) => post<Relationships>(`/api/rounds/${roundId}/relationships`, { ...(document ? { document } : {}), ...(probe ? { probe } : {}) }),
   compareMapping: (id: string, document?: MappingDocument) => post<SandboxReport>(`/api/mappings/${id}/compare`, document ? { document } : {}),
   sandboxList: (id: string, list: string, offset = 0, limit = 100) => get<{ report: SandboxReport | null; list: string; total: number; items: SandboxItem[] }>(`/api/mappings/${id}/sandbox?list=${list}&offset=${offset}&limit=${limit}`),
   dsl: () => get<{ ops: string[]; json_schema: unknown }>('/api/dsl'),

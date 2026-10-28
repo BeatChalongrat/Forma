@@ -11,6 +11,7 @@
 | 6 Advanced | NL data editing (copilot), root-cause diagnosis, change intelligence, lineage | **done** | `agents.py`, `routes.py` |
 | 7 Production | scale, reliability, security, observability, deployment | **done** — see below | ADR-010 … ADR-016 |
 | 7+ Safety | mapping simulation sandbox: new vs approved mapping on real files, drill-down, policy block | **done** | ADR-018 |
+| 7+ Trust & visual mapping | risk level (low/medium/high + factors + records affected) on every decision; relationship discovery between all tables, diagram in the Studio, drag-to-map | **done** | ADR-019 |
 | 7+ Operability | any target format without code (semantic mapping, exact export shape), settings in the web app (AI key, policy, formats, customers) | **done** | ADR-017 |
 
 ## Phase 7 — production hardening (done)

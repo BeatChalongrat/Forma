@@ -200,3 +200,50 @@ def test_risk_override_and_field_confidence_fallback(engine: PolicyEngine, schem
         f.confidence = None
     d = engine.evaluate(doc, schema, findings=[], rows_out=5, has_previous_approval=True)
     assert d.decision == "auto_approve"
+
+
+def test_risk_levels(engine: PolicyEngine, schema: TargetSchema) -> None:
+    """Low = safe to automate, medium = a human looks, high = a human must decide (ADR-019)."""
+    returning = {"rows_out": 100, "drift": "identical", "has_previous_approval": True}
+    low = engine.evaluate(_doc(), schema, findings=[], **returning)  # type: ignore[arg-type]
+    assert (low.risk_level, low.risk_factors, low.impact) == ("low", [], {})
+    assert low.to_dict()["risk_level"] == "low"
+    medium = engine.evaluate(_doc(), schema, findings=[], rows_out=100, has_previous_approval=False)
+    assert (medium.decision, medium.risk_level, medium.risk_factors) == ("review", "medium", [])
+
+    wrong = engine.evaluate(
+        _doc(), schema, findings=[], rows_out=100, drift="unrelated_file", has_previous_approval=True
+    )
+    assert wrong.risk_level == "high"
+    assert wrong.risk_factors == ["blocked by policy", "format change: unrelated_file"]
+    ambiguous = engine.evaluate(_doc(amount_conf=0.5), schema, findings=[], **returning)  # type: ignore[arg-type]
+    assert ambiguous.risk_level == "high" and ambiguous.risk_factors[0].startswith("ambiguous critical field")
+    dup = [{"kind": "join", "severity": "warning", "message": "join a→b: 3 right keys are duplicated"}]
+    joined = engine.evaluate(_doc(), schema, findings=dup, **returning)  # type: ignore[arg-type]
+    assert joined.risk_level == "high" and joined.risk_factors == ["join cardinality / duplicate keys"]
+
+
+def test_impact_vs_the_approved_mapping(engine: PolicyEngine, schema: TargetSchema) -> None:
+    def sandbox(changed: int) -> dict[str, object]:
+        delta = {"changed_records": changed, "lost": 0, "gained": 2, "changed_prices": changed}
+        return {
+            "verdict": "warn",
+            "delta": {**delta, "new_errors": 0, "new_invalid_prices": 0, "new_duplicates": 0},
+        }
+
+    kw = {"findings": [], "rows_out": 100, "drift": "identical", "has_previous_approval": True}
+    big = engine.evaluate(_doc(), schema, sandbox=sandbox(18), **kw)  # type: ignore[arg-type]
+    assert big.impact == {
+        "affected_records": 20,
+        "of_records": 100,
+        "ratio": 0.2,
+        "changed_prices": 18,
+        "high": True,
+    }
+    assert big.risk_level == "high" and big.risk_factors == [
+        "20 of 100 records (20%) change vs the approved mapping"
+    ]
+    small = engine.evaluate(_doc(), schema, sandbox=sandbox(3), **kw)  # type: ignore[arg-type]
+    assert small.impact["affected_records"] == 5 and not small.impact["high"] and small.risk_level != "high"
+    strict = PolicyEngine({"review": {"high_impact_ratio": 0.05}})
+    assert strict.evaluate(_doc(), schema, sandbox=sandbox(3), **kw).risk_level == "high"  # type: ignore[arg-type]

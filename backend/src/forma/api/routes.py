@@ -22,6 +22,7 @@ from forma.api.schemas import (
     MappingEditIn,
     MappingPreviewIn,
     ProposeIn,
+    RelationshipsIn,
     RoundIn,
     SchemaIn,
     SourcePreviewIn,
@@ -48,6 +49,7 @@ from forma.schema_registry import PROVENANCE_KEY, TargetSchema
 from forma.services import config as cfg
 from forma.services import datasets as ds
 from forma.services import mapping as ms
+from forma.services import relationships as rel
 from forma.services import rounds as rs
 from forma.services.context import ServiceContext, get_context
 
@@ -532,6 +534,27 @@ def mapping_preview(
 ) -> dict[str, Any]:
     _round_scoped(session, p, round_id)
     return ms.preview_mapping(ctx, session, round_id, body.document, limit=body.limit)
+
+
+@api.post("/rounds/{round_id}/relationships")
+def round_relationships(
+    round_id: str,
+    body: RelationshipsIn,
+    session: Session = Depends(get_session),
+    ctx: ServiceContext = Depends(ctx_dep),
+    p: Principal = Depends(current_principal),
+) -> dict[str, Any]:
+    """Visual mapping (ADR-019): tables, the keys that connect them and how well, on real rows."""
+    _round_scoped(session, p, round_id)
+    probe = body.probe
+    return rel.discover(
+        ctx,
+        session,
+        round_id,
+        body.document,
+        limit=body.limit,
+        probe=(probe.from_.node, probe.from_.column, probe.to.node, probe.to.column) if probe else None,
+    )
 
 
 @api.post("/mappings/{mapping_id}/compare")

@@ -1,13 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { Check, X, Save, Stethoscope, ChevronDown, ChevronRight, Braces, Plus, Trash2, Wand2, ShieldAlert } from 'lucide-react'
+import { Check, X, Save, Stethoscope, ChevronDown, ChevronRight, Braces, Plus, Trash2, Wand2, ShieldAlert, Network } from 'lucide-react'
 import { api, type SandboxItem, type SandboxReport, type Expr, type FieldMapping, type FieldSpec, type MappingDocument, type TableProfile } from '../lib/api'
 import { cn, describeExpr, fmtInt, pyRegex } from '../lib/utils'
-import { Badge, Confidence, RiskDot, Spinner, StatusBadge, Tabs, FindingRow, Modal } from '../components/ui'
+import { Badge, Confidence, RiskDot, RiskLevel, Spinner, StatusBadge, Tabs, FindingRow, Modal } from '../components/ui'
 import { useToast } from '../lib/toast'
+import { RelationshipMap } from './RelationshipMap'
 
 type Group = { title: string; pointer: string | null; source: string; fields: FieldSpec[] }
+const DRAG_TYPE = 'application/x-forma-column'
 
 const OP_PRESETS: { op: string; label: string; params?: Record<string, unknown> }[] = [
   { op: 'col', label: 'as is (column)' },
@@ -63,6 +65,8 @@ export function MappingStudio() {
   const [comment, setComment] = useState('')
   const [reject, setReject] = useState(false)
   const [overrideOpen, setOverrideOpen] = useState(false)
+  const [view, setView] = useState<'fields' | 'relationships'>('fields')
+  const [dropOn, setDropOn] = useState<string | null>(null) // target field a column is dragged over
 
   useEffect(() => { if (mv?.document && !doc) { setDoc(mv.document); setSelectedSource(mv.document.record.root_source) } }, [mv, doc])
 
@@ -150,6 +154,17 @@ export function MappingStudio() {
     if (coll) { const c = d.collections.find((x) => x.target === coll); if (c) c.fields = c.fields.filter((f) => f.target !== ptr) } else d.fields = d.fields.filter((f) => f.target !== ptr)
     return d
   })
+  // point a target field at a source column — shared by drag-and-drop and the "use" button; a field of a
+  // collection goes into that collection even before it is mapped (the schema says which one)
+  const pointAt = (ptr: string, sourceId: string, column: string) => {
+    if (!doc || !schema) return
+    const { fm, coll: mapped } = getMapping(ptr)
+    const coll = mapped ?? schema.fields?.find((f) => f.pointer === ptr)?.in_collection ?? null
+    const base = coll ? doc.collections.find((x) => x.target === coll)?.source : doc.record.root_source
+    if (coll && !base) { toast.push({ kind: 'info', title: `Link a table to ${coll} first`, detail: 'Use Relationships or “add collection”.' }); return }
+    const leaf = exprLeaf(fm?.expr)
+    setFieldExpr(ptr, coll, buildExpr({ ...leaf, op: leaf.op === 'const' ? 'col' : leaf.op, col: column, source: sourceId === base ? null : sourceId }))
+  }
   const addCollection = (ptr: string) => update((d) => { if (!d.collections.find((c) => c.target === ptr)) d.collections.push({ target: ptr, source: d.record.root_source, link: [{ left: '', right: '' }], fields: [] }); return d })
 
   if (!mv || !doc || !schema) return <div className="p-10 text-center"><Spinner /></div>
@@ -169,6 +184,7 @@ export function MappingStudio() {
           {dirty && <Badge tone="warn">unsaved edits</Badge>}
         </div>
         <div className="ml-auto flex items-center gap-2">
+          <button className={cn('btn btn-sm', view === 'relationships' && 'bg-signal-soft text-signal border-signal/30')} onClick={() => setView(view === 'relationships' ? 'fields' : 'relationships')}><Network size={13} /> Relationships</button>
           <button className={cn('btn btn-sm', showRaw && 'bg-signal-soft text-signal border-signal/30')} onClick={() => { setRawText(JSON.stringify(doc, null, 2)); setShowRaw(true) }}><Braces size={13} /> JSON</button>
           <button className="btn btn-sm" onClick={() => { setRightTab('diagnosis'); diagnose.mutate() }}><Stethoscope size={13} /> Diagnose</button>
           {dirty && <button className="btn btn-sm btn-primary" disabled={save.isPending} onClick={() => save.mutate()}><Save size={13} /> Save as new version</button>}
@@ -186,11 +202,15 @@ export function MappingStudio() {
 
       {/* policy strip */}
       <div className="px-5 py-2 border-b border-line bg-surface-2/60 text-[12.5px] flex items-center gap-4 shrink-0 overflow-x-auto">
+        <RiskLevel level={mv.policy.risk_level} factors={mv.policy.risk_factors} />
         <span className={cn('font-medium', mv.policy.decision === 'auto_approve' ? 'text-ok' : mv.policy.decision === 'block' ? 'text-bad' : 'text-warn')}>{mv.policy.decision?.replace('_', ' ')}</span>
+        {mv.policy.risk_level === 'high' && mv.policy.risk_factors?.map((r) => <span key={r} className="text-bad whitespace-nowrap">• {r}</span>)}
+        {mv.policy.impact?.affected_records !== undefined && !mv.policy.impact.high && <span className="text-ink-2 whitespace-nowrap tnum">• {fmtInt(mv.policy.impact.affected_records)} of {fmtInt(mv.policy.impact.of_records)} records change vs the approved mapping</span>}
         {mv.policy.reasons.map((r, i) => <span key={i} className="text-ink-2 whitespace-nowrap">• {r}</span>)}
         {mv.open_questions.length > 0 && <span className="text-warn whitespace-nowrap">• {mv.open_questions.length} open question{mv.open_questions.length > 1 ? 's' : ''}</span>}
       </div>
 
+      {view === 'relationships' ? <RelationshipMap roundId={roundId} doc={doc} schemaFields={schema.fields ?? []} locked={locked} onChange={update} /> : (
       <div className="flex-1 min-h-0 grid grid-cols-[240px_minmax(0,1fr)_380px]">
         {/* LEFT: sources */}
         <aside className="border-r border-line overflow-auto bg-surface">
@@ -212,10 +232,11 @@ export function MappingStudio() {
                 {open && (
                   <ul className="pb-2">
                     {cols.map((c) => (
-                      <li key={c} className={cn('flex items-center gap-2 px-4 py-1 text-[12.5px]', used.has(c) ? 'text-ink' : 'text-muted')}>
+                      <li key={c} draggable={!locked} onDragStart={(e) => { e.dataTransfer.setData(DRAG_TYPE, JSON.stringify({ source: s.id, column: c })); e.dataTransfer.effectAllowed = 'copy' }} onDragEnd={() => setDropOn(null)}
+                        className={cn('flex items-center gap-2 px-4 py-1 text-[12.5px]', !locked && 'cursor-grab active:cursor-grabbing hover:bg-surface-2', used.has(c) ? 'text-ink' : 'text-muted')}>
                         <span className={cn('w-1.5 h-1.5 rounded-full shrink-0', used.has(c) ? 'bg-signal' : 'bg-line-2')} />
                         <span className="truncate">{c}</span>
-                        {selected && !locked && <button className="ml-auto btn btn-ghost btn-sm text-signal" onClick={() => { const { coll } = getMapping(selected); const leaf = exprLeaf(getMapping(selected).fm?.expr); setFieldExpr(selected, coll, buildExpr({ ...leaf, op: leaf.op === 'const' ? 'col' : leaf.op, col: c, source: s.id === (coll ? doc.collections.find((x) => x.target === coll)?.source : doc.record.root_source) ? null : s.id })) }}>use</button>}
+                        {selected && !locked && <button className="ml-auto btn btn-ghost btn-sm text-signal" onClick={() => pointAt(selected, s.id, c)}>use</button>}
                       </li>
                     ))}
                     {!cols.length && <li className="px-4 py-1 text-[12px] text-muted">columns unavailable (profile missing)</li>}
@@ -224,7 +245,7 @@ export function MappingStudio() {
               </div>
             )
           })}
-          <div className="p-4 text-[11.5px] text-muted leading-relaxed">Select a target field on the right, then click <span className="text-signal">use</span> on a column to point it there.</div>
+          <div className="p-4 text-[11.5px] text-muted leading-relaxed">Drag a column onto a target field — or select a field, then click <span className="text-signal">use</span> on a column. <span className="text-signal">Relationships</span> shows how the tables connect.</div>
         </aside>
 
         {/* CENTER: target fields */}
@@ -254,7 +275,10 @@ export function MappingStudio() {
                       const { fm, coll: c } = getMapping(f.pointer)
                       const isSel = selected === f.pointer
                       return (
-                        <li key={f.pointer} className={cn('px-5 border-b border-line/70 last:border-0', isSel ? 'bg-signal-soft/50' : 'hover:bg-surface-2/50')}>
+                        <li key={f.pointer} className={cn('px-5 border-b border-line/70 last:border-0', dropOn === f.pointer ? 'bg-signal-soft ring-2 ring-inset ring-signal' : isSel ? 'bg-signal-soft/50' : 'hover:bg-surface-2/50')}
+                          onDragOver={(e) => { if (locked || !e.dataTransfer.types.includes(DRAG_TYPE)) return; e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; if (dropOn !== f.pointer) setDropOn(f.pointer) }}
+                          onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDropOn((p) => (p === f.pointer ? null : p)) }}
+                          onDrop={(e) => { e.preventDefault(); setDropOn(null); const raw = e.dataTransfer.getData(DRAG_TYPE); if (!raw) return; const v = JSON.parse(raw) as { source: string; column: string }; pointAt(f.pointer, v.source, v.column); setSelected(f.pointer) }}>
                           <button className="w-full grid grid-cols-[minmax(140px,180px)_minmax(0,1fr)_104px_56px] items-center gap-3 py-2 text-left" onClick={() => setSelected(isSel ? null : f.pointer)}>
                             <span className="flex items-center gap-2 min-w-0"><RiskDot risk={f.risk} /><span className={cn('mono truncate', !fm && 'text-muted')}>{f.pointer.replace(/^\/[^/]+\/\*\//, '').replace(/^\//, '')}</span>{f.required && <span className="text-[10px] text-muted">req</span>}</span>
                             <span className={cn('truncate text-[12.5px]', fm ? 'text-ink' : 'text-muted italic')}>{fm ? describeExpr(fm.expr) : 'not mapped'}</span>
@@ -322,6 +346,7 @@ export function MappingStudio() {
           </div>
         </aside>
       </div>
+      )}
 
       <Modal open={showRaw} onClose={() => setShowRaw(false)} title="Mapping document (JSON)" width="max-w-4xl" footer={<><button className="btn" onClick={() => setShowRaw(false)}>Close</button>{!locked && <button className="btn btn-primary" onClick={() => { try { const d = JSON.parse(rawText) as MappingDocument; setDoc(d); setDirty(true); setShowRaw(false) } catch (e) { toast.push({ kind: 'bad', title: 'Invalid JSON', detail: (e as Error).message }) } }}>Apply</button>}</>}>
         <textarea className="input mono h-[60vh] py-2 resize-none" value={rawText} onChange={(e) => setRawText(e.target.value)} spellCheck={false} />

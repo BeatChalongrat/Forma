@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 from forma.ai.agents import PROMPT_VERSION, AgentResult, adaptation_agent, mapping_agent, schema_agent
 from forma.ai.heuristics import HeuristicProposal, propose_mapping
 from forma.ai.llm import LLMError
+from forma.ai.policy import PolicyDecision
 from forma.core.errors import Conflict, NotFound, PolicyBlocked, ValidationFailed
 from forma.core.ids import new_id
 from forma.db.models import ImportRound, LLMCall, MappingVersion, ReviewTask, SourceFile
@@ -121,6 +122,15 @@ def simulate(
         return None, problems
     engine = TransformEngine(schema)
     return engine.run(mapping, bindings, limit=limit), []
+
+
+def _risk(decision: PolicyDecision) -> dict[str, Any]:
+    """What the review queue shows next to a task: low / medium / high and why (ADR-019)."""
+    return {
+        "risk_level": decision.risk_level,
+        "risk_factors": decision.risk_factors,
+        "impact": decision.impact,
+    }
 
 
 def _sandbox(
@@ -328,6 +338,7 @@ def propose_for_round(
                 reasons=decision.reasons,
                 details={
                     "decision": decision.decision,
+                    **_risk(decision),
                     "open_questions": open_questions,
                     "findings": findings[:50],
                 },
@@ -567,7 +578,7 @@ def save_mapping_edit(
             kind="mapping",
             priority=decision.priority,
             reasons=["edited by " + actor, *decision.reasons],
-            details={"decision": decision.decision, "findings": findings[:50]},
+            details={"decision": decision.decision, **_risk(decision), "findings": findings[:50]},
         )
     )
     audit(session, "mapping.edit", "mapping", mv.id, actor=actor, parent=parent.id)

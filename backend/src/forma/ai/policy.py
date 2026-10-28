@@ -19,6 +19,9 @@ class PolicyDecision:
     reasons: list[str] = field(default_factory=list)
     risk_score: float = 0.0
     checks: dict[str, Any] = field(default_factory=dict)
+    risk_level: str = "medium"  # low | medium | high — what a reviewer should expect (ADR-019)
+    risk_factors: list[str] = field(default_factory=list)
+    impact: dict[str, Any] = field(default_factory=dict)  # records this mapping changes vs the approved one
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -26,6 +29,9 @@ class PolicyDecision:
             "priority": self.priority,
             "reasons": self.reasons,
             "risk_score": round(self.risk_score, 3),
+            "risk_level": self.risk_level,
+            "risk_factors": self.risk_factors,
+            "impact": self.impact,
             "checks": self.checks,
         }
 
@@ -52,7 +58,8 @@ DEFAULT_POLICY: dict[str, Any] = {
             "warnings": 2,
             "sandbox_failed": 60,
             "sandbox_changed_values": 25,
-        }
+        },
+        "high_impact_ratio": 0.2,  # share of records a new mapping changes that makes it high risk
     },
     "block": {"on_unrelated_file": True, "on_missing_identity": True, "on_zero_rows": True},
     "risk_overrides": {},
@@ -102,6 +109,7 @@ def validate_policy(policy: dict[str, Any]) -> list[str]:
     allowed = set(DRIFT_KINDS) - {"unrelated_file"}  # a wrong file is never auto-approved
     if not isinstance(drift, list) or not set(drift) <= allowed:
         problems.append(f"auto_approve.allowed_drift must be a subset of {sorted(allowed)}")
+    number("review.high_impact_ratio", p["review"].get("high_impact_ratio"), 0, 1)
     weights = p["review"].get("priority_weights", {})
     known = set(DEFAULT_POLICY["review"]["priority_weights"]) | {f"drift_{k}" for k in DRIFT_KINDS}
     for k, v in weights.items():
@@ -163,6 +171,79 @@ class PolicyEngine:
         return schema.risk_of(pointer)
 
     def evaluate(
+        self,
+        mapping: MappingDocument,
+        schema: TargetSchema,
+        *,
+        findings: list[dict[str, Any]],
+        rows_out: int,
+        drift: str | None = None,
+        has_previous_approval: bool = False,
+        row_change_ratio: float | None = None,
+        reused_approved: bool = False,
+        other_customer: dict[str, Any] | None = None,
+        llm_fallback: bool = False,
+        sandbox: dict[str, Any] | None = None,
+    ) -> PolicyDecision:
+        d = self._decide(
+            mapping,
+            schema,
+            findings=findings,
+            rows_out=rows_out,
+            drift=drift,
+            has_previous_approval=has_previous_approval,
+            row_change_ratio=row_change_ratio,
+            reused_approved=reused_approved,
+            other_customer=other_customer,
+            llm_fallback=llm_fallback,
+            sandbox=sandbox,
+        )
+        self._classify(d, findings=findings, rows_out=rows_out, drift=drift, sandbox=sandbox)
+        return d
+
+    def _classify(
+        self,
+        d: PolicyDecision,
+        *,
+        findings: list[dict[str, Any]],
+        rows_out: int,
+        drift: str | None,
+        sandbox: dict[str, Any] | None,
+    ) -> None:
+        """Low = safe to automate, medium = a human looks, high = a human must decide (ADR-019)."""
+        delta = (sandbox or {}).get("delta") or {}
+        affected = (
+            int(delta.get("changed_records", 0)) + int(delta.get("lost", 0)) + int(delta.get("gained", 0))
+        )
+        ratio = affected / rows_out if rows_out and delta else None
+        high_impact = ratio is not None and ratio >= float(self.policy["review"]["high_impact_ratio"])
+        if delta:
+            d.impact = {
+                "affected_records": affected,
+                "of_records": rows_out,
+                "ratio": round(ratio, 4) if ratio is not None else None,
+                "changed_prices": int(delta.get("changed_prices", 0)),
+                "high": high_impact,  # also listed as a risk factor
+            }
+        factors: list[str] = []
+        if d.decision == "block":
+            factors.append("blocked by policy")
+        if d.checks.get("low_confidence_critical"):
+            factors.append("ambiguous critical field (price, discount, identity …)")
+        if d.checks.get("errors"):
+            factors.append("validation or engine errors")
+        if any(f.get("kind") == "join" for f in findings) or any(
+            f.get("kind") == "dedupe" and "duplicate" in str(f.get("message", "")) for f in findings
+        ):
+            factors.append("join cardinality / duplicate keys")
+        if drift in ("columns_removed", "sheets_removed", "types_changed", "unrelated_file"):
+            factors.append(f"format change: {drift}")
+        if high_impact:
+            factors.append(f"{affected} of {rows_out} records ({ratio:.0%}) change vs the approved mapping")
+        d.risk_factors = factors
+        d.risk_level = "high" if factors else "low" if d.decision == "auto_approve" else "medium"
+
+    def _decide(
         self,
         mapping: MappingDocument,
         schema: TargetSchema,
