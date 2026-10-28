@@ -33,6 +33,7 @@ def pg_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Path]:
     monkeypatch.setenv("FORMA_DATA_DIR", str(tmp_path / "data"))
     monkeypatch.setenv("FORMA_LLM_PROVIDER", "mock")
     monkeypatch.setenv("FORMA_ENV", "prod")
+    monkeypatch.setenv("FORMA_AUTH_ALLOW_DEV_IN_PROD", "true")  # the API flow runs without an IdP
     from tests.conftest import clear_forma_caches
 
     clear_forma_caches()

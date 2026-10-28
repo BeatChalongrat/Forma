@@ -67,7 +67,9 @@ dir and relative paths inside an installed image; public pre-sign endpoint).
 
 1. **Real IdP**: run `FORMA_AUTH=oidc` against the organisation's Keycloak/Entra tenant; add the redirect
    URI `https://<host>/auth/callback`; map groups to `importer/reviewer/approver/admin`; verify
-   `GET /api/me` shows the right `effective_roles`; then remove `FORMA_AUTH=dev` from production env.
+   `GET /api/me` shows the right `effective_roles`. The API already refuses `FORMA_AUTH=dev` with
+   `FORMA_ENV=prod`; a local smoke test of the prod stack without an IdP needs
+   `FORMA_AUTH_ALLOW_DEV_IN_PROD=true`, which must never reach a real deployment.
 2. **Real files into eval**: drop anonymised customer exports + expected JSON into `data/eval/<customer>/`
    and extend `forma eval` to iterate them (same report shape), then raise `data/eval_baseline.json`.
 3. **Real target contract**: replace `target_schema/product.v1.json`, run `GET /api/schemas/product/diff/…`,
@@ -93,6 +95,8 @@ dir and relative paths inside an installed image; public pre-sign endpoint).
   pre-signed download; เจอบั๊ก 2 จุดจากการรันจริงและแก้แล้ว
 * ถ้า LLM ล่ม ระบบใช้ heuristic แทนและ policy ส่งเข้า review เสมอ ไม่ auto-approve
 * ยังไม่ได้ทดสอบ OIDC กับ IdP จริง (ทดสอบด้วย token RSA ที่สร้างเอง) — ขั้นตอนถัดไปข้อ 1
+* API ไม่ยอมเริ่มทำงานถ้า `FORMA_ENV=prod` แต่ยังใช้ `FORMA_AUTH=dev` (ทุกคำขอจะเป็น admin โดยไม่ต้องล็อกอิน);
+  ถ้าจะ smoke test stack production ในเครื่องโดยไม่มี IdP ให้ตั้ง `FORMA_AUTH_ALLOW_DEV_IN_PROD=true` ชั่วคราวเท่านั้น
 * ควร pin dependency (`uv lock`) ก่อน build production ครั้งแรก
 * เอกสาร: ADR-010…016, PERFORMANCE.md, RUNBOOK.md, ROADMAP_STATUS.md อัปเดตแล้ว
 * Dev loop เดิมยังใช้ได้เหมือนเดิม: SQLite + local disk + ไม่ต้องล็อกอิน ไม่ต้องมี service เพิ่ม

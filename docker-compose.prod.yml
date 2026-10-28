@@ -2,6 +2,8 @@
 #   cp .env.production.example .env.production   # fill in secrets
 #   docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build --scale worker=4
 #   docker compose -f docker-compose.prod.yml --profile otel up -d   # with the OpenTelemetry collector
+# Auth: set FORMA_AUTH=oidc (+ issuer, client id) in .env.production — the api refuses FORMA_AUTH=dev in
+# prod; FORMA_AUTH_ALLOW_DEV_IN_PROD=true is for a local smoke test of this stack only (ADR-013).
 x-forma-env: &forma-env
   env_file: .env.production
   environment:

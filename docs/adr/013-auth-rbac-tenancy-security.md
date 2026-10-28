@@ -8,7 +8,10 @@
    `X-Forma-User` header (fallback `operator`) with roles from the seeded dev users or `X-Forma-Roles`;
    `FORMA_AUTH=oidc` validates bearer JWTs (PyJWT + JWKS from the issuer's discovery document; issuer,
    audience, expiry, signature). Services only ever see a `Principal` (subject, roles, optional customer
-   set); nothing below the API layer knows about tokens.
+   set); nothing below the API layer knows about tokens. Dev mode answers a header-less request as an
+   admin, so with `FORMA_ENV=prod` the API refuses to start on `FORMA_AUTH=dev` (`ensure_auth_is_safe` in
+   `create_app`); `FORMA_AUTH_ALLOW_DEV_IN_PROD=true` exists for a local smoke test of the prod stack only
+   and is logged as a warning at startup.
 2. **Four hierarchical roles.** `importer` (upload, run) ⊂ `reviewer` (approve/reject mappings and data,
    edit, copilot) ⊂ `approver` (publish/export, persistent overrides, schema changes) ⊂ `admin` (policy,
    customers, retention, ops). Enforced in exactly one dependency, `require_role(role)`; roles come from

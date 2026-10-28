@@ -6,12 +6,14 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Any
 
+import structlog
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
 
 from forma import __version__
 from forma.api.routes import api
+from forma.auth import ensure_auth_is_safe
 from forma.core import metrics, telemetry
 from forma.core.errors import FormaError
 from forma.core.ids import new_id
@@ -26,6 +28,8 @@ from forma.jobs import runner
 async def lifespan(app_: FastAPI) -> AsyncIterator[None]:
     s = get_settings()
     configure_logging(s.log_level, s.log_format)
+    if s.is_prod and s.auth == "dev":
+        structlog.get_logger().warning("auth.dev_in_prod", detail="FORMA_AUTH_ALLOW_DEV_IN_PROD is set")
     init_db()
     if telemetry.configure(s.otel_endpoint, s.otel_service_name):
         telemetry.instrument_app(app_)
@@ -36,6 +40,7 @@ async def lifespan(app_: FastAPI) -> AsyncIterator[None]:
 
 def create_app() -> FastAPI:
     s = get_settings()
+    ensure_auth_is_safe(s)  # refuse to serve before anything listens
     app = FastAPI(
         title="FORMA API",
         version=__version__,
@@ -64,8 +69,6 @@ def create_app() -> FastAPI:
     async def _request_id(request: Request, call_next: Any) -> Any:
         """Request id in, request id out, bound to the structlog context and propagated to jobs."""
         import time
-
-        import structlog
 
         rid = request.headers.get("x-request-id") or new_id("req")
         request.state.request_id = rid
