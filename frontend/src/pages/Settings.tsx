@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowDown, ArrowUp, Bot, Check, FileJson, KeyRound, Plus, RotateCcw, Save, Star, Trash2, Upload, Wifi } from 'lucide-react'
 import { api, ApiError, type AISettings, type AiProbe, type BackupKey, type Policy, type SchemaPreview } from '../lib/api'
@@ -6,15 +7,18 @@ import { PageHeader, Section, Badge, RiskDot, Tabs, Json, KV, Modal, Spinner } f
 import { cn, fmtDate } from '../lib/utils'
 import { useToast } from '../lib/toast'
 
-type Tab = 'ai' | 'formats' | 'policy' | 'dsl' | 'audit' | 'system'
+const TABS = ['ai', 'formats', 'policy', 'dsl', 'audit', 'system'] as const
+type Tab = (typeof TABS)[number]
 
 /** Admins change AI, the approval policy and target formats here — validated, audited, applied without a restart. */
 export function SettingsPage() {
-  const [tab, setTab] = useState<Tab>('ai')
+  const [params, setParams] = useSearchParams()
+  const tab: Tab = (TABS as readonly string[]).includes(params.get('tab') ?? '') ? (params.get('tab') as Tab) : 'ai'
+  const setTab = (t: Tab) => setParams({ tab: t }, { replace: true })
   return (
     <>
-      <PageHeader title="Settings" subtitle="AI provider, target formats and the approval policy — edited here, checked before saving, recorded in the audit log, applied without a restart." />
-      <Tabs value={tab} onChange={setTab} items={[{ id: 'ai', label: 'AI' }, { id: 'formats', label: 'Target formats' }, { id: 'policy', label: 'Approval policy' }, { id: 'dsl', label: 'Mapping DSL' }, { id: 'audit', label: 'Audit log' }, { id: 'system', label: 'System' }]} />
+      <PageHeader title="Settings" subtitle="AI provider, target formats and the approval policy — edited here, checked before saving, recorded in the audit log, applied without a restart." hint="ตั้งค่า AI (key หลัก/สำรอง, model) · Target format ที่ระบบปลายทางต้องการ · กฎว่าเมื่อไรระบบ approve เองได้" />
+      <Tabs value={tab} onChange={setTab} items={[{ id: 'ai', label: 'AI', hint: 'เชื่อม AI, key สำรอง, เลือก model' }, { id: 'formats', label: 'Target formats', hint: 'อัป Target JSON และตั้งค่าเริ่มต้น' }, { id: 'policy', label: 'Approval policy', hint: 'เกณฑ์ approve อัตโนมัติ และเกณฑ์ความผิดปกติ' }, { id: 'dsl', label: 'Mapping DSL', hint: 'รายการคำสั่งแปลงข้อมูลที่ใช้ได้' }, { id: 'audit', label: 'Audit log', hint: 'ใครทำอะไร เมื่อไร' }, { id: 'system', label: 'System', hint: 'การตั้งค่าเครื่อง server' }]} />
       <div className="mt-4">
         {tab === 'ai' && <AITab />}
         {tab === 'formats' && <FormatsTab />}

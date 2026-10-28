@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Check, X, Save, Stethoscope, ChevronDown, ChevronRight, Braces, Plus, Trash2, Wand2, ShieldAlert, Network } from 'lucide-react'
 import { api, type SandboxItem, type SandboxReport, type Expr, type FieldChange, type FieldMapping, type FieldSpec, type MappingDocument, type TableProfile } from '../lib/api'
 import { cn, describeExpr, fmtInt, pyRegex } from '../lib/utils'
-import { Badge, Confidence, RiskDot, RiskLevel, Spinner, StatusBadge, Tabs, FindingRow, Modal } from '../components/ui'
+import { Badge, Confidence, HelpStrip, RiskDot, RiskLevel, Spinner, StatusBadge, Tabs, FindingRow, Modal } from '../components/ui'
 import { useToast } from '../lib/toast'
 import { RelationshipMap } from './RelationshipMap'
 
@@ -47,6 +47,9 @@ function buildExpr(leaf: { col?: string; source?: string | null; op: string; par
   return { op, args: [col], params: leaf.params }
 }
 
+const STUDIO_TABS = ['json', 'source', 'findings', 'diagnosis', 'compare', 'changes'] as const
+type StudioTab = (typeof STUDIO_TABS)[number]
+
 export function MappingStudio() {
   const { roundId = '', mappingId = '' } = useParams()
   const qc = useQueryClient()
@@ -59,22 +62,23 @@ export function MappingStudio() {
   const [dirty, setDirty] = useState(false)
   const [selected, setSelected] = useState<string | null>(null) // target pointer being edited
   const [selectedSource, setSelectedSource] = useState<string | null>(null)
-  const [rightTab, setRightTab] = useState<'json' | 'source' | 'findings' | 'diagnosis' | 'compare' | 'changes'>('json')
+  const [params] = useSearchParams() // ?tab= and ?view= open a tool directly (links from the round page, the guide, Ctrl+K)
+  const [rightTab, setRightTab] = useState<StudioTab>(() => (STUDIO_TABS as readonly string[]).includes(params.get('tab') ?? '') ? (params.get('tab') as StudioTab) : 'json')
   const [showRaw, setShowRaw] = useState(false)
   const [rawText, setRawText] = useState('')
   const [comment, setComment] = useState('')
   const [reject, setReject] = useState(false)
   const [overrideOpen, setOverrideOpen] = useState(false)
-  const [view, setView] = useState<'fields' | 'relationships'>('fields')
+  const [view, setView] = useState<'fields' | 'relationships'>(() => (params.get('view') === 'relationships' ? 'relationships' : 'fields'))
   const [dropOn, setDropOn] = useState<string | null>(null) // target field a column is dragged over
 
   useEffect(() => {
     if (mv?.document && !doc) {
       setDoc(mv.document)
       setSelectedSource(mv.document.record.root_source)
-      if (mv.policy.field_review?.needs_decision?.length) setRightTab('changes') // a drifted format: show what needs a decision first
+      if (mv.policy.field_review?.needs_decision?.length && !params.get('tab')) setRightTab('changes') // a drifted format: show what needs a decision first
     }
-  }, [mv, doc])
+  }, [mv, doc, params])
 
   // ---- profiles of this round (columns per source) --------------------------------------------
   const tables: TableProfile[] = useMemo(() => {
@@ -190,16 +194,16 @@ export function MappingStudio() {
       <div className="h-14 px-5 border-b border-line bg-surface flex items-center gap-4 shrink-0">
         <div className="min-w-0 flex items-center gap-3">
           <Link to={`/rounds/${roundId}`} className="text-muted hover:text-ink text-[12.5px]">← {round?.customer?.code} · {round?.label}</Link>
-          <span className="font-semibold">Mapping Studio</span>
+          <span className="heading">Mapping Studio</span>
           <span className="text-muted tnum">v{mv.version}</span>
           <StatusBadge status={mv.status} />
           <Confidence value={mv.confidence} />
           {dirty && <Badge tone="warn">unsaved edits</Badge>}
         </div>
         <div className="ml-auto flex items-center gap-2">
-          <button className={cn('btn btn-sm', view === 'relationships' && 'bg-signal-soft text-signal border-signal/30')} onClick={() => setView(view === 'relationships' ? 'fields' : 'relationships')}><Network size={13} /> Relationships</button>
+          <button className={cn('btn btn-sm', view === 'relationships' && 'bg-signal-soft text-signal border-signal/30')} title="แผนภาพว่าชีต/ตารางเชื่อมกันยังไง" onClick={() => setView(view === 'relationships' ? 'fields' : 'relationships')}><Network size={13} /> {view === 'relationships' ? 'Back to fields' : 'How sheets connect'}</button>
           <button className={cn('btn btn-sm', showRaw && 'bg-signal-soft text-signal border-signal/30')} onClick={() => { setRawText(JSON.stringify(doc, null, 2)); setShowRaw(true) }}><Braces size={13} /> JSON</button>
-          <button className="btn btn-sm" onClick={() => { setRightTab('diagnosis'); diagnose.mutate() }}><Stethoscope size={13} /> Diagnose</button>
+          <button className="btn btn-sm" title="ให้ระบบหาสาเหตุของปัญหาที่พบ" onClick={() => { setRightTab('diagnosis'); diagnose.mutate() }}><Stethoscope size={13} /> Diagnose</button>
           {dirty && <button className="btn btn-sm btn-primary" disabled={save.isPending} onClick={() => save.mutate()}><Save size={13} /> Save as new version</button>}
           {!dirty && !locked && (
             <>
@@ -221,6 +225,14 @@ export function MappingStudio() {
         {mv.policy.impact?.affected_records !== undefined && !mv.policy.impact.high && <span className="text-ink-2 whitespace-nowrap tnum">• {fmtInt(mv.policy.impact.affected_records)} of {fmtInt(mv.policy.impact.of_records)} records change vs the approved mapping</span>}
         {mv.policy.reasons.map((r, i) => <span key={i} className="text-ink-2 whitespace-nowrap">• {r}</span>)}
         {mv.open_questions.length > 0 && <span className="text-warn whitespace-nowrap">• {mv.open_questions.length} open question{mv.open_questions.length > 1 ? 's' : ''}</span>}
+      </div>
+
+      <div className="px-5 py-2 border-b border-line bg-surface shrink-0">
+        <HelpStrip id="studio">
+          {view === 'relationships'
+            ? <>Each box is a table found in the files; lines are links measured on the real rows. Click a line for its numbers, drag between two columns to connect tables. <span className="text-muted">— กล่องคือตารางในไฟล์ เส้นคือการเชื่อมที่วัดจากข้อมูลจริง ลากระหว่างคอลัมน์เพื่อเชื่อมเอง</span></>
+            : <><b>Left</b>: columns found in the files · <b>Middle</b>: fields of the target format — drag a column onto a field to map it · <b>Right</b>: the JSON you will get, problems, and what changed. Approve when it looks right. <span className="text-muted">— ซ้าย: คอลัมน์ในไฟล์ · กลาง: field ปลายทาง ลากคอลัมน์มาวางเพื่อจับคู่ · ขวา: ผลลัพธ์และสิ่งที่เปลี่ยน แล้วกด Approve</span></>}
+        </HelpStrip>
       </div>
 
       {view === 'relationships' ? <RelationshipMap roundId={roundId} doc={doc} schemaFields={schema.fields ?? []} locked={locked} onChange={update} /> : (
@@ -316,7 +328,7 @@ export function MappingStudio() {
 
         {/* RIGHT: preview */}
         <aside className="border-l border-line bg-surface flex flex-col min-h-0">
-          <Tabs value={rightTab} onChange={setRightTab} items={[{ id: 'json', label: 'JSON output', count: pv?.records.length }, { id: 'source', label: 'Source rows' }, { id: 'findings', label: 'Findings', count: pv?.findings.length }, { id: 'changes', label: <span className="flex items-center gap-1">What changed{(mv.policy.field_review?.needs_decision?.length ?? 0) > 0 && <span className="w-1.5 h-1.5 rounded-full bg-warn" />}</span> }, { id: 'diagnosis', label: 'Diagnosis' }, { id: 'compare', label: <span className="flex items-center gap-1">Compare{mv.policy.sandbox?.verdict === 'fail' && <span className="w-1.5 h-1.5 rounded-full bg-bad" />}</span> }]} />
+          <Tabs value={rightTab} onChange={setRightTab} items={[{ id: 'json', label: 'Output preview', count: pv?.records.length, hint: 'ตัวอย่าง JSON ที่จะได้จากไฟล์นี้' }, { id: 'source', label: 'Source rows', hint: 'แถวต้นทางจากไฟล์' }, { id: 'findings', label: 'Problems', count: pv?.findings.length, hint: 'ปัญหาที่พบตอนลองรัน mapping' }, { id: 'changes', hint: 'field ไหนเปลี่ยนจาก mapping ที่ approve แล้ว ตรวจกับข้อมูลจริง', label: <span className="flex items-center gap-1">What changed{(mv.policy.field_review?.needs_decision?.length ?? 0) > 0 && <span className="w-1.5 h-1.5 rounded-full bg-warn" />}</span> }, { id: 'diagnosis', label: 'Diagnosis', hint: 'สาเหตุของปัญหาและวิธีแก้' }, { id: 'compare', hint: 'รันคู่กับ mapping เดิม ดูว่า record/ราคาไหนเปลี่ยน', label: <span className="flex items-center gap-1">Compare outputs{mv.policy.sandbox?.verdict === 'fail' && <span className="w-1.5 h-1.5 rounded-full bg-bad" />}</span> }]} />
           <div className="flex-1 overflow-auto p-3">
             {rightTab === 'json' && (
               <>

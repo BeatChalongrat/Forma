@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { ArrowRight, FileSpreadsheet, Play, RefreshCw, Table2 } from 'lucide-react'
+import { FileSpreadsheet, Table2 } from 'lucide-react'
 import { api, waitForJob, type SourceFile, type TableProfile } from '../lib/api'
 import { fmtBytes, fmtDate, fmtInt, cn } from '../lib/utils'
-import { PageHeader, StatusBadge, Section, Badge, Confidence, Drawer, KV, Spinner, FindingRow, Empty, RiskLevel } from '../components/ui'
+import { PageHeader, StatusBadge, Section, Badge, Confidence, Drawer, KV, Spinner, FindingRow, Empty } from '../components/ui'
+import { RoundSteps } from '../components/RoundSteps'
 import { useToast } from '../lib/toast'
 
 const driftTone = (d?: string | null) => (d === 'identical' || d === 'header_moved' ? 'ok' : d === 'unrelated_file' ? 'bad' : d ? 'warn' : 'neutral')
@@ -26,54 +27,29 @@ export function RoundPage() {
     onError: (e: Error) => toast.push({ kind: 'bad', title: 'Request failed', detail: e.message }),
   })
 
+  const doExport = useMutation({
+    mutationFn: (v: { id: string; fmt: string }) => api.exportDataset(v.id, v.fmt),
+    onSuccess: (a) => { qc.invalidateQueries(); window.open(api.downloadUrl(a.id), '_blank'); toast.push({ kind: 'ok', title: `Exported ${fmtInt(a.row_count)} records as ${a.fmt.toUpperCase()}` }) },
+    onError: (e: Error) => toast.push({ kind: 'bad', title: 'Not exported', detail: e.message }),
+  })
+
   if (isLoading || !r) return <div className="p-10 text-center text-muted"><Spinner /> </div>
   const latestMapping = r.mappings?.[0]
   const latestDataset = r.datasets?.[0]
   const drift = r.summary.drift
-  const decision = latestMapping?.policy?.decision
 
   return (
     <>
       <PageHeader
         crumbs={<><Link to="/imports" className="hover:text-ink">Imports</Link><span>/</span><Link to={`/customers/${r.customer_id}`} className="hover:text-ink">{r.customer?.code}</Link></>}
         title={<span>{r.customer?.name} <span className="text-muted font-normal">· {r.label}</span></span>}
-        subtitle={<span className="flex items-center gap-2"><StatusBadge status={r.status} />{drift && <Badge tone={driftTone(drift)}>format: {drift.replace('_', ' ')}</Badge>}<span>{fmtDate(r.created_at)}</span></span>}
-        actions={
-          <>
-            <button className="btn" disabled={runJob.isPending} onClick={() => runJob.mutate('propose')}><RefreshCw size={14} className={cn(runJob.isPending && 'animate-spin')} /> Re-propose mapping</button>
-            {latestMapping?.status === 'approved' && <button className="btn" disabled={runJob.isPending} onClick={() => runJob.mutate('transform')}><Play size={14} /> Transform</button>}
-            {!latestMapping && <button className="btn btn-primary" disabled={runJob.isPending} onClick={() => runJob.mutate('run')}><Play size={14} /> Run pipeline</button>}
-          </>
-        }
+        subtitle={<span className="flex items-center gap-2 flex-wrap"><StatusBadge status={r.status} />{drift && <Badge tone={driftTone(drift)}>format: {drift.replace('_', ' ')}</Badge>}<span className="text-muted">{fmtDate(r.created_at)}</span></span>}
+        hint="รอบนี้อยู่ขั้นไหน และต้องทำอะไรต่อ ดูที่แถบด้านล่าง"
       />
 
-      {/* Decision strip */}
-      {latestMapping && (
-        <div className={cn('card p-4 mb-4 flex items-start gap-4 border-l-4', decision === 'auto_approve' ? 'border-l-ok' : decision === 'block' ? 'border-l-bad' : 'border-l-warn')}>
-          <div className="flex-1 min-w-0">
-            <div className="font-medium">
-              <span className="mr-2 align-middle"><RiskLevel level={latestMapping.policy.risk_level} factors={latestMapping.policy.risk_factors} /></span>
-              {decision === 'auto_approve' && 'Approved automatically — the structure matched an approved format and all policy checks passed.'}
-              {decision === 'review' && 'Needs a decision — policy routed this mapping to review.'}
-              {decision === 'block' && 'Blocked — this file does not look like it belongs to this customer, or produced no data.'}
-              {latestMapping.status === 'approved' && latestMapping.approved_by && latestMapping.approved_by !== 'policy' && ` Approved by ${latestMapping.approved_by}.`}
-            </div>
-            <ul className="text-[12.5px] text-ink-2 mt-1.5 flex flex-wrap gap-x-4 gap-y-0.5">
-              {latestMapping.policy.reasons.map((x, i) => <li key={i}>• {x}</li>)}
-            </ul>
-            {latestMapping.policy.risk_level === 'high' && latestMapping.policy.risk_factors?.length ? <div className="text-[12.5px] text-bad mt-1">Why high risk: {latestMapping.policy.risk_factors.join(' · ')}</div> : null}
-            <div className="flex items-center gap-4 mt-2 text-[12.5px] text-muted">
-              <span>source: {latestMapping.policy.source ?? latestMapping.created_by}</span>
-              <span className="flex items-center gap-1.5">confidence <Confidence value={latestMapping.confidence} /></span>
-              {latestMapping.policy.simulation && <span className="tnum">{fmtInt(latestMapping.policy.simulation.rows_out)} rows simulated · {latestMapping.policy.simulation.findings.error} errors · {latestMapping.policy.simulation.findings.warning} warnings</span>}
-              {latestMapping.policy.sandbox?.delta && <span className={cn('tnum', latestMapping.policy.sandbox.verdict === 'fail' && 'text-bad font-medium')}>vs approved v{latestMapping.policy.sandbox.baseline_version}: {latestMapping.policy.impact?.affected_records !== undefined ? `${fmtInt(latestMapping.policy.impact.affected_records)} of ${fmtInt(latestMapping.policy.impact.of_records)} records change · ` : ''}{fmtInt(latestMapping.policy.sandbox.delta.changed_prices)} prices change · {fmtInt(latestMapping.policy.sandbox.delta.lost)} records missing</span>}
-            </div>
-          </div>
-          <Link to={`/rounds/${r.id}/mapping/${latestMapping.id}`} className="btn btn-primary shrink-0">Open Mapping Studio <ArrowRight size={14} /></Link>
-        </div>
-      )}
-      {r.summary.error && <div className="card p-4 mb-4 border-l-4 border-l-bad text-bad">{r.summary.error}</div>}
+      <RoundSteps r={r} busy={runJob.isPending || doExport.isPending} onRun={(k) => runJob.mutate(k)} onExport={(id, fmt) => doExport.mutate({ id, fmt })} />
 
+      <div className="flex items-baseline gap-3 mb-3"><h2 className="heading text-[16px]">Details</h2><span className="hint-th">ไฟล์ mapping ทุกเวอร์ชัน dataset และงานเบื้องหลังของรอบนี้</span></div>
       <div className="grid lg:grid-cols-[1fr_380px] gap-4">
         <div className="flex flex-col gap-4">
           <Section title="Files">
