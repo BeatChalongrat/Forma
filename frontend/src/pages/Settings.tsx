@@ -44,6 +44,7 @@ function AITab() {
   const { data: ai } = useQuery({ queryKey: ['ai-settings'], queryFn: api.aiSettings })
   const [draft, setDraft] = useState<AIForm | null>(null)
   const [key, setKey] = useState('')
+  const [advanced, setAdvanced] = useState(false)
   const f = draft ?? (ai ? formOf(ai) : null)
   const set = (k: keyof AIForm, v: string) => f && setDraft({ ...f, [k]: v })
   const save = useMutation({
@@ -56,8 +57,12 @@ function AITab() {
   if (!ai || !f) return <div className="p-10 text-center"><Spinner /></div>
   const dirty = draft !== null || key.trim() !== ''
   return (
+    <div className="flex flex-col gap-4">
+      <ConnectCard ai={ai} />
+      <div><button className="btn btn-ghost btn-sm" onClick={() => setAdvanced(!advanced)}>{advanced ? 'Hide' : 'Show'} advanced settings — provider, model, gateway URL, timeout</button></div>
+      {advanced && (
     <div className="grid lg:grid-cols-[1fr_340px] gap-4">
-      <Section title="AI provider" actions={ai.offline ? <Badge tone="warn">offline · deterministic mapper only</Badge> : <Badge tone="ok"><Bot size={12} /> {ai.active_provider} · {ai.model}</Badge>}>
+      <Section title="Advanced settings" actions={ai.offline ? <Badge tone="warn">offline · deterministic mapper only</Badge> : <Badge tone="ok"><Bot size={12} /> {ai.active_provider} · {ai.model}</Badge>}>
         <div className="p-4 grid sm:grid-cols-2 gap-4 text-[13px]">
           <label className="flex flex-col gap-1.5"><span className="text-muted">Provider</span>
             <select className="input" value={f.provider} onChange={(e) => set('provider', e.target.value)}>{ai.providers.map((p) => <option key={p} value={p}>{p === 'mock' ? 'off (mock)' : p}</option>)}</select>
@@ -86,6 +91,58 @@ function AITab() {
         {ai.updated_at && <p className="text-muted">Last changed by {ai.updated_by} · {fmtDate(ai.updated_at)}</p>}
       </div></Section>
     </div>
+      )}
+    </div>
+  )
+}
+
+
+/** Paste a key, press Connect: the provider is recognised, a model chosen, the key tried and saved encrypted. */
+function ConnectCard({ ai }: { ai: AISettings }) {
+  const qc = useQueryClient()
+  const toast = useToast()
+  const [key, setKey] = useState('')
+  const [provider, setProvider] = useState('')
+  const [replacing, setReplacing] = useState(false)
+  const k = key.trim()
+  const detected = k.startsWith('sk-ant-') ? 'anthropic' : k.startsWith('sk-') ? 'openai' : null
+  const connect = useMutation({
+    mutationFn: () => api.connectAi(key, detected ? undefined : provider || undefined),
+    onSuccess: (r) => { setKey(''); setReplacing(false); qc.invalidateQueries(); toast.push({ kind: 'ok', title: 'AI connected', detail: `${r.ai.active_provider} · ${r.ai.model} · answered in ${r.test.latency_ms} ms` }) },
+  })
+  const disconnect = useMutation({
+    mutationFn: () => api.saveAiSettings({ api_key: '', provider: null, model: null }),
+    onSuccess: () => { qc.invalidateQueries(); toast.push({ kind: 'ok', title: 'AI disconnected', detail: 'FORMA keeps mapping with its deterministic mapper.' }) },
+  })
+  if (!ai.offline && !replacing) {
+    return (
+      <Section title="AI">
+        <div className="p-4 flex flex-wrap items-center gap-3 text-[13px]">
+          <Badge tone="ok"><Check size={12} /> Connected</Badge>
+          <span className="text-ink-2">{ai.active_provider} · <span className="mono">{ai.model}</span>{ai.api_key_hint && <> · key {ai.api_key_hint}</>}</span>
+          <div className="ml-auto flex gap-2">
+            <button className="btn btn-sm" onClick={() => setReplacing(true)}><KeyRound size={13} /> Replace key</button>
+            {ai.api_key_source === 'ui' && <button className="btn btn-sm btn-ghost" disabled={disconnect.isPending} onClick={() => disconnect.mutate()}>Disconnect</button>}
+          </div>
+        </div>
+      </Section>
+    )
+  }
+  return (
+    <Section title="Connect AI" actions={!replacing ? <Badge tone="warn">offline · deterministic mapper only</Badge> : undefined}>
+      <div className="p-4 flex flex-col gap-3 text-[13px]">
+        <p className="text-ink-2">Paste your API key and press Connect. OpenAI (<span className="mono">sk-…</span>) and Anthropic (<span className="mono">sk-ant-…</span>) keys are recognised automatically; FORMA picks the model, tries the key with one tiny call and saves it encrypted — nothing else to fill in.</p>
+        <div className="flex flex-wrap items-center gap-2">
+          <input className="input mono flex-1 min-w-[280px]" type="password" autoComplete="off" autoFocus value={key} onChange={(e) => setKey(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && k && (detected || provider)) connect.mutate() }} placeholder="Paste API key here" />
+          {k && (detected
+            ? <Badge tone="signal">{detected === 'anthropic' ? 'Anthropic' : 'OpenAI'} key</Badge>
+            : <select className="input w-52" value={provider} onChange={(e) => setProvider(e.target.value)}><option value="">Which provider is this?</option><option value="openai">OpenAI</option><option value="anthropic">Anthropic</option><option value="openai_compatible">Gateway (set its URL under advanced)</option></select>)}
+          <button className="btn btn-primary" disabled={!k || connect.isPending || (!detected && !provider)} onClick={() => connect.mutate()}><Wifi size={14} /> {connect.isPending ? 'Checking the key…' : 'Connect'}</button>
+          {replacing && <button className="btn" onClick={() => { setReplacing(false); setKey('') }}>Cancel</button>}
+        </div>
+        {connect.error && <div className="rounded-[var(--radius-md)] bg-bad-soft text-bad px-3 py-2 text-[12.5px]">{connect.error.message}</div>}
+      </div>
+    </Section>
   )
 }
 

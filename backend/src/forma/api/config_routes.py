@@ -7,15 +7,13 @@ within ``FORMA_CONFIG_REFRESH_S``.
 
 from __future__ import annotations
 
-import time
 from typing import Any
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
-from forma.ai.llm import LLMClient, LLMError
 from forma.api.routes import ctx_dep
-from forma.api.schemas import AISettingsIn, DefaultFormatIn, PolicyIn, SchemaIn
+from forma.api.schemas import AISettingsIn, ConnectAIIn, DefaultFormatIn, PolicyIn, SchemaIn
 from forma.auth import Principal, current_principal, llm_rate_limited, require_role
 from forma.db.models import LLMCall
 from forma.db.session import get_session
@@ -52,6 +50,22 @@ def put_ai(
     return cfg.ai_view(session, ctx.settings)
 
 
+@router.post("/settings/ai/connect")
+def connect_ai(
+    body: ConnectAIIn,
+    session: Session = Depends(get_session),
+    ctx: ServiceContext = Depends(ctx_dep),
+    p: Principal = Depends(require_role("admin")),
+    _rl: Principal = Depends(llm_rate_limited),
+) -> dict[str, Any]:
+    """Paste a key and go: the provider is recognised from the key, a model is chosen, the key is tried
+    with one tiny call, and it is saved (encrypted) only when that call works."""
+    result = cfg.connect_ai(session, ctx.settings, body.api_key, p.actor, body.provider)
+    session.commit()
+    ctx.refresh()
+    return {"test": result, "ai": cfg.ai_view(session, ctx.settings)}
+
+
 @router.post("/settings/ai/test")
 def test_ai(
     session: Session = Depends(get_session),
@@ -59,44 +73,22 @@ def test_ai(
     p: Principal = Depends(require_role("admin")),
     _rl: Principal = Depends(llm_rate_limited),
 ) -> dict[str, Any]:
-    """One tiny structured call with the saved settings; the tokens go to the LLM ledger."""
+    """One tiny call with the saved settings; the tokens go to the LLM ledger."""
     ctx.refresh()
-    client: LLMClient = ctx.llm
-    if client.is_mock:
-        return {
-            "ok": False,
-            "offline": True,
-            "message": "AI is offline: choose a provider and save an API key",
-        }
-    t0 = time.perf_counter()
-    try:
-        res = client.structured(
-            system="You are a connectivity check. Reply with JSON only.",
-            user='Return {"ok": true}.',
-            schema={"type": "object", "properties": {"ok": {"type": "boolean"}}, "required": ["ok"]},
+    result = cfg.probe(ctx.llm)
+    if result.get("usage"):
+        session.add(
+            LLMCall(
+                agent="settings.test",
+                model=ctx.llm.model,
+                prompt_version="settings",
+                input_tokens=result["usage"]["input_tokens"],
+                output_tokens=result["usage"]["output_tokens"],
+                cost_usd=result["usage"]["cost_usd"],
+                latency_ms=result["latency_ms"],
+            )
         )
-    except (LLMError, Exception) as e:  # any provider/transport failure is the answer, not a 500
-        return {"ok": False, "offline": False, "message": str(e)[:300], "model": client.model}
-    session.add(
-        LLMCall(
-            agent="settings.test",
-            model=res.usage.model or client.model,
-            prompt_version="settings",
-            input_tokens=res.usage.input_tokens,
-            output_tokens=res.usage.output_tokens,
-            cost_usd=res.usage.cost_usd,
-            latency_ms=res.usage.latency_ms,
-            attempts=res.attempts,
-        )
-    )
-    return {
-        "ok": bool(res.data.get("ok")),
-        "offline": False,
-        "message": "connected",
-        "model": client.model,
-        "provider": client.provider.name,
-        "latency_ms": round((time.perf_counter() - t0) * 1000, 1),
-    }
+    return result
 
 
 # --------------------------------------------------------------------------------------------

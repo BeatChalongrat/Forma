@@ -200,6 +200,7 @@ export const api = {
   setDefaultFormat: (target_schema: string) => put<{ target_schema: string }>('/api/settings/default-format', { target_schema }),
   aiSettings: () => get<AISettings>('/api/settings/ai'),
   saveAiSettings: (b: AISettingsPatch) => put<AISettings>('/api/settings/ai', b),
+  connectAi: (api_key: string, provider?: string) => post<{ test: { ok: boolean; message: string; model?: string; provider?: string; latency_ms?: number }; ai: AISettings }>('/api/settings/ai/connect', { api_key, ...(provider ? { provider } : {}) }),
   testAi: () => post<{ ok: boolean; offline: boolean; message: string; model?: string; provider?: string; latency_ms?: number }>('/api/settings/ai/test'),
   policySettings: () => get<PolicyView>('/api/settings/policy'),
   savePolicy: (policy: Policy) => put<PolicyView>('/api/settings/policy', { policy }),

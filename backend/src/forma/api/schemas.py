@@ -100,3 +100,8 @@ class PolicyIn(BaseModel):
 
 class DefaultFormatIn(BaseModel):
     target_schema: str
+
+
+class ConnectAIIn(BaseModel):
+    api_key: str
+    provider: str | None = None  # only when the key's prefix does not tell (gateways)

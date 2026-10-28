@@ -209,3 +209,38 @@ def test_customer_master_data_is_edited_in_the_app(client: TestClient) -> None:
     )
     audit = [x for x in c.get(f"/api/audit?entity_id={a['id']}").json() if x["action"] == "customer.update"]
     assert audit[-1]["details"]["before"]["code"] == "A1" and audit[-1]["details"]["after"]["code"] == "A2"
+
+
+def test_paste_a_key_and_connect(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    from forma.ai.llm import AnthropicProvider, LLMError, OpenAICompatibleProvider, Usage
+
+    def works(self: Any, **kw: Any) -> tuple[str, Any]:
+        return '{"ok": true}', Usage(9, 2, 1, 3.0, kw["model"])
+
+    def rejects(self: Any, **kw: Any) -> tuple[str, Any]:
+        raise LLMError("anthropic HTTP 401: invalid x-api-key")
+
+    c = client
+    url = "/api/settings/ai/connect"
+    assert c.post(url, json={"api_key": "sk-ant-x"}, headers=REVIEWER).status_code == 403
+    unknown = c.post(url, json={"api_key": "gw-123456789"})
+    assert unknown.status_code == 422 and unknown.json()["details"]["needs_provider"] is True
+    # a key that does not work is refused and never stored
+    monkeypatch.setattr(AnthropicProvider, "complete_json", rejects)
+    bad = c.post(url, json={"api_key": "sk-ant-wrong-0000000000"})
+    assert (
+        bad.status_code == 422 and "did not work" in bad.json()["message"] and "401" in bad.json()["message"]
+    )
+    assert c.get("/api/settings/ai").json()["api_key_set"] is False
+
+    # paste an Anthropic key (stray spaces and newline included): provider and model are chosen for you
+    monkeypatch.setattr(AnthropicProvider, "complete_json", works)
+    ok = c.post(url, json={"api_key": "  sk-ant-good-123456789abc \n"}).json()
+    assert ok["test"]["ok"] and ok["ai"]["provider"] == "anthropic" and ok["ai"]["model"] == "claude-opus-5-5"
+    assert ok["ai"]["api_key_hint"] == "…9abc" and ok["ai"]["offline"] is False
+    # an OpenAI key switches the provider and moves the model to that provider's default
+    monkeypatch.setattr(OpenAICompatibleProvider, "complete_json", works)
+    oa = c.post(url, json={"api_key": "sk-proj-openai-00000000000"}).json()
+    assert (oa["ai"]["provider"], oa["ai"]["model"]) == ("openai", "gpt-4.1-mini")
+    llm = c.get("/api/dashboard").json()["llm"]
+    assert llm["calls"] == 2 and llm["cost_usd"] > 0  # both checks are in the ledger

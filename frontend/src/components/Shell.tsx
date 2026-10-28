@@ -1,4 +1,4 @@
-import { NavLink, Outlet, useLocation } from 'react-router-dom'
+import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 import { LayoutGrid, Inbox, Users, ShieldCheck, Settings, Sun, Moon, Upload, Activity, LogOut, WifiOff } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../lib/api'
@@ -58,7 +58,7 @@ export function Shell() {
         <div className="mt-auto p-3 border-t border-line text-[12px] text-muted flex items-center justify-between gap-2">
           <div className="min-w-0">
             <div className="truncate" title={me ? `${me.name} · ${me.effective_roles.join(', ')}` : ''}>{me ? <>{me.name} <span className="text-ink-3">· {me.roles[0] ?? 'no role'}</span></> : '…'}</div>
-            <div>{dash?.llm.provider === 'mock' ? 'AI: offline mode' : `AI: ${dash?.llm.model ?? '…'}`}</div>
+            <div>{dash?.llm.provider === 'mock' ? (isAdmin ? <Link to="/settings" className="text-signal hover:underline">AI: offline — connect</Link> : 'AI: offline mode') : `AI: ${dash?.llm.model ?? '…'}`}</div>
             <div className="tnum">{dash ? `${dash.customers} customers` : ''}</div>
           </div>
           <div className="flex flex-col gap-1 shrink-0">

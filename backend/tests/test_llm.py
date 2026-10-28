@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from typing import Any
 
 import pytest
@@ -13,7 +14,6 @@ from forma.ai.llm import (
     MockProvider,
     OpenAICompatibleProvider,
     Usage,
-    _loosen,
     _parse_json,
 )
 from forma.core.settings import Settings
@@ -109,7 +109,6 @@ def test_from_settings_provider_selection() -> None:
     assert isinstance(a.provider, AnthropicProvider) and a.provider.base_url == "https://api.anthropic.com"
     # no key → offline mock
     assert LLMClient.from_settings(Settings(llm_provider="anthropic")).is_mock
-    assert _loosen({"properties": {}}) == {"properties": {}, "type": "object"}
 
 
 def test_http_providers_with_mocked_transport(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -129,12 +128,23 @@ def test_http_providers_with_mocked_transport(monkeypatch: pytest.MonkeyPatch) -
     def anthropic_handler(request: httpx.Request) -> httpx.Response:
         assert request.url.path == "/v1/messages"
         assert request.headers["x-api-key"] == "key"
+        body = json.loads(request.content)
+        # current Claude models reject forced tool use and non-default sampling: neither is sent,
+        # the schema travels in the system prompt and the JSON comes back as text
+        assert "tool_choice" not in body and "tools" not in body and "temperature" not in body
+        assert '"properties":{}' in body["system"] and body["max_tokens"] == 16000
         return httpx.Response(
             200,
             json={
-                "content": [{"type": "text", "text": "hi"}, {"type": "tool_use", "input": {"y": 2}}],
+                "content": [{"type": "thinking", "thinking": ""}, {"type": "text", "text": '{"y": 2}'}],
+                "stop_reason": "end_turn",
                 "usage": {"input_tokens": 5, "output_tokens": 1},
             },
+        )
+
+    def refusing(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200, json={"content": [], "stop_reason": "refusal", "stop_details": {"category": "cyber"}}
         )
 
     def failing(request: httpx.Request) -> httpx.Response:
@@ -157,9 +167,13 @@ def test_http_providers_with_mocked_transport(monkeypatch: pytest.MonkeyPatch) -
 
     handlers["current"] = anthropic_handler
     text, usage = AnthropicProvider("key").complete_json(
-        system="s", user="u", schema={"properties": {}}, model="claude-sonnet-4-5", temperature=0.0
+        system="s", user="u", schema={"properties": {}}, model="claude-opus-5-5", temperature=0.0
     )
-    assert text == '{"y": 2}' and usage.input_tokens == 5
+    assert text == '{"y": 2}' and usage.input_tokens == 5 and usage.cost_usd > 0
+
+    handlers["current"] = refusing
+    with pytest.raises(LLMError, match="refusal: cyber"):
+        AnthropicProvider("key").complete_json(system="s", user="u", schema={}, model="m", temperature=0.0)
 
     handlers["current"] = failing
     with pytest.raises(LLMError, match="HTTP 500"):
