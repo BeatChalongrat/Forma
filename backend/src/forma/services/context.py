@@ -39,7 +39,9 @@ class ServiceContext:
     def records_path(self, dv: DatasetVersion) -> Path:
         """Local file for a dataset version (the object itself on local storage, a cached copy on S3)."""
         if not dv.records_key:
-            raise FileNotFoundError(f"dataset version {dv.id} has no records (purged?)")
+            from forma.core.errors import NotFound
+
+            raise NotFound(f"dataset version {dv.id} has no records (purged by retention)")
         return self.storage.local_path(dv.records_key)
 
     @property

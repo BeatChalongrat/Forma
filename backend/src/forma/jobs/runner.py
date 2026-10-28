@@ -133,9 +133,18 @@ class _PoolBackend:
         return self._pool
 
     def submit(self, job_id: str) -> None:
+        from concurrent.futures.process import BrokenProcessPool
+
         with self._lock:
             self._inflight += 1
-        fut = self._ensure().submit(run_job, job_id)
+        try:
+            fut = self._ensure().submit(run_job, job_id)
+        except BrokenProcessPool:
+            # a worker process died (OOM, kill): rebuild the pool, the job row stays `running` until
+            # recover_stale() re-queues it
+            log.warning("worker pool broken; recreating", backend=self.name)
+            self._pool = None
+            fut = self._ensure().submit(run_job, job_id)
 
         def _done(_: Any) -> None:
             with self._lock:
@@ -250,6 +259,7 @@ def start() -> dict[str, Any]:
     """Worker/API start: re-queue stale ``running`` jobs and re-submit ``queued`` ones (in-memory queues
     do not survive a restart; arq's does, and a duplicate submit is harmless thanks to the claim)."""
     stale = recover_stale()
+    _start_retention_scheduler()
     resubmitted: list[str] = []
     backend = get_backend()
     if backend.name != "arq":
@@ -262,7 +272,54 @@ def start() -> dict[str, Any]:
 
 
 def stop() -> None:
+    _stop_retention_scheduler()
     reset_backend()
+
+
+# --------------------------------------------------------------------------------------------
+# Scheduled retention (ADR-015): a daemon thread per API/worker process, off unless configured
+# --------------------------------------------------------------------------------------------
+_RETENTION_STOP = threading.Event()
+_RETENTION_THREAD: threading.Thread | None = None
+
+
+def _retention_loop(interval_s: float, apply: bool) -> None:
+    from forma.services import retention
+
+    while not _RETENTION_STOP.wait(interval_s):
+        try:
+            ctx = get_context()
+            with session_scope() as s:
+                plan = retention.plan(ctx, s)
+                summary = plan["summary"]
+                if apply:
+                    summary = retention.apply(ctx, s, plan, actor="retention.scheduler")
+            log.info("retention run", apply=apply, **{k: v for k, v in summary.items() if k != "errors"})
+        except Exception as e:
+            log.error("retention run failed", error=str(e)[:300])
+
+
+def _start_retention_scheduler() -> None:
+    global _RETENTION_THREAD
+    s = get_settings()
+    if s.retention_interval_h <= 0 or _RETENTION_THREAD is not None:
+        return
+    _RETENTION_STOP.clear()
+    _RETENTION_THREAD = threading.Thread(
+        target=_retention_loop,
+        args=(s.retention_interval_h * 3600.0, s.retention_apply),
+        name="forma-retention",
+        daemon=True,
+    )
+    _RETENTION_THREAD.start()
+
+
+def _stop_retention_scheduler() -> None:
+    global _RETENTION_THREAD
+    _RETENTION_STOP.set()
+    if _RETENTION_THREAD is not None:
+        _RETENTION_THREAD.join(timeout=2)
+    _RETENTION_THREAD = None
 
 
 # --------------------------------------------------------------------------------------------

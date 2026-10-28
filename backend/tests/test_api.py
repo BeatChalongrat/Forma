@@ -15,7 +15,7 @@ from fastapi.testclient import TestClient
 FILE_NAME = "สินค้า_ตค69_C001.xlsx"
 
 
-def make_workbook(path: Path, *, rename_qty: bool = False) -> Path:
+def make_workbook(path: Path, *, rename_qty: bool = False, n_products: int = 12) -> Path:
     wb = openpyxl.Workbook()
     wb.remove(wb.active)  # type: ignore[arg-type]
     ws = wb.create_sheet("สินค้า")
@@ -23,7 +23,7 @@ def make_workbook(path: Path, *, rename_qty: bool = False) -> Path:
     ws.append([None])
     ws.append(["รหัสสินค้า", "ชื่อสินค้า", "หมวด", "ยี่ห้อ", "บาร์โค้ด", "หน่วย", "ราคาขาย (รวม VAT)", "สถานะ"])
     cats = ["อาหาร", "เครื่องดื่ม", "ของใช้"]
-    for i in range(1, 13):
+    for i in range(1, n_products + 1):
         ws.append(
             [
                 f"A{i:03d}",
@@ -39,7 +39,7 @@ def make_workbook(path: Path, *, rename_qty: bool = False) -> Path:
     ws.append(["รวม", None, None, None, None, None, "9,999.00", None])
     st = wb.create_sheet("Stock")
     st.append(["รหัสสินค้า", "คลัง", "จำนวนคงเหลือ" if rename_qty else "ยอดคงเหลือ"])
-    for i in range(1, 13):
+    for i in range(1, n_products + 1):
         st.append([f"A{i:03d}", "BKK", i * 3])
         st.append([f"A{i:03d}", "CNX", i])
     pr = wb.create_sheet("Promotions")

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import sys
 
 import structlog
 
@@ -19,6 +20,7 @@ def configure_logging(level: str = "INFO", fmt: str = "console") -> None:
             renderer,
         ],
         wrapper_class=structlog.make_filtering_bound_logger(logging.getLevelName(level)),
+        logger_factory=structlog.PrintLoggerFactory(sys.stderr),  # stdout is for CLI output
         cache_logger_on_first_use=False,
     )
 
