@@ -24,6 +24,6 @@ switch ($cmd) {
   "eval"  { Push-Location $backend; & $forma eval --corpus ../data/synthetic --report ../data/eval_report.json; Pop-Location }
   "test"  { Push-Location $backend; & $py -m pytest; Pop-Location }
   "lint"  { Push-Location $backend; & $py -m ruff check .; & $py -m mypy; Pop-Location }
-  "reset" { Remove-Item -Recurse -Force (Join-Path $root "data\forma.db*"), (Join-Path $root "data\files"), (Join-Path $root "data\datasets"), (Join-Path $root "data\exports") -ErrorAction SilentlyContinue }
+  "reset" { Remove-Item -Recurse -Force (Join-Path $root "data\forma.db*"), (Join-Path $root "data\files"), (Join-Path $root "data\datasets"), (Join-Path $root "data\exports"), (Join-Path $root "data\sandbox") -ErrorAction SilentlyContinue }
   default { Write-Host "usage: .\scripts\dev.ps1 install|api|web|worker|synth|seed|eval|eval-gate|bench|bench-short|config-example|prod-up|prod-down|test|lint|reset" }
 }
