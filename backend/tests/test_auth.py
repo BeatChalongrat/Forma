@@ -213,6 +213,29 @@ def test_oidc_mode_requires_bearer(isolated_env: Path, monkeypatch: pytest.Monke
         assert cfg["mode"] == "oidc" and cfg["issuer"].startswith("https://idp")
 
 
+def test_prod_refuses_dev_auth(isolated_env: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from tests.conftest import clear_forma_caches
+
+    from forma.api.app import create_app
+    from forma.auth import ensure_auth_is_safe
+    from forma.core.settings import Settings
+
+    # dev mode answers every header-less request as admin: never acceptable in production
+    with pytest.raises(RuntimeError, match="FORMA_AUTH=dev with FORMA_ENV=prod"):
+        ensure_auth_is_safe(Settings(env="prod", auth="dev"))
+    ensure_auth_is_safe(Settings(env="production", auth="oidc"))
+    ensure_auth_is_safe(Settings(env="dev", auth="dev"))
+    ensure_auth_is_safe(Settings(env="prod", auth="dev", auth_allow_dev_in_prod=True))  # local smoke test
+    # the app factory enforces it, so neither uvicorn nor a TestClient gets a listening app
+    monkeypatch.setenv("FORMA_ENV", "prod")
+    clear_forma_caches()
+    with pytest.raises(RuntimeError, match="FORMA_AUTH_ALLOW_DEV_IN_PROD"):
+        create_app()
+    monkeypatch.setenv("FORMA_AUTH_ALLOW_DEV_IN_PROD", "true")
+    clear_forma_caches()
+    assert create_app().title == "FORMA API"
+
+
 def test_llm_endpoint_rate_limit(isolated_env: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("FORMA_LLM_RATE_LIMIT_PER_MIN", "2")
     from tests.conftest import clear_forma_caches

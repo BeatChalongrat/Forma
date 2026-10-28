@@ -33,6 +33,16 @@ DEV_USERS: dict[str, dict[str, Any]] = {
 }
 
 
+def ensure_auth_is_safe(s: Settings) -> None:
+    """Production never runs on dev auth: every caller would be an unauthenticated admin (ADR-013)."""
+    if s.is_prod and s.auth == "dev" and not s.auth_allow_dev_in_prod:
+        raise RuntimeError(
+            "FORMA_AUTH=dev with FORMA_ENV=prod: every request would be an unauthenticated admin. "
+            "Set FORMA_AUTH=oidc with FORMA_AUTH_ISSUER and FORMA_AUTH_CLIENT_ID, or "
+            "FORMA_AUTH_ALLOW_DEV_IN_PROD=true for a local smoke test of the stack only."
+        )
+
+
 @lru_cache
 def _verifier() -> Any:
     from forma.auth.oidc import OIDCVerifier

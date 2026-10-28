@@ -88,7 +88,8 @@ curl http://localhost/ready       # db · storage · queue
 What switches on in production is configuration, not code: `FORMA_ENV=prod` (migrations mandatory),
 `FORMA_DATABASE_URL` (Postgres, JSONB), `FORMA_JOB_BACKEND=arq` + `FORMA_REDIS_URL` (workers on any
 number of nodes), `FORMA_STORAGE=s3` (S3/MinIO, pre-signed downloads), `FORMA_AUTH=oidc` (bearer tokens,
-PKCE login in the web app; roles importer/reviewer/approver/admin), `FORMA_OTEL_ENDPOINT` (traces),
+PKCE login in the web app; roles importer/reviewer/approver/admin — required: the API refuses to start on
+`FORMA_AUTH=dev` when `FORMA_ENV=prod`), `FORMA_OTEL_ENDPOINT` (traces),
 `FORMA_LOG_FORMAT=json`. `forma config show` prints the effective configuration with secrets masked.
 Operations: `docs/RUNBOOK.md` (worker crash, stuck round, wrong file published, provider outage, schema
 rollout, backup/restore), the admin **Ops** page, `/metrics` for Prometheus.

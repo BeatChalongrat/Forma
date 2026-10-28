@@ -110,6 +110,10 @@ class Settings(BaseSettings):
     auth_role_claim: str = Field(default="roles", description="Token claim holding FORMA roles.")
     auth_customers_claim: str = Field(default="customers", description="Token claim restricting customers.")
     auth_dev_default_role: str = Field(default="admin", description="Role for unknown users in dev mode.")
+    auth_allow_dev_in_prod: bool = Field(
+        default=False,
+        description="Local smoke tests of the prod stack only: let FORMA_AUTH=dev run with FORMA_ENV=prod.",
+    )
 
     # Observability
     otel_endpoint: str | None = Field(

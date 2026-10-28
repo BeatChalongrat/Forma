@@ -28,6 +28,7 @@ def test_dev_init_creates_schema_and_stamps_head(isolated_env: Path) -> None:
 
 def test_prod_refuses_without_migrations(isolated_env: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("FORMA_ENV", "prod")
+    monkeypatch.setenv("FORMA_AUTH", "oidc")  # prod never runs on dev auth (ADR-013)
     from tests.conftest import clear_forma_caches
 
     clear_forma_caches()
