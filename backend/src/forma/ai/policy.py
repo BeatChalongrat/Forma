@@ -89,6 +89,7 @@ class PolicyEngine:
         row_change_ratio: float | None = None,
         reused_approved: bool = False,
         other_customer: dict[str, Any] | None = None,
+        llm_fallback: bool = False,
     ) -> PolicyDecision:
         aa = self.policy["auto_approve"]
         w = self.policy["review"]["priority_weights"]
@@ -104,6 +105,7 @@ class PolicyEngine:
         checks["rows_out"] = rows_out
         checks["drift"] = drift
         checks["reused_approved"] = reused_approved
+        checks["llm_fallback"] = llm_fallback
 
         # ---- hard blocks
         blk = self.policy["block"]
@@ -172,6 +174,14 @@ class PolicyEngine:
             )
             priority += w["unrelated_file"] // 2
             risk += 0.3
+        if llm_fallback:
+            # The model failed, timed out or its output was rejected by the guard: the deterministic
+            # draft is in use. Never auto-approve a fallback (ADR-013 / ADR-015).
+            reasons.append(
+                "AI mapping unavailable (provider failure or rejected output); heuristic draft used"
+            )
+            priority += w["new_customer"]
+            risk += 0.2
         if aa["require_previous_approval_for_auto"] and not has_previous_approval:
             reasons.append("first time this customer/format is seen")
             priority += w["new_customer"]

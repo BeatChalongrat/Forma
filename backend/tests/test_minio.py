@@ -13,7 +13,6 @@ from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
-
 from tests.test_api import FILE_NAME, _run, _upload, make_workbook
 
 ENDPOINT = os.environ.get("FORMA_TEST_S3_ENDPOINT")
@@ -59,7 +58,9 @@ def test_full_flow_on_minio(s3_env: Path) -> None:
         ds = j["result"]["dataset_version_id"]
         # objects live in the bucket under keys, rows are read back through the cache
         keys = {o.key for o in ctx.storage.list("")}
-        assert any(k.startswith("files/") for k in keys) and any(k.startswith(f"datasets/{cust['id']}/") for k in keys)
+        assert any(k.startswith("files/") for k in keys) and any(
+            k.startswith(f"datasets/{cust['id']}/") for k in keys
+        )
         assert c.get(f"/api/datasets/{ds}/rows?limit=3").json()["total"] == 12
         grid = c.get(f"/api/rounds/{rid}/files/{files[0]['id']}/grid?rows=5").json()
         assert grid["rows"]
@@ -75,7 +76,10 @@ def test_full_flow_on_minio(s3_env: Path) -> None:
         # edits create a new version object; rollback another; nothing is mutated in place
         nv = c.post(
             f"/api/datasets/{ds}/changes",
-            json={"operations": [{"kind": "set_field", "target": "/status", "value": "inactive"}], "kind": "one_time"},
+            json={
+                "operations": [{"kind": "set_field", "target": "/status", "value": "inactive"}],
+                "kind": "one_time",
+            },
         ).json()["dataset"]
         assert nv["version"] == 2 and ctx.storage.exists(f"datasets/{cust['id']}/{nv['id']}.jsonl")
         assert ctx.storage.exists(f"datasets/{cust['id']}/{ds}.jsonl")

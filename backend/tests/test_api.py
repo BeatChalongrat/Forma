@@ -523,7 +523,9 @@ def test_ai_endpoints_with_llm(client: TestClient, isolated_env: Path) -> None:
                     },
                     "explanation_th": "ลบ",
                 },
-                {"kind": "unknown_kind", "target": "/x", "explanation_th": "?"},
+                # unknown kinds are dropped by the API; the target must still be a schema pointer or the
+                # output guard (ADR-013) rejects the whole answer
+                {"kind": "unknown_kind", "target": "/status", "explanation_th": "?"},
             ]
         }
     ]

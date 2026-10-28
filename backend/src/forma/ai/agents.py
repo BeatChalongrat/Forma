@@ -11,6 +11,7 @@ import json
 from dataclasses import dataclass, field
 from typing import Any
 
+from forma.ai import guard
 from forma.ai.heuristics import HeuristicProposal
 from forma.ai.llm import LLMClient, LLMError, Usage
 from forma.mapping_dsl.models import MappingDocument, Op
@@ -42,7 +43,43 @@ def _ops_list() -> str:
     return ", ".join(o.value for o in Op)
 
 
+def _caps() -> tuple[int, int]:
+    from forma.core.settings import get_settings
+
+    s = get_settings()
+    return s.llm_max_sample_rows, s.llm_max_sample_chars
+
+
+def _clip(v: Any, max_chars: int) -> Any:
+    """Cap every string a model sees (ADR-013): cell contents are data, and bounded data."""
+    if isinstance(v, str):
+        return v if len(v) <= max_chars else v[:max_chars] + "…"
+    if isinstance(v, dict):
+        return {k: _clip(x, max_chars) for k, x in v.items()}
+    if isinstance(v, list):
+        return [_clip(x, max_chars) for x in v]
+    return v
+
+
+def cap_samples(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    rows, chars = _caps()
+    return [_clip(r, chars) for r in records[:rows]]
+
+
+def _guarded(schema: TargetSchema | None, inner: Any = None) -> Any:
+    """Validation callback: output guard first, then the agent's own checks."""
+
+    def _v(d: dict[str, Any]) -> list[str]:
+        problems = [f"guard: {p}" for p in guard.scan(d, schema)]
+        if problems:
+            return problems
+        return list(inner(d)) if inner else []
+
+    return _v
+
+
 def _profile_digest(profile: WorkbookProfile, *, max_cols: int = 60) -> dict[str, Any]:
+    rows, chars = _caps()
     tables = []
     for i, t in enumerate(profile.tables):
         tables.append(
@@ -59,7 +96,7 @@ def _profile_digest(profile: WorkbookProfile, *, max_cols: int = 60) -> dict[str
                         "type": c.inferred_type,
                         "null_ratio": c.null_ratio,
                         "unique_ratio": c.unique_ratio,
-                        "samples": c.samples[:5],
+                        "samples": [_clip(x, chars) for x in c.samples[:rows]],
                         "hints": c.hints,
                     }
                     for c in t.columns[:max_cols]
@@ -173,7 +210,9 @@ def schema_agent(client: LLMClient, profile: WorkbookProfile, schema: TargetSche
         system=system,
         user=user,
         schema=SCHEMA_AGENT_SCHEMA,
-        validate=lambda d: [] if isinstance(d.get("tables"), list) else ["'tables' must be a list"],
+        validate=_guarded(
+            schema, lambda d: [] if isinstance(d.get("tables"), list) else ["'tables' must be a list"]
+        ),
     )
     return AgentResult("schema", res.data, res.usage, res.attempts)
 
@@ -230,9 +269,11 @@ def mapping_agent(
         return [f"{i.code} at {i.path}: {i.message}" for i in rep.issues if i.level == "error"]
 
     try:
-        res = client.structured(system=system, user=user, schema=MAPPING_AGENT_SCHEMA, validate=_validate)
+        res = client.structured(
+            system=system, user=user, schema=MAPPING_AGENT_SCHEMA, validate=_guarded(schema, _validate)
+        )
     except LLMError as e:
-        # Fall back to the deterministic draft but record the failure as a note.
+        # Fall back to the deterministic draft but record the failure as a note (policy → review).
         r = AgentResult(
             "mapping",
             {"mapping": draft.mapping.model_dump(mode="json")},
@@ -299,8 +340,8 @@ def diagnosis_agent(
         {
             "mapping": mapping.model_dump(mode="json", exclude_none=True),
             "target_fields": _field_catalogue(schema),
-            "findings": findings[:60],
-            "sample_output_records": sample_records[:5],
+            "findings": _clip(findings[:60], _caps()[1]),
+            "sample_output_records": cap_samples(sample_records),
         },
         ensure_ascii=False,
     )
@@ -316,7 +357,9 @@ def diagnosis_agent(
             return [f"{i.code}: {i.message}" for i in rep.issues if i.level == "error"]
         return []
 
-    res = client.structured(system=system, user=user, schema=DIAGNOSIS_SCHEMA, validate=_validate)
+    res = client.structured(
+        system=system, user=user, schema=DIAGNOSIS_SCHEMA, validate=_guarded(schema, _validate)
+    )
     patched = (
         MappingDocument.model_validate(res.data["patched_mapping"])
         if res.data.get("patched_mapping")
@@ -359,7 +402,9 @@ def adaptation_agent(
         return [f"{i.code}: {i.message}" for i in validate_mapping(doc, schema).issues if i.level == "error"]
 
     try:
-        res = client.structured(system=system, user=user, schema=MAPPING_AGENT_SCHEMA, validate=_validate)
+        res = client.structured(
+            system=system, user=user, schema=MAPPING_AGENT_SCHEMA, validate=_guarded(schema, _validate)
+        )
     except LLMError as e:
         return draft.mapping, AgentResult("adaptation", {}, client.total_usage, 0, [f"llm_failed: {e}"])
     doc = MappingDocument.model_validate(res.data["mapping"])
@@ -414,11 +459,11 @@ def copilot_agent(
     )
     user = json.dumps(
         {
-            "instruction": instruction,
+            "instruction": _clip(instruction, 2000),
             "target_fields": _field_catalogue(schema),
-            "sample_records": sample_records[:5],
+            "sample_records": cap_samples(sample_records),
         },
         ensure_ascii=False,
     )
-    res = client.structured(system=system, user=user, schema=COPILOT_SCHEMA)
+    res = client.structured(system=system, user=user, schema=COPILOT_SCHEMA, validate=_guarded(schema))
     return AgentResult("copilot", res.data, res.usage, res.attempts)

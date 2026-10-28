@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from typing import Any
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -12,6 +13,7 @@ from fastapi.responses import JSONResponse
 from forma import __version__
 from forma.api.routes import api
 from forma.core.errors import FormaError
+from forma.core.ids import new_id
 from forma.core.logging import configure_logging
 from forma.core.settings import get_settings
 from forma.db.session import init_db
@@ -42,9 +44,33 @@ def create_app() -> FastAPI:
         CORSMiddleware,
         allow_origins=s.cors_origins,
         allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        allow_headers=[
+            "Authorization",
+            "Content-Type",
+            "X-Forma-User",
+            "X-Forma-Roles",
+            "X-Forma-Customers",
+            "X-Request-Id",
+        ],
+        expose_headers=["X-Request-Id", "Retry-After"],
+        max_age=600,
     )
+
+    @app.middleware("http")
+    async def _request_id(request: Request, call_next: Any) -> Any:
+        """Request id in, request id out, bound to the structlog context and propagated to jobs."""
+        import structlog
+
+        rid = request.headers.get("x-request-id") or new_id("req")
+        request.state.request_id = rid
+        structlog.contextvars.bind_contextvars(request_id=rid, path=request.url.path)
+        try:
+            response = await call_next(request)
+        finally:
+            structlog.contextvars.unbind_contextvars("request_id", "path")
+        response.headers["X-Request-Id"] = rid
+        return response
 
     @app.exception_handler(FormaError)
     async def _forma_error(_: Request, exc: FormaError) -> JSONResponse:
