@@ -24,7 +24,8 @@ from forma.api.schemas import (
     SchemaIn,
     SourcePreviewIn,
 )
-from forma.core.errors import NotFound, PayloadTooLarge, ValidationFailed
+from forma.auth import Principal, current_principal, ensure_customer, llm_rate_limited, require_role
+from forma.core.errors import Forbidden, NotFound, PayloadTooLarge, ValidationFailed
 from forma.db.models import (
     ChangeSet,
     Customer,
@@ -53,12 +54,62 @@ def ctx_dep() -> ServiceContext:
     return get_context()
 
 
+def _scoped(p: Principal, q: Any, col: Any) -> Any:
+    """Tenant scoping (ADR-013): restrict a query to the principal's customers when a claim is present."""
+    return q if p.customers is None else q.where(col.in_(sorted(p.customers)))
+
+
+def _round_scoped(session: Session, p: Principal, round_id: str) -> ImportRound:
+    r = rs.get_round(session, round_id)
+    ensure_customer(p, r.customer_id)
+    return r
+
+
+def _mapping_scoped(session: Session, p: Principal, mapping_id: str) -> MappingVersion:
+    m = ms.get_mapping(session, mapping_id)
+    ensure_customer(p, m.customer_id)
+    return m
+
+
+def _dataset_scoped(session: Session, p: Principal, dataset_id: str) -> DatasetVersion:
+    d = ds.get_dataset(session, dataset_id)
+    ensure_customer(p, d.customer_id)
+    return d
+
+
+# ============================================================================================
+# Identity
+# ============================================================================================
+@api.get("/me")
+def me(p: Principal = Depends(current_principal)) -> dict[str, Any]:
+    return p.to_dict()
+
+
+@api.get("/auth/config")
+def auth_config(ctx: ServiceContext = Depends(ctx_dep)) -> dict[str, Any]:
+    """Public: what the SPA needs to log in (never secrets)."""
+    s = ctx.settings
+    if s.auth != "oidc":
+        from forma.auth.deps import DEV_USERS
+
+        return {"mode": "dev", "dev_users": sorted(DEV_USERS)}
+    return {
+        "mode": "oidc",
+        "issuer": s.auth_issuer,
+        "client_id": s.auth_client_id,
+        "audience": s.auth_audience,
+        "scopes": "openid profile email",
+    }
+
+
 # ============================================================================================
 # Customers
 # ============================================================================================
 @api.get("/customers")
-def list_customers(session: Session = Depends(get_session)) -> list[dict[str, Any]]:
-    rows = session.scalars(select(Customer).order_by(Customer.code)).all()
+def list_customers(
+    session: Session = Depends(get_session), p: Principal = Depends(current_principal)
+) -> list[dict[str, Any]]:
+    rows = session.scalars(_scoped(p, select(Customer), Customer.id).order_by(Customer.code)).all()
     counts = dict(
         session.execute(select(ImportRound.customer_id, func.count()).group_by(ImportRound.customer_id)).all()
     )
@@ -85,13 +136,18 @@ def list_customers(session: Session = Depends(get_session)) -> list[dict[str, An
 
 
 @api.post("/customers", status_code=201)
-def create_customer(body: CustomerIn, session: Session = Depends(get_session)) -> dict[str, Any]:
+def create_customer(
+    body: CustomerIn, session: Session = Depends(get_session), p: Principal = Depends(require_role("admin"))
+) -> dict[str, Any]:
     return ser.customer(rs.create_customer(session, body.code, body.name, body.erp_type, body.notes))
 
 
 @api.get("/customers/{customer_id}")
-def get_customer(customer_id: str, session: Session = Depends(get_session)) -> dict[str, Any]:
+def get_customer(
+    customer_id: str, session: Session = Depends(get_session), p: Principal = Depends(current_principal)
+) -> dict[str, Any]:
     c = rs.get_customer(session, customer_id)
+    ensure_customer(p, c.id)
     rounds = session.scalars(
         select(ImportRound).where(ImportRound.customer_id == c.id).order_by(ImportRound.created_at.desc())
     ).all()
@@ -124,8 +180,12 @@ def get_customer(customer_id: str, session: Session = Depends(get_session)) -> d
 
 @api.delete("/customers/{customer_id}/overrides/{override_id}")
 def delete_override(
-    customer_id: str, override_id: str, session: Session = Depends(get_session)
+    customer_id: str,
+    override_id: str,
+    session: Session = Depends(get_session),
+    p: Principal = Depends(require_role("approver")),
 ) -> dict[str, Any]:
+    ensure_customer(p, customer_id)
     o = session.get(Override, override_id)
     if o is None or o.customer_id != customer_id:
         raise NotFound("override not found")
@@ -143,8 +203,14 @@ def list_rounds(
     limit: int = Query(100, le=500),
     offset: int = Query(0, ge=0),
     session: Session = Depends(get_session),
+    p: Principal = Depends(current_principal),
 ) -> list[dict[str, Any]]:
-    q = select(ImportRound).order_by(ImportRound.created_at.desc()).limit(limit).offset(offset)
+    q = (
+        _scoped(p, select(ImportRound), ImportRound.customer_id)
+        .order_by(ImportRound.created_at.desc())
+        .limit(limit)
+        .offset(offset)
+    )
     if status:
         q = q.where(ImportRound.status == status)
     if customer_id:
@@ -155,13 +221,18 @@ def list_rounds(
 
 
 @api.post("/rounds", status_code=201)
-def create_round(body: RoundIn, session: Session = Depends(get_session)) -> dict[str, Any]:
+def create_round(
+    body: RoundIn, session: Session = Depends(get_session), p: Principal = Depends(require_role("importer"))
+) -> dict[str, Any]:
+    ensure_customer(p, body.customer_id)
     return ser.import_round(rs.create_round(session, body.customer_id, body.label, body.target_schema))
 
 
 @api.get("/rounds/{round_id}")
-def get_round(round_id: str, session: Session = Depends(get_session)) -> dict[str, Any]:
-    r = rs.get_round(session, round_id)
+def get_round(
+    round_id: str, session: Session = Depends(get_session), p: Principal = Depends(current_principal)
+) -> dict[str, Any]:
+    r = _round_scoped(session, p, round_id)
     c = session.get(Customer, r.customer_id)
     mappings = session.scalars(
         select(MappingVersion)
@@ -201,8 +272,9 @@ async def upload_files(
     files: list[UploadFile] = File(...),
     session: Session = Depends(get_session),
     ctx: ServiceContext = Depends(ctx_dep),
+    p: Principal = Depends(require_role("importer")),
 ) -> list[dict[str, Any]]:
-    r = rs.get_round(session, round_id)
+    r = _round_scoped(session, p, round_id)
     limit = ctx.settings.max_upload_mb * 1024 * 1024
     out = []
     for up in files:
@@ -232,8 +304,13 @@ async def upload_files(
 
 
 @api.get("/rounds/{round_id}/files/{file_id}")
-def get_file(round_id: str, file_id: str, session: Session = Depends(get_session)) -> dict[str, Any]:
-    r = rs.get_round(session, round_id)
+def get_file(
+    round_id: str,
+    file_id: str,
+    session: Session = Depends(get_session),
+    p: Principal = Depends(current_principal),
+) -> dict[str, Any]:
+    r = _round_scoped(session, p, round_id)
     f = next((x for x in r.files if x.id == file_id), None)
     if f is None:
         raise NotFound("file not found")
@@ -248,11 +325,12 @@ def file_grid(
     rows: int = Query(60, le=500),
     session: Session = Depends(get_session),
     ctx: ServiceContext = Depends(ctx_dep),
+    p: Principal = Depends(current_principal),
 ) -> dict[str, Any]:
     """Raw cells of a sheet (for the side-by-side Excel view)."""
     from forma.ingestion.readers import read_raw
 
-    r = rs.get_round(session, round_id)
+    r = _round_scoped(session, p, round_id)
     f = next((x for x in r.files if x.id == file_id), None)
     if f is None:
         raise NotFound("file not found")
@@ -262,44 +340,59 @@ def file_grid(
 
 @api.post("/rounds/{round_id}/profile")
 def profile_round(
-    round_id: str, sync: bool = False, session: Session = Depends(get_session)
+    round_id: str,
+    sync: bool = False,
+    session: Session = Depends(get_session),
+    p: Principal = Depends(require_role("importer")),
 ) -> dict[str, Any]:
-    rs.get_round(session, round_id)
+    _round_scoped(session, p, round_id)
     session.commit()
     return {"job_id": runner.enqueue("profile_round", {"round_id": round_id}, round_id=round_id, sync=sync)}
 
 
 @api.post("/rounds/{round_id}/propose")
 def propose(
-    round_id: str, body: ProposeIn | None = None, session: Session = Depends(get_session)
+    round_id: str,
+    body: ProposeIn | None = None,
+    session: Session = Depends(get_session),
+    p: Principal = Depends(require_role("importer")),
 ) -> dict[str, Any]:
     body = body or ProposeIn()
-    rs.get_round(session, round_id)
+    _round_scoped(session, p, round_id)
+    if body.use_llm:
+        llm_rate_limited(p)
     session.commit()
     return {
         "job_id": runner.enqueue(
             "propose_mapping",
-            {"round_id": round_id, "use_llm": body.use_llm, "actor": body.actor},
+            {"round_id": round_id, "use_llm": body.use_llm, "actor": p.actor},
             round_id=round_id,
             sync=body.sync,
+            request_id=p.request_id,
         )
     }
 
 
 @api.post("/rounds/{round_id}/run")
 def run_pipeline(
-    round_id: str, body: ProposeIn | None = None, session: Session = Depends(get_session)
+    round_id: str,
+    body: ProposeIn | None = None,
+    session: Session = Depends(get_session),
+    p: Principal = Depends(require_role("importer")),
 ) -> dict[str, Any]:
     """One click: profile → propose → (auto-approve) → transform."""
     body = body or ProposeIn()
-    rs.get_round(session, round_id)
+    _round_scoped(session, p, round_id)
+    if body.use_llm:
+        llm_rate_limited(p)
     session.commit()
     return {
         "job_id": runner.enqueue(
             "run_pipeline",
-            {"round_id": round_id, "use_llm": body.use_llm, "actor": body.actor},
+            {"round_id": round_id, "use_llm": body.use_llm, "actor": p.actor},
             round_id=round_id,
             sync=body.sync,
+            request_id=p.request_id,
         )
     }
 
@@ -311,13 +404,14 @@ def transform(
     actor: str = "operator",
     sync: bool = False,
     session: Session = Depends(get_session),
+    p: Principal = Depends(require_role("importer")),
 ) -> dict[str, Any]:
-    rs.get_round(session, round_id)
+    _round_scoped(session, p, round_id)
     session.commit()
     return {
         "job_id": runner.enqueue(
             "transform_round",
-            {"round_id": round_id, "mapping_version_id": mapping_version_id, "actor": actor, "force": True},
+            {"round_id": round_id, "mapping_version_id": mapping_version_id, "actor": p.actor, "force": True},
             round_id=round_id,
             sync=sync,
         )
@@ -325,17 +419,27 @@ def transform(
 
 
 @api.post("/rounds/batch-run")
-def batch_run(body: BatchRunIn, session: Session = Depends(get_session)) -> dict[str, Any]:
+def batch_run(
+    body: BatchRunIn,
+    session: Session = Depends(get_session),
+    p: Principal = Depends(require_role("importer")),
+) -> dict[str, Any]:
     """Fan out one `run_pipeline` job per round under a single batch id (300-file rounds, bulk re-runs)."""
     ids = list(dict.fromkeys(body.round_ids))
-    found = set(session.scalars(select(ImportRound.id).where(ImportRound.id.in_(ids))).all())
+    found = set(
+        session.scalars(
+            _scoped(p, select(ImportRound.id).where(ImportRound.id.in_(ids)), ImportRound.customer_id)
+        ).all()
+    )
+    if body.use_llm:
+        llm_rate_limited(p)
     missing = [i for i in ids if i not in found]
     if missing:
         raise NotFound(f"unknown rounds: {missing[:5]}")
     session.commit()
     batch_id, job_ids = runner.enqueue_batch(
         "run_pipeline",
-        [{"round_id": rid, "use_llm": body.use_llm, "actor": body.actor, "force": body.force} for rid in ids],
+        [{"round_id": rid, "use_llm": body.use_llm, "actor": p.actor, "force": body.force} for rid in ids],
         sync=body.sync,
     )
     return {"batch_id": batch_id, "job_ids": job_ids, "count": len(job_ids)}
@@ -345,26 +449,32 @@ def batch_run(body: BatchRunIn, session: Session = Depends(get_session)) -> dict
 # Mappings
 # ============================================================================================
 @api.get("/mappings/{mapping_id}")
-def get_mapping(mapping_id: str, session: Session = Depends(get_session)) -> dict[str, Any]:
-    return ser.mapping_version(ms.get_mapping(session, mapping_id))
+def get_mapping(
+    mapping_id: str, session: Session = Depends(get_session), p: Principal = Depends(current_principal)
+) -> dict[str, Any]:
+    return ser.mapping_version(_mapping_scoped(session, p, mapping_id))
 
 
 @api.post("/mappings/{mapping_id}/approve")
 def approve_mapping(
-    mapping_id: str, body: Decision, session: Session = Depends(get_session)
+    mapping_id: str,
+    body: Decision,
+    session: Session = Depends(get_session),
+    p: Principal = Depends(require_role("reviewer")),
 ) -> dict[str, Any]:
-    return ser.mapping_version(
-        ms.approve_mapping(session, mapping_id, body.actor, body.comment), document=False
-    )
+    _mapping_scoped(session, p, mapping_id)
+    return ser.mapping_version(ms.approve_mapping(session, mapping_id, p.actor, body.comment), document=False)
 
 
 @api.post("/mappings/{mapping_id}/reject")
 def reject_mapping(
-    mapping_id: str, body: Decision, session: Session = Depends(get_session)
+    mapping_id: str,
+    body: Decision,
+    session: Session = Depends(get_session),
+    p: Principal = Depends(require_role("reviewer")),
 ) -> dict[str, Any]:
-    return ser.mapping_version(
-        ms.reject_mapping(session, mapping_id, body.actor, body.comment), document=False
-    )
+    _mapping_scoped(session, p, mapping_id)
+    return ser.mapping_version(ms.reject_mapping(session, mapping_id, p.actor, body.comment), document=False)
 
 
 @api.post("/mappings/{mapping_id}/edit", status_code=201)
@@ -373,8 +483,10 @@ def edit_mapping(
     body: MappingEditIn,
     session: Session = Depends(get_session),
     ctx: ServiceContext = Depends(ctx_dep),
+    p: Principal = Depends(require_role("reviewer")),
 ) -> dict[str, Any]:
-    return ser.mapping_version(ms.save_mapping_edit(ctx, session, mapping_id, body.document, body.actor))
+    _mapping_scoped(session, p, mapping_id)
+    return ser.mapping_version(ms.save_mapping_edit(ctx, session, mapping_id, body.document, p.actor))
 
 
 @api.post("/rounds/{round_id}/mapping-preview")
@@ -383,7 +495,9 @@ def mapping_preview(
     body: MappingPreviewIn,
     session: Session = Depends(get_session),
     ctx: ServiceContext = Depends(ctx_dep),
+    p: Principal = Depends(current_principal),
 ) -> dict[str, Any]:
+    _round_scoped(session, p, round_id)
     return ms.preview_mapping(ctx, session, round_id, body.document, limit=body.limit)
 
 
@@ -393,12 +507,14 @@ def source_preview(
     body: SourcePreviewIn,
     session: Session = Depends(get_session),
     ctx: ServiceContext = Depends(ctx_dep),
+    p: Principal = Depends(current_principal),
 ) -> dict[str, Any]:
+    _round_scoped(session, p, round_id)
     return ms.source_preview(ctx, session, round_id, body.source, limit=body.limit)
 
 
 @api.get("/dsl")
-def dsl_reference() -> dict[str, Any]:
+def dsl_reference(p: Principal = Depends(current_principal)) -> dict[str, Any]:
     return {"ops": [o.value for o in Op], "json_schema": MappingDocument.json_schema_document()}
 
 
@@ -411,9 +527,10 @@ def review_queue(
     limit: int = Query(200, le=1000),
     offset: int = Query(0, ge=0),
     session: Session = Depends(get_session),
+    p: Principal = Depends(current_principal),
 ) -> list[dict[str, Any]]:
     tasks = session.scalars(
-        select(ReviewTask)
+        _scoped(p, select(ReviewTask), ReviewTask.customer_id)
         .where(ReviewTask.status == status)
         .order_by(ReviewTask.priority.desc(), ReviewTask.created_at.asc())
         .limit(limit)
@@ -448,8 +565,10 @@ def review_queue(
 # Datasets
 # ============================================================================================
 @api.get("/datasets/{dataset_id}")
-def get_dataset(dataset_id: str, session: Session = Depends(get_session)) -> dict[str, Any]:
-    d = ds.get_dataset(session, dataset_id)
+def get_dataset(
+    dataset_id: str, session: Session = Depends(get_session), p: Principal = Depends(current_principal)
+) -> dict[str, Any]:
+    d = _dataset_scoped(session, p, dataset_id)
     out = ser.dataset_version(d)
     out["change_sets"] = [
         ser.change_set(c)
@@ -480,8 +599,9 @@ def dataset_rows(
     desc: bool = False,
     session: Session = Depends(get_session),
     ctx: ServiceContext = Depends(ctx_dep),
+    p: Principal = Depends(current_principal),
 ) -> dict[str, Any]:
-    d = ds.get_dataset(session, dataset_id)
+    d = _dataset_scoped(session, p, dataset_id)
     schema = ctx.registry.get_ref(ms.get_mapping(session, d.mapping_version_id).target_schema)
     records = ds.records_of(ctx, d)
     if q:
@@ -511,7 +631,9 @@ def preview_changes(
     body: ChangesIn,
     session: Session = Depends(get_session),
     ctx: ServiceContext = Depends(ctx_dep),
+    p: Principal = Depends(require_role("reviewer")),
 ) -> dict[str, Any]:
+    _dataset_scoped(session, p, dataset_id)
     return ds.preview_changes(ctx, session, dataset_id, body.operations)
 
 
@@ -521,9 +643,13 @@ def apply_changes(
     body: ChangesIn,
     session: Session = Depends(get_session),
     ctx: ServiceContext = Depends(ctx_dep),
+    p: Principal = Depends(require_role("reviewer")),
 ) -> dict[str, Any]:
+    _dataset_scoped(session, p, dataset_id)
+    if body.kind == "persistent" and not p.has_role("approver"):
+        raise Forbidden("persistent overrides require the approver role")
     nv, cs = ds.apply_changes(
-        ctx, session, dataset_id, body.operations, kind=body.kind, actor=body.actor, note=body.note
+        ctx, session, dataset_id, body.operations, kind=body.kind, actor=p.actor, note=body.note
     )
     return {"dataset": ser.dataset_version(nv), "change_set": ser.change_set(cs)}
 
@@ -534,21 +660,31 @@ def rollback(
     body: Decision,
     session: Session = Depends(get_session),
     ctx: ServiceContext = Depends(ctx_dep),
+    p: Principal = Depends(require_role("reviewer")),
 ) -> dict[str, Any]:
-    return ser.dataset_version(ds.rollback(ctx, session, dataset_id, body.actor))
+    _dataset_scoped(session, p, dataset_id)
+    return ser.dataset_version(ds.rollback(ctx, session, dataset_id, p.actor))
 
 
 @api.post("/datasets/{dataset_id}/approve")
 def approve_dataset(
-    dataset_id: str, body: Decision, session: Session = Depends(get_session)
+    dataset_id: str,
+    body: Decision,
+    session: Session = Depends(get_session),
+    p: Principal = Depends(require_role("reviewer")),
 ) -> dict[str, Any]:
-    return ser.dataset_version(ds.approve_dataset(session, dataset_id, body.actor))
+    _dataset_scoped(session, p, dataset_id)
+    return ser.dataset_version(ds.approve_dataset(session, dataset_id, p.actor))
 
 
 @api.get("/datasets/{dataset_id}/changes-report")
 def changes_report(
-    dataset_id: str, session: Session = Depends(get_session), ctx: ServiceContext = Depends(ctx_dep)
+    dataset_id: str,
+    session: Session = Depends(get_session),
+    ctx: ServiceContext = Depends(ctx_dep),
+    p: Principal = Depends(current_principal),
 ) -> dict[str, Any]:
+    _dataset_scoped(session, p, dataset_id)
     return ds.change_report(ctx, session, dataset_id)
 
 
@@ -558,7 +694,9 @@ def lineage(
     identity: str,
     session: Session = Depends(get_session),
     ctx: ServiceContext = Depends(ctx_dep),
+    p: Principal = Depends(current_principal),
 ) -> dict[str, Any]:
+    _dataset_scoped(session, p, dataset_id)
     return ds.lineage(ctx, session, dataset_id, identity)
 
 
@@ -569,18 +707,24 @@ def export_dataset(
     actor: str = "operator",
     session: Session = Depends(get_session),
     ctx: ServiceContext = Depends(ctx_dep),
+    p: Principal = Depends(require_role("approver")),
 ) -> dict[str, Any]:
-    return ser.export_artifact(ds.export_dataset(ctx, session, dataset_id, fmt, actor))
+    _dataset_scoped(session, p, dataset_id)
+    return ser.export_artifact(ds.export_dataset(ctx, session, dataset_id, fmt, p.actor))
 
 
 @api.get("/exports/{export_id}/download")
 def download_export(
-    export_id: str, session: Session = Depends(get_session), ctx: ServiceContext = Depends(ctx_dep)
+    export_id: str,
+    session: Session = Depends(get_session),
+    ctx: ServiceContext = Depends(ctx_dep),
+    p: Principal = Depends(current_principal),
 ) -> Response:
     """Pre-signed redirect when the storage supports it (S3/MinIO), streamed proxy otherwise."""
     e = session.get(ExportArtifact, export_id)
     if e is None:
         raise NotFound("export not found")
+    ensure_customer(p, e.customer_id)
     name = e.storage_key.rsplit("/", 1)[-1]
     url = ctx.storage.url(e.storage_key, expires_s=ctx.settings.s3_presign_s, filename=name)
     if url:
@@ -598,9 +742,13 @@ def download_export(
 # ============================================================================================
 @api.post("/mappings/{mapping_id}/diagnose")
 def diagnose(
-    mapping_id: str, session: Session = Depends(get_session), ctx: ServiceContext = Depends(ctx_dep)
+    mapping_id: str,
+    session: Session = Depends(get_session),
+    ctx: ServiceContext = Depends(ctx_dep),
+    p: Principal = Depends(require_role("reviewer")),
+    _rl: Principal = Depends(llm_rate_limited),
 ) -> dict[str, Any]:
-    m = ms.get_mapping(session, mapping_id)
+    m = _mapping_scoped(session, p, mapping_id)
     schema = ctx.registry.get_ref(m.target_schema)
     doc = MappingDocument.model_validate(m.document)
     findings = ((m.policy or {}).get("simulation") or {}).get("findings", {})
@@ -681,9 +829,11 @@ def copilot(
     body: CopilotIn,
     session: Session = Depends(get_session),
     ctx: ServiceContext = Depends(ctx_dep),
+    p: Principal = Depends(require_role("reviewer")),
+    _rl: Principal = Depends(llm_rate_limited),
 ) -> dict[str, Any]:
     """Natural-language edit → planned safe operations + impact preview (nothing is applied)."""
-    d = ds.get_dataset(session, dataset_id)
+    d = _dataset_scoped(session, p, dataset_id)
     schema = ctx.registry.get_ref(ms.get_mapping(session, d.mapping_version_id).target_schema)
     records = ds.records_of(ctx, d)
     if ctx.llm.is_mock:
@@ -786,12 +936,16 @@ def _rule_based_copilot(text: str) -> list[dict[str, Any]] | None:
 # Schemas, policy, dashboard, jobs
 # ============================================================================================
 @api.get("/schemas")
-def list_schemas(ctx: ServiceContext = Depends(ctx_dep)) -> list[dict[str, Any]]:
+def list_schemas(
+    ctx: ServiceContext = Depends(ctx_dep), p: Principal = Depends(current_principal)
+) -> list[dict[str, Any]]:
     return [s.to_summary() for s in ctx.registry.list()]
 
 
 @api.get("/schemas/{ref}")
-def get_schema(ref: str, ctx: ServiceContext = Depends(ctx_dep)) -> dict[str, Any]:
+def get_schema(
+    ref: str, ctx: ServiceContext = Depends(ctx_dep), p: Principal = Depends(current_principal)
+) -> dict[str, Any]:
     s = ctx.registry.get_ref(ref)
     return {
         **s.to_summary(),
@@ -801,32 +955,49 @@ def get_schema(ref: str, ctx: ServiceContext = Depends(ctx_dep)) -> dict[str, An
 
 
 @api.post("/schemas", status_code=201)
-def register_schema(body: SchemaIn, ctx: ServiceContext = Depends(ctx_dep)) -> dict[str, Any]:
+def register_schema(
+    body: SchemaIn, ctx: ServiceContext = Depends(ctx_dep), p: Principal = Depends(require_role("approver"))
+) -> dict[str, Any]:
     s = ctx.registry.register(body.document)
     return s.to_summary()
 
 
 @api.get("/schemas/{a}/diff/{b}")
-def diff_schema(a: str, b: str, ctx: ServiceContext = Depends(ctx_dep)) -> dict[str, Any]:
+def diff_schema(
+    a: str, b: str, ctx: ServiceContext = Depends(ctx_dep), p: Principal = Depends(current_principal)
+) -> dict[str, Any]:
     return ctx.registry.diff(ctx.registry.get_ref(a), ctx.registry.get_ref(b))
 
 
 @api.get("/policy")
-def get_policy(ctx: ServiceContext = Depends(ctx_dep)) -> dict[str, Any]:
+def get_policy(
+    ctx: ServiceContext = Depends(ctx_dep), p: Principal = Depends(require_role("admin"))
+) -> dict[str, Any]:
     return ctx.policy.policy
 
 
 @api.get("/dashboard")
 def dashboard(
-    session: Session = Depends(get_session), ctx: ServiceContext = Depends(ctx_dep)
+    session: Session = Depends(get_session),
+    ctx: ServiceContext = Depends(ctx_dep),
+    p: Principal = Depends(current_principal),
 ) -> dict[str, Any]:
     by_status = dict(
-        session.execute(select(ImportRound.status, func.count()).group_by(ImportRound.status)).all()
+        session.execute(
+            _scoped(p, select(ImportRound.status, func.count()), ImportRound.customer_id).group_by(
+                ImportRound.status
+            )
+        ).all()
     )
     open_reviews = (
-        session.scalar(select(func.count()).select_from(ReviewTask).where(ReviewTask.status == "open")) or 0
+        session.scalar(
+            _scoped(p, select(func.count()).select_from(ReviewTask), ReviewTask.customer_id).where(
+                ReviewTask.status == "open"
+            )
+        )
+        or 0
     )
-    customers = session.scalar(select(func.count()).select_from(Customer)) or 0
+    customers = session.scalar(_scoped(p, select(func.count()).select_from(Customer), Customer.id)) or 0
     approved_mappings = (
         session.scalar(
             select(func.count()).select_from(MappingVersion).where(MappingVersion.status == "approved")
@@ -861,7 +1032,11 @@ def dashboard(
             func.count(), func.sum(LLMCall.cost_usd), func.sum(LLMCall.input_tokens + LLMCall.output_tokens)
         ).select_from(LLMCall)
     ).one()
-    recent = session.scalars(select(ImportRound).order_by(ImportRound.updated_at.desc()).limit(8)).all()
+    recent = session.scalars(
+        _scoped(p, select(ImportRound), ImportRound.customer_id)
+        .order_by(ImportRound.updated_at.desc())
+        .limit(8)
+    ).all()
     cmap = {c.id: c for c in session.scalars(select(Customer)).all()}
     failed_jobs = session.scalar(select(func.count()).select_from(Job).where(Job.status == "failed")) or 0
     return {
@@ -894,17 +1069,18 @@ def list_jobs(
     kind: str | None = None,
     limit: int = Query(100, le=1000),
     offset: int = Query(0, ge=0),
+    p: Principal = Depends(current_principal),
 ) -> list[dict[str, Any]]:
     return runner.list_jobs(status=status, kind=kind, limit=limit, offset=offset)
 
 
 @api.get("/jobs/stats")
-def job_stats() -> dict[str, Any]:
+def job_stats(p: Principal = Depends(current_principal)) -> dict[str, Any]:
     return runner.queue_stats()
 
 
 @api.get("/jobs/batch/{batch_id}")
-def get_batch(batch_id: str) -> dict[str, Any]:
+def get_batch(batch_id: str, p: Principal = Depends(current_principal)) -> dict[str, Any]:
     try:
         return runner.batch_status(batch_id)
     except KeyError as e:
@@ -912,7 +1088,7 @@ def get_batch(batch_id: str) -> dict[str, Any]:
 
 
 @api.get("/jobs/{job_id}")
-def get_job(job_id: str) -> dict[str, Any]:
+def get_job(job_id: str, p: Principal = Depends(current_principal)) -> dict[str, Any]:
     try:
         return runner.job_status(job_id)
     except KeyError as e:
@@ -920,7 +1096,7 @@ def get_job(job_id: str) -> dict[str, Any]:
 
 
 @api.post("/jobs/{job_id}/retry")
-def retry_job(job_id: str) -> dict[str, Any]:
+def retry_job(job_id: str, p: Principal = Depends(require_role("admin"))) -> dict[str, Any]:
     return {"job_id": runner.retry_job(job_id)}
 
 
@@ -930,6 +1106,7 @@ def audit_log(
     offset: int = Query(0, ge=0),
     entity_id: str | None = None,
     session: Session = Depends(get_session),
+    p: Principal = Depends(require_role("admin")),
 ) -> list[dict[str, Any]]:
     from forma.db.models import AuditLog
 

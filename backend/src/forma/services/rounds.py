@@ -14,9 +14,10 @@ from forma.core.errors import NotFound, ValidationFailed
 from forma.core.telemetry import span
 from forma.db.models import AuditLog, Customer, ImportRound, MappingVersion, SourceFile
 from forma.fingerprint.fingerprint import Fingerprint, compare, fingerprint_profile, merge_fingerprints
-from forma.ingestion.readers import file_kind
+from forma.ingestion.sniff import sniff_kind
 from forma.profiling.profile import WorkbookProfile, merge_profiles, profile_workbook
 from forma.services.context import ServiceContext
+from forma.storage import safe_name
 
 
 def audit(
@@ -76,7 +77,8 @@ def get_round(session: Session, round_id: str) -> ImportRound:
 def add_file(
     ctx: ServiceContext, session: Session, round_: ImportRound, name: str, data: bytes
 ) -> SourceFile:
-    kind = file_kind(Path(name))
+    kind = sniff_kind(data, name)  # bytes decide, not the extension (ADR-013)
+    name = safe_name(name)
     stored = ctx.files.put_bytes(data, name)
     dup = session.scalar(
         select(SourceFile)

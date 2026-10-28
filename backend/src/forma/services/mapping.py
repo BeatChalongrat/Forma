@@ -137,6 +137,7 @@ def propose_for_round(
     use_llm = (not ctx.llm.is_mock) if use_llm is None else use_llm
     agent_log: list[dict[str, Any]] = []
     open_questions: list[str] = []
+    llm_fallback = False
     file_fps = {f.id: f.fingerprint for f in r.files if f.fingerprint}
 
     # 1) Mapping memory: identical structure → reuse the approved mapping verbatim
@@ -186,8 +187,12 @@ def propose_for_round(
                 open_questions.extend(
                     res.data.get("open_questions", []) if isinstance(res.data, dict) else []
                 )
+                if any(n.startswith("llm_failed") for n in res.notes):
+                    llm_fallback = True
+                    source_kind = "heuristic"
             except LLMError as e:
                 agent_log.append({"agent": "llm", "error": str(e)[:500], "fallback": "heuristic"})
+                llm_fallback = True
         doc.meta.customer_id = r.customer_id
         doc.meta.target_schema = schema.ref
         doc.meta.version = (previous.version + 1) if previous else 1
@@ -230,6 +235,7 @@ def propose_for_round(
         has_previous_approval=previous is not None,
         reused_approved=(source_kind == "memory"),
         row_change_ratio=row_change_ratio,
+        llm_fallback=llm_fallback,
     )
     mv = MappingVersion(
         customer_id=r.customer_id,
