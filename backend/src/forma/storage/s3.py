@@ -25,6 +25,7 @@ class S3Storage:
         prefix: str = "",
         cache_dir: Path,
         endpoint_url: str | None = None,
+        public_endpoint_url: str | None = None,
         region: str = "us-east-1",
         access_key: str | None = None,
         secret_key: str | None = None,
@@ -35,22 +36,29 @@ class S3Storage:
         self.prefix = prefix.strip("/")
         self.cache_dir = cache_dir
         self.presign_s = presign_s
-        if client is None:
+
+        def _make(endpoint: str | None) -> Any:
             import boto3
             from botocore.config import Config
 
-            client = boto3.client(
+            return boto3.client(
                 "s3",
-                endpoint_url=endpoint_url,
+                endpoint_url=endpoint,
                 region_name=region,
                 aws_access_key_id=access_key,
                 aws_secret_access_key=secret_key,
                 config=Config(
-                    s3={"addressing_style": "path"} if endpoint_url else {},
+                    s3={"addressing_style": "path"} if endpoint else {},
                     retries={"max_attempts": 5},
                 ),
             )
-        self.client = client
+
+        self.client = client if client is not None else _make(endpoint_url)
+        # Pre-signed URLs embed the host: behind compose the API reaches MinIO as http://minio:9000 but a
+        # browser needs the published address, so signing uses a second client when configured.
+        self.public_client = (
+            _make(public_endpoint_url) if public_endpoint_url and client is None else self.client
+        )
 
     # ---- helpers --------------------------------------------------------------------------
     def _k(self, key: str) -> str:
@@ -112,7 +120,7 @@ class S3Storage:
         params: dict[str, Any] = {"Bucket": self.bucket, "Key": self._k(key)}
         if filename:
             params["ResponseContentDisposition"] = f'attachment; filename="{filename}"'
-        url = self.client.generate_presigned_url(
+        url = self.public_client.generate_presigned_url(
             "get_object", Params=params, ExpiresIn=expires_s or self.presign_s
         )
         return str(url)

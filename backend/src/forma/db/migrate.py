@@ -14,16 +14,35 @@ from forma.core.logging import get_logger
 from forma.db.models import Base
 
 log = get_logger(__name__)
-BACKEND_DIR = Path(__file__).resolve().parents[3]
 
 
 class MigrationPending(RuntimeError):
     pass
 
 
+def alembic_dir() -> Path:
+    """Where the migration scripts live: FORMA_ALEMBIC_DIR, the source checkout (backend/alembic), or
+    ./alembic next to the process (the container image copies it to the working directory)."""
+    from forma.core.settings import get_settings
+
+    s = get_settings()
+    candidates = [
+        s.resolve(s.alembic_dir) if s.alembic_dir else None,
+        Path(__file__).resolve().parents[3] / "alembic",
+        Path.cwd() / "alembic",
+    ]
+    for c in candidates:
+        if c is not None and (c / "env.py").exists():
+            return c
+    raise RuntimeError("alembic directory not found; set FORMA_ALEMBIC_DIR")
+
+
 def alembic_config(url: str | None = None) -> Config:
-    cfg = Config(str(BACKEND_DIR / "alembic.ini"))
-    cfg.set_main_option("script_location", str(BACKEND_DIR / "alembic"))
+    scripts = alembic_dir()
+    ini = scripts.parent / "alembic.ini"
+    cfg = Config(str(ini)) if ini.exists() else Config()
+    cfg.set_main_option("script_location", str(scripts))
+    cfg.set_main_option("prepend_sys_path", str(scripts.parent / "src"))
     if url:
         cfg.set_main_option("sqlalchemy.url", url.replace("%", "%%"))  # configparser escapes
     return cfg

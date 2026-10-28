@@ -30,6 +30,9 @@ class Settings(BaseSettings):
     )
     target_schema_dir: Path = Field(default=Path("../target_schema"), description="Target JSON Schema dir.")
     policies_dir: Path = Field(default=Path("../policies"), description="approval.yaml / retention.yaml dir.")
+    alembic_dir: Path | None = Field(
+        default=None, description="Migration scripts dir (auto: backend/alembic or ./alembic)."
+    )
 
     # LLM (provider-agnostic). provider: mock | openai | anthropic | openai_compatible
     llm_provider: str = Field(default="mock", description="mock | openai | openai_compatible | anthropic.")
@@ -89,6 +92,9 @@ class Settings(BaseSettings):
     s3_bucket: str = Field(default="forma", description="S3 bucket name.")
     s3_prefix: str = Field(default="", description="Key prefix inside the bucket.")
     s3_endpoint_url: str | None = Field(default=None, description="Custom endpoint (MinIO), empty for AWS.")
+    s3_public_endpoint_url: str | None = Field(
+        default=None, description="Endpoint browsers can reach, used only to pre-sign download URLs (MinIO)."
+    )
     s3_region: str = Field(default="us-east-1", description="S3 region.")
     s3_access_key: str | None = Field(default=None, description="S3 access key id (falls back to AWS chain).")
     s3_secret_key: str | None = Field(default=None, description="S3 secret key (secret).")
@@ -124,7 +130,14 @@ class Settings(BaseSettings):
         return Path(__file__).resolve().parents[4]
 
     def resolve(self, p: Path) -> Path:
-        return p if p.is_absolute() else (self.root / "backend" / p).resolve()
+        """Relative paths are relative to ``backend/`` in a source checkout; in an installed image (no
+        checkout around site-packages) they are relative to the working directory."""
+        if p.is_absolute():
+            return p
+        base = self.root / "backend"
+        if not (base / "pyproject.toml").exists():
+            base = Path.cwd()
+        return (base / p).resolve()
 
     @property
     def data_path(self) -> Path:
