@@ -14,6 +14,8 @@ export function Overview() {
   const nav = useNavigate()
   const { data: d } = useQuery({ queryKey: ['dashboard'], queryFn: api.dashboard, refetchInterval: 10000 })
   const { data: rounds } = useQuery({ queryKey: ['rounds', ''], queryFn: () => api.rounds(), refetchInterval: 10000 })
+  const { data: uploads } = useQuery({ queryKey: ['uploads'], queryFn: api.uploads, refetchInterval: 10000 })
+  const unknown = (uploads ?? []).filter((u) => u.counts.needs_customer)
   const by = (s: string[]) => (rounds ?? []).filter((r) => s.includes(r.status))
   const studio = (r: ImportRound) => (r.summary.mapping_version_id ? `/rounds/${r.id}/mapping/${r.summary.mapping_version_id}` : `/rounds/${r.id}`)
   const todos: Todo[] = [
@@ -30,8 +32,16 @@ export function Overview() {
         title="What needs you today"
         subtitle="Every delivery waiting for a person, grouped by what to do next."
         hint="งานที่รอคุณ เรียงตามขั้นตอน — กดที่รายการเพื่อไปทำต่อได้เลย"
-        actions={<Link to="/imports/new" className="btn btn-primary btn-lg"><Upload size={15} /> New import</Link>}
+        actions={<Link to="/imports/new" className="btn btn-primary btn-lg"><Upload size={15} /> Upload files</Link>}
       />
+
+      {unknown.map((u) => (
+        <Link key={u.id} to={`/uploads/${u.id}`} className="card p-4 mb-4 flex items-center gap-3 border-l-4 border-l-warn hover:bg-surface-2/60">
+          <FileWarning className="text-warn shrink-0" />
+          <span className="flex-1"><span className="heading block">{u.counts.needs_customer} file{u.counts.needs_customer === 1 ? '' : 's'} in “{u.label}” have an unknown format</span><span className="hint-th">ไม่ตรงกับ format ของลูกค้ารายไหน — เลือกลูกค้าแล้วระบบทำต่อเอง</span></span>
+          <span className="btn btn-sm">Choose customer <ArrowRight size={13} /></span>
+        </Link>
+      ))}
 
       <div className="grid sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
         {todos.map((t) => <TodoCard key={t.key} t={t} onOpen={(r) => nav(t.href(r))} />)}

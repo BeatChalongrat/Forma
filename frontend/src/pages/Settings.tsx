@@ -460,6 +460,12 @@ function PolicyTab() {
             {num('Rounds in the usual-size baseline', p.anomaly.history_rounds, (v) => edit((x) => { x.anomaly!.history_rounds = Math.round(v) }))}
             {flag('Approving data with high-severity anomalies needs an acknowledgement', p.anomaly.block_approval_on_high, (v) => edit((x) => { x.anomaly!.block_approval_on_high = v }))}
           </div></Section>}
+          {p.publish && <Section title="Automatic publishing (bulk upload)" hint="เมื่อไรระบบ approve ข้อมูลและออก JSON เองได้ โดยไม่ต้องรอคน"><div className="px-4 py-2">
+            {flag('Publish automatically when every check passes', p.publish.enabled, (v) => edit((x) => { x.publish!.enabled = v }))}
+            {num('Allowed high-severity anomalies', p.publish.max_high_anomalies, (v) => edit((x) => { x.publish!.max_high_anomalies = Math.round(v) }))}
+            {num('Allowed engine errors (duplicates, broken links)', p.publish.max_error_findings, (v) => edit((x) => { x.publish!.max_error_findings = Math.round(v) }))}
+            <div className="hint-th py-1.5">Always required: an approved mapping and every record matching the target format. ต้องมี mapping ที่ approve แล้ว และทุก record ตรง format เสมอ</div>
+          </div></Section>}
           <Section title="Risk by meaning (overrides the format)"><div className="px-4 py-2">
             {Object.entries(p.risk_overrides).map(([sem, risk]) => (
               <div key={sem} className="flex items-center gap-2 py-1"><span className="mono flex-1 truncate">{sem}</span>

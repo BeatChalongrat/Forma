@@ -14,6 +14,16 @@ class CustomerIn(BaseModel):
     notes: str | None = None
 
 
+class BatchAssignIn(BaseModel):
+    """Give files of a bulk upload that matched no format a customer: an existing one or a new one."""
+
+    item_ids: list[str] = Field(min_length=1, max_length=1000)
+    customer_id: str | None = None
+    new_customer: CustomerIn | None = None
+    use_llm: bool | None = None
+    sync: bool = False
+
+
 class RoundIn(BaseModel):
     customer_id: str
     label: str | None = None

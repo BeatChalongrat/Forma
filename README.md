@@ -60,7 +60,8 @@ make web      # terminal 2
 
 Then open http://localhost:5173 — Home lists what needs a person (grouped by the next step), the Imports list
 shows the demo rounds (including the returning-customer sequences C900–C902 that exercise memory → drift → wrong file),
-and **New import** accepts your own files. Every round page shows its five steps
+and **Upload files** takes any number of files at once: each is matched to its customer by format and comes
+out as its own JSON, published automatically when every check passes (ADR-027). Every round page shows its five steps
 (files → mapping → create data → check & approve → export) with the next action; **Feature guide** and
 **Ctrl K** find any feature by name, in English or Thai. The UI follows the aCommerce brand (Montserrat,
 navy/blue/lime), bundled so it works offline.

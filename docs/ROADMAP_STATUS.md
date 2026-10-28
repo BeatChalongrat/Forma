@@ -15,6 +15,7 @@
 | 7+ Signature features | spreadsheet editing (paste, ranges, bulk on picked rows) + override collisions; cell-level lineage with cause of change; self-healing per-field review checked on data; anomaly detection + approval gate; copilot conditions across collections + evidence-based answers | **done** | ADR-020 … ADR-024 |
 | 7+ Operability | any target format without code (semantic mapping, exact export shape), settings in the web app (AI key, policy, formats, customers) | **done** | ADR-017 |
 | 7+ AI resilience | backup AI keys tried in order (own provider, model, breaker), model picker, test every key | **done** | ADR-025 |
+| 7+ Bulk upload | many files at once, customer found by format (and file-name code), one JSON per file, policy-decided automatic publishing, zip of all JSON | **done** | ADR-027 |
 | 7+ Contract gate | records that break the target schema block approval and export; edits refused only for the errors they add | **done** | ADR-026 |
 
 ## Phase 7 — production hardening (done)

@@ -48,6 +48,11 @@ anomaly:                                 # change intelligence: what counts as u
   history_rounds: 5                      # published rounds the row-count baseline averages
   block_approval_on_high: true           # approving data with high anomalies needs an acknowledgement
 
+publish:                                 # automatic publishing of rounds that ask for it (bulk upload, ADR-027)
+  enabled: true                          # false: a person approves every dataset
+  max_high_anomalies: 0                  # more high-severity anomalies than this → a person checks the data
+  max_error_findings: 0                  # engine errors (duplicates, broken links) → a person checks
+
 risk_overrides:                          # per-semantic risk overrides (defaults come from the schema)
   "price.amount": critical
   "discount.percent": critical

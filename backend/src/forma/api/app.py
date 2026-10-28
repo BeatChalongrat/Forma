@@ -12,6 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
 
 from forma import __version__
+from forma.api.batch_routes import router as batch_router
 from forma.api.config_routes import router as config_router
 from forma.api.routes import api
 from forma.auth import ensure_auth_is_safe
@@ -116,6 +117,7 @@ def create_app() -> FastAPI:
 
     app.include_router(api)
     app.include_router(config_router)
+    app.include_router(batch_router)
     return app
 
 

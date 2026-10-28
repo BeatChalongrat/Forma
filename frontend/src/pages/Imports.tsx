@@ -11,11 +11,32 @@ import { useToast } from '../lib/toast'
 export function Imports() {
   const [status, setStatus] = useState('')
   const { data } = useQuery({ queryKey: ['rounds', status], queryFn: () => api.rounds({ status: status || undefined }), refetchInterval: 8000 })
+  const { data: uploads } = useQuery({ queryKey: ['uploads'], queryFn: api.uploads, refetchInterval: 5000 })
   const nav = useNavigate()
   const statuses: [string, string][] = [['', 'All'], ['review', 'Check mapping'], ['blocked', 'Blocked'], ['approved', 'Create data'], ['transformed', 'Check data'], ['approved_data', 'Ready to export'], ['published', 'Exported'], ['failed', 'Failed']]
   return (
     <>
-      <PageHeader title="Imports" subtitle="Every delivery from every customer, newest first." hint="ทุกไฟล์ที่ลูกค้าส่งมา คอลัมน์ Next step บอกว่าต้องทำอะไรต่อ — กดที่แถวเพื่อเปิดรอบนั้น" actions={<Link to="/imports/new" className="btn btn-primary btn-lg"><UploadCloud size={15} /> New import</Link>} />
+      <PageHeader title="Imports" subtitle="Every delivery from every customer, newest first." hint="ทุกไฟล์ที่ลูกค้าส่งมา คอลัมน์ Next step บอกว่าต้องทำอะไรต่อ — กดที่แถวเพื่อเปิดรอบนั้น" actions={<Link to="/imports/new" className="btn btn-primary btn-lg"><UploadCloud size={15} /> Upload files</Link>} />
+      {!!uploads?.length && (
+        <Section className="mb-5" title="Recent uploads" hint="การอัปโหลดหลายไฟล์ล่าสุด — กดเพื่อดูแต่ละไฟล์และดาวน์โหลด JSON">
+          <ul>
+            {uploads.slice(0, 5).map((u) => {
+              const ready = u.counts.ready ?? 0
+              const need = (u.counts.needs_customer ?? 0) + (u.counts.needs_review ?? 0) + (u.counts.needs_data_check ?? 0)
+              return (
+                <li key={u.id} className="border-b border-line last:border-0">
+                  <Link to={`/uploads/${u.id}`} className="flex items-center gap-4 px-4 py-2.5 hover:bg-surface-2/60">
+                    <span className="min-w-0 flex-1"><span className="block font-semibold text-navy truncate">{u.label}</span><span className="block text-[11.5px] text-muted">{u.total} files · {timeAgo(u.created_at)}</span></span>
+                    <span className="w-40 h-1.5 rounded-full bg-line overflow-hidden"><span className="block h-full" style={{ width: `${(ready / Math.max(1, u.total)) * 100}%`, backgroundImage: 'var(--gradient-brand)' }} /></span>
+                    <span className="text-[12px] tnum w-24 text-right"><b className="text-ok">{ready}</b> JSON ready</span>
+                    {u.stuck > 0 ? <Badge tone="bad">stuck — resume</Badge> : need > 0 ? <Badge tone="warn">{need} need you</Badge> : !u.done ? <Badge>working…</Badge> : <Badge tone="ok">done</Badge>}
+                  </Link>
+                </li>
+              )
+            })}
+          </ul>
+        </Section>
+      )}
       <div className="flex items-center gap-1.5 mb-4 flex-wrap">
         {statuses.map(([s, label]) => (
           <button key={s} onClick={() => setStatus(s)} className={cn('btn btn-sm rounded-full', status === s ? 'bg-signal-soft border-signal/40 text-navy' : 'btn-ghost text-ink-2')}>{label}</button>

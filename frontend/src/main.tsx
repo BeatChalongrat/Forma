@@ -18,6 +18,7 @@ import { DataEditor } from './pages/DataEditor'
 import { SettingsPage } from './pages/Settings'
 import { OpsPage } from './pages/Ops'
 import { GuidePage } from './pages/Guide'
+import { BulkUpload, UploadPage } from './pages/Upload'
 import { AuthCallback } from './pages/AuthCallback'
 import { ensureAuthenticated } from './lib/auth'
 
@@ -30,7 +31,9 @@ const router = createBrowserRouter([
     children: [
       { index: true, element: <Overview /> },
       { path: 'imports', element: <Imports /> },
-      { path: 'imports/new', element: <NewImport /> },
+      { path: 'imports/new', element: <BulkUpload /> },
+      { path: 'imports/new/single', element: <NewImport /> },
+      { path: 'uploads/:batchId', element: <UploadPage /> },
       { path: 'rounds/:roundId', element: <RoundPage /> },
       { path: 'rounds/:roundId/mapping/:mappingId', element: <MappingStudio /> },
       { path: 'review', element: <ReviewCenter /> },

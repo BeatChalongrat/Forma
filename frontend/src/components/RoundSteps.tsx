@@ -78,6 +78,7 @@ function CurrentStep({ r, mapping, dataset, busy, onRun, onExport }: Props & { m
     body = (
       <div className="text-ink-2">
         {fmtInt(dataset.row_count)} records are ready. Check them, fix what is wrong, then approve.
+        {r.summary.publish?.decision === 'review' && <div className="mt-1.5 text-warn font-semibold">Held for a person: {r.summary.publish.reasons.join(' · ')}</div>}
         {dataset.invalid_records > 0 && <div className="mt-1.5 text-bad font-semibold">{fmtInt(dataset.invalid_records)} record{dataset.invalid_records > 1 ? 's' : ''} do not match the target format — fix or remove them before approving.</div>}
         <div className="hint-th mt-1">เปิด Data Editor เพื่อดูสิ่งที่เปลี่ยนจากรอบก่อน ความผิดปกติ และแก้ข้อมูล แล้วกด Approve data</div>
       </div>
