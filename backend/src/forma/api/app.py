@@ -16,13 +16,17 @@ from forma.core.logging import configure_logging
 from forma.core.settings import get_settings
 from forma.db.session import init_db
 from forma.jobs import handlers as _handlers  # noqa: F401  (registers job handlers)
+from forma.jobs import runner
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
-    configure_logging()
+    s = get_settings()
+    configure_logging(s.log_level, s.log_format)
     init_db()
+    runner.start()
     yield
+    runner.stop()
 
 
 def create_app() -> FastAPI:
@@ -47,6 +51,7 @@ def create_app() -> FastAPI:
         return JSONResponse(
             status_code=exc.http_status,
             content={"error": exc.code, "message": exc.message, "details": exc.details},
+            headers=exc.headers or None,
         )
 
     @app.get("/health")

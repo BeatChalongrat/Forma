@@ -30,8 +30,10 @@ def clear_forma_caches() -> None:
     """Drop every lru_cache that pins settings / engine / context between tests."""
     from forma.core.settings import get_settings
     from forma.db.session import _factory, get_engine
+    from forma.jobs import runner
     from forma.services.context import get_context
 
+    runner.reset_backend()
     get_context.cache_clear()
     _factory.cache_clear()
     with contextlib.suppress(Exception):  # the engine may never have been created

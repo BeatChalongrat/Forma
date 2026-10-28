@@ -426,8 +426,10 @@ def render_variant(v: Variant, out_dir: Path, rng: random.Random) -> None:
         h["price"] = "price_inc_vat"
     out_dir.mkdir(parents=True, exist_ok=True)
 
+    price_index = {(x["sku"], x["price_list"]): x for x in t.prices}
+
     def price_for(sku: str, lst: str = "standard") -> float:
-        p = next(x for x in t.prices if x["sku"] == sku and x["price_list"] == lst)
+        p = price_index[(sku, lst)]
         return float(round(p["amount_ex"] * 1.07, 2) if vat else p["amount_ex"])
 
     # ---- products sheet -------------------------------------------------------------------
@@ -669,6 +671,15 @@ def expected_records(v: Variant) -> list[dict[str, Any]]:
     assert v.truth is not None
     t = v.truth
     out = []
+    prices_by: dict[str, list[dict[str, Any]]] = {}
+    for pr in t.prices:
+        prices_by.setdefault(pr["sku"], []).append(pr)
+    stock_by: dict[str, list[dict[str, Any]]] = {}
+    for st in t.stock:
+        stock_by.setdefault(st["sku"], []).append(st)
+    promos_by: dict[str, list[dict[str, Any]]] = {}
+    for pm in t.promos:
+        promos_by.setdefault(pm["sku"], []).append(pm)
     for p in t.products:
         rec: dict[str, Any] = {
             "sku": p["sku"],
@@ -686,14 +697,13 @@ def expected_records(v: Variant) -> list[dict[str, Any]]:
                     "vat_included": v.vat_inclusive,
                     "effective_from": pr["effective_from"].isoformat(),
                 }
-                for pr in t.prices
-                if pr["sku"] == p["sku"]
+                for pr in prices_by.get(p["sku"], [])
             ],
             "inventory": [
-                {"warehouse_code": s["warehouse"], "qty": s["qty"]} for s in t.stock if s["sku"] == p["sku"]
+                {"warehouse_code": s["warehouse"], "qty": s["qty"]} for s in stock_by.get(p["sku"], [])
             ],
         }
-        promos = [pr for pr in t.promos if pr["sku"] == p["sku"]]
+        promos = promos_by.get(p["sku"], [])
         if promos:
             rec["promotions"] = [
                 {
@@ -720,12 +730,14 @@ def expected_records(v: Variant) -> list[dict[str, Any]]:
 # --------------------------------------------------------------------------------------------
 # Corpus plan
 # --------------------------------------------------------------------------------------------
-def plan_corpus(seed: int, n_variants: int) -> list[Variant]:
+def plan_corpus(seed: int, n_variants: int, *, sequences: bool = True) -> list[Variant]:
+    """``n_variants`` total; the last 12 are the three returning-customer sequences unless ``sequences``
+    is off (benchmarks want N independent single-round customers)."""
     rng = _rng(seed, "plan")
     variants: list[Variant] = []
     # 1) single-round variants across archetypes
     i = 0
-    while len(variants) < max(0, n_variants - 12):
+    while len(variants) < max(0, n_variants - (12 if sequences else 0)):
         arche = ARCHETYPES[i % len(ARCHETYPES)]
         lang = (
             "th"
@@ -753,7 +765,7 @@ def plan_corpus(seed: int, n_variants: int) -> list[Variant]:
         )
         i += 1
     # 2) returning-customer sequences: r1 → r2 unchanged → r3 renamed → r4 wrong file
-    for s in range(3):
+    for s in range(3 if sequences else 0):
         arche = ["express_th", "odoo_like", "csv_vendor"][s]
         code = f"C{900 + s:03d}"
         lang = "th" if arche == "express_th" else "en"
@@ -784,18 +796,30 @@ def plan_corpus(seed: int, n_variants: int) -> list[Variant]:
 
 
 def generate_corpus(
-    out: Path, *, seed: int = 42, n_variants: int = 30, scale: str = "small"
+    out: Path,
+    *,
+    seed: int = 42,
+    n_variants: int = 30,
+    scale: str = "small",
+    rows: int | None = None,
+    sequences: bool = True,
 ) -> dict[str, Any]:
+    """``scale`` picks a row range; ``rows`` pins an exact row count (``forma bench --rows``)."""
     out.mkdir(parents=True, exist_ok=True)
-    variants = plan_corpus(seed, n_variants)
-    rows = {"small": (120, 400), "medium": (3000, 6000), "perf": (100_000, 100_000)}[scale]
+    variants = plan_corpus(seed, n_variants, sequences=sequences)
+    rows_range = {"small": (120, 400), "medium": (3000, 6000), "perf": (100_000, 100_000)}[scale]
+    rows_range = (rows, rows) if rows else rows_range
     index: list[dict[str, Any]] = []
     for v in variants:
         rng = _rng(seed, v.variant_id)
         size_rng = (
             _rng(seed, f"{v.sequence}:size") if v.sequence and v.expected_relation != "wrong_file" else rng
         )
-        n = size_rng.randrange(rows[0], rows[1] + 1) if rows[0] != rows[1] else rows[0]
+        n = (
+            size_rng.randrange(rows_range[0], rows_range[1] + 1)
+            if rows_range[0] != rows_range[1]
+            else rows_range[0]
+        )
         # same sequence shares one truth for r0..r2 (so change intelligence shows small deltas), wrong file gets a fresh truth
         truth_seed = (
             f"{v.sequence}:truth"

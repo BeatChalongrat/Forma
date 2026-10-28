@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import copy
 import datetime as dt
-import hashlib
+from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
@@ -17,7 +17,7 @@ from forma.core.errors import Conflict, NotFound, ValidationFailed
 from forma.db.models import ChangeSet, DatasetVersion, ExportArtifact, ImportRound, Override
 from forma.engine.ops import CompileContext, compile_expr
 from forma.engine.transform import TransformEngine, _get_pointer, _set_pointer
-from forma.export.exporter import FORMATS, export_file
+from forma.export.exporter import FORMATS, write_export
 from forma.mapping_dsl.models import CallExpr, ColExpr, ConstExpr, MappingDocument
 from forma.schema_registry import TargetSchema
 from forma.services.context import ServiceContext
@@ -37,13 +37,16 @@ def _write_records(path: Path, records: list[dict[str, Any]]) -> None:
     tmp.replace(path)
 
 
-def read_records(path: Path) -> list[dict[str, Any]]:
-    out: list[dict[str, Any]] = []
+def iter_records(path: Path) -> Iterator[dict[str, Any]]:
+    """Stream a JSONL dataset one record at a time (exports never materialise the dataset twice)."""
     with path.open("rb") as f:
         for line in f:
             if line.strip():
-                out.append(orjson.loads(line))
-    return out
+                yield orjson.loads(line)
+
+
+def read_records(path: Path) -> list[dict[str, Any]]:
+    return list(iter_records(path))
 
 
 def get_dataset(session: Session, dataset_id: str) -> DatasetVersion:
@@ -549,17 +552,16 @@ def export_dataset(
         raise ValidationFailed(f"format must be one of {FORMATS}")
     dv = get_dataset(session, dataset_id)
     schema = ctx.registry.get_ref(get_mapping(session, dv.mapping_version_id).target_schema)
-    records = read_records(Path(dv.records_path))
+    src = Path(dv.records_path)
     stamp = dt.datetime.now(dt.UTC).strftime("%Y%m%dT%H%M%SZ")
     dest = ctx.exports_dir / dv.customer_id / f"{dv.round_id}_{dv.id}_{stamp}.{fmt}"
-    export_file(records, fmt, schema, dest)
-    digest = hashlib.sha256(dest.read_bytes()).hexdigest()
+    _, digest, _size = write_export(lambda: iter_records(src), fmt, schema, dest)
     art = ExportArtifact(
         dataset_version_id=dv.id,
         customer_id=dv.customer_id,
         fmt=fmt,
         path=str(dest),
-        row_count=len(records),
+        row_count=dv.row_count,
         sha256=digest,
     )
     session.add(art)
@@ -568,7 +570,7 @@ def export_dataset(
     r = session.get(ImportRound, dv.round_id)
     if r:
         r.status = "published"
-    audit(session, "dataset.export", "export", dv.id, actor=actor, fmt=fmt, rows=len(records))
+    audit(session, "dataset.export", "export", dv.id, actor=actor, fmt=fmt, rows=dv.row_count)
     return art
 
 

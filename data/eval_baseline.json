@@ -1,0 +1,4157 @@
+{
+  "summary": {
+    "variants": 30,
+    "failed_variants": [],
+    "mean_identity_recall": 1.0,
+    "mean_field_accuracy": 0.9962,
+    "mean_critical_accuracy": 1.0,
+    "variants_at_99": 30,
+    "drift_checks": 9,
+    "drift_correct": 9,
+    "by_archetype": {
+      "sap_like": 0.9921,
+      "express_th": 0.9988,
+      "odoo_like": 0.9955,
+      "dynamics_like": 0.996,
+      "handmade_excel": 0.9972,
+      "crosstab_months": 0.9963,
+      "promo_heavy": 0.9989,
+      "csv_vendor": 0.9947
+    }
+  },
+  "variants": [
+    {
+      "variant": "v000_sap_like",
+      "archetype": "sap_like",
+      "perturbations": [
+        "currency_symbols",
+        "empty_columns",
+        "leading_zeros",
+        "mixed_dates",
+        "thai_digits"
+      ],
+      "files": 1,
+      "tables": 4,
+      "mapping_valid": true,
+      "mapping_confidence": 0.95,
+      "open_questions": [
+        "Pricing table 'A304': no VAT marker in headers; assumed VAT-inclusive (Thai retail convention) — confirm"
+      ],
+      "engine": {
+        "rows_in": 320,
+        "rows_out": 320,
+        "sources": {
+          "products": 320,
+          "pricing": 425,
+          "inventory": 852,
+          "promotions": 105
+        },
+        "collections": {
+          "/prices": 425,
+          "/inventory": 852,
+          "/promotions": 105
+        },
+        "duration_ms": 79.6,
+        "identity_keys": [
+          "/sku"
+        ],
+        "findings": {
+          "error": 0,
+          "warning": 0,
+          "info": 0
+        }
+      },
+      "errors": [],
+      "identity_recall": 1.0,
+      "identity_precision": 1.0,
+      "field_accuracy_by_pointer": {
+        "/sku": 1.0,
+        "/product_name": 1.0,
+        "/brand": 1.0,
+        "/barcode": 1.0,
+        "/category": 1.0,
+        "/unit/sell_unit": 1.0,
+        "/unit/pack_size": 1.0,
+        "/status": 0.9062,
+        "/currency": 1.0,
+        "/prices/0/amount": 1.0,
+        "/prices/0/vat_included": 1.0,
+        "/inventory": 0.9969,
+        "/promotions/0/type": 1.0,
+        "/promotions/0/discount_percent": 1.0,
+        "/promotions/0/start_date": 1.0,
+        "/promotions/0/end_date": 1.0
+      },
+      "field_accuracy": 0.9923,
+      "critical_accuracy": 1.0,
+      "coverage": 1.0,
+      "fingerprint": {
+        "strict": "bcfa1be133a8c96b",
+        "loose": "05afcf266cf0199d",
+        "kind": "excel",
+        "tables": [
+          {
+            "sheet": "mara",
+            "headers": [
+              "matnr",
+              "maktx",
+              "matkl",
+              "brand",
+              "ean11",
+              "meins",
+              "lvorm"
+            ],
+            "types": [
+              "string",
+              "string",
+              "string",
+              "string",
+              "int",
+              "string",
+              "string"
+            ],
+            "header_row": 0,
+            "n_rows_band": "s"
+          },
+          {
+            "sheet": "a",
+            "headers": [
+              "matnr",
+              "kschl",
+              "kbetr",
+              "datab"
+            ],
+            "types": [
+              "string",
+              "string",
+              "float",
+              "date"
+            ],
+            "header_row": 0,
+            "n_rows_band": "s"
+          },
+          {
+            "sheet": "mard",
+            "headers": [
+              "matnr",
+              "werks",
+              "labst"
+            ],
+            "types": [
+              "string",
+              "string",
+              "int"
+            ],
+            "header_row": 0,
+            "n_rows_band": "s"
+          },
+          {
+            "sheet": "promotions",
+            "headers": [
+              "sku",
+              "promo code",
+              "promo type",
+              "discount %",
+              "discount amount",
+              "promo price",
+              "buy",
+              "get",
+              "start date",
+              "end date"
+            ],
+            "types": [
+              "string",
+              "string",
+              "string",
+              "float",
+              "float",
+              "float",
+              "int",
+              "int",
+              "date",
+              "date"
+            ],
+            "header_row": 0,
+            "n_rows_band": "s"
+          }
+        ]
+      }
+    },
+    {
+      "variant": "v001_express_th",
+      "archetype": "express_th",
+      "perturbations": [
+        "duplicate_rows",
+        "nbsp",
+        "thai_digits",
+        "totals_row"
+      ],
+      "files": 1,
+      "tables": 3,
+      "mapping_valid": true,
+      "mapping_confidence": 0.977,
+      "open_questions": [],
+      "engine": {
+        "rows_in": 271,
+        "rows_out": 270,
+        "sources": {
+          "products": 271,
+          "inventory": 491,
+          "promotions": 86
+        },
+        "collections": {
+          "/prices": 270,
+          "/inventory": 491,
+          "/promotions": 86
+        },
+        "duration_ms": 53.2,
+        "identity_keys": [
+          "/sku"
+        ],
+        "findings": {
+          "error": 0,
+          "warning": 1,
+          "info": 1
+        }
+      },
+      "errors": [],
+      "identity_recall": 1.0,
+      "identity_precision": 1.0,
+      "field_accuracy_by_pointer": {
+        "/sku": 1.0,
+        "/product_name": 1.0,
+        "/brand": 1.0,
+        "/barcode": 1.0,
+        "/category": 1.0,
+        "/unit/sell_unit": 1.0,
+        "/unit/pack_size": 1.0,
+        "/status": 1.0,
+        "/currency": 1.0,
+        "/prices/0/amount": 1.0,
+        "/prices/0/vat_included": 1.0,
+        "/inventory": 0.9926,
+        "/promotions/0/type": 1.0,
+        "/promotions/0/start_date": 1.0,
+        "/promotions/0/end_date": 1.0,
+        "/promotions/0/discount_percent": 1.0
+      },
+      "field_accuracy": 0.9994,
+      "critical_accuracy": 1.0,
+      "coverage": 1.0,
+      "fingerprint": {
+        "strict": "114e91dd4826ae14",
+        "loose": "5d7e2a153780ed9d",
+        "kind": "excel",
+        "tables": [
+          {
+            "sheet": "สินค้า",
+            "headers": [
+              "รหัสสินค้า",
+              "ชื่อสินค้า",
+              "หมวดสินค้า",
+              "ยี่ห้อ",
+              "บาร์โค้ด",
+              "หน่วยนับ",
+              "ราคาขาย ไม่รวม vat",
+              "สถานะ"
+            ],
+            "types": [
+              "string",
+              "string",
+              "string",
+              "string",
+              "int",
+              "string",
+              "float",
+              "string"
+            ],
+            "header_row": 0,
+            "n_rows_band": "s"
+          },
+          {
+            "sheet": "สต็อก",
+            "headers": [
+              "รหัสสินค้า",
+              "คลัง",
+              "ยอดคงเหลือ"
+            ],
+            "types": [
+              "string",
+              "string",
+              "int"
+            ],
+            "header_row": 0,
+            "n_rows_band": "s"
+          },
+          {
+            "sheet": "โปรโมชั่น",
+            "headers": [
+              "รหัสสินค้า",
+              "รหัสโปร",
+              "ประเภทโปร",
+              "ส่วนลด %",
+              "ส่วนลด บาท",
+              "ราคาโปร",
+              "ซื้อ",
+              "แถม",
+              "เริ่ม",
+              "สิ้นสุด"
+            ],
+            "types": [
+              "string",
+              "string",
+              "string",
+              "float",
+              "float",
+              "float",
+              "int",
+              "int",
+              "date",
+              "date"
+            ],
+            "header_row": 0,
+            "n_rows_band": "xs"
+          }
+        ]
+      }
+    },
+    {
+      "variant": "v002_odoo_like",
+      "archetype": "odoo_like",
+      "perturbations": [
+        "empty_columns",
+        "multi_table_sheet"
+      ],
+      "files": 1,
+      "tables": 4,
+      "mapping_valid": true,
+      "mapping_confidence": 0.943,
+      "open_questions": [
+        "Price column 'Sales Price': no VAT marker in headers; assumed VAT-inclusive (Thai retail convention) — confirm"
+      ],
+      "engine": {
+        "rows_in": 359,
+        "rows_out": 359,
+        "sources": {
+          "products": 359,
+          "inventory": 645,
+          "promotions": 113
+        },
+        "collections": {
+          "/prices": 359,
+          "/inventory": 645,
+          "/promotions": 113
+        },
+        "duration_ms": 52.1,
+        "identity_keys": [
+          "/sku"
+        ],
+        "findings": {
+          "error": 0,
+          "warning": 0,
+          "info": 0
+        }
+      },
+      "errors": [],
+      "identity_recall": 1.0,
+      "identity_precision": 1.0,
+      "field_accuracy_by_pointer": {
+        "/sku": 1.0,
+        "/product_name": 1.0,
+        "/brand": 1.0,
+        "/barcode": 1.0,
+        "/category": 1.0,
+        "/unit/sell_unit": 1.0,
+        "/unit/pack_size": 1.0,
+        "/status": 0.9471,
+        "/currency": 1.0,
+        "/prices/0/amount": 1.0,
+        "/prices/0/vat_included": 1.0,
+        "/inventory": 0.9916,
+        "/promotions/0/type": 1.0,
+        "/promotions/0/discount_percent": 1.0,
+        "/promotions/0/start_date": 1.0,
+        "/promotions/0/end_date": 1.0
+      },
+      "field_accuracy": 0.9951,
+      "critical_accuracy": 1.0,
+      "coverage": 1.0,
+      "fingerprint": {
+        "strict": "3c4b8f8502043cc7",
+        "loose": "76e9e8ca02af0631",
+        "kind": "excel",
+        "tables": [
+          {
+            "sheet": "products",
+            "headers": [
+              "internal reference",
+              "product name",
+              "product category",
+              "brand",
+              "barcode",
+              "unit of measure",
+              "sales price",
+              "active"
+            ],
+            "types": [
+              "string",
+              "string",
+              "string",
+              "string",
+              "int",
+              "string",
+              "float",
+              "bool"
+            ],
+            "header_row": 0,
+            "n_rows_band": "s"
+          },
+          {
+            "sheet": "stock",
+            "headers": [
+              "internal reference",
+              "warehouse",
+              "quantity on hand"
+            ],
+            "types": [
+              "string",
+              "string",
+              "int"
+            ],
+            "header_row": 0,
+            "n_rows_band": "s"
+          },
+          {
+            "sheet": "promotions",
+            "headers": [
+              "sku",
+              "promo code",
+              "promo type",
+              "discount %",
+              "discount amount",
+              "promo price",
+              "buy",
+              "get",
+              "start date",
+              "end date"
+            ],
+            "types": [
+              "string",
+              "string",
+              "string",
+              "float",
+              "float",
+              "float",
+              "int",
+              "int",
+              "date",
+              "date"
+            ],
+            "header_row": 0,
+            "n_rows_band": "s"
+          }
+        ]
+      }
+    },
+    {
+      "variant": "v003_dynamics_like",
+      "archetype": "dynamics_like",
+      "perturbations": [
+        "blank_rows",
+        "hidden_sheet",
+        "leading_zeros",
+        "multi_table_sheet",
+        "title_rows"
+      ],
+      "files": 1,
+      "tables": 6,
+      "mapping_valid": true,
+      "mapping_confidence": 1.0,
+      "open_questions": [],
+      "engine": {
+        "rows_in": 215,
+        "rows_out": 215,
+        "sources": {
+          "products": 215,
+          "pricing": 264,
+          "inventory": 396,
+          "promotions": 74
+        },
+        "collections": {
+          "/prices": 264,
+          "/inventory": 396,
+          "/promotions": 74
+        },
+        "duration_ms": 53.9,
+        "identity_keys": [
+          "/sku"
+        ],
+        "findings": {
+          "error": 0,
+          "warning": 0,
+          "info": 0
+        }
+      },
+      "errors": [],
+      "identity_recall": 1.0,
+      "identity_precision": 1.0,
+      "field_accuracy_by_pointer": {
+        "/sku": 1.0,
+        "/product_name": 1.0,
+        "/brand": 1.0,
+        "/barcode": 1.0,
+        "/category": 1.0,
+        "/unit/sell_unit": 1.0,
+        "/unit/pack_size": 1.0,
+        "/status": 0.9442,
+        "/currency": 1.0,
+        "/prices/0/amount": 1.0,
+        "/prices/0/vat_included": 1.0,
+        "/inventory": 0.9907,
+        "/promotions/0/type": 1.0,
+        "/promotions/0/discount_percent": 1.0,
+        "/promotions/0/start_date": 1.0,
+        "/promotions/0/end_date": 1.0
+      },
+      "field_accuracy": 0.9948,
+      "critical_accuracy": 1.0,
+      "coverage": 1.0,
+      "fingerprint": {
+        "strict": "6e6d85a923f1cfd8",
+        "loose": "d04b7d10b9c3662b",
+        "kind": "excel",
+        "tables": [
+          {
+            "sheet": "products",
+            "headers": [
+              "item no",
+              "description",
+              "item category code",
+              "vendor",
+              "gtin",
+              "base unit of measure",
+              "blocked"
+            ],
+            "types": [
+              "string",
+              "string",
+              "string",
+              "string",
+              "int",
+              "string",
+              "bool"
+            ],
+            "header_row": 2,
+            "n_rows_band": "s"
+          },
+          {
+            "sheet": "pricing",
+            "headers": [
+              "item no",
+              "sales code",
+              "unit price excl vat",
+              "starting date"
+            ],
+            "types": [
+              "string",
+              "string",
+              "float",
+              "date"
+            ],
+            "header_row": 0,
+            "n_rows_band": "s"
+          },
+          {
+            "sheet": "stock",
+            "headers": [
+              "item no",
+              "location code",
+              "inventory"
+            ],
+            "types": [
+              "string",
+              "string",
+              "int"
+            ],
+            "header_row": 0,
+            "n_rows_band": "s"
+          },
+          {
+            "sheet": "promotions",
+            "headers": [
+              "sku",
+              "promo code",
+              "promo type",
+              "discount %",
+              "discount amount",
+              "promo price",
+              "buy",
+              "get",
+              "start date",
+              "end date"
+            ],
+            "types": [
+              "string",
+              "string",
+              "string",
+              "float",
+              "float",
+              "float",
+              "int",
+              "int",
+              "date",
+              "date"
+            ],
+            "header_row": 2,
+            "n_rows_band": "xs"
+          }
+        ]
+      }
+    },
+    {
+      "variant": "v004_handmade_excel",
+      "archetype": "handmade_excel",
+      "perturbations": [
+        "currency_symbols",
+        "mixed_dates",
+        "multi_table_sheet"
+      ],
+      "files": 1,
+      "tables": 4,
+      "mapping_valid": true,
+      "mapping_confidence": 0.9249999999999999,
+      "open_questions": [
+        "Price column 'ราคา': no VAT marker in headers; assumed VAT-inclusive (Thai retail convention) — confirm"
+      ],
+      "engine": {
+        "rows_in": 123,
+        "rows_out": 123,
+        "sources": {
+          "products": 123,
+          "inventory": 219,
+          "promotions": 43
+        },
+        "collections": {
+          "/prices": 123,
+          "/inventory": 219,
+          "/promotions": 43
+        },
+        "duration_ms": 46.3,
+        "identity_keys": [
+          "/sku"
+        ],
+        "findings": {
+          "error": 0,
+          "warning": 0,
+          "info": 0
+        }
+      },
+      "errors": [],
+      "identity_recall": 1.0,
+      "identity_precision": 1.0,
+      "field_accuracy_by_pointer": {
+        "/sku": 1.0,
+        "/product_name": 1.0,
+        "/brand": 1.0,
+        "/barcode": 1.0,
+        "/category": 1.0,
+        "/unit/sell_unit": 1.0,
+        "/unit/pack_size": 1.0,
+        "/status": 1.0,
+        "/currency": 1.0,
+        "/prices/0/amount": 1.0,
+        "/prices/0/vat_included": 1.0,
+        "/inventory": 0.9756,
+        "/promotions/0/type": 1.0,
+        "/promotions/0/discount_percent": 1.0,
+        "/promotions/0/start_date": 1.0,
+        "/promotions/0/end_date": 1.0
+      },
+      "field_accuracy": 0.9981,
+      "critical_accuracy": 1.0,
+      "coverage": 1.0,
+      "fingerprint": {
+        "strict": "d33756262c0039fa",
+        "loose": "2d2ede6388f6a60e",
+        "kind": "excel",
+        "tables": [
+          {
+            "sheet": "สินค้า",
+            "headers": [
+              "รหัส",
+              "รายการสินค้า",
+              "หมวด",
+              "แบรนด์",
+              "barcode",
+              "หน่วย",
+              "ราคา",
+              "ขาย เลิกขาย"
+            ],
+            "types": [
+              "string",
+              "string",
+              "string",
+              "string",
+              "int",
+              "string",
+              "float",
+              "string"
+            ],
+            "header_row": 0,
+            "n_rows_band": "s"
+          },
+          {
+            "sheet": "สต็อก",
+            "headers": [
+              "รหัส",
+              "สาขา",
+              "คงเหลือ"
+            ],
+            "types": [
+              "string",
+              "string",
+              "int"
+            ],
+            "header_row": 0,
+            "n_rows_band": "s"
+          },
+          {
+            "sheet": "โปรโมชั่น",
+            "headers": [
+              "รหัสสินค้า",
+              "รหัสโปร",
+              "ประเภทโปร",
+              "ส่วนลด %",
+              "ส่วนลด บาท",
+              "ราคาโปร",
+              "ซื้อ",
+              "แถม",
+              "เริ่ม",
+              "สิ้นสุด"
+            ],
+            "types": [
+              "string",
+              "string",
+              "string",
+              "float",
+              "float",
+              "float",
+              "int",
+              "int",
+              "date",
+              "date"
+            ],
+            "header_row": 0,
+            "n_rows_band": "xs"
+          }
+        ]
+      }
+    },
+    {
+      "variant": "v005_crosstab_months",
+      "archetype": "crosstab_months",
+      "perturbations": [
+        "mixed_dates",
+        "multi_table_sheet",
+        "title_rows"
+      ],
+      "files": 1,
+      "tables": 5,
+      "mapping_valid": true,
+      "mapping_confidence": 0.939,
+      "open_questions": [
+        "Table 'Price by Month' is a price grid by period (['Oct-26', 'Nov-26', 'Dec-26']…); mapped every period as a price row — confirm which period applies"
+      ],
+      "engine": {
+        "rows_in": 215,
+        "rows_out": 215,
+        "sources": {
+          "products": 215,
+          "pricing": 645,
+          "inventory": 379,
+          "promotions": 67
+        },
+        "collections": {
+          "/prices": 645,
+          "/inventory": 379,
+          "/promotions": 67
+        },
+        "duration_ms": 52.5,
+        "identity_keys": [
+          "/sku"
+        ],
+        "findings": {
+          "error": 0,
+          "warning": 0,
+          "info": 0
+        }
+      },
+      "errors": [],
+      "identity_recall": 1.0,
+      "identity_precision": 1.0,
+      "field_accuracy_by_pointer": {
+        "/sku": 1.0,
+        "/product_name": 1.0,
+        "/brand": 1.0,
+        "/barcode": 1.0,
+        "/category": 1.0,
+        "/unit/sell_unit": 1.0,
+        "/status": 0.9395,
+        "/currency": 1.0,
+        "/prices/0/amount": 1.0,
+        "/prices/0/vat_included": 1.0,
+        "/inventory": 0.9907,
+        "/unit/pack_size": 1.0,
+        "/promotions/0/type": 1.0,
+        "/promotions/0/discount_percent": 1.0,
+        "/promotions/0/start_date": 1.0,
+        "/promotions/0/end_date": 1.0
+      },
+      "field_accuracy": 0.9944,
+      "critical_accuracy": 1.0,
+      "coverage": 1.0,
+      "fingerprint": {
+        "strict": "1caf92d452624754",
+        "loose": "eae268f17f852411",
+        "kind": "excel",
+        "tables": [
+          {
+            "sheet": "products",
+            "headers": [
+              "item code",
+              "item name",
+              "group",
+              "brand",
+              "barcode",
+              "uom",
+              "status"
+            ],
+            "types": [
+              "string",
+              "string",
+              "string",
+              "string",
+              "int",
+              "string",
+              "bool"
+            ],
+            "header_row": 2,
+            "n_rows_band": "s"
+          },
+          {
+            "sheet": "price by month",
+            "headers": [
+              "item code",
+              "oct 26",
+              "nov 26",
+              "dec 26"
+            ],
+            "types": [
+              "string",
+              "float",
+              "float",
+              "float"
+            ],
+            "header_row": 0,
+            "n_rows_band": "s"
+          },
+          {
+            "sheet": "stock",
+            "headers": [
+              "item code",
+              "wh",
+              "qty"
+            ],
+            "types": [
+              "string",
+              "string",
+              "int"
+            ],
+            "header_row": 0,
+            "n_rows_band": "s"
+          },
+          {
+            "sheet": "promotions",
+            "headers": [
+              "sku",
+              "promo code",
+              "promo type",
+              "discount %",
+              "discount amount",
+              "promo price",
+              "buy",
+              "get",
+              "start date",
+              "end date"
+            ],
+            "types": [
+              "string",
+              "string",
+              "string",
+              "float",
+              "float",
+              "float",
+              "int",
+              "int",
+              "date",
+              "date"
+            ],
+            "header_row": 2,
+            "n_rows_band": "xs"
+          }
+        ]
+      }
+    },
+    {
+      "variant": "v006_promo_heavy",
+      "archetype": "promo_heavy",
+      "perturbations": [
+        "be_dates",
+        "empty_columns",
+        "multi_table_sheet",
+        "title_rows"
+      ],
+      "files": 1,
+      "tables": 4,
+      "mapping_valid": true,
+      "mapping_confidence": 0.9269999999999999,
+      "open_questions": [
+        "Price column 'ราคาปลีก': no VAT marker in headers; assumed VAT-inclusive (Thai retail convention) — confirm"
+      ],
+      "engine": {
+        "rows_in": 240,
+        "rows_out": 240,
+        "sources": {
+          "products": 240,
+          "inventory": 430,
+          "promotions": 80
+        },
+        "collections": {
+          "/prices": 240,
+          "/inventory": 430,
+          "/promotions": 80
+        },
+        "duration_ms": 50.1,
+        "identity_keys": [
+          "/sku"
+        ],
+        "findings": {
+          "error": 0,
+          "warning": 0,
+          "info": 0
+        }
+      },
+      "errors": [],
+      "identity_recall": 1.0,
+      "identity_precision": 1.0,
+      "field_accuracy_by_pointer": {
+        "/sku": 1.0,
+        "/product_name": 1.0,
+        "/brand": 1.0,
+        "/barcode": 1.0,
+        "/category": 1.0,
+        "/unit/sell_unit": 1.0,
+        "/unit/pack_size": 1.0,
+        "/status": 1.0,
+        "/currency": 1.0,
+        "/prices/0/amount": 1.0,
+        "/prices/0/vat_included": 1.0,
+        "/inventory": 0.9792,
+        "/promotions/0/type": 1.0,
+        "/promotions/0/discount_percent": 1.0,
+        "/promotions/0/start_date": 1.0,
+        "/promotions/0/end_date": 1.0
+      },
+      "field_accuracy": 0.9983,
+      "critical_accuracy": 1.0,
+      "coverage": 1.0,
+      "fingerprint": {
+        "strict": "e9dc53f4e4a981a7",
+        "loose": "0b85f967c61b40d6",
+        "kind": "excel",
+        "tables": [
+          {
+            "sheet": "สินค้า",
+            "headers": [
+              "รหัสสินค้า",
+              "ชื่อสินค้า",
+              "กลุ่ม",
+              "ยี่ห้อ",
+              "บาร์โค้ด",
+              "หน่วย",
+              "ราคาปลีก",
+              "สถานะ"
+            ],
+            "types": [
+              "string",
+              "string",
+              "string",
+              "string",
+              "int",
+              "string",
+              "float",
+              "string"
+            ],
+            "header_row": 2,
+            "n_rows_band": "s"
+          },
+          {
+            "sheet": "สต็อก",
+            "headers": [
+              "รหัสสินค้า",
+              "คลังสินค้า",
+              "สต็อก"
+            ],
+            "types": [
+              "string",
+              "string",
+              "int"
+            ],
+            "header_row": 0,
+            "n_rows_band": "s"
+          },
+          {
+            "sheet": "โปรโมชั่น",
+            "headers": [
+              "รหัสสินค้า",
+              "รหัสโปร",
+              "ประเภทโปร",
+              "ส่วนลด %",
+              "ส่วนลด บาท",
+              "ราคาโปร",
+              "ซื้อ",
+              "แถม",
+              "เริ่ม",
+              "สิ้นสุด"
+            ],
+            "types": [
+              "string",
+              "string",
+              "string",
+              "float",
+              "float",
+              "float",
+              "int",
+              "int",
+              "date",
+              "date"
+            ],
+            "header_row": 2,
+            "n_rows_band": "xs"
+          }
+        ]
+      }
+    },
+    {
+      "variant": "v007_csv_vendor",
+      "archetype": "csv_vendor",
+      "perturbations": [
+        "header_offset",
+        "mixed_dates"
+      ],
+      "files": 3,
+      "tables": 3,
+      "mapping_valid": true,
+      "mapping_confidence": 1.0,
+      "open_questions": [],
+      "engine": {
+        "rows_in": 125,
+        "rows_out": 125,
+        "sources": {
+          "products": 125,
+          "inventory": 222,
+          "promotions": 42
+        },
+        "collections": {
+          "/prices": 125,
+          "/inventory": 222,
+          "/promotions": 42
+        },
+        "duration_ms": 47.4,
+        "identity_keys": [
+          "/sku"
+        ],
+        "findings": {
+          "error": 0,
+          "warning": 0,
+          "info": 0
+        }
+      },
+      "errors": [],
+      "identity_recall": 1.0,
+      "identity_precision": 1.0,
+      "field_accuracy_by_pointer": {
+        "/sku": 1.0,
+        "/product_name": 1.0,
+        "/brand": 1.0,
+        "/barcode": 1.0,
+        "/category": 1.0,
+        "/unit/sell_unit": 1.0,
+        "/status": 0.976,
+        "/currency": 1.0,
+        "/prices/0/amount": 1.0,
+        "/prices/0/vat_included": 1.0,
+        "/inventory": 1.0,
+        "/promotions/0/type": 1.0,
+        "/promotions/0/start_date": 1.0,
+        "/promotions/0/end_date": 1.0,
+        "/unit/pack_size": 1.0,
+        "/promotions/0/discount_percent": 1.0
+      },
+      "field_accuracy": 0.9981,
+      "critical_accuracy": 1.0,
+      "coverage": 1.0,
+      "fingerprint": {
+        "strict": "ef09ee001ad6cf0d",
+        "loose": "88d452b2e625f2f5",
+        "kind": "csv",
+        "tables": [
+          {
+            "sheet": "products",
+            "headers": [
+              "sku",
+              "product name",
+              "category",
+              "brand",
+              "ean",
+              "uom",
+              "price inc vat",
+              "status"
+            ],
+            "types": [
+              "string",
+              "string",
+              "string",
+              "string",
+              "int",
+              "string",
+              "float",
+              "bool"
+            ],
+            "header_row": 1,
+            "n_rows_band": "s"
+          }
+        ]
+      }
+    },
+    {
+      "variant": "v008_sap_like",
+      "archetype": "sap_like",
+      "perturbations": [
+        "blank_rows",
+        "header_offset",
+        "hidden_sheet",
+        "totals_row"
+      ],
+      "files": 1,
+      "tables": 5,
+      "mapping_valid": true,
+      "mapping_confidence": 0.95,
+      "open_questions": [
+        "Pricing table 'A304': no VAT marker in headers; assumed VAT-inclusive (Thai retail convention) — confirm"
+      ],
+      "engine": {
+        "rows_in": 219,
+        "rows_out": 219,
+        "sources": {
+          "products": 219,
+          "pricing": 274,
+          "inventory": 587,
+          "promotions": 82
+        },
+        "collections": {
+          "/prices": 274,
+          "/inventory": 587,
+          "/promotions": 82
+        },
+        "duration_ms": 56.5,
+        "identity_keys": [
+          "/sku"
+        ],
+        "findings": {
+          "error": 0,
+          "warning": 0,
+          "info": 0
+        }
+      },
+      "errors": [],
+      "identity_recall": 1.0,
+      "identity_precision": 1.0,
+      "field_accuracy_by_pointer": {
+        "/sku": 1.0,
+        "/product_name": 1.0,
+        "/brand": 1.0,
+        "/barcode": 1.0,
+        "/category": 1.0,
+        "/unit/sell_unit": 1.0,
+        "/status": 0.895,
+        "/currency": 1.0,
+        "/prices/0/amount": 1.0,
+        "/prices/0/vat_included": 1.0,
+        "/inventory": 1.0,
+        "/promotions/0/type": 1.0,
+        "/promotions/0/discount_percent": 1.0,
+        "/promotions/0/start_date": 1.0,
+        "/promotions/0/end_date": 1.0,
+        "/unit/pack_size": 1.0
+      },
+      "field_accuracy": 0.9918,
+      "critical_accuracy": 1.0,
+      "coverage": 1.0,
+      "fingerprint": {
+        "strict": "bcfa1be133a8c96b",
+        "loose": "05afcf266cf0199d",
+        "kind": "excel",
+        "tables": [
+          {
+            "sheet": "mara",
+            "headers": [
+              "matnr",
+              "maktx",
+              "matkl",
+              "brand",
+              "ean11",
+              "meins",
+              "lvorm"
+            ],
+            "types": [
+              "string",
+              "string",
+              "string",
+              "string",
+              "int",
+              "string",
+              "string"
+            ],
+            "header_row": 0,
+            "n_rows_band": "s"
+          },
+          {
+            "sheet": "a",
+            "headers": [
+              "matnr",
+              "kschl",
+              "kbetr",
+              "datab"
+            ],
+            "types": [
+              "string",
+              "string",
+              "float",
+              "date"
+            ],
+            "header_row": 0,
+            "n_rows_band": "s"
+          },
+          {
+            "sheet": "mard",
+            "headers": [
+              "matnr",
+              "werks",
+              "labst"
+            ],
+            "types": [
+              "string",
+              "string",
+              "int"
+            ],
+            "header_row": 0,
+            "n_rows_band": "s"
+          },
+          {
+            "sheet": "promotions",
+            "headers": [
+              "sku",
+              "promo code",
+              "promo type",
+              "discount %",
+              "discount amount",
+              "promo price",
+              "buy",
+              "get",
+              "start date",
+              "end date"
+            ],
+            "types": [
+              "string",
+              "string",
+              "string",
+              "float",
+              "float",
+              "float",
+              "int",
+              "int",
+              "date",
+              "date"
+            ],
+            "header_row": 0,
+            "n_rows_band": "xs"
+          }
+        ]
+      }
+    },
+    {
+      "variant": "v009_express_th",
+      "archetype": "express_th",
+      "perturbations": [
+        "empty_columns",
+        "mixed_dates",
+        "thai_digits"
+      ],
+      "files": 1,
+      "tables": 3,
+      "mapping_valid": true,
+      "mapping_confidence": 0.977,
+      "open_questions": [],
+      "engine": {
+        "rows_in": 238,
+        "rows_out": 238,
+        "sources": {
+          "products": 238,
+          "inventory": 430,
+          "promotions": 87
+        },
+        "collections": {
+          "/prices": 238,
+          "/inventory": 430,
+          "/promotions": 87
+        },
+        "duration_ms": 57.5,
+        "identity_keys": [
+          "/sku"
+        ],
+        "findings": {
+          "error": 0,
+          "warning": 0,
+          "info": 0
+        }
+      },
+      "errors": [],
+      "identity_recall": 1.0,
+      "identity_precision": 1.0,
+      "field_accuracy_by_pointer": {
+        "/sku": 1.0,
+        "/product_name": 1.0,
+        "/brand": 1.0,
+        "/barcode": 1.0,
+        "/category": 1.0,
+        "/unit/sell_unit": 1.0,
+        "/unit/pack_size": 1.0,
+        "/status": 1.0,
+        "/currency": 1.0,
+        "/prices/0/amount": 1.0,
+        "/prices/0/vat_included": 1.0,
+        "/inventory": 1.0,
+        "/promotions/0/type": 1.0,
+        "/promotions/0/start_date": 1.0,
+        "/promotions/0/end_date": 1.0,
+        "/promotions/0/discount_percent": 1.0
+      },
+      "field_accuracy": 1.0,
+      "critical_accuracy": 1.0,
+      "coverage": 1.0,
+      "fingerprint": {
+        "strict": "c978fad04036cc5a",
+        "loose": "0805288959d234b2",
+        "kind": "excel",
+        "tables": [
+          {
+            "sheet": "สินค้า",
+            "headers": [
+              "รหัสสินค้า",
+              "ชื่อสินค้า",
+              "หมวดสินค้า",
+              "ยี่ห้อ",
+              "บาร์โค้ด",
+              "หน่วยนับ",
+              "ราคาขาย รวม vat",
+              "สถานะ"
+            ],
+            "types": [
+              "string",
+              "string",
+              "string",
+              "string",
+              "int",
+              "string",
+              "float",
+              "string"
+            ],
+            "header_row": 0,
+            "n_rows_band": "s"
+          },
+          {
+            "sheet": "สต็อก",
+            "headers": [
+              "รหัสสินค้า",
+              "คลัง",
+              "ยอดคงเหลือ"
+            ],
+            "types": [
+              "string",
+              "string",
+              "int"
+            ],
+            "header_row": 0,
+            "n_rows_band": "s"
+          },
+          {
+            "sheet": "โปรโมชั่น",
+            "headers": [
+              "รหัสสินค้า",
+              "รหัสโปร",
+              "ประเภทโปร",
+              "ส่วนลด %",
+              "ส่วนลด บาท",
+              "ราคาโปร",
+              "ซื้อ",
+              "แถม",
+              "เริ่ม",
+              "สิ้นสุด"
+            ],
+            "types": [
+              "string",
+              "string",
+              "string",
+              "float",
+              "float",
+              "float",
+              "int",
+              "int",
+              "date",
+              "date"
+            ],
+            "header_row": 0,
+            "n_rows_band": "xs"
+          }
+        ]
+      }
+    },
+    {
+      "variant": "v010_odoo_like",
+      "archetype": "odoo_like",
+      "perturbations": [
+        "empty_columns",
+        "header_offset",
+        "hidden_sheet"
+      ],
+      "files": 1,
+      "tables": 4,
+      "mapping_valid": true,
+      "mapping_confidence": 0.943,
+      "open_questions": [
+        "Price column 'Sales Price': no VAT marker in headers; assumed VAT-inclusive (Thai retail convention) — confirm"
+      ],
+      "engine": {
+        "rows_in": 373,
+        "rows_out": 373,
+        "sources": {
+          "products": 373,
+          "inventory": 646,
+          "promotions": 118
+        },
+        "collections": {
+          "/prices": 373,
+          "/inventory": 646,
+          "/promotions": 118
+        },
+        "duration_ms": 57.4,
+        "identity_keys": [
+          "/sku"
+        ],
+        "findings": {
+          "error": 0,
+          "warning": 0,
+          "info": 0
+        }
+      },
+      "errors": [],
+      "identity_recall": 1.0,
+      "identity_precision": 1.0,
+      "field_accuracy_by_pointer": {
+        "/sku": 1.0,
+        "/product_name": 1.0,
+        "/brand": 1.0,
+        "/barcode": 1.0,
+        "/category": 1.0,
+        "/unit/sell_unit": 1.0,
+        "/status": 0.9357,
+        "/currency": 1.0,
+        "/prices/0/amount": 1.0,
+        "/prices/0/vat_included": 1.0,
+        "/inventory": 0.9786,
+        "/promotions/0/type": 1.0,
+        "/promotions/0/discount_percent": 1.0,
+        "/promotions/0/start_date": 1.0,
+        "/promotions/0/end_date": 1.0,
+        "/unit/pack_size": 1.0
+      },
+      "field_accuracy": 0.9931,
+      "critical_accuracy": 1.0,
+      "coverage": 1.0,
+      "fingerprint": {
+        "strict": "3c4b8f8502043cc7",
+        "loose": "76e9e8ca02af0631",
+        "kind": "excel",
+        "tables": [
+          {
+            "sheet": "products",
+            "headers": [
+              "internal reference",
+              "product name",
+              "product category",
+              "brand",
+              "barcode",
+              "unit of measure",
+              "sales price",
+              "active"
+            ],
+            "types": [
+              "string",
+              "string",
+              "string",
+              "string",
+              "int",
+              "string",
+              "float",
+              "bool"
+            ],
+            "header_row": 0,
+            "n_rows_band": "s"
+          },
+          {
+            "sheet": "stock",
+            "headers": [
+              "internal reference",
+              "warehouse",
+              "quantity on hand"
+            ],
+            "types": [
+              "string",
+              "string",
+              "int"
+            ],
+            "header_row": 0,
+            "n_rows_band": "s"
+          },
+          {
+            "sheet": "promotions",
+            "headers": [
+              "sku",
+              "promo code",
+              "promo type",
+              "discount %",
+              "discount amount",
+              "promo price",
+              "buy",
+              "get",
+              "start date",
+              "end date"
+            ],
+            "types": [
+              "string",
+              "string",
+              "string",
+              "float",
+              "float",
+              "float",
+              "int",
+              "int",
+              "date",
+              "date"
+            ],
+            "header_row": 0,
+            "n_rows_band": "s"
+          }
+        ]
+      }
+    },
+    {
+      "variant": "v011_dynamics_like",
+      "archetype": "dynamics_like",
+      "perturbations": [
+        "currency_symbols",
+        "mixed_dates"
+      ],
+      "files": 1,
+      "tables": 4,
+      "mapping_valid": true,
+      "mapping_confidence": 0.95,
+      "open_questions": [
+        "Pricing table 'Pricing': no VAT marker in headers; assumed VAT-inclusive (Thai retail convention) — confirm"
+      ],
+      "engine": {
+        "rows_in": 277,
+        "rows_out": 277,
+        "sources": {
+          "products": 277,
+          "pricing": 365,
+          "inventory": 501,
+          "promotions": 90
+        },
+        "collections": {
+          "/prices": 365,
+          "/inventory": 501,
+          "/promotions": 90
+        },
+        "duration_ms": 66.3,
+        "identity_keys": [
+          "/sku"
+        ],
+        "findings": {
+          "error": 0,
+          "warning": 0,
+          "info": 0
+        }
+      },
+      "errors": [],
+      "identity_recall": 1.0,
+      "identity_precision": 1.0,
+      "field_accuracy_by_pointer": {
+        "/sku": 1.0,
+        "/product_name": 1.0,
+        "/brand": 1.0,
+        "/barcode": 1.0,
+        "/category": 1.0,
+        "/unit/sell_unit": 1.0,
+        "/status": 0.9675,
+        "/currency": 1.0,
+        "/prices/0/amount": 1.0,
+        "/prices/0/vat_included": 1.0,
+        "/inventory": 0.9964,
+        "/promotions/0/type": 1.0,
+        "/promotions/0/start_date": 1.0,
+        "/promotions/0/end_date": 1.0,
+        "/unit/pack_size": 1.0,
+        "/promotions/0/discount_percent": 1.0
+      },
+      "field_accuracy": 0.9971,
+      "critical_accuracy": 1.0,
+      "coverage": 1.0,
+      "fingerprint": {
+        "strict": "20671fb0b8ae0a45",
+        "loose": "5977cff124787704",
+        "kind": "excel",
+        "tables": [
+          {
+            "sheet": "products",
+            "headers": [
+              "item no",
+              "description",
+              "item category code",
+              "vendor",
+              "gtin",
+              "base unit of measure",
+              "blocked"
+            ],
+            "types": [
+              "string",
+              "string",
+              "string",
+              "string",
+              "int",
+              "string",
+              "bool"
+            ],
+            "header_row": 0,
+            "n_rows_band": "s"
+          },
+          {
+            "sheet": "pricing",
+            "headers": [
+              "item no",
+              "sales code",
+              "unit price",
+              "starting date"
+            ],
+            "types": [
+              "string",
+              "string",
+              "float",
+              "date"
+            ],
+            "header_row": 0,
+            "n_rows_band": "s"
+          },
+          {
+            "sheet": "stock",
+            "headers": [
+              "item no",
+              "location code",
+              "inventory"
+            ],
+            "types": [
+              "string",
+              "string",
+              "int"
+            ],
+            "header_row": 0,
+            "n_rows_band": "s"
+          },
+          {
+            "sheet": "promotions",
+            "headers": [
+              "sku",
+              "promo code",
+              "promo type",
+              "discount %",
+              "discount amount",
+              "promo price",
+              "buy",
+              "get",
+              "start date",
+              "end date"
+            ],
+            "types": [
+              "string",
+              "string",
+              "string",
+              "float",
+              "float",
+              "float",
+              "int",
+              "int",
+              "date",
+              "date"
+            ],
+            "header_row": 0,
+            "n_rows_band": "xs"
+          }
+        ]
+      }
+    },
+    {
+      "variant": "v012_handmade_excel",
+      "archetype": "handmade_excel",
+      "perturbations": [
+        "empty_columns",
+        "hidden_sheet",
+        "merged_title"
+      ],
+      "files": 1,
+      "tables": 4,
+      "mapping_valid": true,
+      "mapping_confidence": 0.9249999999999999,
+      "open_questions": [
+        "Price column 'ราคา': no VAT marker in headers; assumed VAT-inclusive (Thai retail convention) — confirm"
+      ],
+      "engine": {
+        "rows_in": 261,
+        "rows_out": 261,
+        "sources": {
+          "products": 261,
+          "inventory": 471,
+          "promotions": 90
+        },
+        "collections": {
+          "/prices": 261,
+          "/inventory": 471,
+          "/promotions": 90
+        },
+        "duration_ms": 54.4,
+        "identity_keys": [
+          "/sku"
+        ],
+        "findings": {
+          "error": 0,
+          "warning": 0,
+          "info": 0
+        }
+      },
+      "errors": [],
+      "identity_recall": 1.0,
+      "identity_precision": 1.0,
+      "field_accuracy_by_pointer": {
+        "/sku": 1.0,
+        "/product_name": 1.0,
+        "/brand": 1.0,
+        "/barcode": 1.0,
+        "/category": 1.0,
+        "/unit/sell_unit": 1.0,
+        "/unit/pack_size": 1.0,
+        "/status": 1.0,
+        "/currency": 1.0,
+        "/prices/0/amount": 1.0,
+        "/prices/0/vat_included": 1.0,
+        "/inventory": 0.977,
+        "/promotions/0/type": 1.0,
+        "/promotions/0/discount_percent": 1.0,
+        "/promotions/0/start_date": 1.0,
+        "/promotions/0/end_date": 1.0
+      },
+      "field_accuracy": 0.9982,
+      "critical_accuracy": 1.0,
+      "coverage": 1.0,
+      "fingerprint": {
+        "strict": "d33756262c0039fa",
+        "loose": "2d2ede6388f6a60e",
+        "kind": "excel",
+        "tables": [
+          {
+            "sheet": "สินค้า",
+            "headers": [
+              "รหัส",
+              "รายการสินค้า",
+              "หมวด",
+              "แบรนด์",
+              "barcode",
+              "หน่วย",
+              "ราคา",
+              "ขาย เลิกขาย"
+            ],
+            "types": [
+              "string",
+              "string",
+              "string",
+              "string",
+              "int",
+              "string",
+              "float",
+              "string"
+            ],
+            "header_row": 0,
+            "n_rows_band": "s"
+          },
+          {
+            "sheet": "สต็อก",
+            "headers": [
+              "รหัส",
+              "สาขา",
+              "คงเหลือ"
+            ],
+            "types": [
+              "string",
+              "string",
+              "int"
+            ],
+            "header_row": 0,
+            "n_rows_band": "s"
+          },
+          {
+            "sheet": "โปรโมชั่น",
+            "headers": [
+              "รหัสสินค้า",
+              "รหัสโปร",
+              "ประเภทโปร",
+              "ส่วนลด %",
+              "ส่วนลด บาท",
+              "ราคาโปร",
+              "ซื้อ",
+              "แถม",
+              "เริ่ม",
+              "สิ้นสุด"
+            ],
+            "types": [
+              "string",
+              "string",
+              "string",
+              "float",
+              "float",
+              "float",
+              "int",
+              "int",
+              "date",
+              "date"
+            ],
+            "header_row": 0,
+            "n_rows_band": "xs"
+          }
+        ]
+      }
+    },
+    {
+      "variant": "v013_crosstab_months",
+      "archetype": "crosstab_months",
+      "perturbations": [
+        "blank_rows",
+        "duplicate_rows"
+      ],
+      "files": 1,
+      "tables": 4,
+      "mapping_valid": true,
+      "mapping_confidence": 0.9289999999999999,
+      "open_questions": [
+        "Table 'Price by Month' is a price grid by period (['Oct-26', 'Nov-26', 'Dec-26']…); mapped every period as a price row — confirm which period applies"
+      ],
+      "engine": {
+        "rows_in": 237,
+        "rows_out": 236,
+        "sources": {
+          "products": 237,
+          "pricing": 708,
+          "inventory": 432,
+          "promotions": 75
+        },
+        "collections": {
+          "/prices": 708,
+          "/inventory": 432,
+          "/promotions": 75
+        },
+        "duration_ms": 66.8,
+        "identity_keys": [
+          "/sku"
+        ],
+        "findings": {
+          "error": 0,
+          "warning": 1,
+          "info": 0
+        }
+      },
+      "errors": [],
+      "identity_recall": 1.0,
+      "identity_precision": 1.0,
+      "field_accuracy_by_pointer": {
+        "/sku": 1.0,
+        "/product_name": 1.0,
+        "/brand": 1.0,
+        "/barcode": 1.0,
+        "/category": 1.0,
+        "/unit/sell_unit": 1.0,
+        "/status": 1.0,
+        "/currency": 1.0,
+        "/prices/0/amount": 1.0,
+        "/prices/0/vat_included": 1.0,
+        "/inventory": 0.9958,
+        "/promotions/0/type": 1.0,
+        "/promotions/0/start_date": 1.0,
+        "/promotions/0/end_date": 1.0,
+        "/unit/pack_size": 1.0,
+        "/promotions/0/discount_percent": 1.0
+      },
+      "field_accuracy": 0.9997,
+      "critical_accuracy": 1.0,
+      "coverage": 1.0,
+      "fingerprint": {
+        "strict": "6b26d8d25a2d8f65",
+        "loose": "0135cfd41521ccfa",
+        "kind": "excel",
+        "tables": [
+          {
+            "sheet": "สินค้า",
+            "headers": [
+              "item code",
+              "item name",
+              "group",
+              "brand",
+              "barcode",
+              "uom",
+              "status"
+            ],
+            "types": [
+              "string",
+              "string",
+              "string",
+              "string",
+              "int",
+              "string",
+              "string"
+            ],
+            "header_row": 0,
+            "n_rows_band": "s"
+          },
+          {
+            "sheet": "price by month",
+            "headers": [
+              "item code",
+              "oct 26",
+              "nov 26",
+              "dec 26"
+            ],
+            "types": [
+              "string",
+              "float",
+              "float",
+              "float"
+            ],
+            "header_row": 0,
+            "n_rows_band": "s"
+          },
+          {
+            "sheet": "สต็อก",
+            "headers": [
+              "item code",
+              "wh",
+              "qty"
+            ],
+            "types": [
+              "string",
+              "string",
+              "int"
+            ],
+            "header_row": 0,
+            "n_rows_band": "s"
+          },
+          {
+            "sheet": "โปรโมชั่น",
+            "headers": [
+              "รหัสสินค้า",
+              "รหัสโปร",
+              "ประเภทโปร",
+              "ส่วนลด %",
+              "ส่วนลด บาท",
+              "ราคาโปร",
+              "ซื้อ",
+              "แถม",
+              "เริ่ม",
+              "สิ้นสุด"
+            ],
+            "types": [
+              "string",
+              "string",
+              "string",
+              "float",
+              "float",
+              "float",
+              "int",
+              "int",
+              "date",
+              "date"
+            ],
+            "header_row": 0,
+            "n_rows_band": "xs"
+          }
+        ]
+      }
+    },
+    {
+      "variant": "v014_promo_heavy",
+      "archetype": "promo_heavy",
+      "perturbations": [
+        "currency_symbols",
+        "merged_title",
+        "totals_row"
+      ],
+      "files": 1,
+      "tables": 3,
+      "mapping_valid": true,
+      "mapping_confidence": 0.977,
+      "open_questions": [],
+      "engine": {
+        "rows_in": 277,
+        "rows_out": 277,
+        "sources": {
+          "products": 277,
+          "inventory": 504,
+          "promotions": 99
+        },
+        "collections": {
+          "/prices": 277,
+          "/inventory": 504,
+          "/promotions": 99
+        },
+        "duration_ms": 58.4,
+        "identity_keys": [
+          "/sku"
+        ],
+        "findings": {
+          "error": 0,
+          "warning": 0,
+          "info": 0
+        }
+      },
+      "errors": [],
+      "identity_recall": 1.0,
+      "identity_precision": 1.0,
+      "field_accuracy_by_pointer": {
+        "/sku": 1.0,
+        "/product_name": 1.0,
+        "/brand": 1.0,
+        "/barcode": 1.0,
+        "/category": 1.0,
+        "/unit/sell_unit": 1.0,
+        "/status": 1.0,
+        "/currency": 1.0,
+        "/prices/0/amount": 1.0,
+        "/prices/0/vat_included": 1.0,
+        "/inventory": 0.9928,
+        "/promotions/0/type": 1.0,
+        "/promotions/0/start_date": 1.0,
+        "/promotions/0/end_date": 1.0,
+        "/unit/pack_size": 1.0,
+        "/promotions/0/discount_percent": 1.0
+      },
+      "field_accuracy": 0.9994,
+      "critical_accuracy": 1.0,
+      "coverage": 1.0,
+      "fingerprint": {
+        "strict": "386f161247f74e87",
+        "loose": "83f44b7405272931",
+        "kind": "excel",
+        "tables": [
+          {
+            "sheet": "สินค้า",
+            "headers": [
+              "รหัสสินค้า",
+              "ชื่อสินค้า",
+              "กลุ่ม",
+              "ยี่ห้อ",
+              "บาร์โค้ด",
+              "หน่วย",
+              "ราคาปลีก ex vat",
+              "สถานะ"
+            ],
+            "types": [
+              "string",
+              "string",
+              "string",
+              "string",
+              "int",
+              "string",
+              "float",
+              "string"
+            ],
+            "header_row": 0,
+            "n_rows_band": "s"
+          },
+          {
+            "sheet": "สต็อก",
+            "headers": [
+              "รหัสสินค้า",
+              "คลังสินค้า",
+              "สต็อก"
+            ],
+            "types": [
+              "string",
+              "string",
+              "int"
+            ],
+            "header_row": 0,
+            "n_rows_band": "s"
+          },
+          {
+            "sheet": "โปรโมชั่น",
+            "headers": [
+              "รหัสสินค้า",
+              "รหัสโปร",
+              "ประเภทโปร",
+              "ส่วนลด %",
+              "ส่วนลด บาท",
+              "ราคาโปร",
+              "ซื้อ",
+              "แถม",
+              "เริ่ม",
+              "สิ้นสุด"
+            ],
+            "types": [
+              "string",
+              "string",
+              "string",
+              "float",
+              "float",
+              "float",
+              "int",
+              "int",
+              "date",
+              "date"
+            ],
+            "header_row": 0,
+            "n_rows_band": "xs"
+          }
+        ]
+      }
+    },
+    {
+      "variant": "v015_csv_vendor",
+      "archetype": "csv_vendor",
+      "perturbations": [
+        "currency_symbols",
+        "title_rows"
+      ],
+      "files": 3,
+      "tables": 3,
+      "mapping_valid": true,
+      "mapping_confidence": 1.0,
+      "open_questions": [],
+      "engine": {
+        "rows_in": 376,
+        "rows_out": 376,
+        "sources": {
+          "products": 376,
+          "inventory": 667,
+          "promotions": 137
+        },
+        "collections": {
+          "/prices": 376,
+          "/inventory": 667,
+          "/promotions": 137
+        },
+        "duration_ms": 60.9,
+        "identity_keys": [
+          "/sku"
+        ],
+        "findings": {
+          "error": 0,
+          "warning": 0,
+          "info": 0
+        }
+      },
+      "errors": [],
+      "identity_recall": 1.0,
+      "identity_precision": 1.0,
+      "field_accuracy_by_pointer": {
+        "/sku": 1.0,
+        "/product_name": 1.0,
+        "/brand": 1.0,
+        "/barcode": 1.0,
+        "/category": 1.0,
+        "/unit/sell_unit": 1.0,
+        "/unit/pack_size": 1.0,
+        "/status": 0.9521,
+        "/currency": 1.0,
+        "/prices/0/amount": 1.0,
+        "/prices/0/vat_included": 1.0,
+        "/inventory": 0.984,
+        "/promotions/0/type": 1.0,
+        "/promotions/0/start_date": 1.0,
+        "/promotions/0/end_date": 1.0,
+        "/promotions/0/discount_percent": 1.0
+      },
+      "field_accuracy": 0.995,
+      "critical_accuracy": 1.0,
+      "coverage": 1.0,
+      "fingerprint": {
+        "strict": "4312e2bbef287008",
+        "loose": "230ed443a32f77aa",
+        "kind": "csv",
+        "tables": [
+          {
+            "sheet": "products",
+            "headers": [
+              "sku",
+              "product name",
+              "category",
+              "brand",
+              "ean",
+              "uom",
+              "price ex vat",
+              "status"
+            ],
+            "types": [
+              "string",
+              "string",
+              "string",
+              "string",
+              "int",
+              "string",
+              "float",
+              "bool"
+            ],
+            "header_row": 2,
+            "n_rows_band": "s"
+          }
+        ]
+      }
+    },
+    {
+      "variant": "v016_sap_like",
+      "archetype": "sap_like",
+      "perturbations": [
+        "currency_symbols",
+        "duplicate_rows",
+        "mixed_dates"
+      ],
+      "files": 1,
+      "tables": 4,
+      "mapping_valid": true,
+      "mapping_confidence": 0.95,
+      "open_questions": [
+        "Pricing table 'A304': no VAT marker in headers; assumed VAT-inclusive (Thai retail convention) — confirm"
+      ],
+      "engine": {
+        "rows_in": 338,
+        "rows_out": 337,
+        "sources": {
+          "products": 338,
+          "pricing": 451,
+          "inventory": 918,
+          "promotions": 115
+        },
+        "collections": {
+          "/prices": 451,
+          "/inventory": 918,
+          "/promotions": 115
+        },
+        "duration_ms": 66.4,
+        "identity_keys": [
+          "/sku"
+        ],
+        "findings": {
+          "error": 0,
+          "warning": 1,
+          "info": 0
+        }
+      },
+      "errors": [],
+      "identity_recall": 1.0,
+      "identity_precision": 1.0,
+      "field_accuracy_by_pointer": {
+        "/sku": 1.0,
+        "/product_name": 1.0,
+        "/brand": 1.0,
+        "/barcode": 1.0,
+        "/category": 1.0,
+        "/unit/sell_unit": 1.0,
+        "/status": 0.9021,
+        "/currency": 1.0,
+        "/prices/0/amount": 1.0,
+        "/prices/0/vat_included": 1.0,
+        "/inventory": 1.0,
+        "/unit/pack_size": 1.0,
+        "/promotions/0/type": 1.0,
+        "/promotions/0/discount_percent": 1.0,
+        "/promotions/0/start_date": 1.0,
+        "/promotions/0/end_date": 1.0
+      },
+      "field_accuracy": 0.9922,
+      "critical_accuracy": 1.0,
+      "coverage": 1.0,
+      "fingerprint": {
+        "strict": "bcfa1be133a8c96b",
+        "loose": "05afcf266cf0199d",
+        "kind": "excel",
+        "tables": [
+          {
+            "sheet": "mara",
+            "headers": [
+              "matnr",
+              "maktx",
+              "matkl",
+              "brand",
+              "ean11",
+              "meins",
+              "lvorm"
+            ],
+            "types": [
+              "string",
+              "string",
+              "string",
+              "string",
+              "int",
+              "string",
+              "string"
+            ],
+            "header_row": 0,
+            "n_rows_band": "s"
+          },
+          {
+            "sheet": "a",
+            "headers": [
+              "matnr",
+              "kschl",
+              "kbetr",
+              "datab"
+            ],
+            "types": [
+              "string",
+              "string",
+              "float",
+              "date"
+            ],
+            "header_row": 0,
+            "n_rows_band": "s"
+          },
+          {
+            "sheet": "mard",
+            "headers": [
+              "matnr",
+              "werks",
+              "labst"
+            ],
+            "types": [
+              "string",
+              "string",
+              "int"
+            ],
+            "header_row": 0,
+            "n_rows_band": "s"
+          },
+          {
+            "sheet": "promotions",
+            "headers": [
+              "sku",
+              "promo code",
+              "promo type",
+              "discount %",
+              "discount amount",
+              "promo price",
+              "buy",
+              "get",
+              "start date",
+              "end date"
+            ],
+            "types": [
+              "string",
+              "string",
+              "string",
+              "float",
+              "float",
+              "float",
+              "int",
+              "int",
+              "date",
+              "date"
+            ],
+            "header_row": 0,
+            "n_rows_band": "s"
+          }
+        ]
+      }
+    },
+    {
+      "variant": "v017_express_th",
+      "archetype": "express_th",
+      "perturbations": [
+        "be_dates",
+        "duplicate_rows",
+        "header_offset",
+        "leading_zeros",
+        "multi_table_sheet"
+      ],
+      "files": 1,
+      "tables": 4,
+      "mapping_valid": true,
+      "mapping_confidence": 0.977,
+      "open_questions": [],
+      "engine": {
+        "rows_in": 156,
+        "rows_out": 155,
+        "sources": {
+          "products": 156,
+          "inventory": 284,
+          "promotions": 59
+        },
+        "collections": {
+          "/prices": 155,
+          "/inventory": 284,
+          "/promotions": 59
+        },
+        "duration_ms": 52.3,
+        "identity_keys": [
+          "/sku"
+        ],
+        "findings": {
+          "error": 0,
+          "warning": 1,
+          "info": 1
+        }
+      },
+      "errors": [],
+      "identity_recall": 1.0,
+      "identity_precision": 1.0,
+      "field_accuracy_by_pointer": {
+        "/sku": 1.0,
+        "/product_name": 1.0,
+        "/brand": 1.0,
+        "/barcode": 1.0,
+        "/category": 1.0,
+        "/unit/sell_unit": 1.0,
+        "/status": 1.0,
+        "/currency": 1.0,
+        "/prices/0/amount": 1.0,
+        "/prices/0/vat_included": 1.0,
+        "/inventory": 0.9871,
+        "/unit/pack_size": 1.0,
+        "/promotions/0/type": 1.0,
+        "/promotions/0/discount_percent": 1.0,
+        "/promotions/0/start_date": 1.0,
+        "/promotions/0/end_date": 1.0
+      },
+      "field_accuracy": 0.999,
+      "critical_accuracy": 1.0,
+      "coverage": 1.0,
+      "fingerprint": {
+        "strict": "c978fad04036cc5a",
+        "loose": "0805288959d234b2",
+        "kind": "excel",
+        "tables": [
+          {
+            "sheet": "สินค้า",
+            "headers": [
+              "รหัสสินค้า",
+              "ชื่อสินค้า",
+              "หมวดสินค้า",
+              "ยี่ห้อ",
+              "บาร์โค้ด",
+              "หน่วยนับ",
+              "ราคาขาย รวม vat",
+              "สถานะ"
+            ],
+            "types": [
+              "string",
+              "string",
+              "string",
+              "string",
+              "int",
+              "string",
+              "float",
+              "string"
+            ],
+            "header_row": 0,
+            "n_rows_band": "s"
+          },
+          {
+            "sheet": "สต็อก",
+            "headers": [
+              "รหัสสินค้า",
+              "คลัง",
+              "ยอดคงเหลือ"
+            ],
+            "types": [
+              "string",
+              "string",
+              "int"
+            ],
+            "header_row": 0,
+            "n_rows_band": "s"
+          },
+          {
+            "sheet": "โปรโมชั่น",
+            "headers": [
+              "รหัสสินค้า",
+              "รหัสโปร",
+              "ประเภทโปร",
+              "ส่วนลด %",
+              "ส่วนลด บาท",
+              "ราคาโปร",
+              "ซื้อ",
+              "แถม",
+              "เริ่ม",
+              "สิ้นสุด"
+            ],
+            "types": [
+              "string",
+              "string",
+              "string",
+              "float",
+              "float",
+              "float",
+              "int",
+              "int",
+              "date",
+              "date"
+            ],
+            "header_row": 0,
+            "n_rows_band": "xs"
+          }
+        ]
+      }
+    },
+    {
+      "variant": "seq0_r0_express_th",
+      "archetype": "express_th",
+      "perturbations": [
+        "blank_rows",
+        "empty_columns",
+        "thai_digits"
+      ],
+      "files": 1,
+      "tables": 3,
+      "mapping_valid": true,
+      "mapping_confidence": 0.977,
+      "open_questions": [],
+      "engine": {
+        "rows_in": 173,
+        "rows_out": 173,
+        "sources": {
+          "products": 173,
+          "inventory": 309,
+          "promotions": 73
+        },
+        "collections": {
+          "/prices": 173,
+          "/inventory": 309,
+          "/promotions": 73
+        },
+        "duration_ms": 53.9,
+        "identity_keys": [
+          "/sku"
+        ],
+        "findings": {
+          "error": 0,
+          "warning": 0,
+          "info": 0
+        }
+      },
+      "errors": [],
+      "identity_recall": 1.0,
+      "identity_precision": 1.0,
+      "field_accuracy_by_pointer": {
+        "/sku": 1.0,
+        "/product_name": 1.0,
+        "/brand": 1.0,
+        "/barcode": 1.0,
+        "/category": 1.0,
+        "/unit/sell_unit": 1.0,
+        "/unit/pack_size": 1.0,
+        "/status": 1.0,
+        "/currency": 1.0,
+        "/prices/0/amount": 1.0,
+        "/prices/0/vat_included": 1.0,
+        "/inventory": 0.9769,
+        "/promotions/0/type": 1.0,
+        "/promotions/0/start_date": 1.0,
+        "/promotions/0/end_date": 1.0,
+        "/promotions/0/discount_percent": 1.0
+      },
+      "field_accuracy": 0.9982,
+      "critical_accuracy": 1.0,
+      "coverage": 1.0,
+      "fingerprint": {
+        "strict": "c978fad04036cc5a",
+        "loose": "0805288959d234b2",
+        "kind": "excel",
+        "tables": [
+          {
+            "sheet": "สินค้า",
+            "headers": [
+              "รหัสสินค้า",
+              "ชื่อสินค้า",
+              "หมวดสินค้า",
+              "ยี่ห้อ",
+              "บาร์โค้ด",
+              "หน่วยนับ",
+              "ราคาขาย รวม vat",
+              "สถานะ"
+            ],
+            "types": [
+              "string",
+              "string",
+              "string",
+              "string",
+              "int",
+              "string",
+              "float",
+              "string"
+            ],
+            "header_row": 0,
+            "n_rows_band": "s"
+          },
+          {
+            "sheet": "สต็อก",
+            "headers": [
+              "รหัสสินค้า",
+              "คลัง",
+              "ยอดคงเหลือ"
+            ],
+            "types": [
+              "string",
+              "string",
+              "int"
+            ],
+            "header_row": 0,
+            "n_rows_band": "s"
+          },
+          {
+            "sheet": "โปรโมชั่น",
+            "headers": [
+              "รหัสสินค้า",
+              "รหัสโปร",
+              "ประเภทโปร",
+              "ส่วนลด %",
+              "ส่วนลด บาท",
+              "ราคาโปร",
+              "ซื้อ",
+              "แถม",
+              "เริ่ม",
+              "สิ้นสุด"
+            ],
+            "types": [
+              "string",
+              "string",
+              "string",
+              "float",
+              "float",
+              "float",
+              "int",
+              "int",
+              "date",
+              "date"
+            ],
+            "header_row": 0,
+            "n_rows_band": "xs"
+          }
+        ]
+      }
+    },
+    {
+      "variant": "seq0_r1_express_th",
+      "archetype": "express_th",
+      "perturbations": [
+        "blank_rows",
+        "empty_columns",
+        "thai_digits"
+      ],
+      "files": 1,
+      "tables": 3,
+      "mapping_valid": true,
+      "mapping_confidence": 0.977,
+      "open_questions": [],
+      "engine": {
+        "rows_in": 172,
+        "rows_out": 172,
+        "sources": {
+          "products": 172,
+          "inventory": 307,
+          "promotions": 73
+        },
+        "collections": {
+          "/prices": 172,
+          "/inventory": 307,
+          "/promotions": 73
+        },
+        "duration_ms": 54.2,
+        "identity_keys": [
+          "/sku"
+        ],
+        "findings": {
+          "error": 0,
+          "warning": 0,
+          "info": 0
+        }
+      },
+      "errors": [],
+      "identity_recall": 1.0,
+      "identity_precision": 1.0,
+      "field_accuracy_by_pointer": {
+        "/sku": 1.0,
+        "/product_name": 1.0,
+        "/brand": 1.0,
+        "/barcode": 1.0,
+        "/category": 1.0,
+        "/unit/sell_unit": 1.0,
+        "/unit/pack_size": 1.0,
+        "/status": 1.0,
+        "/currency": 1.0,
+        "/prices/0/amount": 1.0,
+        "/prices/0/vat_included": 1.0,
+        "/inventory": 0.9767,
+        "/promotions/0/type": 1.0,
+        "/promotions/0/start_date": 1.0,
+        "/promotions/0/end_date": 1.0,
+        "/promotions/0/discount_percent": 1.0
+      },
+      "field_accuracy": 0.9982,
+      "critical_accuracy": 1.0,
+      "coverage": 1.0,
+      "fingerprint": {
+        "strict": "c978fad04036cc5a",
+        "loose": "0805288959d234b2",
+        "kind": "excel",
+        "tables": [
+          {
+            "sheet": "สินค้า",
+            "headers": [
+              "รหัสสินค้า",
+              "ชื่อสินค้า",
+              "หมวดสินค้า",
+              "ยี่ห้อ",
+              "บาร์โค้ด",
+              "หน่วยนับ",
+              "ราคาขาย รวม vat",
+              "สถานะ"
+            ],
+            "types": [
+              "string",
+              "string",
+              "string",
+              "string",
+              "int",
+              "string",
+              "float",
+              "string"
+            ],
+            "header_row": 0,
+            "n_rows_band": "s"
+          },
+          {
+            "sheet": "สต็อก",
+            "headers": [
+              "รหัสสินค้า",
+              "คลัง",
+              "ยอดคงเหลือ"
+            ],
+            "types": [
+              "string",
+              "string",
+              "int"
+            ],
+            "header_row": 0,
+            "n_rows_band": "s"
+          },
+          {
+            "sheet": "โปรโมชั่น",
+            "headers": [
+              "รหัสสินค้า",
+              "รหัสโปร",
+              "ประเภทโปร",
+              "ส่วนลด %",
+              "ส่วนลด บาท",
+              "ราคาโปร",
+              "ซื้อ",
+              "แถม",
+              "เริ่ม",
+              "สิ้นสุด"
+            ],
+            "types": [
+              "string",
+              "string",
+              "string",
+              "float",
+              "float",
+              "float",
+              "int",
+              "int",
+              "date",
+              "date"
+            ],
+            "header_row": 0,
+            "n_rows_band": "xs"
+          }
+        ]
+      }
+    },
+    {
+      "variant": "seq0_r2_express_th",
+      "archetype": "express_th",
+      "perturbations": [
+        "blank_rows",
+        "empty_columns",
+        "renamed_columns",
+        "thai_digits"
+      ],
+      "files": 1,
+      "tables": 3,
+      "mapping_valid": true,
+      "mapping_confidence": 0.96,
+      "open_questions": [],
+      "engine": {
+        "rows_in": 172,
+        "rows_out": 172,
+        "sources": {
+          "products": 172,
+          "inventory": 307,
+          "promotions": 73
+        },
+        "collections": {
+          "/prices": 172,
+          "/inventory": 307,
+          "/promotions": 73
+        },
+        "duration_ms": 65.1,
+        "identity_keys": [
+          "/sku"
+        ],
+        "findings": {
+          "error": 0,
+          "warning": 0,
+          "info": 0
+        }
+      },
+      "errors": [],
+      "identity_recall": 1.0,
+      "identity_precision": 1.0,
+      "field_accuracy_by_pointer": {
+        "/sku": 1.0,
+        "/product_name": 1.0,
+        "/brand": 1.0,
+        "/barcode": 1.0,
+        "/category": 1.0,
+        "/unit/sell_unit": 1.0,
+        "/unit/pack_size": 1.0,
+        "/status": 1.0,
+        "/currency": 1.0,
+        "/prices/0/amount": 1.0,
+        "/prices/0/vat_included": 1.0,
+        "/inventory": 0.9767,
+        "/promotions/0/type": 1.0,
+        "/promotions/0/start_date": 1.0,
+        "/promotions/0/end_date": 1.0,
+        "/promotions/0/discount_percent": 1.0
+      },
+      "field_accuracy": 0.9982,
+      "critical_accuracy": 1.0,
+      "coverage": 1.0,
+      "fingerprint": {
+        "strict": "f035a91cc0b91fdd",
+        "loose": "7e821a0ee3673c44",
+        "kind": "excel",
+        "tables": [
+          {
+            "sheet": "สินค้า",
+            "headers": [
+              "รหัสสินค้า",
+              "ชื่อรายการ",
+              "หมวดสินค้า",
+              "ยี่ห้อ",
+              "บาร์โค้ด",
+              "หน่วยนับ",
+              "ราคาขายรวมภาษี",
+              "สถานะ"
+            ],
+            "types": [
+              "string",
+              "string",
+              "string",
+              "string",
+              "int",
+              "string",
+              "float",
+              "string"
+            ],
+            "header_row": 0,
+            "n_rows_band": "s"
+          },
+          {
+            "sheet": "สต็อก",
+            "headers": [
+              "รหัสสินค้า",
+              "คลัง",
+              "จำนวนคงเหลือ"
+            ],
+            "types": [
+              "string",
+              "string",
+              "int"
+            ],
+            "header_row": 0,
+            "n_rows_band": "s"
+          },
+          {
+            "sheet": "โปรโมชั่น",
+            "headers": [
+              "รหัสสินค้า",
+              "รหัสโปร",
+              "ประเภทโปร",
+              "ส่วนลด %",
+              "ส่วนลด บาท",
+              "ราคาโปร",
+              "ซื้อ",
+              "แถม",
+              "เริ่ม",
+              "สิ้นสุด"
+            ],
+            "types": [
+              "string",
+              "string",
+              "string",
+              "float",
+              "float",
+              "float",
+              "int",
+              "int",
+              "date",
+              "date"
+            ],
+            "header_row": 0,
+            "n_rows_band": "xs"
+          }
+        ]
+      }
+    },
+    {
+      "variant": "seq0_r3_express_th",
+      "archetype": "handmade_excel",
+      "perturbations": [
+        "blank_rows",
+        "empty_columns",
+        "thai_digits"
+      ],
+      "files": 1,
+      "tables": 3,
+      "mapping_valid": true,
+      "mapping_confidence": 0.9329999999999999,
+      "open_questions": [
+        "Price column 'ราคา': no VAT marker in headers; assumed VAT-inclusive (Thai retail convention) — confirm"
+      ],
+      "engine": {
+        "rows_in": 252,
+        "rows_out": 252,
+        "sources": {
+          "products": 252,
+          "inventory": 443,
+          "promotions": 94
+        },
+        "collections": {
+          "/prices": 252,
+          "/inventory": 443,
+          "/promotions": 94
+        },
+        "duration_ms": 55.8,
+        "identity_keys": [
+          "/sku"
+        ],
+        "findings": {
+          "error": 0,
+          "warning": 0,
+          "info": 0
+        }
+      },
+      "errors": [],
+      "identity_recall": 1.0,
+      "identity_precision": 1.0,
+      "field_accuracy_by_pointer": {
+        "/sku": 1.0,
+        "/product_name": 1.0,
+        "/brand": 1.0,
+        "/barcode": 1.0,
+        "/category": 1.0,
+        "/unit/sell_unit": 1.0,
+        "/status": 0.9603,
+        "/currency": 1.0,
+        "/prices/0/amount": 1.0,
+        "/prices/0/vat_included": 1.0,
+        "/inventory": 0.9802,
+        "/promotions/0/type": 1.0,
+        "/promotions/0/start_date": 1.0,
+        "/promotions/0/end_date": 1.0,
+        "/unit/pack_size": 1.0,
+        "/promotions/0/discount_percent": 1.0
+      },
+      "field_accuracy": 0.9953,
+      "critical_accuracy": 1.0,
+      "coverage": 1.0,
+      "fingerprint": {
+        "strict": "219a3265f2a4223a",
+        "loose": "d10a19e9700cfba5",
+        "kind": "excel",
+        "tables": [
+          {
+            "sheet": "products",
+            "headers": [
+              "รหัส",
+              "รายการสินค้า",
+              "หมวด",
+              "แบรนด์",
+              "barcode",
+              "หน่วย",
+              "ราคา",
+              "ขาย เลิกขาย"
+            ],
+            "types": [
+              "string",
+              "string",
+              "string",
+              "string",
+              "int",
+              "string",
+              "float",
+              "bool"
+            ],
+            "header_row": 0,
+            "n_rows_band": "s"
+          },
+          {
+            "sheet": "stock",
+            "headers": [
+              "รหัส",
+              "สาขา",
+              "คงเหลือ"
+            ],
+            "types": [
+              "string",
+              "string",
+              "int"
+            ],
+            "header_row": 0,
+            "n_rows_band": "s"
+          },
+          {
+            "sheet": "promotions",
+            "headers": [
+              "sku",
+              "promo code",
+              "promo type",
+              "discount %",
+              "discount amount",
+              "promo price",
+              "buy",
+              "get",
+              "start date",
+              "end date"
+            ],
+            "types": [
+              "string",
+              "string",
+              "string",
+              "float",
+              "float",
+              "float",
+              "int",
+              "int",
+              "date",
+              "date"
+            ],
+            "header_row": 0,
+            "n_rows_band": "xs"
+          }
+        ]
+      }
+    },
+    {
+      "variant": "seq1_r0_odoo_like",
+      "archetype": "odoo_like",
+      "perturbations": [
+        "be_dates",
+        "merged_title",
+        "multi_table_sheet"
+      ],
+      "files": 1,
+      "tables": 4,
+      "mapping_valid": true,
+      "mapping_confidence": 0.943,
+      "open_questions": [
+        "Price column 'Sales Price': no VAT marker in headers; assumed VAT-inclusive (Thai retail convention) — confirm"
+      ],
+      "engine": {
+        "rows_in": 392,
+        "rows_out": 392,
+        "sources": {
+          "products": 392,
+          "inventory": 701,
+          "promotions": 142
+        },
+        "collections": {
+          "/prices": 392,
+          "/inventory": 701,
+          "/promotions": 142
+        },
+        "duration_ms": 63.4,
+        "identity_keys": [
+          "/sku"
+        ],
+        "findings": {
+          "error": 0,
+          "warning": 0,
+          "info": 0
+        }
+      },
+      "errors": [],
+      "identity_recall": 1.0,
+      "identity_precision": 1.0,
+      "field_accuracy_by_pointer": {
+        "/sku": 1.0,
+        "/product_name": 1.0,
+        "/brand": 1.0,
+        "/barcode": 1.0,
+        "/category": 1.0,
+        "/unit/sell_unit": 1.0,
+        "/unit/pack_size": 1.0,
+        "/status": 0.9617,
+        "/currency": 1.0,
+        "/prices/0/amount": 1.0,
+        "/prices/0/vat_included": 1.0,
+        "/inventory": 0.9923,
+        "/promotions/0/type": 1.0,
+        "/promotions/0/discount_percent": 1.0,
+        "/promotions/0/start_date": 1.0,
+        "/promotions/0/end_date": 1.0
+      },
+      "field_accuracy": 0.9964,
+      "critical_accuracy": 1.0,
+      "coverage": 1.0,
+      "fingerprint": {
+        "strict": "3c4b8f8502043cc7",
+        "loose": "76e9e8ca02af0631",
+        "kind": "excel",
+        "tables": [
+          {
+            "sheet": "products",
+            "headers": [
+              "internal reference",
+              "product name",
+              "product category",
+              "brand",
+              "barcode",
+              "unit of measure",
+              "sales price",
+              "active"
+            ],
+            "types": [
+              "string",
+              "string",
+              "string",
+              "string",
+              "int",
+              "string",
+              "float",
+              "bool"
+            ],
+            "header_row": 0,
+            "n_rows_band": "s"
+          },
+          {
+            "sheet": "stock",
+            "headers": [
+              "internal reference",
+              "warehouse",
+              "quantity on hand"
+            ],
+            "types": [
+              "string",
+              "string",
+              "int"
+            ],
+            "header_row": 0,
+            "n_rows_band": "s"
+          },
+          {
+            "sheet": "promotions",
+            "headers": [
+              "sku",
+              "promo code",
+              "promo type",
+              "discount %",
+              "discount amount",
+              "promo price",
+              "buy",
+              "get",
+              "start date",
+              "end date"
+            ],
+            "types": [
+              "string",
+              "string",
+              "string",
+              "float",
+              "float",
+              "float",
+              "int",
+              "int",
+              "date",
+              "date"
+            ],
+            "header_row": 0,
+            "n_rows_band": "s"
+          }
+        ]
+      }
+    },
+    {
+      "variant": "seq1_r1_odoo_like",
+      "archetype": "odoo_like",
+      "perturbations": [
+        "be_dates",
+        "merged_title",
+        "multi_table_sheet"
+      ],
+      "files": 1,
+      "tables": 4,
+      "mapping_valid": true,
+      "mapping_confidence": 0.943,
+      "open_questions": [
+        "Price column 'Sales Price': no VAT marker in headers; assumed VAT-inclusive (Thai retail convention) — confirm"
+      ],
+      "engine": {
+        "rows_in": 391,
+        "rows_out": 391,
+        "sources": {
+          "products": 391,
+          "inventory": 699,
+          "promotions": 142
+        },
+        "collections": {
+          "/prices": 391,
+          "/inventory": 699,
+          "/promotions": 142
+        },
+        "duration_ms": 67.4,
+        "identity_keys": [
+          "/sku"
+        ],
+        "findings": {
+          "error": 0,
+          "warning": 0,
+          "info": 0
+        }
+      },
+      "errors": [],
+      "identity_recall": 1.0,
+      "identity_precision": 1.0,
+      "field_accuracy_by_pointer": {
+        "/sku": 1.0,
+        "/product_name": 1.0,
+        "/brand": 1.0,
+        "/barcode": 1.0,
+        "/category": 1.0,
+        "/unit/sell_unit": 1.0,
+        "/unit/pack_size": 1.0,
+        "/status": 0.9616,
+        "/currency": 1.0,
+        "/prices/0/amount": 1.0,
+        "/prices/0/vat_included": 1.0,
+        "/inventory": 0.9923,
+        "/promotions/0/type": 1.0,
+        "/promotions/0/discount_percent": 1.0,
+        "/promotions/0/start_date": 1.0,
+        "/promotions/0/end_date": 1.0
+      },
+      "field_accuracy": 0.9964,
+      "critical_accuracy": 1.0,
+      "coverage": 1.0,
+      "fingerprint": {
+        "strict": "3c4b8f8502043cc7",
+        "loose": "76e9e8ca02af0631",
+        "kind": "excel",
+        "tables": [
+          {
+            "sheet": "products",
+            "headers": [
+              "internal reference",
+              "product name",
+              "product category",
+              "brand",
+              "barcode",
+              "unit of measure",
+              "sales price",
+              "active"
+            ],
+            "types": [
+              "string",
+              "string",
+              "string",
+              "string",
+              "int",
+              "string",
+              "float",
+              "bool"
+            ],
+            "header_row": 0,
+            "n_rows_band": "s"
+          },
+          {
+            "sheet": "stock",
+            "headers": [
+              "internal reference",
+              "warehouse",
+              "quantity on hand"
+            ],
+            "types": [
+              "string",
+              "string",
+              "int"
+            ],
+            "header_row": 0,
+            "n_rows_band": "s"
+          },
+          {
+            "sheet": "promotions",
+            "headers": [
+              "sku",
+              "promo code",
+              "promo type",
+              "discount %",
+              "discount amount",
+              "promo price",
+              "buy",
+              "get",
+              "start date",
+              "end date"
+            ],
+            "types": [
+              "string",
+              "string",
+              "string",
+              "float",
+              "float",
+              "float",
+              "int",
+              "int",
+              "date",
+              "date"
+            ],
+            "header_row": 0,
+            "n_rows_band": "s"
+          }
+        ]
+      }
+    },
+    {
+      "variant": "seq1_r2_odoo_like",
+      "archetype": "odoo_like",
+      "perturbations": [
+        "be_dates",
+        "merged_title",
+        "multi_table_sheet",
+        "renamed_columns"
+      ],
+      "files": 1,
+      "tables": 4,
+      "mapping_valid": true,
+      "mapping_confidence": 0.943,
+      "open_questions": [
+        "Price column 'List Price': no VAT marker in headers; assumed VAT-inclusive (Thai retail convention) — confirm"
+      ],
+      "engine": {
+        "rows_in": 391,
+        "rows_out": 391,
+        "sources": {
+          "products": 391,
+          "inventory": 699,
+          "promotions": 142
+        },
+        "collections": {
+          "/prices": 391,
+          "/inventory": 699,
+          "/promotions": 142
+        },
+        "duration_ms": 99.2,
+        "identity_keys": [
+          "/sku"
+        ],
+        "findings": {
+          "error": 0,
+          "warning": 0,
+          "info": 0
+        }
+      },
+      "errors": [],
+      "identity_recall": 1.0,
+      "identity_precision": 1.0,
+      "field_accuracy_by_pointer": {
+        "/sku": 1.0,
+        "/product_name": 1.0,
+        "/brand": 1.0,
+        "/barcode": 1.0,
+        "/category": 1.0,
+        "/unit/sell_unit": 1.0,
+        "/unit/pack_size": 1.0,
+        "/status": 0.9616,
+        "/currency": 1.0,
+        "/prices/0/amount": 1.0,
+        "/prices/0/vat_included": 1.0,
+        "/inventory": 0.9923,
+        "/promotions/0/type": 1.0,
+        "/promotions/0/discount_percent": 1.0,
+        "/promotions/0/start_date": 1.0,
+        "/promotions/0/end_date": 1.0
+      },
+      "field_accuracy": 0.9964,
+      "critical_accuracy": 1.0,
+      "coverage": 1.0,
+      "fingerprint": {
+        "strict": "fe70e25784a52995",
+        "loose": "d09efb79bb068abc",
+        "kind": "excel",
+        "tables": [
+          {
+            "sheet": "products",
+            "headers": [
+              "internal reference",
+              "name",
+              "product category",
+              "brand",
+              "barcode",
+              "unit of measure",
+              "list price",
+              "active"
+            ],
+            "types": [
+              "string",
+              "string",
+              "string",
+              "string",
+              "int",
+              "string",
+              "float",
+              "bool"
+            ],
+            "header_row": 0,
+            "n_rows_band": "s"
+          },
+          {
+            "sheet": "stock",
+            "headers": [
+              "internal reference",
+              "warehouse",
+              "qty available"
+            ],
+            "types": [
+              "string",
+              "string",
+              "int"
+            ],
+            "header_row": 0,
+            "n_rows_band": "s"
+          },
+          {
+            "sheet": "promotions",
+            "headers": [
+              "sku",
+              "promo code",
+              "promo type",
+              "discount %",
+              "discount amount",
+              "promo price",
+              "buy",
+              "get",
+              "start date",
+              "end date"
+            ],
+            "types": [
+              "string",
+              "string",
+              "string",
+              "float",
+              "float",
+              "float",
+              "int",
+              "int",
+              "date",
+              "date"
+            ],
+            "header_row": 0,
+            "n_rows_band": "s"
+          }
+        ]
+      }
+    },
+    {
+      "variant": "seq1_r3_odoo_like",
+      "archetype": "crosstab_months",
+      "perturbations": [
+        "be_dates",
+        "merged_title",
+        "multi_table_sheet"
+      ],
+      "files": 1,
+      "tables": 5,
+      "mapping_valid": true,
+      "mapping_confidence": 0.939,
+      "open_questions": [
+        "Table 'Price by Month' is a price grid by period (['Oct-26', 'Nov-26', 'Dec-26']…); mapped every period as a price row — confirm which period applies"
+      ],
+      "engine": {
+        "rows_in": 372,
+        "rows_out": 372,
+        "sources": {
+          "products": 372,
+          "pricing": 1116,
+          "inventory": 684,
+          "promotions": 138
+        },
+        "collections": {
+          "/prices": 1116,
+          "/inventory": 684,
+          "/promotions": 138
+        },
+        "duration_ms": 85.4,
+        "identity_keys": [
+          "/sku"
+        ],
+        "findings": {
+          "error": 0,
+          "warning": 0,
+          "info": 0
+        }
+      },
+      "errors": [],
+      "identity_recall": 1.0,
+      "identity_precision": 1.0,
+      "field_accuracy_by_pointer": {
+        "/sku": 1.0,
+        "/product_name": 1.0,
+        "/brand": 1.0,
+        "/barcode": 1.0,
+        "/category": 1.0,
+        "/unit/sell_unit": 1.0,
+        "/unit/pack_size": 1.0,
+        "/status": 0.9382,
+        "/currency": 1.0,
+        "/prices/0/amount": 1.0,
+        "/prices/0/vat_included": 1.0,
+        "/inventory": 0.9973,
+        "/promotions/0/type": 1.0,
+        "/promotions/0/start_date": 1.0,
+        "/promotions/0/end_date": 1.0,
+        "/promotions/0/discount_percent": 1.0
+      },
+      "field_accuracy": 0.9949,
+      "critical_accuracy": 1.0,
+      "coverage": 1.0,
+      "fingerprint": {
+        "strict": "1caf92d452624754",
+        "loose": "eae268f17f852411",
+        "kind": "excel",
+        "tables": [
+          {
+            "sheet": "products",
+            "headers": [
+              "item code",
+              "item name",
+              "group",
+              "brand",
+              "barcode",
+              "uom",
+              "status"
+            ],
+            "types": [
+              "string",
+              "string",
+              "string",
+              "string",
+              "int",
+              "string",
+              "bool"
+            ],
+            "header_row": 0,
+            "n_rows_band": "s"
+          },
+          {
+            "sheet": "price by month",
+            "headers": [
+              "item code",
+              "oct 26",
+              "nov 26",
+              "dec 26"
+            ],
+            "types": [
+              "string",
+              "float",
+              "float",
+              "float"
+            ],
+            "header_row": 0,
+            "n_rows_band": "s"
+          },
+          {
+            "sheet": "stock",
+            "headers": [
+              "item code",
+              "wh",
+              "qty"
+            ],
+            "types": [
+              "string",
+              "string",
+              "int"
+            ],
+            "header_row": 0,
+            "n_rows_band": "s"
+          },
+          {
+            "sheet": "promotions",
+            "headers": [
+              "sku",
+              "promo code",
+              "promo type",
+              "discount %",
+              "discount amount",
+              "promo price",
+              "buy",
+              "get",
+              "start date",
+              "end date"
+            ],
+            "types": [
+              "string",
+              "string",
+              "string",
+              "float",
+              "float",
+              "float",
+              "int",
+              "int",
+              "date",
+              "date"
+            ],
+            "header_row": 0,
+            "n_rows_band": "s"
+          }
+        ]
+      }
+    },
+    {
+      "variant": "seq2_r0_csv_vendor",
+      "archetype": "csv_vendor",
+      "perturbations": [
+        "currency_symbols",
+        "empty_columns",
+        "multi_table_sheet"
+      ],
+      "files": 3,
+      "tables": 4,
+      "mapping_valid": true,
+      "mapping_confidence": 1.0,
+      "open_questions": [],
+      "engine": {
+        "rows_in": 344,
+        "rows_out": 344,
+        "sources": {
+          "products": 344,
+          "inventory": 624,
+          "promotions": 109
+        },
+        "collections": {
+          "/prices": 344,
+          "/inventory": 624,
+          "/promotions": 109
+        },
+        "duration_ms": 76.6,
+        "identity_keys": [
+          "/sku"
+        ],
+        "findings": {
+          "error": 0,
+          "warning": 0,
+          "info": 0
+        }
+      },
+      "errors": [],
+      "identity_recall": 1.0,
+      "identity_precision": 1.0,
+      "field_accuracy_by_pointer": {
+        "/sku": 1.0,
+        "/product_name": 1.0,
+        "/brand": 1.0,
+        "/barcode": 1.0,
+        "/category": 1.0,
+        "/unit/sell_unit": 1.0,
+        "/status": 0.9273,
+        "/currency": 1.0,
+        "/prices/0/amount": 1.0,
+        "/prices/0/vat_included": 1.0,
+        "/inventory": 0.9913,
+        "/promotions/0/type": 1.0,
+        "/promotions/0/start_date": 1.0,
+        "/promotions/0/end_date": 1.0,
+        "/unit/pack_size": 1.0,
+        "/promotions/0/discount_percent": 1.0
+      },
+      "field_accuracy": 0.9935,
+      "critical_accuracy": 1.0,
+      "coverage": 1.0,
+      "fingerprint": {
+        "strict": "ef09ee001ad6cf0d",
+        "loose": "88d452b2e625f2f5",
+        "kind": "csv",
+        "tables": [
+          {
+            "sheet": "products",
+            "headers": [
+              "sku",
+              "product name",
+              "category",
+              "brand",
+              "ean",
+              "uom",
+              "price inc vat",
+              "status"
+            ],
+            "types": [
+              "string",
+              "string",
+              "string",
+              "string",
+              "int",
+              "string",
+              "float",
+              "bool"
+            ],
+            "header_row": 0,
+            "n_rows_band": "s"
+          }
+        ]
+      }
+    },
+    {
+      "variant": "seq2_r1_csv_vendor",
+      "archetype": "csv_vendor",
+      "perturbations": [
+        "currency_symbols",
+        "empty_columns",
+        "multi_table_sheet"
+      ],
+      "files": 3,
+      "tables": 4,
+      "mapping_valid": true,
+      "mapping_confidence": 1.0,
+      "open_questions": [],
+      "engine": {
+        "rows_in": 343,
+        "rows_out": 343,
+        "sources": {
+          "products": 343,
+          "inventory": 622,
+          "promotions": 109
+        },
+        "collections": {
+          "/prices": 343,
+          "/inventory": 622,
+          "/promotions": 109
+        },
+        "duration_ms": 58.8,
+        "identity_keys": [
+          "/sku"
+        ],
+        "findings": {
+          "error": 0,
+          "warning": 0,
+          "info": 0
+        }
+      },
+      "errors": [],
+      "identity_recall": 1.0,
+      "identity_precision": 1.0,
+      "field_accuracy_by_pointer": {
+        "/sku": 1.0,
+        "/product_name": 1.0,
+        "/brand": 1.0,
+        "/barcode": 1.0,
+        "/category": 1.0,
+        "/unit/sell_unit": 1.0,
+        "/status": 0.9271,
+        "/currency": 1.0,
+        "/prices/0/amount": 1.0,
+        "/prices/0/vat_included": 1.0,
+        "/inventory": 0.9913,
+        "/promotions/0/type": 1.0,
+        "/promotions/0/start_date": 1.0,
+        "/promotions/0/end_date": 1.0,
+        "/unit/pack_size": 1.0,
+        "/promotions/0/discount_percent": 1.0
+      },
+      "field_accuracy": 0.9935,
+      "critical_accuracy": 1.0,
+      "coverage": 1.0,
+      "fingerprint": {
+        "strict": "ef09ee001ad6cf0d",
+        "loose": "88d452b2e625f2f5",
+        "kind": "csv",
+        "tables": [
+          {
+            "sheet": "products",
+            "headers": [
+              "sku",
+              "product name",
+              "category",
+              "brand",
+              "ean",
+              "uom",
+              "price inc vat",
+              "status"
+            ],
+            "types": [
+              "string",
+              "string",
+              "string",
+              "string",
+              "int",
+              "string",
+              "float",
+              "bool"
+            ],
+            "header_row": 0,
+            "n_rows_band": "s"
+          }
+        ]
+      }
+    },
+    {
+      "variant": "seq2_r2_csv_vendor",
+      "archetype": "csv_vendor",
+      "perturbations": [
+        "currency_symbols",
+        "empty_columns",
+        "multi_table_sheet",
+        "renamed_columns"
+      ],
+      "files": 3,
+      "tables": 4,
+      "mapping_valid": true,
+      "mapping_confidence": 1.0,
+      "open_questions": [],
+      "engine": {
+        "rows_in": 343,
+        "rows_out": 343,
+        "sources": {
+          "products": 343,
+          "inventory": 622,
+          "promotions": 109
+        },
+        "collections": {
+          "/prices": 343,
+          "/inventory": 622,
+          "/promotions": 109
+        },
+        "duration_ms": 60.1,
+        "identity_keys": [
+          "/sku"
+        ],
+        "findings": {
+          "error": 0,
+          "warning": 0,
+          "info": 0
+        }
+      },
+      "errors": [],
+      "identity_recall": 1.0,
+      "identity_precision": 1.0,
+      "field_accuracy_by_pointer": {
+        "/sku": 1.0,
+        "/product_name": 1.0,
+        "/brand": 1.0,
+        "/barcode": 1.0,
+        "/category": 1.0,
+        "/unit/sell_unit": 1.0,
+        "/status": 0.9271,
+        "/currency": 1.0,
+        "/prices/0/amount": 1.0,
+        "/prices/0/vat_included": 1.0,
+        "/inventory": 0.9913,
+        "/promotions/0/type": 1.0,
+        "/promotions/0/start_date": 1.0,
+        "/promotions/0/end_date": 1.0,
+        "/unit/pack_size": 1.0,
+        "/promotions/0/discount_percent": 1.0
+      },
+      "field_accuracy": 0.9935,
+      "critical_accuracy": 1.0,
+      "coverage": 1.0,
+      "fingerprint": {
+        "strict": "2362d9ae051b7d4a",
+        "loose": "23676a397b217864",
+        "kind": "csv",
+        "tables": [
+          {
+            "sheet": "products",
+            "headers": [
+              "sku",
+              "name",
+              "category",
+              "brand",
+              "ean",
+              "uom",
+              "price inc vat",
+              "status"
+            ],
+            "types": [
+              "string",
+              "string",
+              "string",
+              "string",
+              "int",
+              "string",
+              "float",
+              "bool"
+            ],
+            "header_row": 0,
+            "n_rows_band": "s"
+          }
+        ]
+      }
+    },
+    {
+      "variant": "seq2_r3_csv_vendor",
+      "archetype": "odoo_like",
+      "perturbations": [
+        "currency_symbols",
+        "empty_columns",
+        "multi_table_sheet"
+      ],
+      "files": 1,
+      "tables": 4,
+      "mapping_valid": true,
+      "mapping_confidence": 0.943,
+      "open_questions": [
+        "Price column 'Sales Price': no VAT marker in headers; assumed VAT-inclusive (Thai retail convention) — confirm"
+      ],
+      "engine": {
+        "rows_in": 234,
+        "rows_out": 234,
+        "sources": {
+          "products": 234,
+          "inventory": 422,
+          "promotions": 81
+        },
+        "collections": {
+          "/prices": 234,
+          "/inventory": 422,
+          "/promotions": 81
+        },
+        "duration_ms": 57.5,
+        "identity_keys": [
+          "/sku"
+        ],
+        "findings": {
+          "error": 0,
+          "warning": 0,
+          "info": 0
+        }
+      },
+      "errors": [],
+      "identity_recall": 1.0,
+      "identity_precision": 1.0,
+      "field_accuracy_by_pointer": {
+        "/sku": 1.0,
+        "/product_name": 1.0,
+        "/brand": 1.0,
+        "/barcode": 1.0,
+        "/category": 1.0,
+        "/unit/sell_unit": 1.0,
+        "/unit/pack_size": 1.0,
+        "/status": 0.953,
+        "/currency": 1.0,
+        "/prices/0/amount": 1.0,
+        "/prices/0/vat_included": 1.0,
+        "/inventory": 0.9915,
+        "/promotions/0/type": 1.0,
+        "/promotions/0/discount_percent": 1.0,
+        "/promotions/0/start_date": 1.0,
+        "/promotions/0/end_date": 1.0
+      },
+      "field_accuracy": 0.9956,
+      "critical_accuracy": 1.0,
+      "coverage": 1.0,
+      "fingerprint": {
+        "strict": "3c4b8f8502043cc7",
+        "loose": "76e9e8ca02af0631",
+        "kind": "excel",
+        "tables": [
+          {
+            "sheet": "products",
+            "headers": [
+              "internal reference",
+              "product name",
+              "product category",
+              "brand",
+              "barcode",
+              "unit of measure",
+              "sales price",
+              "active"
+            ],
+            "types": [
+              "string",
+              "string",
+              "string",
+              "string",
+              "int",
+              "string",
+              "float",
+              "bool"
+            ],
+            "header_row": 0,
+            "n_rows_band": "s"
+          },
+          {
+            "sheet": "stock",
+            "headers": [
+              "internal reference",
+              "warehouse",
+              "quantity on hand"
+            ],
+            "types": [
+              "string",
+              "string",
+              "int"
+            ],
+            "header_row": 0,
+            "n_rows_band": "s"
+          },
+          {
+            "sheet": "promotions",
+            "headers": [
+              "sku",
+              "promo code",
+              "promo type",
+              "discount %",
+              "discount amount",
+              "promo price",
+              "buy",
+              "get",
+              "start date",
+              "end date"
+            ],
+            "types": [
+              "string",
+              "string",
+              "string",
+              "float",
+              "float",
+              "float",
+              "int",
+              "int",
+              "date",
+              "date"
+            ],
+            "header_row": 0,
+            "n_rows_band": "xs"
+          }
+        ]
+      }
+    }
+  ],
+  "drift": [
+    {
+      "sequence": "seq0",
+      "round": 1,
+      "expected": "same_customer_unchanged",
+      "got": "identical",
+      "similarity": 1.0,
+      "ok": true
+    },
+    {
+      "sequence": "seq0",
+      "round": 2,
+      "expected": "renamed",
+      "got": "columns_removed",
+      "similarity": 0.761,
+      "ok": true
+    },
+    {
+      "sequence": "seq0",
+      "round": 3,
+      "expected": "wrong_file",
+      "got": "unrelated_file",
+      "similarity": 0.096,
+      "ok": true
+    },
+    {
+      "sequence": "seq1",
+      "round": 1,
+      "expected": "same_customer_unchanged",
+      "got": "identical",
+      "similarity": 1.0,
+      "ok": true
+    },
+    {
+      "sequence": "seq1",
+      "round": 2,
+      "expected": "renamed",
+      "got": "columns_removed",
+      "similarity": 0.804,
+      "ok": true
+    },
+    {
+      "sequence": "seq1",
+      "round": 3,
+      "expected": "wrong_file",
+      "got": "unrelated_file",
+      "similarity": 0.25,
+      "ok": true
+    },
+    {
+      "sequence": "seq2",
+      "round": 1,
+      "expected": "same_customer_unchanged",
+      "got": "identical",
+      "similarity": 1.0,
+      "ok": true
+    },
+    {
+      "sequence": "seq2",
+      "round": 2,
+      "expected": "renamed",
+      "got": "columns_renamed",
+      "similarity": 0.861,
+      "ok": true
+    },
+    {
+      "sequence": "seq2",
+      "round": 3,
+      "expected": "wrong_file",
+      "got": "unrelated_file",
+      "similarity": 0.18,
+      "ok": true
+    }
+  ]
+}
