@@ -226,6 +226,31 @@ class LLMClient:
     def is_mock(self) -> bool:
         return isinstance(self.provider, MockProvider)
 
+    def _call_provider(self, system: str, user: str, schema: dict[str, Any]) -> tuple[str, Usage]:
+        """One provider round-trip with transport retries + the circuit breaker (ADR-015).
+        The mock provider is never wrapped so unit tests stay deterministic."""
+        if self.is_mock:
+            return self.provider.complete_json(
+                system=system, user=user, schema=schema, model=self.model, temperature=self.temperature
+            )
+        from forma.ai.breaker import CircuitOpen, guarded_call
+        from forma.core.settings import get_settings
+
+        s = get_settings()
+        try:
+            out: tuple[str, Usage] = guarded_call(
+                lambda: self.provider.complete_json(
+                    system=system, user=user, schema=schema, model=self.model, temperature=self.temperature
+                ),
+                attempts=s.llm_transport_retries,
+                base_s=s.llm_backoff_s,
+            )
+        except CircuitOpen as e:
+            raise LLMError(str(e)) from e
+        except Exception as e:
+            raise LLMError(f"{type(e).__name__}: {e}"[:500]) from e
+        return out
+
     def structured(
         self,
         *,
@@ -277,9 +302,7 @@ class LLMClient:
                 + "\n\nYour previous answer had these problems, fix them:\n- "
                 + "\n- ".join(errors[:12])
             )
-            text, u = self.provider.complete_json(
-                system=system, user=prompt, schema=schema, model=self.model, temperature=self.temperature
-            )
+            text, u = self._call_provider(system, prompt, schema)
             usage.add(u)
             try:
                 data = _parse_json(text)

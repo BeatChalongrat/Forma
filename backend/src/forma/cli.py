@@ -263,6 +263,54 @@ def seed(corpus: Path = Path("../data/synthetic"), run: bool = True) -> None:
     typer.echo(json.dumps(seed_database(corpus, run_pipeline=run), ensure_ascii=False, indent=2))
 
 
+retention_app = typer.Typer(help="Retention policy (policies/retention.yaml)")
+app.add_typer(retention_app, name="retention")
+
+
+@retention_app.command("run")
+def retention_run(apply: bool = False, out: Path | None = None) -> None:
+    """Plan (default) or apply retention. Every deletion is audited. --apply deletes."""
+    from forma.db.session import init_db, session_scope
+    from forma.services import retention
+    from forma.services.context import get_context
+
+    init_db()
+    ctx = get_context()
+    with session_scope() as s:
+        plan = retention.plan(ctx, s)
+        result: dict[str, object] = {"dry_run": not apply, "summary": plan["summary"]}
+        if apply:
+            result["applied"] = retention.apply(ctx, s, plan, actor="retention.cli")
+    if out:
+        out.write_text(json.dumps(plan, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
+        result["plan_written"] = str(out)
+    typer.echo(json.dumps(result, ensure_ascii=False, indent=2, default=str))
+
+
+@app.command()
+def backup(out: Path = Path("../data/backups"), objects: bool = True, archive: bool = False) -> None:
+    """DB dump + storage manifest (+ objects) into OUT (docs/RUNBOOK.md)."""
+    from forma.db.session import init_db
+    from forma.services.backup import create_backup
+    from forma.services.context import get_context
+
+    init_db()
+    typer.echo(
+        json.dumps(
+            create_backup(get_context(), out.resolve(), include_objects=objects, archive=archive), indent=2
+        )
+    )
+
+
+@app.command()
+def restore(src: Path, verify: bool = True) -> None:
+    """Restore a backup directory or .tar.gz into an EMPTY database + the configured storage."""
+    from forma.services.backup import restore_backup
+    from forma.services.context import get_context
+
+    typer.echo(json.dumps(restore_backup(get_context(), src.resolve(), verify=verify), indent=2))
+
+
 @schema_app.command("list")
 def schema_list() -> None:
     from forma.services.context import get_context

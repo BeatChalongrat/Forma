@@ -144,5 +144,5 @@ def test_json_log_format_configures_without_error(capsys: pytest.CaptureFixture[
     get_logger("t").info("hello", n=1)
     structlog.contextvars.unbind_contextvars("request_id")
     configure_logging("INFO", "console")
-    out = capsys.readouterr().out
+    out = capsys.readouterr().err  # logs go to stderr; stdout stays machine-readable for the CLI
     assert '"event": "hello"' in out and '"request_id": "r1"' in out

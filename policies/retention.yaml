@@ -1,0 +1,30 @@
+# Retention policy (ADR-015). Applied by `forma retention run` (dry-run by default; --apply deletes)
+# and by the scheduled hook (`FORMA_RETENTION_SCHEDULE`). Every deletion is written to the audit log.
+version: 1
+
+source_files:
+  # Keep uploaded source files this many days after their round was published (or rejected/blocked).
+  # Files of rounds that are still open are never touched. Content-addressed objects shared by several
+  # rounds are deleted only when every referencing round is past retention.
+  keep_days_after_publish: 90
+
+dataset_versions:
+  # Keep only the last K versions per round; approved/published versions and the parents of kept
+  # versions (rollback targets) are always kept. Older draft/superseded JSONL objects are deleted and the
+  # row is marked `purged` (history stays visible, the data does not).
+  keep_last_versions: 5
+
+exports:
+  # Export artifacts older than this are deleted (the dataset version can be re-exported).
+  keep_days: 180
+
+jobs:
+  # Finished job rows (done/failed) older than this are deleted.
+  keep_days: 30
+
+llm_calls:
+  keep_days: 365
+
+cache:
+  # S3 local cache objects not touched for this many days (local storage: no-op).
+  keep_days: 7

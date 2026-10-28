@@ -38,6 +38,8 @@ class Settings(BaseSettings):
     llm_base_url: str | None = Field(default=None, description="Gateway base URL for openai_compatible.")
     llm_timeout_s: float = Field(default=90.0, description="Per-call HTTP timeout in seconds.")
     llm_max_retries: int = Field(default=2, description="Structured-output retries on invalid JSON.")
+    llm_transport_retries: int = Field(default=3, description="Attempts per provider call on timeouts/5xx.")
+    llm_backoff_s: float = Field(default=1.0, description="Base backoff between transport retries (doubles).")
     llm_breaker_failures: int = Field(
         default=5, description="Consecutive provider failures that open the circuit."
     )
@@ -76,6 +78,12 @@ class Settings(BaseSettings):
     )
     max_upload_mb: int = Field(default=200, description="Largest accepted upload per file, in MB.")
 
+    retention_interval_h: float = Field(
+        default=0.0, description="Hours between scheduled retention runs (0 = off)."
+    )
+    retention_apply: bool = Field(
+        default=False, description="Scheduled retention deletes (true) or only plans (false)."
+    )
     # Storage
     storage: str = Field(default="local", description="local | s3 (S3 or MinIO via boto3).")
     s3_bucket: str = Field(default="forma", description="S3 bucket name.")
