@@ -76,6 +76,23 @@ FORMA_LLM_API_KEY=sk-...
 
 Token usage and cost per round are recorded in the `llm_calls` ledger and shown on the Overview.
 
+### Run it in production mode (Postgres · Redis workers · MinIO · nginx)
+
+```bash
+cp .env.production.example .env.production        # every variable explained; fill in the secrets
+docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build --scale worker=4
+open http://localhost/            # web (set FORMA_WEB_PORT to change)
+curl http://localhost/ready       # db · storage · queue
+```
+
+What switches on in production is configuration, not code: `FORMA_ENV=prod` (migrations mandatory),
+`FORMA_DATABASE_URL` (Postgres, JSONB), `FORMA_JOB_BACKEND=arq` + `FORMA_REDIS_URL` (workers on any
+number of nodes), `FORMA_STORAGE=s3` (S3/MinIO, pre-signed downloads), `FORMA_AUTH=oidc` (bearer tokens,
+PKCE login in the web app; roles importer/reviewer/approver/admin), `FORMA_OTEL_ENDPOINT` (traces),
+`FORMA_LOG_FORMAT=json`. `forma config show` prints the effective configuration with secrets masked.
+Operations: `docs/RUNBOOK.md` (worker crash, stuck round, wrong file published, provider outage, schema
+rollout, backup/restore), the admin **Ops** page, `/metrics` for Prometheus.
+
 ### Useful commands
 
 | Command | What it does |
@@ -83,8 +100,14 @@ Token usage and cost per round are recorded in the `llm_calls` ledger and shown 
 | `forma profile <file>` | sheets, tables, columns, types, fingerprint of one file |
 | `forma propose <file> [--llm]` | propose a mapping YAML for a file |
 | `forma transform <file> <mapping.yaml> --fmt csv` | run a mapping, write output |
-| `forma eval` | accuracy of mapper + engine vs corpus ground truth |
-| `make check` | ruff + mypy + pytest with coverage |
+| `forma eval [--baseline data/eval_baseline.json]` | accuracy of mapper + engine vs corpus ground truth (CI gate) |
+| `forma bench --files 300 --rows 100000` | end-to-end throughput benchmark (`docs/PERFORMANCE.md`) |
+| `forma worker` | run a job worker (`FORMA_JOB_BACKEND=arq` needs Redis) |
+| `forma db upgrade / revision -m "…" / current` | Alembic migrations |
+| `forma retention run [--apply]` | retention policy, dry-run by default |
+| `forma backup / forma restore <path>` | DB dump + storage manifest (+ objects) |
+| `forma config show / config example` | effective config (masked) / regenerate `.env.production.example` |
+| `make check` | ruff + mypy + pytest with coverage (≥ 85 %) |
 | `make reset` | wipe runtime data (DB, files, datasets, exports) |
 
 ---
@@ -121,5 +144,8 @@ docs/               architecture, ADRs, data model, DSL reference, Thai rules, r
 * [docs/DATA_MODEL.md](docs/DATA_MODEL.md) — entities and versioning rules
 * [docs/THAI_CONTEXT_RULES.md](docs/THAI_CONTEXT_RULES.md) — dates, numbers, VAT, units
 * [docs/EVALUATION.md](docs/EVALUATION.md) — corpus, metrics, current results
+* [docs/PERFORMANCE.md](docs/PERFORMANCE.md) — measured throughput of a 300-file night, engine profile
+* [docs/RUNBOOK.md](docs/RUNBOOK.md) — operations: RPO/RTO, incident procedures, backup/restore, retention
 * [docs/ROADMAP_STATUS.md](docs/ROADMAP_STATUS.md) — what is built per blueprint phase, what is next
+* [docs/PHASE7_HANDOFF.md](docs/PHASE7_HANDOFF.md) — Phase 7 handoff: what was done, numbers, limits, next steps
 * [docs/adr/](docs/adr/) — architecture decision records
