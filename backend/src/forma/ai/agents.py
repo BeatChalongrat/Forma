@@ -286,7 +286,7 @@ def mapping_agent(
         return draft.mapping, r
     doc = MappingDocument.model_validate(res.data["mapping"])
     doc.meta.created_by = "ai"
-    doc.meta.model = client.model
+    doc.meta.model = res.usage.model or client.model  # the route that answered (ADR-025)
     if res.data.get("confidence") is not None:
         doc.meta.confidence = float(res.data["confidence"])
     return doc, AgentResult(
@@ -413,7 +413,7 @@ def adaptation_agent(
         return draft.mapping, AgentResult("adaptation", {}, client.total_usage, 0, [f"llm_failed: {e}"])
     doc = MappingDocument.model_validate(res.data["mapping"])
     doc.meta.created_by = "ai"
-    doc.meta.model = client.model
+    doc.meta.model = res.usage.model or client.model  # the route that answered (ADR-025)
     return doc, AgentResult(
         "adaptation", {k: v for k, v in res.data.items() if k != "mapping"}, res.usage, res.attempts
     )

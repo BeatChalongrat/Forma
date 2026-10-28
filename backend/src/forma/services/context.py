@@ -95,7 +95,7 @@ class ServiceContext:
             if "policy" not in self._pinned:
                 self._policy = PolicyEngine.load(s.resolve(s.policies_dir), snap.policy)
             if "llm" not in self._pinned:
-                self._llm = LLMClient.from_settings(config.llm_settings(s, snap.ai))
+                self._llm = config.build_client(s, snap.ai)
             self._revision = rev
 
     def refresh(self) -> None:

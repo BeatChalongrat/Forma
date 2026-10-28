@@ -5,6 +5,7 @@ from __future__ import annotations
 import contextlib
 import copy
 import datetime as dt
+import re
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
@@ -18,7 +19,7 @@ from forma.core.errors import Conflict, NotFound, ValidationFailed
 from forma.core.ids import new_id
 from forma.db.models import ChangeSet, DatasetVersion, ExportArtifact, ImportRound, Override
 from forma.engine.ops import CompileContext, compile_expr
-from forma.engine.transform import TransformEngine, _get_pointer, _set_pointer
+from forma.engine.transform import Finding, TransformEngine, _get_pointer, _set_pointer
 from forma.export.exporter import FORMATS, write_export
 from forma.mapping_dsl.models import CallExpr, ColExpr, ConstExpr, MappingDocument
 from forma.schema_registry import INTERNAL_KEYS, PROVENANCE_KEY, TargetSchema
@@ -128,9 +129,14 @@ def transform_round(
     res = engine.run(doc, bindings)
     records = res.records
     findings = [f.to_dict() for f in res.findings]
+    stats = dict(res.stats)
     override_impact: dict[str, Any] = {}
     if apply_overrides:
         records, override_impact = apply_persistent_overrides(session, r.customer_id, schema, records)
+        if override_impact.get("rows_affected") or override_impact.get("rows_deleted"):
+            errors = schema_errors(schema, records)  # validate what the overrides produced
+            findings = _with_schema_findings(findings, errors, schema)
+            stats["invalid_records"] = _invalid_count(errors)
     dv = _new_version(
         ctx,
         session,
@@ -141,7 +147,7 @@ def transform_round(
         mapping_version_id=mv.id,
         version=(prev_version.version + 1) if prev_version else 1,
         status="draft",
-        stats={**res.stats, "overrides": override_impact},
+        stats={**stats, "overrides": override_impact},
         findings=findings,
         parent_id=prev_version.id if prev_version else None,
         created_by=actor,
@@ -172,6 +178,92 @@ def transform_round(
 
 def _identity_of(rec: dict[str, Any], schema: TargetSchema) -> str:
     return "|".join(str(_get_pointer(rec, k)) for k in schema.identity_keys)
+
+
+# --------------------------------------------------------------------------------------------
+# Schema conformance (ADR-026): a record that breaks the target contract is never approved or exported
+# --------------------------------------------------------------------------------------------
+SCHEMA_FINDINGS_CAP = 200
+
+
+def schema_errors(schema: TargetSchema, records: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Every error of every record as exported: row, identity, pointer, message."""
+    out: list[dict[str, Any]] = []
+    for i, rec in enumerate(records):
+        errs = schema.validate_record(rec)
+        if errs:
+            ident = _identity_of(rec, schema)
+            out.extend({"row": i, "identity": ident, **e} for e in errs)
+    return out
+
+
+def new_schema_errors(
+    schema: TargetSchema, before: list[dict[str, Any]], after_errors: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
+    """The errors an edit introduces: present after it, absent from the same record before it. Only the
+    records that are invalid after the edit are validated again, so fixing one row of many is allowed."""
+    if not after_errors:
+        return []
+    wanted = {e["identity"] for e in after_errors}
+    old = {ident: r for r in before if (ident := _identity_of(r, schema)) in wanted}
+    known = {
+        (ident, e["pointer"], e["message"]) for ident, r in old.items() for e in schema.validate_record(r)
+    }
+    return [e for e in after_errors if (e["identity"], e["pointer"], e["message"]) not in known]
+
+
+def _invalid_count(errors: list[dict[str, Any]]) -> int:
+    return len({e["row"] for e in errors})
+
+
+def _with_schema_findings(
+    findings: list[dict[str, Any]], errors: list[dict[str, Any]], schema: TargetSchema
+) -> list[dict[str, Any]]:
+    """Replace a version's validation findings with the errors of its current records."""
+    kept = [f for f in findings or [] if f.get("kind") != "validation"]
+    fresh = [
+        Finding(
+            "validation",
+            "error",
+            f"{e['pointer']}: {e['message']}",
+            target=schema.wildcard(e["pointer"]),
+            row=e["row"],
+            identity=e["identity"],
+        ).to_dict()
+        for e in errors[:SCHEMA_FINDINGS_CAP]
+    ]
+    if len(errors) > SCHEMA_FINDINGS_CAP:
+        more = len(errors) - SCHEMA_FINDINGS_CAP
+        fresh.append(Finding("validation", "error", f"... {more} more schema validation errors").to_dict())
+    return kept + fresh
+
+
+def invalid_records(dv: DatasetVersion) -> int:
+    """How many records of this version do not match the target schema."""
+    stats = dv.stats or {}
+    if "invalid_records" in stats:
+        return int(stats["invalid_records"])
+    n = 0  # versions made before the count was kept: their validation findings, one per record
+    for f in dv.findings or []:
+        if f.get("kind") == "validation" and f.get("severity") == "error":
+            more = re.match(r"\.\.\. (\d+) more", str(f.get("message", "")))
+            n += int(more.group(1)) if more else 1
+    return n
+
+
+def _require_valid(dv: DatasetVersion, action: str) -> None:
+    bad = invalid_records(dv)
+    if bad:
+        sample = [
+            {"identity": f.get("identity"), "message": f.get("message")}
+            for f in dv.findings or []
+            if f.get("kind") == "validation" and f.get("row") is not None
+        ][:10]
+        raise Conflict(
+            f"{bad} record{'s do' if bad != 1 else ' does'} not match the target format; "
+            f"fix or remove them before {action}",
+            details={"invalid_records": bad, "errors": sample},
+        )
 
 
 def derived_columns(schema: TargetSchema) -> list[dict[str, Any]]:
@@ -375,8 +467,14 @@ def preview_changes(
     schema = ctx.registry.get_ref(get_mapping(session, dv.mapping_version_id).target_schema)
     records = records_of(ctx, dv)
     new, impact = apply_operations(records, operations, schema)
-    errors = schema.validate_records(new, limit=50)
-    return {"impact": impact, "validation_errors": errors, "rows_after": len(new)}
+    after = schema_errors(schema, new)
+    return {
+        "impact": impact,
+        "validation_errors": new_schema_errors(schema, records, after)[:50],  # these block the save
+        "invalid_before": invalid_records(dv),
+        "invalid_after": _invalid_count(after),
+        "rows_after": len(new),
+    }
 
 
 def apply_changes(
@@ -394,9 +492,10 @@ def apply_changes(
     schema = ctx.registry.get_ref(mv.target_schema)
     records = records_of(ctx, dv)
     new, impact = apply_operations(records, operations, schema)
-    errors = schema.validate_records(new, limit=50)
-    if errors:
-        raise ValidationFailed("edits would violate the target schema", details={"errors": errors})
+    after = schema_errors(schema, new)
+    added = new_schema_errors(schema, records, after)
+    if added:  # errors the records already had do not block fixing others one at a time
+        raise ValidationFailed("edits would violate the target schema", details={"errors": added[:50]})
     nv = _new_version(
         ctx,
         session,
@@ -407,8 +506,8 @@ def apply_changes(
         mapping_version_id=dv.mapping_version_id,
         version=dv.version + 1,
         status="draft",
-        stats={**dv.stats, "last_change": impact},
-        findings=dv.findings,
+        stats={**dv.stats, "last_change": impact, "invalid_records": _invalid_count(after)},
+        findings=_with_schema_findings(dv.findings, after, schema),
         parent_id=dv.id,
         created_by=actor,
         note=note,
@@ -453,7 +552,8 @@ def apply_changes(
                 )
     r = session.get(ImportRound, dv.round_id)
     if r:
-        r.summary = {**(r.summary or {}), "dataset_version_id": nv.id, "rows": len(new)}
+        errors = sum(1 for f in nv.findings if f["severity"] == "error")
+        r.summary = {**(r.summary or {}), "dataset_version_id": nv.id, "rows": len(new), "errors": errors}
     audit(
         session,
         "dataset.edit",
@@ -552,6 +652,7 @@ def approve_dataset(
     comment: str | None = None,
 ) -> DatasetVersion:
     dv = get_dataset(session, dataset_id)
+    _require_valid(dv, "approving")  # the contract is not negotiable: no acknowledgement overrides it
     acknowledged = None
     if ctx is not None and ctx.policy.policy["anomaly"]["block_approval_on_high"]:
         rep = anomaly_report(ctx, session, dv)
@@ -706,6 +807,7 @@ def export_dataset(
     # exporting publishes: only data a human approved may leave (approved_data → published)
     if dv.status not in ("approved", "published"):
         raise Conflict(f"dataset is {dv.status}; approve it before exporting", details={"status": dv.status})
+    _require_valid(dv, "exporting")  # also for versions approved before the gate existed
     schema = ctx.registry.get_ref(get_mapping(session, dv.mapping_version_id).target_schema)
     src = ctx.records_path(dv)
     stamp = dt.datetime.now(dt.UTC).strftime("%Y%m%dT%H%M%SZ")

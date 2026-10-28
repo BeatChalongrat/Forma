@@ -127,6 +127,8 @@ def review_task(t: ReviewTask, **extra: Any) -> dict[str, Any]:
 
 
 def dataset_version(d: DatasetVersion) -> dict[str, Any]:
+    from forma.services.datasets import invalid_records
+
     return {
         "id": d.id,
         "round_id": d.round_id,
@@ -135,6 +137,7 @@ def dataset_version(d: DatasetVersion) -> dict[str, Any]:
         "version": d.version,
         "status": d.status,
         "row_count": d.row_count,
+        "invalid_records": invalid_records(d),
         "stats": d.stats,
         "findings": d.findings,
         "parent_id": d.parent_id,

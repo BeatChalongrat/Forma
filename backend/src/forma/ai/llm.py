@@ -3,6 +3,9 @@
 Providers: ``mock`` (deterministic, offline — used in tests and when no API key is configured),
 ``openai`` / ``openai_compatible`` (any /chat/completions endpoint: OpenAI, Azure, vLLM, Ollama,
 an internal AI gateway), ``anthropic`` (Messages API, JSON forced through tool-use).
+
+A client has a primary route and optional backup routes (ADR-025): when a provider call fails
+(transport, HTTP error, open circuit) the next route answers; each route has its own circuit breaker.
 """
 
 from __future__ import annotations
@@ -31,6 +34,14 @@ PRICING: dict[str, tuple[float, float]] = {
     "claude-haiku-4-5": (1.0, 5.0),
     "claude-opus-4-1": (15.0, 75.0),
 }
+
+
+def model_catalogue() -> dict[str, list[str]]:
+    """Models FORMA knows per provider (the Settings model picker); any other name can still be typed."""
+    out: dict[str, list[str]] = {"anthropic": [], "openai": []}
+    for m in PRICING:
+        out["anthropic" if m.startswith("claude") else "openai"].append(m)
+    return out
 
 
 @dataclass
@@ -203,6 +214,26 @@ def _json_instruction(schema: dict[str, Any]) -> str:
     )
 
 
+def make_provider(kind: str, api_key: str | None, base_url: str | None, timeout: float) -> Provider:
+    """The provider for a kind and key; ``MockProvider`` when it cannot be reached (no key, no URL)."""
+    if kind in ("openai", "openai_compatible") and api_key:
+        return OpenAICompatibleProvider(api_key, base_url, timeout)
+    if kind == "openai_compatible" and base_url:
+        return OpenAICompatibleProvider(None, base_url, timeout)
+    if kind == "anthropic" and api_key:
+        return AnthropicProvider(api_key, base_url, timeout)
+    return MockProvider()
+
+
+@dataclass(frozen=True)
+class Route:
+    """One way to reach a model. ``name`` ("primary" or a backup's id) also names its circuit breaker."""
+
+    name: str
+    provider: Provider
+    model: str
+
+
 # --------------------------------------------------------------------------------------------
 @dataclass
 class LLMClient:
@@ -211,49 +242,68 @@ class LLMClient:
     max_retries: int = 2
     temperature: float = 0.0
     total_usage: Usage = field(default_factory=Usage)
+    fallbacks: list[Route] = field(default_factory=list)  # tried in order when the primary fails
+    primary_name: str = "primary"
+    last_route: str | None = None  # the route that answered the last call
 
     @classmethod
     def from_settings(cls, settings: Settings | None = None) -> LLMClient:
         s = settings or get_settings()
-        provider: Provider
-        if s.llm_provider in ("openai", "openai_compatible") and s.llm_api_key:
-            provider = OpenAICompatibleProvider(s.llm_api_key, s.llm_base_url, s.llm_timeout_s)
-        elif s.llm_provider == "openai_compatible" and s.llm_base_url:
-            provider = OpenAICompatibleProvider(None, s.llm_base_url, s.llm_timeout_s)
-        elif s.llm_provider == "anthropic" and s.llm_api_key:
-            provider = AnthropicProvider(s.llm_api_key, s.llm_base_url, s.llm_timeout_s)
-        else:
-            provider = MockProvider()
+        provider = make_provider(s.llm_provider, s.llm_api_key, s.llm_base_url, s.llm_timeout_s)
         return cls(provider, s.llm_model, s.llm_max_retries)
 
     @property
     def is_mock(self) -> bool:
         return isinstance(self.provider, MockProvider)
 
+    @property
+    def routes(self) -> list[Route]:
+        return [Route(self.primary_name, self.provider, self.model), *self.fallbacks]
+
     def _call_provider(self, system: str, user: str, schema: dict[str, Any]) -> tuple[str, Usage]:
-        """One provider round-trip with transport retries + the circuit breaker (ADR-015).
-        The mock provider is never wrapped so unit tests stay deterministic."""
+        """One provider round-trip with transport retries + the circuit breaker (ADR-015), falling over
+        to the backup routes in order (ADR-025). The mock provider is never wrapped so unit tests stay
+        deterministic."""
         if self.is_mock:
             return self.provider.complete_json(
                 system=system, user=user, schema=schema, model=self.model, temperature=self.temperature
             )
-        from forma.ai.breaker import CircuitOpen, guarded_call
+        from forma.ai.breaker import CircuitOpen, get_breaker, guarded_call
+        from forma.core.logging import get_logger
         from forma.core.settings import get_settings
 
+        log = get_logger(__name__)
         s = get_settings()
-        try:
-            out: tuple[str, Usage] = guarded_call(
-                lambda: self.provider.complete_json(
-                    system=system, user=user, schema=schema, model=self.model, temperature=self.temperature
-                ),
-                attempts=s.llm_transport_retries,
-                base_s=s.llm_backoff_s,
-            )
-        except CircuitOpen as e:
-            raise LLMError(str(e)) from e
-        except Exception as e:
-            raise LLMError(f"{type(e).__name__}: {e}"[:500]) from e
-        return out
+        routes = self.routes
+        failures: list[str] = []
+        for route in routes:
+
+            def call(r: Route = route) -> tuple[str, Usage]:
+                return r.provider.complete_json(
+                    system=system, user=user, schema=schema, model=r.model, temperature=self.temperature
+                )
+
+            try:
+                out: tuple[str, Usage] = guarded_call(
+                    call,
+                    attempts=s.llm_transport_retries,
+                    base_s=s.llm_backoff_s,
+                    breaker=get_breaker(route.name),
+                )
+            except CircuitOpen as e:
+                failures.append(f"{route.name}: {e}")
+            except Exception as e:
+                failures.append(f"{route.name}: {type(e).__name__}: {e}"[:300])
+            else:
+                if route.name != routes[0].name:
+                    log.warning("llm answered by a backup", route=route.name, model=route.model)
+                self.last_route = route.name
+                return out
+            if len(routes) > 1:
+                log.warning("llm route failed", route=route.name, error=failures[-1][:200])
+        if len(routes) == 1:
+            raise LLMError(failures[0].split(": ", 1)[1][:500])
+        raise LLMError("every AI route failed — " + " | ".join(failures)[:1000])
 
     def structured(
         self,
@@ -267,18 +317,20 @@ class LLMClient:
         from forma.core import metrics
         from forma.core.telemetry import set_attrs, span
 
-        usage = Usage(model=self.model)
+        usage = Usage()  # takes the model of the route that answers first
         errors: list[str] = []
         text = ""
         with span("llm.structured", model=self.model, provider=self.provider.name) as sp:
             try:
                 res = self._structured(system, user, schema, validate, usage, errors, text)
             except LLMError:
+                usage.model = usage.model or self.model
                 set_attrs(sp, attempts=usage.calls, input_tokens=usage.input_tokens, outcome="error")
                 metrics.observe_llm(_agent_name(), usage, ok=False)
                 raise
             set_attrs(
                 sp,
+                route=self.last_route or self.primary_name,
                 attempts=res.attempts,
                 input_tokens=usage.input_tokens,
                 output_tokens=usage.output_tokens,

@@ -204,9 +204,10 @@ export function DataEditor() {
     mutationFn: (b: { acknowledge_anomalies?: boolean; comment?: string }) => api.approveDataset(datasetId, b),
     onSuccess: () => { qc.invalidateQueries(); setAck(null); toast.push({ kind: 'ok', title: 'Dataset approved' }) },
     // the policy holds data with high-severity anomalies until a person acknowledges them (ADR-022)
-    onError: (e: Error) => { const d = e instanceof ApiError ? (e.details as { high?: number; headline?: string } | undefined) : undefined; if (d?.high) { setAck({ high: d.high, headline: d.headline ?? '' }); setRightTab('diff') } else toast.push({ kind: 'bad', title: 'Approve failed', detail: e.message }) },
+    // records that break the target format are never approved — no acknowledgement overrides it (ADR-026)
+    onError: (e: Error) => { const d = e instanceof ApiError ? (e.details as { high?: number; headline?: string; invalid_records?: number } | undefined) : undefined; if (d?.invalid_records) { setRightTab('findings'); toast.push({ kind: 'bad', title: 'Not approved', detail: e.message }) } else if (d?.high) { setAck({ high: d.high, headline: d.headline ?? '' }); setRightTab('diff') } else toast.push({ kind: 'bad', title: 'Approve failed', detail: e.message }) },
   })
-  const doExport = useMutation({ mutationFn: (fmt: string) => api.exportDataset(datasetId, fmt), onSuccess: (a) => { qc.invalidateQueries(); window.open(api.downloadUrl(a.id), '_blank'); toast.push({ kind: 'ok', title: `Exported ${a.row_count} rows as ${a.fmt.toUpperCase()}` }) } })
+  const doExport = useMutation({ mutationFn: (fmt: string) => api.exportDataset(datasetId, fmt), onSuccess: (a) => { qc.invalidateQueries(); window.open(api.downloadUrl(a.id), '_blank'); toast.push({ kind: 'ok', title: `Exported ${a.row_count} rows as ${a.fmt.toUpperCase()}` }) }, onError: (e: Error) => { setRightTab('findings'); toast.push({ kind: 'bad', title: 'Not exported', detail: e.message }) } })
   const question = useMutation({ mutationFn: () => api.ask(datasetId, copilot), onSuccess: (a) => { setAnswer(a); setRightTab('copilot'); setCopilot('') }, onError: (e: Error) => toast.push({ kind: 'bad', title: 'Could not answer', detail: e.message }) })
   const submitCopilot = () => { if (!copilot.trim()) return; if (isQuestion(copilot)) question.mutate(); else ask.mutate() }
   const ask = useMutation({
@@ -228,7 +229,8 @@ export function DataEditor() {
   const allPicked = pageIds.length > 0 && pageIds.every((i) => picked.has(i))
 
   if (!ds) return <div className="p-10 text-center"><Spinner /></div>
-  const errors = ds.findings.filter((f) => f.severity === 'error').length
+  const invalid = ds.invalid_records ?? 0
+  const errors = ds.findings.filter((f) => f.severity === 'error' && f.kind !== 'validation').length
   const widths = (f: FieldSpec) => (f.is_collection ? 220 : f.semantic === 'product_name' || f.semantic === 'description' ? 240 : f.json_type.includes('number') ? 110 : 140)
 
   return (
@@ -239,11 +241,14 @@ export function DataEditor() {
         <span className="tnum text-muted">v{ds.version}</span>
         <StatusBadge status={ds.status} />
         <span className="tnum text-muted text-[12.5px]">{fmtInt(ds.row_count)} rows</span>
-        {errors ? <Badge tone="bad"><AlertCircle size={12} /> {errors} errors</Badge> : <Badge tone="ok"><CheckCircle2 size={12} /> schema valid</Badge>}
+        {invalid > 0
+          ? <button onClick={() => setRightTab('findings')} title="These records do not match the target format: approval and export wait until they are fixed or removed"><Badge tone="bad"><AlertCircle size={12} /> {fmtInt(invalid)} record{invalid > 1 ? 's' : ''} break the format</Badge></button>
+          : <Badge tone="ok"><CheckCircle2 size={12} /> schema valid</Badge>}
+        {errors > 0 && <Badge tone="bad"><AlertCircle size={12} /> {errors} other error{errors > 1 ? 's' : ''}</Badge>}
         <div className="relative ml-4"><Search size={13} className="absolute left-2.5 top-2.5 text-muted" /><input className="input pl-7 w-72" placeholder="Search any field…" value={q} onChange={(e) => setQ(e.target.value)} /></div>
         <div className="ml-auto flex items-center gap-2">
           {pending.length > 0 && <><button className="btn btn-sm" onClick={() => setPending([])}><Undo2 size={13} /> Discard</button><button className="btn btn-sm btn-primary" onClick={() => { preview.mutate(); setSaveOpen(true) }}>Review {pending.length} change{pending.length > 1 ? 's' : ''}</button></>}
-          {!pending.length && ds.status === 'draft' && <button className="btn btn-sm" disabled={approve.isPending} onClick={() => approve.mutate({})}><CheckCircle2 size={13} /> Approve data</button>}
+          {!pending.length && ds.status === 'draft' && <button className="btn btn-sm" disabled={approve.isPending || invalid > 0} title={invalid ? `Fix or remove the ${invalid} record${invalid > 1 ? 's' : ''} that do not match the target format first` : undefined} onClick={() => approve.mutate({})}><CheckCircle2 size={13} /> Approve data</button>}
           {!pending.length && ds.parent_id && <button className="btn btn-sm" onClick={() => rollback.mutate()} title="New version with the parent's content"><History size={13} /> Roll back</button>}
           {!pending.length && (ds.status === 'approved' || ds.status === 'published') && <div className="flex items-center rounded-[var(--radius-md)] border border-line overflow-hidden">{['json', 'jsonl', 'csv'].map((f) => <button key={f} className="h-8 px-2.5 text-[12.5px] font-medium hover:bg-surface-2 border-r border-line last:border-0 flex items-center gap-1" onClick={() => doExport.mutate(f)}><Download size={12} /> {f.toUpperCase()}</button>)}</div>}
         </div>
@@ -325,7 +330,15 @@ export function DataEditor() {
             {rightTab === 'changes' && (pending.length ? (
               <ul className="flex flex-col gap-1">{pending.map((p, i) => <li key={i} className="flex items-start gap-2 py-1 border-b border-line/70"><Badge tone={p.kind.startsWith('delete') ? 'bad' : 'signal'} className="h-5 px-1.5 text-[11px] shrink-0">{p.kind.replace('_', ' ')}</Badge><span className="flex-1 break-words">{p.label}</span><button className="text-muted hover:text-bad" onClick={() => setPending((xs) => xs.filter((_, j) => j !== i))}>×</button></li>)}</ul>
             ) : <div className="text-muted leading-relaxed">Edit cells directly (double-click or <span className="kbd">↵</span>), delete rows, or ask the copilot. Changes stay here until you review their impact and save them as a new version — nothing is overwritten.</div>)}
-            {rightTab === 'findings' && (ds.findings.length ? ds.findings.map((f, i) => <FindingRow key={i} f={f} />) : <div className="text-muted">No findings. Every record passed the schema and quality rules.</div>)}
+            {rightTab === 'findings' && invalid > 0 && (
+              <div className="card p-3 mb-2 border-bad/40 leading-relaxed">
+                <div className="font-medium text-bad">{fmtInt(invalid)} record{invalid > 1 ? 's do' : ' does'} not match the target format</div>
+                <div className="text-ink-2">Approval and export wait until every record fits. Fix them one at a time or delete them — click a schema finding to find its row.</div>
+              </div>
+            )}
+            {rightTab === 'findings' && (ds.findings.length ? ds.findings.map((f, i) => (f.kind === 'validation' && f.identity
+              ? <button key={i} className="block w-full text-left hover:bg-surface-2 rounded" title="Show this row" onClick={() => setQ(f.identity ?? '')}><FindingRow f={{ ...f, message: `${f.identity} · ${f.message}` }} /></button>
+              : <FindingRow key={i} f={f} />)) : <div className="text-muted">No findings. Every record passed the schema and quality rules.</div>)}
             {rightTab === 'diff' && <DiffPanel report={report} ack={ack} acking={approve.isPending} onAcknowledge={(comment) => approve.mutate({ acknowledge_anomalies: true, comment })} onTrace={(identity, kind) => setDrawer({ kind: 'lineage', identity, pointer: /price|discount|promo/.test(kind) && pricePointer ? pricePointer.replace('/*/', '/0/') : undefined })} />}
             {rightTab === 'copilot' && <AnswerPanel answer={answer} pending={question.isPending} onTrace={(identity, pointer) => setDrawer({ kind: 'lineage', identity, pointer })} />}
             {rightTab === 'versions' && (
@@ -349,7 +362,7 @@ export function DataEditor() {
       <Modal open={saveOpen} onClose={() => setSaveOpen(false)} title="Review changes before saving" width="max-w-3xl"
         footer={<SaveFooter pending={apply.isPending} valid={!!preview.data && preview.data.validation_errors.length === 0} onCancel={() => setSaveOpen(false)} onSave={(kind, note) => apply.mutate({ kind, note })} />}>
         {preview.isPending && <div className="text-muted flex items-center gap-2"><Spinner /> computing impact…</div>}
-        {preview.data && <ImpactView impact={preview.data.impact} rowsAfter={preview.data.rows_after} errors={preview.data.validation_errors} />}
+        {preview.data && <ImpactView impact={preview.data.impact} rowsAfter={preview.data.rows_after} errors={preview.data.validation_errors} invalid={[preview.data.invalid_before, preview.data.invalid_after]} />}
       </Modal>
     </div>
   )
@@ -383,14 +396,16 @@ function CollectionCell({ value, fields }: { value: unknown; fields: FieldSpec[]
   return <span>{items.map((it) => pick.map((f) => part(f, it[name(f)])).filter(Boolean).join(' ')).join(' · ')}</span>
 }
 
-function ImpactView({ impact, rowsAfter, errors }: { impact: Impact; rowsAfter: number; errors: { row: number; pointer: string; message: string }[] }) {
+function ImpactView({ impact, rowsAfter, errors, invalid }: { impact: Impact; rowsAfter: number; errors: { row: number; identity?: string; pointer: string; message: string }[]; invalid: [number, number] }) {
+  const [before, after] = invalid
   return (
     <div className="text-[13px]">
       <div className="grid grid-cols-4 gap-3 mb-4">
         {[['Rows affected', impact.rows_affected], ['Cells changed', impact.cells_changed], ['Rows deleted', impact.rows_deleted], ['Rows after', rowsAfter]].map(([k, v]) => <div key={String(k)} className="card p-3"><div className="text-muted text-[12px]">{k}</div><div className="text-[20px] font-semibold tnum">{fmtInt(v as number)}</div></div>)}
       </div>
       {impact.fields.length > 0 && <div className="text-muted mb-2">Fields: <span className="mono text-ink">{impact.fields.join(', ')}</span></div>}
-      {errors.length > 0 && <div className="card p-3 border-bad/40 mb-3"><div className="font-medium text-bad">These changes would violate the target schema</div><ul className="mt-1 text-[12.5px]">{errors.slice(0, 8).map((e, i) => <li key={i} className="mono">row {e.row} {e.pointer}: {e.message}</li>)}</ul></div>}
+      {errors.length > 0 && <div className="card p-3 border-bad/40 mb-3"><div className="font-medium text-bad">These changes would break records that fit the target format</div><ul className="mt-1 text-[12.5px]">{errors.slice(0, 8).map((e, i) => <li key={i} className="mono">{e.identity ?? `row ${e.row}`} {e.pointer}: {e.message}</li>)}</ul></div>}
+      {(before > 0 || after > 0) && <div className={cn('card p-3 mb-3', after < before ? 'border-ok/40' : 'border-warn/40')}>Records not matching the target format: <span className="tnum font-medium">{fmtInt(before)} → {fmtInt(after)}</span>{after > 0 && <span className="text-muted"> — this version can be saved, but not approved or exported until it reaches 0.</span>}</div>}
       <table className="table text-[12.5px]"><thead><tr><th>Identity</th><th>Field</th><th>Before</th><th>After</th></tr></thead>
         <tbody>{impact.sample.map((s, i) => <tr key={i}><td className="mono">{s.identity}</td><td className="mono">{s.target ?? 'row'}</td><td className="text-muted">{cellText(s.before) || '∅'}</td><td className={s.after === null ? 'text-bad' : 'text-signal'}>{s.after === null && s.target === null ? 'deleted' : cellText(s.after) || '∅'}</td></tr>)}</tbody></table>
       {impact.sample.length < impact.cells_changed + impact.rows_deleted && <div className="text-muted text-[12px] mt-2">Showing the first {impact.sample.length} changes.</div>}
