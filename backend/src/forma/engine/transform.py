@@ -307,7 +307,7 @@ class TransformEngine:
             out, collections, passthrough, root_id, identity_cols, mapping, bindings
         )
         # schema validation
-        v_errors = self._validate(records)
+        v_errors, invalid = self._validate(records)
         findings.extend(v_errors)
 
         stats = {
@@ -317,6 +317,7 @@ class TransformEngine:
             "collections": {k: v.height for k, v in collections.items()},
             "duration_ms": round((time.perf_counter() - t0) * 1000, 1),
             "identity_keys": identity_cols,
+            "invalid_records": invalid,  # records that do not match the target schema (ADR-026)
         }
         _observe_engine(
             rows_in,
@@ -726,7 +727,8 @@ class TransformEngine:
             records.append(rec)
         return records
 
-    def _validate(self, records: list[dict[str, Any]]) -> list[Finding]:
+    def _validate(self, records: list[dict[str, Any]]) -> tuple[list[Finding], int]:
+        """Schema errors as findings (the first 200) and the number of records that have any."""
         findings: list[Finding] = []
         try:
             import fastjsonschema
@@ -734,7 +736,7 @@ class TransformEngine:
             validate = fastjsonschema.compile(self.schema.document)
         except Exception:  # pragma: no cover - fall back to jsonschema
             validate = None
-        count = 0
+        count = invalid = 0
         for i, rec in enumerate(records):
             errs: list[str] = []
             if validate is not None:
@@ -747,6 +749,7 @@ class TransformEngine:
                     rec.update(view)  # keep the defaults the validator filled in
             else:
                 errs = [f"{x['pointer']}: {x['message']}" for x in self.schema.validate_record(rec)]
+            invalid += bool(errs)
             for m in errs:
                 count += 1
                 if count <= 200:
@@ -756,7 +759,7 @@ class TransformEngine:
             findings.append(
                 Finding("validation", "error", f"... {count - 200} more schema validation errors")
             )
-        return findings
+        return findings, invalid
 
 
 # --------------------------------------------------------------------------------------------

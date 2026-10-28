@@ -206,6 +206,7 @@ class TargetSchema:
     version: int
     document: dict[str, Any]
     path: Path | None = None
+    _validator: Draft202012Validator | None = field(default=None, init=False, repr=False, compare=False)
 
     # ---- metadata -------------------------------------------------------------------------
     @property
@@ -322,7 +323,9 @@ class TargetSchema:
 
     # ---- validation -----------------------------------------------------------------------
     def validator(self) -> Draft202012Validator:
-        return Draft202012Validator(self.document, format_checker=FormatChecker())
+        if self._validator is None:  # built once: every saved edit validates the whole dataset
+            self._validator = Draft202012Validator(self.document, format_checker=FormatChecker())
+        return self._validator
 
     def validate_record(self, record: dict[str, Any]) -> list[dict[str, Any]]:
         """Errors of the record *as exported* (``export_view``), so 'valid' means the export is valid."""

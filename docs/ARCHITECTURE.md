@@ -65,9 +65,11 @@ ImportRound: uploaded ─▶ profiled ─▶ ┬─ auto_approved ─▶ transfo
    approving it is an explicit override (`override_block`, approver role, mandatory reason, audited), and a
    Studio edit keeps the round's drift, so it cannot clear a wrong-file block.
 7. **Transform** — full run with the approved mapping; persistent overrides for the customer are
-   re-applied; records are validated against the schema; a `DatasetVersion` (JSONL on disk) is created.
+   re-applied; records are validated against the schema (the count of records that break it is kept on the
+   version, ADR-026); a `DatasetVersion` (JSONL on disk) is created.
 8. **Edit** — the Data Editor stages cell edits, pasted blocks, bulk edits on picked rows, copilot
-   operations and deletions; the API previews impact (rows, cells, before/after) and schema validity;
+   operations and deletions; the API previews impact (rows, cells, before/after) and schema validity —
+   a save is refused only for errors it adds, so invalid records can be fixed one at a time (ADR-026);
    applying creates a new version + `ChangeSet`. *Persistent* edits also create `Override` rules for future
    rounds (ADR-024). The copilot plans conditions across collections and answers "why" questions from
    evidence (ADR-023). Every value traces back to its Excel cell, with the cause of a change (ADR-020).
@@ -75,7 +77,8 @@ ImportRound: uploaded ─▶ profiled ─▶ ┬─ auto_approved ─▶ transfo
 9. **Change intelligence** — the dataset is diffed against the customer's previous published dataset:
    SKUs added/removed, changed fields, price moves (large ones flagged), promotion changes; anomalies
    (price jumps and outliers, discounts, promotion dates, stock, removed SKUs, unusual size) with "% normal".
-   Approving data with high-severity anomalies needs an acknowledgement (ADR-022).
+   Approving data with high-severity anomalies needs an acknowledgement (ADR-022). Data with records that
+   break the target schema is never approved or exported, whatever is acknowledged (ADR-026).
 10. **Export** — JSON (nested), JSONL, or CSV flattened per the schema's `output_variants`; atomic write;
    artifact recorded with sha256. Exporting publishes, so only an approved (or already published) dataset
    can be exported; a draft is refused with 409.
@@ -144,7 +147,7 @@ A round's format: the request's, else the customer's (`default_target_schema`), 
   scrape-time gauges from the DB, JSON logs with request ids that follow a job into its worker, `/health`
   and `/ready`, an admin Ops page (queue, workers, failed jobs + retry, spend, slowest rounds).
 * **Reliability** (ADR-015). Retries with backoff and a circuit breaker for the model (fallback never
-  auto-approves), retention policy with audited deletions, `forma backup|restore`, `docs/RUNBOOK.md`.
+  auto-approves); backup AI keys tried in order, each with its own breaker and model (ADR-025); retention policy with audited deletions, `forma backup|restore`, `docs/RUNBOOK.md`.
 * **Deployment** (ADR-016). One backend image (`forma serve` / `forma worker`), one web image,
   `docker-compose.prod.yml`, `.env.production.example` generated from `Settings`, CI gates (lint, types,
   tests on SQLite + Postgres + MinIO, migration/config drift, eval baseline, short bench, image builds).

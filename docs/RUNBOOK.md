@@ -65,8 +65,10 @@ Symptoms: `forma_llm_breaker_open` = 1, Ops page shows "circuit breaker OPEN", r
    still approved from memory without any model call).
 2. The breaker probes the provider every `FORMA_LLM_BREAKER_RESET_S` (120 s). When the provider is back the
    gauge drops to 0. To force a reset restart the API.
-3. If the outage is a quota/rate limit (`HTTP 429`), lower `FORMA_LLM_RATE_LIMIT_PER_MIN` or switch
-   `FORMA_LLM_PROVIDER`/`FORMA_LLM_BASE_URL` to the fallback gateway; the mapping DSL is provider-agnostic.
+3. If the outage is a quota/rate limit (`HTTP 429`), lower `FORMA_LLM_RATE_LIMIT_PER_MIN` or add a
+   backup key in Settings → AI (another provider, model or gateway). Backups are tried in order with their
+   own breakers, so the next round uses them at once (ADR-025); "Test all keys" shows which key answers.
+   The mapping DSL is provider-agnostic.
 
 ### Storage outage (S3/MinIO)
 

@@ -112,6 +112,24 @@ class ConnectAIIn(BaseModel):
     provider: str | None = None  # only when the key's prefix does not tell (gateways)
 
 
+class BackupKeyIn(BaseModel):
+    api_key: str
+    provider: str | None = None  # only when the key's prefix does not tell (gateways)
+    model: str | None = None  # default: the provider's default model
+    base_url: str | None = None
+
+
+class BackupKeyPatchIn(BaseModel):
+    """Only the fields sent are changed."""
+
+    model: str | None = None
+    base_url: str | None = None
+
+
+class BackupOrderIn(BaseModel):
+    ids: list[str] = Field(max_length=16)
+
+
 class CompareIn(BaseModel):
     document: dict[str, Any] | None = None  # unsaved edits; omitted → the mapping as saved
     limit: int = Field(default=5000, ge=1, le=200_000)

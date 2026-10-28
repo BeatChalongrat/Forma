@@ -13,7 +13,16 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from forma.api.routes import ctx_dep
-from forma.api.schemas import AISettingsIn, ConnectAIIn, DefaultFormatIn, PolicyIn, SchemaIn
+from forma.api.schemas import (
+    AISettingsIn,
+    BackupKeyIn,
+    BackupKeyPatchIn,
+    BackupOrderIn,
+    ConnectAIIn,
+    DefaultFormatIn,
+    PolicyIn,
+    SchemaIn,
+)
 from forma.auth import Principal, current_principal, llm_rate_limited, require_role
 from forma.db.models import LLMCall
 from forma.db.session import get_session
@@ -73,22 +82,88 @@ def test_ai(
     p: Principal = Depends(require_role("admin")),
     _rl: Principal = Depends(llm_rate_limited),
 ) -> dict[str, Any]:
-    """One tiny call with the saved settings; the tokens go to the LLM ledger."""
+    """One tiny call with the saved settings — the primary and every backup key (``backups``); the
+    tokens go to the LLM ledger."""
     ctx.refresh()
-    result = cfg.probe(ctx.llm)
-    if result.get("usage"):
-        session.add(
-            LLMCall(
-                agent="settings.test",
-                model=ctx.llm.model,
-                prompt_version="settings",
-                input_tokens=result["usage"]["input_tokens"],
-                output_tokens=result["usage"]["output_tokens"],
-                cost_usd=result["usage"]["cost_usd"],
-                latency_ms=result["latency_ms"],
+    result = cfg.probe_all(ctx.llm)
+    for r in [result, *result.get("backups", [])]:
+        if r.get("usage"):
+            session.add(
+                LLMCall(
+                    agent="settings.test",
+                    model=r["model"],
+                    prompt_version="settings",
+                    input_tokens=r["usage"]["input_tokens"],
+                    output_tokens=r["usage"]["output_tokens"],
+                    cost_usd=r["usage"]["cost_usd"],
+                    latency_ms=r["latency_ms"],
+                )
             )
-        )
     return result
+
+
+@router.post("/settings/ai/backups")
+def add_backup(
+    body: BackupKeyIn,
+    session: Session = Depends(get_session),
+    ctx: ServiceContext = Depends(ctx_dep),
+    p: Principal = Depends(require_role("admin")),
+    _rl: Principal = Depends(llm_rate_limited),
+) -> dict[str, Any]:
+    """Add a backup key (ADR-025): tried with one tiny call, saved encrypted only when it works, and used
+    when the primary provider fails."""
+    result = cfg.add_backup(
+        session,
+        ctx.settings,
+        body.api_key,
+        p.actor,
+        provider=body.provider,
+        model=body.model,
+        base_url=body.base_url,
+    )
+    session.commit()
+    ctx.refresh()
+    return {"test": result, "ai": cfg.ai_view(session, ctx.settings)}
+
+
+@router.patch("/settings/ai/backups/{backup_id}")
+def update_backup(
+    backup_id: str,
+    body: BackupKeyPatchIn,
+    session: Session = Depends(get_session),
+    ctx: ServiceContext = Depends(ctx_dep),
+    p: Principal = Depends(require_role("admin")),
+) -> dict[str, Any]:
+    cfg.update_backup(session, backup_id, {k: getattr(body, k) for k in body.model_fields_set}, p.actor)
+    session.commit()
+    ctx.refresh()
+    return cfg.ai_view(session, ctx.settings)
+
+
+@router.delete("/settings/ai/backups/{backup_id}")
+def remove_backup(
+    backup_id: str,
+    session: Session = Depends(get_session),
+    ctx: ServiceContext = Depends(ctx_dep),
+    p: Principal = Depends(require_role("admin")),
+) -> dict[str, Any]:
+    cfg.remove_backup(session, backup_id, p.actor)
+    session.commit()
+    ctx.refresh()
+    return cfg.ai_view(session, ctx.settings)
+
+
+@router.put("/settings/ai/backups/order")
+def order_backups(
+    body: BackupOrderIn,
+    session: Session = Depends(get_session),
+    ctx: ServiceContext = Depends(ctx_dep),
+    p: Principal = Depends(require_role("admin")),
+) -> dict[str, Any]:
+    cfg.order_backups(session, body.ids, p.actor)
+    session.commit()
+    ctx.refresh()
+    return cfg.ai_view(session, ctx.settings)
 
 
 # --------------------------------------------------------------------------------------------

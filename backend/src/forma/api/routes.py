@@ -1169,6 +1169,7 @@ def dashboard(
             "tokens": int(llm[2] or 0),
             "provider": ctx.llm.provider.name,
             "model": ctx.llm.model,
+            "backups": len(ctx.llm.fallbacks),
         },
         "recent_rounds": [
             ser.import_round(r, files=False, customer_obj=cmap.get(r.customer_id)) for r in recent

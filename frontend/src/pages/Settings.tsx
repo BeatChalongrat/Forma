@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Bot, Check, FileJson, KeyRound, RotateCcw, Save, Star, Upload, Wifi } from 'lucide-react'
-import { api, ApiError, type AISettings, type Policy, type SchemaPreview } from '../lib/api'
+import { ArrowDown, ArrowUp, Bot, Check, FileJson, KeyRound, Plus, RotateCcw, Save, Star, Trash2, Upload, Wifi } from 'lucide-react'
+import { api, ApiError, type AISettings, type AiProbe, type BackupKey, type Policy, type SchemaPreview } from '../lib/api'
 import { PageHeader, Section, Badge, RiskDot, Tabs, Json, KV, Modal, Spinner } from '../components/ui'
 import { cn, fmtDate } from '../lib/utils'
 import { useToast } from '../lib/toast'
@@ -59,15 +59,16 @@ function AITab() {
   return (
     <div className="flex flex-col gap-4">
       <ConnectCard ai={ai} />
+      <BackupKeysCard ai={ai} />
       <div><button className="btn btn-ghost btn-sm" onClick={() => setAdvanced(!advanced)}>{advanced ? 'Hide' : 'Show'} advanced settings — provider, model, gateway URL, timeout</button></div>
       {advanced && (
     <div className="grid lg:grid-cols-[1fr_340px] gap-4">
       <Section title="Advanced settings" actions={ai.offline ? <Badge tone="warn">offline · deterministic mapper only</Badge> : <Badge tone="ok"><Bot size={12} /> {ai.active_provider} · {ai.model}</Badge>}>
         <div className="p-4 grid sm:grid-cols-2 gap-4 text-[13px]">
           <label className="flex flex-col gap-1.5"><span className="text-muted">Provider</span>
-            <select className="input" value={f.provider} onChange={(e) => set('provider', e.target.value)}>{ai.providers.map((p) => <option key={p} value={p}>{p === 'mock' ? 'off (mock)' : p}</option>)}</select>
+            <select className="input" value={f.provider} onChange={(e) => { const p = e.target.value; const known = ai.models[p] ?? []; setDraft({ ...f, provider: p, model: !known.length || known.includes(f.model) ? f.model : known[0] }) }}>{ai.providers.map((p) => <option key={p} value={p}>{p === 'mock' ? 'off (mock)' : p}</option>)}</select>
           </label>
-          <label className="flex flex-col gap-1.5"><span className="text-muted">Model</span><input className="input mono" value={f.model} onChange={(e) => set('model', e.target.value)} placeholder="gpt-4.1-mini · claude-…" /></label>
+          <label className="flex flex-col gap-1.5"><span className="text-muted">Model</span><ModelPicker provider={f.provider} models={ai.models} value={f.model} onChange={(m) => set('model', m)} /></label>
           <label className="flex flex-col gap-1.5 sm:col-span-2"><span className="text-muted">API key {ai.api_key_set && <span className="text-ink-2">— saved {ai.api_key_hint} ({ai.api_key_source === 'ui' ? 'from this page' : 'from the server environment'})</span>}</span>
             <input className="input mono" type="password" autoComplete="off" value={key} onChange={(e) => setKey(e.target.value)} placeholder={ai.api_key_set ? 'leave empty to keep the saved key' : 'paste the key; it is stored encrypted and never shown again'} />
           </label>
@@ -112,14 +113,21 @@ function ConnectCard({ ai }: { ai: AISettings }) {
   })
   const disconnect = useMutation({
     mutationFn: () => api.saveAiSettings({ api_key: '', provider: null, model: null }),
-    onSuccess: () => { qc.invalidateQueries(); toast.push({ kind: 'ok', title: 'AI disconnected', detail: 'FORMA keeps mapping with its deterministic mapper.' }) },
+    onSuccess: () => { qc.invalidateQueries(); toast.push({ kind: 'ok', title: 'Main key removed', detail: ai.backups.length ? 'Backup keys answer from now on.' : 'FORMA keeps mapping with its deterministic mapper.' }) },
   })
-  if (!ai.offline && !replacing) {
+  const model = useMutation({
+    mutationFn: (m: string) => api.saveAiSettings({ model: m || null }),
+    onSuccess: (r) => { qc.invalidateQueries(); toast.push({ kind: 'ok', title: 'Model changed', detail: `${r.active_provider} · ${r.model}` }) },
+    onError: (e: Error) => toast.push({ kind: 'bad', title: 'Not changed', detail: e.message }),
+  })
+  const primary = ai.active_route === 'primary'
+  if (!ai.offline && primary && !replacing) {
     return (
-      <Section title="AI">
+      <Section title="AI" actions={ai.circuit_open ? <Badge tone="warn">main key resting after failures — backups answer</Badge> : undefined}>
         <div className="p-4 flex flex-wrap items-center gap-3 text-[13px]">
           <Badge tone="ok"><Check size={12} /> Connected</Badge>
-          <span className="text-ink-2">{ai.active_provider} · <span className="mono">{ai.model}</span>{ai.api_key_hint && <> · key {ai.api_key_hint}</>}</span>
+          <span className="text-ink-2">{ai.active_provider}{ai.api_key_hint && <> · key {ai.api_key_hint}</>}</span>
+          <span className="flex items-center gap-2"><span className="text-muted">Model</span><span className="w-56"><ModelPicker provider={ai.provider} models={ai.models} value={ai.model} disabled={model.isPending} saveOnBlur onChange={(m) => m && m !== ai.model && model.mutate(m)} /></span></span>
           <div className="ml-auto flex gap-2">
             <button className="btn btn-sm" onClick={() => setReplacing(true)}><KeyRound size={13} /> Replace key</button>
             {ai.api_key_source === 'ui' && <button className="btn btn-sm btn-ghost" disabled={disconnect.isPending} onClick={() => disconnect.mutate()}>Disconnect</button>}
@@ -129,7 +137,7 @@ function ConnectCard({ ai }: { ai: AISettings }) {
     )
   }
   return (
-    <Section title="Connect AI" actions={!replacing ? <Badge tone="warn">offline · deterministic mapper only</Badge> : undefined}>
+    <Section title="Connect AI" actions={replacing ? undefined : ai.offline ? <Badge tone="warn">offline · deterministic mapper only</Badge> : <Badge tone="warn">no main key · a backup key answers</Badge>}>
       <div className="p-4 flex flex-col gap-3 text-[13px]">
         <p className="text-ink-2">Paste your API key and press Connect. OpenAI (<span className="mono">sk-…</span>) and Anthropic (<span className="mono">sk-ant-…</span>) keys are recognised automatically; FORMA picks the model, tries the key with one tiny call and saves it encrypted — nothing else to fill in.</p>
         <div className="flex flex-wrap items-center gap-2">
@@ -142,6 +150,123 @@ function ConnectCard({ ai }: { ai: AISettings }) {
         </div>
         {connect.error && <div className="rounded-[var(--radius-md)] bg-bad-soft text-bad px-3 py-2 text-[12.5px]">{connect.error.message}</div>}
       </div>
+    </Section>
+  )
+}
+
+/** Known models of the provider in a list, "Other model…" for any name (gateways, new models).
+ *  ``saveOnBlur``: a typed name is sent when the field is left (or Enter), not on every keystroke. */
+function ModelPicker({ provider, models, value, onChange, allowDefault, disabled, saveOnBlur }: { provider: string; models: Record<string, string[]>; value: string; onChange: (m: string) => void; allowDefault?: boolean; disabled?: boolean; saveOnBlur?: boolean }) {
+  const known = models[provider] ?? []
+  const [typing, setTyping] = useState(false)
+  const [draft, setDraft] = useState<string | null>(null)
+  if (typing || !known.length || (value !== '' && !known.includes(value))) {
+    const commit = () => { if (draft !== null) { onChange(draft.trim()); setDraft(null) } }
+    return (
+      <span className="flex gap-1">
+        <input className="input mono flex-1 min-w-0" value={saveOnBlur ? draft ?? value : value} disabled={disabled} placeholder="model name"
+          onChange={(e) => (saveOnBlur ? setDraft(e.target.value) : onChange(e.target.value))}
+          onBlur={commit} onKeyDown={(e) => { if (e.key === 'Enter') commit() }} />
+        {known.length > 0 && <button type="button" className="btn btn-ghost btn-sm" onClick={() => { setTyping(false); onChange(allowDefault ? '' : known[0]) }}>List</button>}
+      </span>
+    )
+  }
+  return (
+    <select className="input mono w-full" value={value} disabled={disabled} onChange={(e) => { if (e.target.value === '__other') { setTyping(true); onChange('') } else onChange(e.target.value) }}>
+      {allowDefault && <option value="">Default model</option>}
+      {known.map((m) => <option key={m} value={m}>{m}</option>)}
+      <option value="__other">Other model…</option>
+    </select>
+  )
+}
+
+const PROVIDER_LABEL: Record<string, string> = { anthropic: 'Anthropic', openai: 'OpenAI', openai_compatible: 'Gateway' }
+
+/** Backup keys (ADR-025): tried in order when the main key fails — error, rate limit, no credit. */
+function BackupKeysCard({ ai }: { ai: AISettings }) {
+  const qc = useQueryClient()
+  const toast = useToast()
+  const [adding, setAdding] = useState(false)
+  const [key, setKey] = useState('')
+  const [provider, setProvider] = useState('')
+  const [model, setModel] = useState('')
+  const [url, setUrl] = useState('')
+  const [probes, setProbes] = useState<Record<string, AiProbe>>({})
+  const k = key.trim()
+  const detected = k.startsWith('sk-ant-') ? 'anthropic' : k.startsWith('sk-') ? 'openai' : null
+  const chosen = detected ?? provider
+  const done = (title: string) => (r: AISettings) => { qc.setQueryData(['ai-settings'], r); qc.invalidateQueries(); toast.push({ kind: 'ok', title }) }
+  const failed = (e: Error) => toast.push({ kind: 'bad', title: 'Not changed', detail: e.message })
+  const add = useMutation({
+    mutationFn: () => api.addBackupKey({ api_key: k, ...(detected ? {} : { provider }), ...(model.trim() ? { model: model.trim() } : {}), ...(url.trim() ? { base_url: url.trim() } : {}) }),
+    onSuccess: (r) => { setKey(''); setModel(''); setUrl(''); setProvider(''); setAdding(false); qc.setQueryData(['ai-settings'], r.ai); qc.invalidateQueries(); toast.push({ kind: 'ok', title: 'Backup key added', detail: `${r.test.provider} · ${r.test.model} · answered in ${r.test.latency_ms} ms` }) },
+  })
+  const update = useMutation({ mutationFn: (v: { id: string; model: string }) => api.updateBackupKey(v.id, { model: v.model }), onSuccess: done('Backup model changed'), onError: failed })
+  const remove = useMutation({ mutationFn: (id: string) => api.removeBackupKey(id), onSuccess: done('Backup key removed'), onError: failed })
+  const order = useMutation({ mutationFn: (ids: string[]) => api.orderBackupKeys(ids), onSuccess: done('Order saved'), onError: failed })
+  const test = useMutation({
+    mutationFn: api.testAi,
+    onSuccess: (r) => setProbes(Object.fromEntries([[r.route ?? 'primary', r], ...(r.backups ?? []).map((b) => [b.id, b] as const)])),
+    onError: failed,
+  })
+  const move = (i: number, d: -1 | 1) => { const ids = ai.backups.map((b) => b.id); [ids[i], ids[i + d]] = [ids[i + d], ids[i]]; order.mutate(ids) }
+  const ready = !!k && !!chosen && (chosen !== 'openai_compatible' || (!!url.trim() && !!model.trim()))
+  const status = (b: BackupKey) => {
+    const pr = probes[b.id]
+    if (pr) return <Badge tone={pr.ok ? 'ok' : 'bad'}>{pr.ok ? `ok · ${pr.latency_ms} ms` : pr.message.slice(0, 80)}</Badge>
+    if (b.warning) return <Badge tone="bad">{b.warning}</Badge>
+    if (b.circuit_open) return <Badge tone="warn">resting after failures</Badge>
+    if (ai.active_route === b.id) return <Badge tone="signal">answering (no main key)</Badge>
+    return <Badge tone="neutral">standby</Badge>
+  }
+  return (
+    <Section title="Backup keys" actions={<div className="flex gap-2">
+      {ai.backups.length > 0 && <button className="btn btn-sm" disabled={test.isPending} onClick={() => test.mutate()}><Wifi size={13} /> {test.isPending ? 'Testing…' : 'Test all keys'}</button>}
+      {!adding && ai.backups.length < ai.max_backups && <button className="btn btn-sm btn-primary" onClick={() => setAdding(true)}><Plus size={13} /> Add backup key</button>}
+    </div>}>
+      <div className="px-4 pt-3 pb-1 text-[12.5px] text-ink-2">When the main key fails — an error, a rate limit, no credit left — FORMA tries these keys in order, each with its own model. A key that keeps failing rests for a while and the next one answers; if every key fails, the deterministic mapper takes over and the round goes to review.</div>
+      {probes.primary && <div className="px-4 pt-2 text-[12.5px] flex items-center gap-2"><span className="text-muted">Main key</span><Badge tone={probes.primary.ok ? 'ok' : 'bad'}>{probes.primary.ok ? `ok · ${probes.primary.latency_ms} ms` : probes.primary.message.slice(0, 80)}</Badge></div>}
+      {ai.backups.length > 0 ? (
+        <table className="table mt-2">
+          <thead><tr><th className="w-10">#</th><th>Provider</th><th className="w-64">Model</th><th>Key</th><th>Status</th><th className="w-36" /></tr></thead>
+          <tbody>{ai.backups.map((b, i) => (
+            <tr key={b.id}>
+              <td className="tnum text-muted">{i + 1}</td>
+              <td>{PROVIDER_LABEL[b.provider] ?? b.provider}{b.base_url && <div className="text-[11.5px] text-muted mono truncate max-w-[220px]">{b.base_url}</div>}</td>
+              <td><ModelPicker provider={b.provider} models={ai.models} value={b.model} disabled={update.isPending} saveOnBlur onChange={(m) => m.trim() && m !== b.model && update.mutate({ id: b.id, model: m })} /></td>
+              <td className="mono text-muted">{b.api_key_hint ?? '—'}</td>
+              <td>{status(b)}</td>
+              <td><div className="flex justify-end gap-1">
+                <button className="btn btn-ghost btn-sm" title="Try earlier" disabled={i === 0 || order.isPending} onClick={() => move(i, -1)}><ArrowUp size={13} /></button>
+                <button className="btn btn-ghost btn-sm" title="Try later" disabled={i === ai.backups.length - 1 || order.isPending} onClick={() => move(i, 1)}><ArrowDown size={13} /></button>
+                <button className="btn btn-ghost btn-sm" title="Remove" disabled={remove.isPending} onClick={() => remove.mutate(b.id)}><Trash2 size={13} /></button>
+              </div></td>
+            </tr>
+          ))}</tbody>
+        </table>
+      ) : !adding && <div className="px-4 py-3 text-[12.5px] text-muted">No backup key — when the main key fails, the deterministic mapper takes over.</div>}
+      {adding && (
+        <div className="m-4 p-3 rounded-[var(--radius-md)] border border-line flex flex-col gap-3 text-[13px]">
+          <div className="flex flex-wrap items-center gap-2">
+            <input className="input mono flex-1 min-w-[260px]" type="password" autoComplete="off" autoFocus value={key} onChange={(e) => setKey(e.target.value)} placeholder="Paste the backup API key" />
+            {k && (detected
+              ? <Badge tone="signal">{PROVIDER_LABEL[detected]} key</Badge>
+              : <select className="input w-52" value={provider} onChange={(e) => { setProvider(e.target.value); setModel('') }}><option value="">Which provider is this?</option><option value="openai">OpenAI</option><option value="anthropic">Anthropic</option><option value="openai_compatible">Gateway</option></select>)}
+          </div>
+          {chosen && (
+            <div className="grid sm:grid-cols-2 gap-3">
+              <label className="flex flex-col gap-1.5"><span className="text-muted">Model</span><ModelPicker provider={chosen} models={ai.models} value={model} allowDefault={chosen !== 'openai_compatible'} onChange={setModel} /></label>
+              {chosen === 'openai_compatible' && <label className="flex flex-col gap-1.5"><span className="text-muted">Gateway URL</span><input className="input mono" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://your-gateway/v1" /></label>}
+            </div>
+          )}
+          <div className="flex items-center gap-2">
+            <button className="btn btn-primary" disabled={!ready || add.isPending} onClick={() => add.mutate()}><Wifi size={14} /> {add.isPending ? 'Checking the key…' : 'Test & add'}</button>
+            <button className="btn" onClick={() => { setAdding(false); setKey(''); add.reset() }}>Cancel</button>
+            <span className="text-[12px] text-muted">The key is tried with one tiny call and saved encrypted only if it answers.</span>
+          </div>
+          {add.error && <div className="rounded-[var(--radius-md)] bg-bad-soft text-bad px-3 py-2 text-[12.5px]">{add.error.message}</div>}
+        </div>
+      )}
     </Section>
   )
 }

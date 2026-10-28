@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import copy
 from dataclasses import dataclass, field
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import select
 from sqlalchemy.exc import OperationalError, ProgrammingError
@@ -20,11 +20,15 @@ from sqlalchemy.orm import Session
 from forma.ai.policy import DEFAULT_POLICY, _merge, file_policy, validate_policy
 from forma.core import secrets
 from forma.core.errors import NotFound, ValidationFailed
+from forma.core.ids import new_id
 from forma.core.settings import Settings
 from forma.db.models import AppSetting, LLMCall, StoredSchema
 from forma.db.session import session_scope
 from forma.schema_registry import SchemaRegistry, TargetSchema
 from forma.services.rounds import audit
+
+if TYPE_CHECKING:
+    from forma.ai.llm import LLMClient
 
 REVISION_KEY = "revision"
 AI_KEY = "ai"
@@ -32,6 +36,7 @@ POLICY_KEY = "policy"
 DEFAULTS_KEY = "defaults"
 PROVIDERS = ("mock", "openai", "openai_compatible", "anthropic")
 FALLBACK_TARGET_SCHEMA = "product"
+MAX_BACKUP_KEYS = 4
 
 
 @dataclass
@@ -127,18 +132,60 @@ def llm_settings(base: Settings, ai: dict[str, Any]) -> Settings:
     return base.model_copy(update=update) if update else base
 
 
+def build_client(base: Settings, ai: dict[str, Any]) -> LLMClient:
+    """The LLM client with its backup keys (ADR-025), in the order the admin set. A backup whose key
+    cannot be read is skipped. With no usable primary, the first usable backup becomes the primary."""
+    from forma.ai.llm import LLMClient, MockProvider, Route, make_provider
+
+    eff = llm_settings(base, ai)
+    client = LLMClient.from_settings(eff)
+    routes: list[Route] = []
+    for b in ai.get("backups") or []:
+        key = secrets.decrypt(base, b["api_key_enc"]) if b.get("api_key_enc") else None
+        provider = make_provider(b["provider"], key, b.get("base_url"), eff.llm_timeout_s)
+        if not isinstance(provider, MockProvider):
+            routes.append(Route(b["id"], provider, b["model"]))
+    if client.is_mock and routes:
+        first = routes.pop(0)
+        client = LLMClient(first.provider, first.model, eff.llm_max_retries, primary_name=first.name)
+    client.fallbacks = routes
+    return client
+
+
+def _backup_view(base: Settings, b: dict[str, Any], usable: set[str]) -> dict[str, Any]:
+    from forma.ai.breaker import is_open
+
+    key = secrets.decrypt(base, b["api_key_enc"]) if b.get("api_key_enc") else None
+    return {
+        "id": b["id"],
+        "provider": b["provider"],
+        "model": b["model"],
+        "base_url": b.get("base_url"),
+        "api_key_hint": secrets.hint(key),
+        "usable": b["id"] in usable,
+        "circuit_open": is_open(b["id"]),
+        "warning": None if key or not b.get("api_key_enc") else "the key cannot be decrypted: add it again",
+        "added_by": b.get("added_by"),
+        "added_at": b.get("added_at"),
+    }
+
+
 def ai_view(session: Session, base: Settings) -> dict[str, Any]:
     """What the Settings page shows: effective values, where each comes from, never the key itself."""
-    from forma.ai.llm import LLMClient
+    from forma.ai.breaker import is_open
+    from forma.ai.llm import model_catalogue
 
     row = _row(session, AI_KEY)
     ai = dict(row.value or {}) if row else {}
     eff = llm_settings(base, ai)
-    client = LLMClient.from_settings(eff)
+    client = build_client(base, ai)
     key_source = "ui" if ai.get("api_key_enc") else "env" if base.llm_api_key else None
     active = client.provider.name if not client.is_mock else "mock"
+    usable = {r.name for r in client.routes} if not client.is_mock else set()
     warning = None
-    if eff.llm_provider != "mock" and client.is_mock:
+    if client.primary_name != "primary":
+        warning = "the primary provider has no usable key: the first backup key answers"
+    elif eff.llm_provider != "mock" and client.is_mock:
         warning = f"{eff.llm_provider} is selected but has no API key (or gateway URL): AI runs offline"
     elif ai.get("api_key_enc") and eff.llm_api_key is None:
         warning = "the saved API key cannot be decrypted (FORMA_SECRET_KEY changed): enter it again"
@@ -156,9 +203,15 @@ def ai_view(session: Session, base: Settings) -> dict[str, Any]:
             for k in ("provider", "model", "base_url", "timeout_s", "max_retries")
         },
         "active_provider": active,
+        "active_model": client.model,
+        "active_route": client.primary_name if not client.is_mock else None,
         "offline": client.is_mock,
         "warning": warning,
         "providers": list(PROVIDERS),
+        "models": model_catalogue(),
+        "circuit_open": is_open("primary"),
+        "backups": [_backup_view(base, b, usable) for b in ai.get("backups") or []],
+        "max_backups": MAX_BACKUP_KEYS,
         **_stamp(row),
     }
 
@@ -304,30 +357,46 @@ def _model_for(provider: str, current: str | None) -> str:
 
 def probe(client: Any) -> dict[str, Any]:
     """One tiny call straight to the provider (no retries, no circuit breaker): is this key usable?"""
+    if client.is_mock:
+        return {"ok": False, "offline": True, "message": "AI is offline: no provider key"}
+    return _probe(client.provider, client.model, client.temperature)
+
+
+def probe_all(client: Any) -> dict[str, Any]:
+    """The primary's probe, plus one per backup key (``backups``), each straight to its provider."""
+    out = probe(client)
+    if client.is_mock:
+        return out
+    out["route"] = client.primary_name
+    out["backups"] = [
+        {"id": r.name, **_probe(r.provider, r.model, client.temperature)} for r in client.fallbacks
+    ]
+    return out
+
+
+def _probe(provider: Any, model: str, temperature: float = 0.0) -> dict[str, Any]:
     import time
 
     from forma.ai.llm import _parse_json
 
-    if client.is_mock:
-        return {"ok": False, "offline": True, "message": "AI is offline: no provider key"}
     t0 = time.perf_counter()
     try:
-        text, usage = client.provider.complete_json(
+        text, usage = provider.complete_json(
             system="You are a connectivity check.",
             user='Return {"ok": true}.',
             schema={"type": "object", "properties": {"ok": {"type": "boolean"}}, "required": ["ok"]},
-            model=client.model,
-            temperature=client.temperature,
+            model=model,
+            temperature=temperature,
         )
         ok = bool(_parse_json(text).get("ok"))
     except Exception as e:  # any provider/transport failure is the answer
-        return {"ok": False, "offline": False, "message": str(e)[:300], "model": client.model}
+        return {"ok": False, "offline": False, "message": str(e)[:300], "model": model}
     return {
         "ok": ok,
         "offline": False,
         "message": "connected" if ok else "the provider answered, but not with the expected JSON",
-        "model": client.model,
-        "provider": client.provider.name,
+        "model": model,
+        "provider": provider.name,
         "latency_ms": round((time.perf_counter() - t0) * 1000, 1),
         "usage": {
             "input_tokens": usage.input_tokens,
@@ -364,9 +433,18 @@ def connect_ai(
         raise ValidationFailed(
             f"the key did not work: {result['message']}", details={"provider": chosen, "model": model}
         )
+    _ledger(session, "settings.connect", model, result)
+    update_ai(session, base, {"provider": chosen, "model": model, "api_key": key}, actor)
+    return result
+
+
+# --------------------------------------------------------------------------------------------
+# backup keys (ADR-025): tried in order when the primary provider fails
+# --------------------------------------------------------------------------------------------
+def _ledger(session: Session, agent: str, model: str, result: dict[str, Any]) -> None:
     session.add(
         LLMCall(
-            agent="settings.connect",
+            agent=agent,
             model=model,
             prompt_version="settings",
             input_tokens=result["usage"]["input_tokens"],
@@ -375,5 +453,133 @@ def connect_ai(
             latency_ms=result["latency_ms"],
         )
     )
-    update_ai(session, base, {"provider": chosen, "model": model, "api_key": key}, actor)
-    return result
+
+
+def add_backup(
+    session: Session,
+    base: Settings,
+    api_key: str,
+    actor: str,
+    *,
+    provider: str | None = None,
+    model: str | None = None,
+    base_url: str | None = None,
+) -> dict[str, Any]:
+    """Add a backup key: the provider is recognised from the key, the key is tried with one tiny call
+    on the chosen model, and it is saved (encrypted) only when that call works."""
+    import datetime as dt
+
+    from forma.ai.llm import MockProvider, make_provider
+
+    key = api_key.strip()
+    if not key:
+        raise ValidationFailed("paste an API key")
+    chosen = provider or detect_provider(key)
+    if chosen is None or chosen == "mock" or chosen not in PROVIDERS:
+        raise ValidationFailed(
+            "cannot tell which provider this key belongs to: choose OpenAI, Anthropic or a gateway",
+            details={"needs_provider": True},
+        )
+    url = (base_url or "").strip() or None
+    if url and not url.startswith(("http://", "https://")):
+        raise ValidationFailed("base_url must start with http:// or https://")
+    if chosen == "openai_compatible" and not (url and (model or "").strip()):
+        raise ValidationFailed("a gateway backup needs its URL and a model name")
+    row = _row(session, AI_KEY)
+    ai = dict(row.value or {}) if row else {}
+    backups = list(ai.get("backups") or [])
+    if len(backups) >= MAX_BACKUP_KEYS:
+        raise ValidationFailed(f"at most {MAX_BACKUP_KEYS} backup keys")
+    chosen_model = (model or "").strip() or _model_for(chosen, None)
+    eff = llm_settings(base, ai)
+    candidate = make_provider(chosen, key, url, eff.llm_timeout_s)
+    if isinstance(candidate, MockProvider):  # pragma: no cover - a key is always given here
+        raise ValidationFailed("this key cannot reach a provider")
+    result = _probe(candidate, chosen_model)
+    if not result["ok"]:
+        raise ValidationFailed(
+            f"the key did not work: {result['message']}", details={"provider": chosen, "model": chosen_model}
+        )
+    _ledger(session, "settings.backup", chosen_model, result)
+    entry = {
+        "id": new_id("bk"),
+        "provider": chosen,
+        "model": chosen_model,
+        "base_url": url,
+        "api_key_enc": secrets.encrypt(base, key),
+        "added_by": actor,
+        "added_at": dt.datetime.now(dt.UTC).isoformat(timespec="seconds"),
+    }
+    _put(session, AI_KEY, {**ai, "backups": [*backups, entry]}, actor)
+    audit(
+        session,
+        "settings.ai.backup.add",
+        "settings",
+        AI_KEY,
+        actor=actor,
+        backup=entry["id"],
+        provider=chosen,
+        model=chosen_model,
+    )  # never the key
+    return {"id": entry["id"], **result}
+
+
+def _backups(session: Session) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    row = _row(session, AI_KEY)
+    ai = dict(row.value or {}) if row else {}
+    return ai, [dict(b) for b in ai.get("backups") or []]
+
+
+def update_backup(session: Session, backup_id: str, patch: dict[str, Any], actor: str) -> None:
+    """Change a backup's model or gateway URL (the key stays; add the backup again to change it)."""
+    ai, backups = _backups(session)
+    b = next((x for x in backups if x["id"] == backup_id), None)
+    if b is None:
+        raise NotFound(f"backup key {backup_id} not found")
+    changed: list[str] = []
+    if "model" in patch:
+        m = (patch["model"] or "").strip()
+        if not m:
+            raise ValidationFailed("model must not be empty")
+        b["model"] = m
+        changed.append("model")
+    if "base_url" in patch:
+        url = (patch["base_url"] or "").strip() or None
+        if url and not url.startswith(("http://", "https://")):
+            raise ValidationFailed("base_url must start with http:// or https://")
+        if b["provider"] == "openai_compatible" and not url:
+            raise ValidationFailed("a gateway backup needs its URL")
+        b["base_url"] = url
+        changed.append("base_url")
+    if not changed:
+        return
+    _put(session, AI_KEY, {**ai, "backups": backups}, actor)
+    audit(
+        session,
+        "settings.ai.backup.update",
+        "settings",
+        AI_KEY,
+        actor=actor,
+        backup=backup_id,
+        **{k: b[k] for k in changed},
+    )
+
+
+def remove_backup(session: Session, backup_id: str, actor: str) -> None:
+    ai, backups = _backups(session)
+    left = [b for b in backups if b["id"] != backup_id]
+    if len(left) == len(backups):
+        raise NotFound(f"backup key {backup_id} not found")
+    rest = {k: v for k, v in ai.items() if k != "backups"}
+    _put(session, AI_KEY, ({**rest, "backups": left} if left else rest) or None, actor)
+    audit(session, "settings.ai.backup.remove", "settings", AI_KEY, actor=actor, backup=backup_id)
+
+
+def order_backups(session: Session, ids: list[str], actor: str) -> None:
+    """Set the order in which backups are tried (every backup id, once)."""
+    ai, backups = _backups(session)
+    if sorted(ids) != sorted(b["id"] for b in backups):
+        raise ValidationFailed("give every backup key id exactly once")
+    by_id = {b["id"]: b for b in backups}
+    _put(session, AI_KEY, {**ai, "backups": [by_id[i] for i in ids]}, actor)
+    audit(session, "settings.ai.backup.order", "settings", AI_KEY, actor=actor, order=ids)

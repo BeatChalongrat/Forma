@@ -5,6 +5,10 @@ Transport errors (timeouts, connection errors, 5xx/429) are retried with backoff
 ``FORMA_LLM_BREAKER_RESET_S`` and every call fails fast with ``LLMError`` — the agents then fall back
 to the deterministic draft and policy routes the round to review (never auto-approve, see
 ``PolicyEngine.evaluate(llm_fallback=True)``). One probe call is allowed when the window expires.
+
+Every AI route (the primary and each backup key, ADR-025) has its own breaker, so a dead key opens only
+its own circuit and the next route answers. Hard errors (401, 400, refusals) are not retried: they
+count against the breaker and the call moves on at once.
 """
 
 from __future__ import annotations
@@ -29,8 +33,13 @@ class CircuitOpen(RuntimeError):
 
 class CircuitBreaker:
     def __init__(
-        self, failures: int = 5, reset_s: float = 120.0, clock: Callable[[], float] = time.monotonic
+        self,
+        failures: int = 5,
+        reset_s: float = 120.0,
+        clock: Callable[[], float] = time.monotonic,
+        name: str = "primary",
     ) -> None:
+        self.name = name
         self.threshold = max(1, failures)
         self.reset_s = reset_s
         self.clock = clock
@@ -86,7 +95,8 @@ class CircuitBreaker:
             self._opened_at = None
             self._opened_wall = None
             self._half_open = False
-            _gauge(0)
+            if self.name == "primary":
+                _gauge(0)
 
     def failure(self) -> None:
         with self._lock:
@@ -97,8 +107,11 @@ class CircuitBreaker:
                 self._opened_at = self.clock()
                 self._opened_wall = dt.datetime.now(dt.UTC)
                 self._half_open = False
-                log.warning("llm circuit opened", failures=self._failures, reset_s=self.reset_s)
-                _gauge(1)
+                log.warning(
+                    "llm circuit opened", route=self.name, failures=self._failures, reset_s=self.reset_s
+                )
+                if self.name == "primary":
+                    _gauge(1)
 
 
 def _gauge(v: int) -> None:
@@ -126,30 +139,38 @@ def is_transient(e: BaseException) -> bool:
     return any(f"HTTP {code}" in msg for code in (429, 500, 502, 503, 504))
 
 
-_BREAKER: CircuitBreaker | None = None
+_BREAKERS: dict[str, CircuitBreaker] = {}
 _LOCK = threading.Lock()
 
 
-def get_breaker() -> CircuitBreaker:
-    global _BREAKER
+def get_breaker(name: str = "primary") -> CircuitBreaker:
+    """The breaker of one AI route ("primary" or a backup key's id)."""
     with _LOCK:
-        if _BREAKER is None:
+        if name not in _BREAKERS:
             from forma.core.settings import get_settings
 
             s = get_settings()
-            _BREAKER = CircuitBreaker(s.llm_breaker_failures, s.llm_breaker_reset_s)
-        return _BREAKER
+            _BREAKERS[name] = CircuitBreaker(s.llm_breaker_failures, s.llm_breaker_reset_s, name=name)
+        return _BREAKERS[name]
 
 
 def reset_breaker() -> None:
-    global _BREAKER
     with _LOCK:
-        _BREAKER = None
+        _BREAKERS.clear()
     _gauge(0)
 
 
 def state() -> dict[str, Any]:
-    return get_breaker().state()
+    """The primary route's breaker, plus the open/closed state of every backup that has been used."""
+    with _LOCK:
+        backups = {k: b for k, b in _BREAKERS.items() if k != "primary"}
+    return {**get_breaker().state(), "backups": {k: b.state()["open"] for k, b in backups.items()}}
+
+
+def is_open(name: str) -> bool:
+    with _LOCK:
+        b = _BREAKERS.get(name)
+    return b.is_open if b else False
 
 
 def guarded_call(
@@ -171,7 +192,7 @@ def guarded_call(
             if is_transient(e):
                 raise
             b.failure()  # a hard provider error counts, but is not retried
-            raise
+            raise _Hard(e) from e
 
     try:
         out = retry(
@@ -186,9 +207,19 @@ def guarded_call(
                 else None
             ),
         )
+    except _Hard as h:
+        raise h.error from None
     except Exception as e:
         if is_transient(e):
             b.failure()
         raise
     b.success()
     return out
+
+
+class _Hard(Exception):  # internal carrier, never escapes guarded_call
+    """Wraps a non-transient error so ``retry`` (which retries RuntimeError for HTTP 429/5xx) skips it."""
+
+    def __init__(self, error: Exception) -> None:
+        super().__init__(str(error))
+        self.error = error
