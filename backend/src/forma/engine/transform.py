@@ -83,13 +83,8 @@ class TransformResult:
 # --------------------------------------------------------------------------------------------
 # Loading sources
 # --------------------------------------------------------------------------------------------
-def load_source_frame(
-    spec: SourceSpec,
-    bound: BoundSource,
-    *,
-    limit: int | None = None,
-    expected_columns: set[str] | None = None,
-) -> pl.DataFrame:
+def resolve_sheet(spec: SourceSpec, bound: BoundSource) -> int | str | None:
+    """The sheet (name or index) a source reads: bound by the binder, else named/indexed/matched by the spec."""
     sheet: int | str | None = bound.sheet
     if sheet is None and spec.sheet is not None:
         if spec.sheet.name is not None:
@@ -105,6 +100,17 @@ def load_source_frame(
             if hit is None:
                 raise ValueError(f"no sheet matches /{spec.sheet.match}/ in {bound.path.name}")
             sheet = hit.index
+    return sheet
+
+
+def load_source_frame(
+    spec: SourceSpec,
+    bound: BoundSource,
+    *,
+    limit: int | None = None,
+    expected_columns: set[str] | None = None,
+) -> pl.DataFrame:
+    sheet = resolve_sheet(spec, bound)
     raw = read_raw(
         bound.path,
         sheet,
@@ -681,6 +687,12 @@ class TransformEngine:
         pass_plan = [(cols.index(c), c.split(".", 1)[1]) for c in passthrough]
         row_i = cols.index(row_col)
         provenance = mapping.provenance
+        # lineage: the row of each joined lookup table this record took columns from
+        join_plan = [
+            (cols.index(f"{j.right}.{ROW_COL}"), j.right)
+            for j in mapping.joins
+            if j.left == root_id and f"{j.right}.{ROW_COL}" in cols
+        ]
 
         records: list[dict[str, Any]] = []
         for row in frame.iter_rows():
@@ -690,20 +702,27 @@ class TransformEngine:
                 if v is None and skip_null:
                     continue
                 _set_segs(rec, segs, v)
-            for i, _target, segs, idx in coll_plan:
+            item_rows: dict[str, list[Any]] = {}
+            for i, target, segs, idx in coll_plan:
                 linked = idx.get(row[i])
                 if linked:
                     _set_segs(
                         rec, segs, [{k: v for k, v in it.items() if not k.startswith("_")} for it in linked]
                     )
+                    if provenance:
+                        item_rows[target] = [it.get("_row") for it in linked]
             if pass_plan:
                 attrs = {name: row[i] for i, name in pass_plan if row[i] is not None}
                 if attrs:
                     rec[PASSTHROUGH_KEY] = attrs
             if provenance:
-                rec.setdefault(PROVENANCE_KEY, {}).update(
-                    meta_base | {"lineage": {"root_row": row[row_i], "source": root_id}}
-                )
+                lineage: dict[str, Any] = {"root_row": row[row_i], "source": root_id}
+                if item_rows:
+                    lineage["items"] = item_rows  # collection → source row of each item, in order
+                joined = {sid: row[i] for i, sid in join_plan if row[i] is not None}
+                if joined:
+                    lineage["joined"] = joined
+                rec.setdefault(PROVENANCE_KEY, {}).update(meta_base | {"lineage": lineage})
             records.append(rec)
         return records
 

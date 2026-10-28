@@ -52,7 +52,9 @@ ImportRound: uploaded ─▶ profiled ─▶ ┬─ auto_approved ─▶ transfo
    statically against the target schema and simulated on a sample.
 5. **Sandbox** — a new mapping for a customer with an approved one (drift re-proposal, AI adaptation,
    Studio edit) runs next to the approved mapping on the same files; rows, errors, invalid prices,
-   duplicates, lost/gained records and every changed price are compared (ADR-018).
+   duplicates, lost/gained records and every changed price are compared (ADR-018), and the customer's
+   persistent overrides are checked for collisions (ADR-024). Each changed field is checked on the data
+   against the last published round — same values, VAT gap, scaled or different (ADR-021).
    In the Studio, `POST /rounds/{id}/relationships` measures how every table of the round connects
    (cardinality, match rate, orphan rows) and suggests key pairs; the Relationships view draws them and turns
    an accepted connection into a collection link or a join of the mapping document (ADR-019).
@@ -64,11 +66,16 @@ ImportRound: uploaded ─▶ profiled ─▶ ┬─ auto_approved ─▶ transfo
    Studio edit keeps the round's drift, so it cannot clear a wrong-file block.
 7. **Transform** — full run with the approved mapping; persistent overrides for the customer are
    re-applied; records are validated against the schema; a `DatasetVersion` (JSONL on disk) is created.
-8. **Edit** — the Data Editor stages cell edits, bulk/copilot operations and deletions; the API previews
-   impact (rows, cells, before/after) and schema validity; applying creates a new version + `ChangeSet`.
-   *Persistent* edits also create `Override` rules for future rounds. Rollback = new version from parent.
+8. **Edit** — the Data Editor stages cell edits, pasted blocks, bulk edits on picked rows, copilot
+   operations and deletions; the API previews impact (rows, cells, before/after) and schema validity;
+   applying creates a new version + `ChangeSet`. *Persistent* edits also create `Override` rules for future
+   rounds (ADR-024). The copilot plans conditions across collections and answers "why" questions from
+   evidence (ADR-023). Every value traces back to its Excel cell, with the cause of a change (ADR-020).
+   Rollback = new version from parent.
 9. **Change intelligence** — the dataset is diffed against the customer's previous published dataset:
-   SKUs added/removed, changed fields, price moves (large ones flagged), promotion changes.
+   SKUs added/removed, changed fields, price moves (large ones flagged), promotion changes; anomalies
+   (price jumps and outliers, discounts, promotion dates, stock, removed SKUs, unusual size) with "% normal".
+   Approving data with high-severity anomalies needs an acknowledgement (ADR-022).
 10. **Export** — JSON (nested), JSONL, or CSV flattened per the schema's `output_variants`; atomic write;
    artifact recorded with sha256. Exporting publishes, so only an approved (or already published) dataset
    can be exported; a draft is refused with 409.

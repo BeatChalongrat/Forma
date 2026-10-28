@@ -275,8 +275,22 @@ def dedupe_names(names: list[str]) -> list[str]:
 # --------------------------------------------------------------------------------------------
 # Extraction
 # --------------------------------------------------------------------------------------------
-def extract_table(df: pl.DataFrame, spec: TableSpec, *, rename: dict[str, str] | None = None) -> pl.DataFrame:
-    """Turn a raw grid into a header-named frame according to ``spec`` (all columns stay strings)."""
+SHEET_ROW = "__sheet_row__"  # 0-based row of the raw grid a data row came from (lineage only)
+
+
+def extract_table(
+    df: pl.DataFrame,
+    spec: TableSpec,
+    *,
+    rename: dict[str, str] | None = None,
+    row_numbers: bool = False,
+    positions: dict[str, int] | None = None,
+) -> pl.DataFrame:
+    """Turn a raw grid into a header-named frame according to ``spec`` (all columns stay strings).
+
+    For lineage, ``row_numbers`` adds a ``__sheet_row__`` column (the raw grid row each data row came
+    from) and ``positions`` is filled with header → raw grid column. Without them the output is unchanged.
+    """
     if df.height == 0:
         return pl.DataFrame()
     if spec.header_row == "auto":
@@ -320,16 +334,23 @@ def extract_table(df: pl.DataFrame, spec: TableSpec, *, rename: dict[str, str] |
                 }
             ),
             rename=rename,
+            row_numbers=row_numbers,
+            positions=positions,
         )
     headers = merge_header_rows(header_rows)
     data_start = spec.data_start if spec.data_start is not None else header_row + spec.header_rows
     data_end = spec.data_end if spec.data_end is not None else df.height
     body = df.slice(data_start, max(0, data_end - data_start)).select(cols)
     body.columns = headers
+    if positions is not None:
+        positions.update({(rename or {}).get(h, h): c0 + i for i, h in enumerate(headers)})
+    if row_numbers:
+        body = body.with_columns(pl.int_range(data_start, data_start + body.height).alias(SHEET_ROW))
+    data = [c for c in body.columns if c != SHEET_ROW]  # every column unless lineage asked for rows
 
     # stop at N consecutive blank rows
     if spec.stop_at_blank_rows and body.height:
-        blank = body.select(pl.all_horizontal(pl.all().is_null()).alias("b"))["b"].to_list()
+        blank = body.select(pl.all_horizontal(pl.col(data).is_null()).alias("b"))["b"].to_list()
         run = 0
         cut = len(blank)
         for i, b in enumerate(blank):
@@ -340,12 +361,12 @@ def extract_table(df: pl.DataFrame, spec: TableSpec, *, rename: dict[str, str] |
         body = body.head(cut)
     # drop fully blank rows
     if body.height:
-        body = body.filter(~pl.all_horizontal(pl.all().is_null()))
+        body = body.filter(~pl.all_horizontal(pl.col(data).is_null()))
     # drop total rows: a total label in the first non-null cell and nothing but numbers beside it
-    if spec.drop_total_rows and body.height and body.width:
-        first_text = pl.coalesce([pl.col(c) for c in body.columns]).str.to_lowercase().str.strip_chars()
+    if spec.drop_total_rows and body.height and data:
+        first_text = pl.coalesce([pl.col(c) for c in data]).str.to_lowercase().str.strip_chars()
         words = pl.sum_horizontal(
-            [pl.col(c).str.contains(_WORD_RE).fill_null(False).cast(pl.Int32) for c in body.columns]
+            [pl.col(c).str.contains(_WORD_RE).fill_null(False).cast(pl.Int32) for c in data]
         )
         cond = first_text.str.contains(TOTAL_LABEL_RE).fill_null(False) & (words <= 1)
         body = body.filter(~cond)
@@ -354,7 +375,7 @@ def extract_table(df: pl.DataFrame, spec: TableSpec, *, rename: dict[str, str] |
         if c in body.columns:
             body = body.with_columns(pl.col(c).fill_null(strategy="forward"))
     if spec.drop_empty_columns and body.height:
-        keep = [c for c in body.columns if body[c].null_count() < body.height]
+        keep = [c for c in body.columns if c == SHEET_ROW or body[c].null_count() < body.height]
         body = body.select(keep)
     if spec.unpivot is not None:
         u = spec.unpivot
@@ -363,9 +384,10 @@ def extract_table(df: pl.DataFrame, spec: TableSpec, *, rename: dict[str, str] |
             rx = re.compile(u.value_columns_regex)
             value_cols = [c for c in body.columns if rx.search(c) and c not in u.id_columns]
         if value_cols is None:
-            value_cols = [c for c in body.columns if c not in u.id_columns]
+            value_cols = [c for c in body.columns if c not in u.id_columns and c != SHEET_ROW]
+        index = [*u.id_columns, SHEET_ROW] if row_numbers else u.id_columns
         body = body.unpivot(
-            on=value_cols, index=u.id_columns, variable_name=u.variable_name, value_name=u.value_name
+            on=value_cols, index=index, variable_name=u.variable_name, value_name=u.value_name
         )
     if rename:
         body = body.rename({k: v for k, v in rename.items() if k in body.columns})

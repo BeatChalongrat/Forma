@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Check, X, Save, Stethoscope, ChevronDown, ChevronRight, Braces, Plus, Trash2, Wand2, ShieldAlert, Network } from 'lucide-react'
-import { api, type SandboxItem, type SandboxReport, type Expr, type FieldMapping, type FieldSpec, type MappingDocument, type TableProfile } from '../lib/api'
+import { api, type SandboxItem, type SandboxReport, type Expr, type FieldChange, type FieldMapping, type FieldSpec, type MappingDocument, type TableProfile } from '../lib/api'
 import { cn, describeExpr, fmtInt, pyRegex } from '../lib/utils'
 import { Badge, Confidence, RiskDot, RiskLevel, Spinner, StatusBadge, Tabs, FindingRow, Modal } from '../components/ui'
 import { useToast } from '../lib/toast'
@@ -59,7 +59,7 @@ export function MappingStudio() {
   const [dirty, setDirty] = useState(false)
   const [selected, setSelected] = useState<string | null>(null) // target pointer being edited
   const [selectedSource, setSelectedSource] = useState<string | null>(null)
-  const [rightTab, setRightTab] = useState<'json' | 'source' | 'findings' | 'diagnosis' | 'compare'>('json')
+  const [rightTab, setRightTab] = useState<'json' | 'source' | 'findings' | 'diagnosis' | 'compare' | 'changes'>('json')
   const [showRaw, setShowRaw] = useState(false)
   const [rawText, setRawText] = useState('')
   const [comment, setComment] = useState('')
@@ -68,7 +68,13 @@ export function MappingStudio() {
   const [view, setView] = useState<'fields' | 'relationships'>('fields')
   const [dropOn, setDropOn] = useState<string | null>(null) // target field a column is dragged over
 
-  useEffect(() => { if (mv?.document && !doc) { setDoc(mv.document); setSelectedSource(mv.document.record.root_source) } }, [mv, doc])
+  useEffect(() => {
+    if (mv?.document && !doc) {
+      setDoc(mv.document)
+      setSelectedSource(mv.document.record.root_source)
+      if (mv.policy.field_review?.needs_decision?.length) setRightTab('changes') // a drifted format: show what needs a decision first
+    }
+  }, [mv, doc])
 
   // ---- profiles of this round (columns per source) --------------------------------------------
   const tables: TableProfile[] = useMemo(() => {
@@ -164,6 +170,13 @@ export function MappingStudio() {
     if (coll && !base) { toast.push({ kind: 'info', title: `Link a table to ${coll} first`, detail: 'Use Relationships or “add collection”.' }); return }
     const leaf = exprLeaf(fm?.expr)
     setFieldExpr(ptr, coll, buildExpr({ ...leaf, op: leaf.op === 'const' ? 'col' : leaf.op, col: column, source: sourceId === base ? null : sourceId }))
+  }
+  // "use the approved one" for a field the proposal changed (self-healing review, ADR-021)
+  const revertField = (c: FieldChange) => {
+    const { coll: mapped } = getMapping(c.pointer)
+    const coll = mapped ?? schema?.fields?.find((x) => x.pointer === c.pointer)?.in_collection ?? null
+    if (c.status === 'added') removeField(c.pointer, mapped)
+    else if (c.before) setFieldExpr(c.pointer, coll, c.before.expr)
   }
   const addCollection = (ptr: string) => update((d) => { if (!d.collections.find((c) => c.target === ptr)) d.collections.push({ target: ptr, source: d.record.root_source, link: [{ left: '', right: '' }], fields: [] }); return d })
 
@@ -303,7 +316,7 @@ export function MappingStudio() {
 
         {/* RIGHT: preview */}
         <aside className="border-l border-line bg-surface flex flex-col min-h-0">
-          <Tabs value={rightTab} onChange={setRightTab} items={[{ id: 'json', label: 'JSON output', count: pv?.records.length }, { id: 'source', label: 'Source rows' }, { id: 'findings', label: 'Findings', count: pv?.findings.length }, { id: 'diagnosis', label: 'Diagnosis' }, { id: 'compare', label: <span className="flex items-center gap-1">Compare{mv.policy.sandbox?.verdict === 'fail' && <span className="w-1.5 h-1.5 rounded-full bg-bad" />}</span> }]} />
+          <Tabs value={rightTab} onChange={setRightTab} items={[{ id: 'json', label: 'JSON output', count: pv?.records.length }, { id: 'source', label: 'Source rows' }, { id: 'findings', label: 'Findings', count: pv?.findings.length }, { id: 'changes', label: <span className="flex items-center gap-1">What changed{(mv.policy.field_review?.needs_decision?.length ?? 0) > 0 && <span className="w-1.5 h-1.5 rounded-full bg-warn" />}</span> }, { id: 'diagnosis', label: 'Diagnosis' }, { id: 'compare', label: <span className="flex items-center gap-1">Compare{mv.policy.sandbox?.verdict === 'fail' && <span className="w-1.5 h-1.5 rounded-full bg-bad" />}</span> }]} />
           <div className="flex-1 overflow-auto p-3">
             {rightTab === 'json' && (
               <>
@@ -325,6 +338,7 @@ export function MappingStudio() {
               ) : <div className="text-muted text-[12.5px]">{selectedSource ? (srcPreview.isLoading ? 'Loading…' : srcPreview.error ? String((srcPreview.error as Error).message) : '') : 'Select a source on the left.'}</div>
             )}
             {rightTab === 'findings' && (pv?.findings.length ? pv.findings.map((f, i) => <FindingRow key={i} f={f} />) : <div className="text-muted text-[12.5px]">No findings on the sample.</div>)}
+            {rightTab === 'changes' && <ChangesPanel mappingId={mappingId} onRevert={locked ? null : revertField} />}
             {rightTab === 'compare' && <ComparePanel mappingId={mappingId} stored={mv.policy.sandbox ?? null} draft={dirty ? doc : null} />}
             {rightTab === 'diagnosis' && (
               diagnose.isPending ? <div className="text-muted text-[12.5px] flex items-center gap-2"><Spinner /> analysing…</div> : diagnose.data ? (
@@ -434,6 +448,51 @@ function FieldEditor({ field, fm, columns, locked, onChange, onRemove }: { field
 // ---------------------------------------------------------------------------------------------
 type SandboxList = 'price_changes' | 'changed' | 'lost' | 'gained'
 
+const CHECK_TONE: Record<string, string> = { same: 'bg-ok-soft text-ok', vat_added: 'bg-warn-soft text-warn', vat_removed: 'bg-warn-soft text-warn', scaled: 'bg-warn-soft text-warn', different: 'bg-bad-soft text-bad', no_data: 'bg-surface-2 text-ink-2' }
+
+function ChangesPanel({ mappingId, onRevert }: { mappingId: string; onRevert: ((c: FieldChange) => void) | null }) {
+  const { data, isLoading, error } = useQuery({ queryKey: ['field-review', mappingId], queryFn: () => api.fieldReview(mappingId) })
+  if (isLoading) return <div className="text-muted text-[12.5px] flex items-center gap-2"><Spinner /> comparing with the approved mapping…</div>
+  if (error) return <div className="text-bad text-[12.5px]">{(error as Error).message}</div>
+  if (!data?.baseline_id) return <div className="text-muted text-[12.5px]">No approved mapping for this customer yet, so every field is new — review them in the field list.</div>
+  const changed = data.fields.filter((c) => c.status !== 'unchanged')
+  const decide = changed.filter((c) => data.needs_decision.includes(c.pointer))
+  const safe = changed.filter((c) => !data.needs_decision.includes(c.pointer))
+  return (
+    <div className="flex flex-col gap-3 text-[12.5px]">
+      <div className="text-muted">vs approved v{data.baseline_version}{data.compared_with ? ' · values checked against the last published round, SKU by SKU' : ' · no published round yet to check values against'}</div>
+      <div className="grid grid-cols-3 gap-2">
+        {[['Unchanged', data.counts.unchanged ?? 0, ''], ['Changed', (data.counts.changed ?? 0) + (data.counts.added ?? 0) + (data.counts.removed ?? 0), ''], ['Need a decision', decide.length, decide.length ? 'text-warn' : 'text-ok']].map(([k, v, cls]) => <div key={String(k)} className="card p-2"><div className="text-muted text-[11.5px]">{k}</div><div className={cn('tnum text-[17px] font-semibold', cls as string)}>{fmtInt(v as number)}</div></div>)}
+      </div>
+      {!changed.length && <div className="text-ok">Nothing changed — the proposal reads every field like the approved mapping.</div>}
+      {decide.length > 0 && <><div className="font-medium">Needs your decision</div>{decide.map((c) => <ChangeCard key={c.pointer} c={c} onRevert={onRevert} />)}</>}
+      {safe.length > 0 && <><div className="font-medium">Safe changes</div>{safe.map((c) => <ChangeCard key={c.pointer} c={c} onRevert={onRevert} />)}</>}
+      {changed.length > 0 && <div className="text-muted">Keep the proposal and approve, or press “Use approved” on a field and save the result as a new version.</div>}
+    </div>
+  )
+}
+
+function ChangeCard({ c, onRevert }: { c: FieldChange; onRevert: ((c: FieldChange) => void) | null }) {
+  const fmt = (v: unknown) => (v === null || v === undefined ? '∅' : typeof v === 'object' ? JSON.stringify(v) : String(v))
+  const side = (x: FieldChange['before']) => (x ? (x.reads.length ? x.reads.join(', ') : describeExpr(x.expr)) : '—')
+  return (
+    <div className="card p-2.5">
+      <div className="flex items-center gap-2">
+        <RiskDot risk={c.risk ?? 'low'} /><span className="mono truncate">{c.pointer}</span><Badge tone={c.status === 'removed' ? 'bad' : c.status === 'added' ? 'info' : 'warn'} className="h-5 px-1.5 text-[10.5px]">{c.status}</Badge>
+        {onRevert && <button className="btn btn-ghost btn-sm ml-auto text-signal" onClick={() => onRevert(c)}>{c.status === 'added' ? 'Remove' : 'Use approved'}</button>}
+      </div>
+      <div className="mt-1 mono text-[11.5px]"><span className="text-muted">{side(c.before)}</span> → <span>{c.status === 'removed' ? 'not mapped' : side(c.after)}</span></div>
+      {c.before && c.after && describeExpr(c.before.expr) !== describeExpr(c.after.expr) && <div className="text-muted text-[11.5px] mono">{describeExpr(c.before.expr)} → {describeExpr(c.after.expr)}</div>}
+      {c.check && (
+        <div className={cn('mt-1.5 rounded-[var(--radius-sm)] px-2 py-1', CHECK_TONE[c.check.verdict] ?? 'bg-surface-2')}>
+          {c.check.summary}
+          {c.check.examples?.length ? <div className="mono text-[11px] opacity-90">{c.check.examples.slice(0, 3).map((e) => `${e.identity}: ${fmt(e.before)} → ${fmt(e.after)}`).join(' · ')}</div> : null}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function ComparePanel({ mappingId, stored, draft }: { mappingId: string; stored: SandboxReport | null; draft: MappingDocument | null }) {
   const run = useMutation({ mutationFn: (d: MappingDocument | undefined) => api.compareMapping(mappingId, d) })
   const report = draft ? run.data ?? null : run.data ?? stored
@@ -483,6 +542,13 @@ function SandboxView({ mappingId, report, live }: { mappingId: string; report: S
           <tr key={label} className="border-t border-line"><td className="py-1.5">{label}</td><td className="text-right">{a === undefined ? '–' : fmtInt(a)}</td><td className={cn('text-right', worse && 'text-bad font-medium')}>{b === undefined ? '–' : fmtInt(b)}</td></tr>
         ))}</tbody>
       </table>
+      {report.override_conflicts && report.override_conflicts.length > 0 && (
+        <div className="card p-3 border-warn/40">
+          <div className="font-medium text-warn mb-1">{report.override_conflicts.length} persistent override{report.override_conflicts.length > 1 ? 's' : ''} collide with this mapping</div>
+          <ul className="flex flex-col gap-1 text-[12px]">{report.override_conflicts.slice(0, 20).map((c, i) => <li key={i}><Badge tone="warn" className="h-5 px-1.5 text-[10.5px] mr-1.5">{c.kind.replace('_', ' ')}</Badge>{c.message}</li>)}</ul>
+          <div className="text-muted text-[11.5px] mt-1.5">Overrides are re-applied on every import of this customer. Keep or remove them on the customer page before approving.</div>
+        </div>
+      )}
       {d && (
         <>
           <div className="flex flex-wrap gap-1.5">{(['price_changes', 'changed', 'lost', 'gained'] as SandboxList[]).map((k) => (

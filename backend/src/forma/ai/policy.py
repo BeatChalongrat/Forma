@@ -72,6 +72,17 @@ DEFAULT_POLICY: dict[str, Any] = {
         "max_new_duplicates": 0,  # duplicate identities beyond the approved mapping's → block
         "max_changed_prices_auto": 0,  # more changed prices than this → a human reviews (never auto)
     },
+    # Change intelligence (ADR-022): what counts as unusual in a round's data.
+    "anomaly": {
+        "max_price_change_pct": 30,  # a price moving more than this vs last round
+        "max_discount_pct": 50,  # a discount above this
+        "max_stock_drop_pct": 80,  # stock falling more than this vs last round
+        "max_removed_pct": 10,  # share of last round's SKUs gone
+        "row_count_tolerance_pct": 30,  # records vs the customer's recent average
+        "outlier_mad": 6,  # a price this many robust deviations from its category's median
+        "history_rounds": 5,  # published rounds the row-count baseline averages
+        "block_approval_on_high": True,  # approving data with high-severity anomalies needs an acknowledgement
+    },
 }
 
 
@@ -128,10 +139,24 @@ def validate_policy(policy: dict[str, Any]) -> list[str]:
             problems.append(f"sandbox.{k} is not a known setting")
         elif isinstance(v, bool) or not isinstance(v, int) or v < 0:
             problems.append(f"sandbox.{k} must be a whole number ≥ 0")
+    for k, v in p["anomaly"].items():
+        if k not in DEFAULT_POLICY["anomaly"]:
+            problems.append(f"anomaly.{k} is not a known setting")
+        elif isinstance(DEFAULT_POLICY["anomaly"][k], bool):
+            if not isinstance(v, bool):
+                problems.append(f"anomaly.{k} must be true or false")
+        else:
+            number(f"anomaly.{k}", v, 0)
     for sem, risk in p["risk_overrides"].items():
         if risk not in RISK_ORDER:
             problems.append(f"risk_overrides.{sem} must be one of {list(RISK_ORDER)}")
     return problems
+
+
+def _meaning_doubts(checks: list[dict[str, Any]] | None) -> list[dict[str, Any]]:
+    """Self-healing data checks (ADR-021) that doubt a critical/high field still means the same thing."""
+    doubtful = ("vat_added", "vat_removed", "scaled", "different")
+    return [c for c in checks or [] if c.get("verdict") in doubtful and c.get("risk") in ("critical", "high")]
 
 
 class PolicyEngine:
@@ -184,6 +209,7 @@ class PolicyEngine:
         other_customer: dict[str, Any] | None = None,
         llm_fallback: bool = False,
         sandbox: dict[str, Any] | None = None,
+        field_checks: list[dict[str, Any]] | None = None,
     ) -> PolicyDecision:
         d = self._decide(
             mapping,
@@ -197,8 +223,11 @@ class PolicyEngine:
             other_customer=other_customer,
             llm_fallback=llm_fallback,
             sandbox=sandbox,
+            field_checks=field_checks,
         )
-        self._classify(d, findings=findings, rows_out=rows_out, drift=drift, sandbox=sandbox)
+        self._classify(
+            d, findings=findings, rows_out=rows_out, drift=drift, sandbox=sandbox, field_checks=field_checks
+        )
         return d
 
     def _classify(
@@ -209,6 +238,7 @@ class PolicyEngine:
         rows_out: int,
         drift: str | None,
         sandbox: dict[str, Any] | None,
+        field_checks: list[dict[str, Any]] | None = None,
     ) -> None:
         """Low = safe to automate, medium = a human looks, high = a human must decide (ADR-019)."""
         delta = (sandbox or {}).get("delta") or {}
@@ -232,12 +262,17 @@ class PolicyEngine:
             factors.append("ambiguous critical field (price, discount, identity …)")
         if d.checks.get("errors"):
             factors.append("validation or engine errors")
-        if any(f.get("kind") == "join" for f in findings) or any(
-            f.get("kind") == "dedupe" and "duplicate" in str(f.get("message", "")) for f in findings
-        ):
+        # join cardinality (keys that repeat, so rows multiply) — rows that match nothing are data, not mapping risk
+        if any(
+            f.get("kind") == "join"
+            and ("duplicated" in str(f.get("message", "")) or f.get("severity") == "error")
+            for f in findings
+        ) or any(f.get("kind") == "dedupe" and "duplicate" in str(f.get("message", "")) for f in findings):
             factors.append("join cardinality / duplicate keys")
         if drift in ("columns_removed", "sheets_removed", "types_changed", "unrelated_file"):
             factors.append(f"format change: {drift}")
+        for c in _meaning_doubts(field_checks):
+            factors.append(f"meaning check on {c['pointer']}: {c['summary']}")
         if high_impact:
             factors.append(f"{affected} of {rows_out} records ({ratio:.0%}) change vs the approved mapping")
         d.risk_factors = factors
@@ -257,6 +292,7 @@ class PolicyEngine:
         other_customer: dict[str, Any] | None = None,
         llm_fallback: bool = False,
         sandbox: dict[str, Any] | None = None,
+        field_checks: list[dict[str, Any]] | None = None,
     ) -> PolicyDecision:
         aa = self.policy["auto_approve"]
         w = self.policy["review"]["priority_weights"]
@@ -297,6 +333,15 @@ class PolicyEngine:
         ):
             reasons.append(
                 f"sandbox: {changed['changed_prices']} prices differ from the approved mapping's output"
+            )
+            priority += w.get("sandbox_changed_values", 25)
+        for c in _meaning_doubts(field_checks)[:3]:
+            reasons.append(f"data check: {c['pointer']}: {c['summary']}")
+            priority += w["critical_field_low_confidence"]
+            risk += 0.3
+        if changed.get("override_conflicts"):
+            reasons.append(
+                f"sandbox: {changed['override_conflicts']} persistent override(s) collide with the new mapping"
             )
             priority += w.get("sandbox_changed_values", 25)
         if blk["on_missing_identity"] and any(

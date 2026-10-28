@@ -20,10 +20,15 @@ class RoundIn(BaseModel):
     target_schema: str | None = None  # None → the customer's format, else the default format
 
 
+class AskIn(BaseModel):
+    question: str = Field(min_length=1, max_length=2000)
+
+
 class Decision(BaseModel):
     actor: str = "operator"
     comment: str | None = None
     override_block: bool = False  # approve a policy-blocked mapping (approver role + comment required)
+    acknowledge_anomalies: bool = False  # approve data that has high-severity anomalies (ADR-022)
 
 
 class MappingEditIn(BaseModel):

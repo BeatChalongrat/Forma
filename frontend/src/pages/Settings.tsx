@@ -321,6 +321,16 @@ function PolicyTab() {
             {num('Block on extra duplicates (more than)', p.sandbox.max_new_duplicates, (v) => edit((x) => { x.sandbox.max_new_duplicates = Math.round(v) }))}
             {num('Changed prices a human must see (more than)', p.sandbox.max_changed_prices_auto, (v) => edit((x) => { x.sandbox.max_changed_prices_auto = Math.round(v) }))}
           </div></Section>
+          {p.anomaly && <Section title="Anomalies: what counts as unusual"><div className="px-4 py-2">
+            {num('Price moves more than (%) vs last round', p.anomaly.max_price_change_pct, (v) => edit((x) => { x.anomaly!.max_price_change_pct = v }))}
+            {num('Discount above (%)', p.anomaly.max_discount_pct, (v) => edit((x) => { x.anomaly!.max_discount_pct = v }))}
+            {num('Stock falls more than (%)', p.anomaly.max_stock_drop_pct, (v) => edit((x) => { x.anomaly!.max_stock_drop_pct = v }))}
+            {num('SKUs gone since last round (%)', p.anomaly.max_removed_pct, (v) => edit((x) => { x.anomaly!.max_removed_pct = v }))}
+            {num('Record count vs usual (± %)', p.anomaly.row_count_tolerance_pct, (v) => edit((x) => { x.anomaly!.row_count_tolerance_pct = v }))}
+            {num('Price outlier in its category (robust deviations)', p.anomaly.outlier_mad, (v) => edit((x) => { x.anomaly!.outlier_mad = v }))}
+            {num('Rounds in the usual-size baseline', p.anomaly.history_rounds, (v) => edit((x) => { x.anomaly!.history_rounds = Math.round(v) }))}
+            {flag('Approving data with high-severity anomalies needs an acknowledgement', p.anomaly.block_approval_on_high, (v) => edit((x) => { x.anomaly!.block_approval_on_high = v }))}
+          </div></Section>}
           <Section title="Risk by meaning (overrides the format)"><div className="px-4 py-2">
             {Object.entries(p.risk_overrides).map(([sem, risk]) => (
               <div key={sem} className="flex items-center gap-2 py-1"><span className="mono flex-1 truncate">{sem}</span>

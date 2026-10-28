@@ -149,6 +149,90 @@ def compare_records(
     return counts, details
 
 
+def override_conflicts(
+    schema: TargetSchema,
+    old: list[dict[str, Any]],
+    new: list[dict[str, Any]],
+    overrides: list[dict[str, Any]],
+    *,
+    cap: int = 200,
+) -> list[dict[str, Any]]:
+    """Persistent overrides (edits re-applied on every import) that the new mapping collides with: the
+    record they pin is gone, the mapping now produces a different value underneath them (the override
+    would hide the change), a rule matches other records than before, or the field is no longer filled."""
+    if not overrides:
+        return []
+    from forma.services.datasets import _flat_frame, _where_mask, where_names
+
+    o = {_identity(r, schema): r for r in old}
+    n = {_identity(r, schema): r for r in new}
+    frames: dict[str, Any] = {}
+    out: list[dict[str, Any]] = []
+    for ov in overrides:
+        target, where = str(ov["target"]), ov.get("where") or {}
+        base = {"override_id": ov.get("id"), "target": target, "value": ov.get("value")}
+        if "identity" in where:
+            ident = str(where["identity"])
+            if ident not in n:
+                out.append(
+                    {
+                        **base,
+                        "identity": ident,
+                        "kind": "no_record",
+                        "message": f"{ident}: the new mapping produces no such record, so the override on "
+                        f"{target} would apply to nothing",
+                    }
+                )
+            elif ident in o and _get_pointer(o[ident], target) != _get_pointer(n[ident], target):
+                before, after = _get_pointer(o[ident], target), _get_pointer(n[ident], target)
+                out.append(
+                    {
+                        **base,
+                        "identity": ident,
+                        "kind": "value_changed",
+                        "before": before,
+                        "after": after,
+                        "message": f"{ident}: the new mapping changes {target} ({before} → {after}), but a "
+                        f"persistent override replaces it with {ov.get('value')}, hiding the change",
+                    }
+                )
+        else:
+            if "old" not in frames:
+                need = set().union(*(where_names(x.get("where")) for x in overrides))
+                frames["old"], frames["new"] = _flat_frame(old, schema, need), _flat_frame(new, schema, need)
+            try:
+                hit_old = {_identity(old[i], schema) for i in _where_mask(frames["old"], where or None)}
+                hit_new = {_identity(new[i], schema) for i in _where_mask(frames["new"], where or None)}
+            except Exception:
+                continue
+            if hit_old != hit_new:
+                out.append(
+                    {
+                        **base,
+                        "kind": "scope_changed",
+                        "before": len(hit_old),
+                        "after": len(hit_new),
+                        "message": f"a rule setting {target} matched {len(hit_old)} records with the approved "
+                        f"mapping and {len(hit_new)} with the new one",
+                    }
+                )
+        if len(out) >= cap:
+            break
+    targets = sorted({str(ov["target"]) for ov in overrides})
+    for t in targets:
+        filled_before = any(v is not None for r in old for v in _values(r, t))
+        if filled_before and not any(v is not None for r in new for v in _values(r, t)):
+            out.append(
+                {
+                    "override_id": None,
+                    "target": t,
+                    "kind": "field_dropped",
+                    "message": f"the new mapping no longer fills {t}; overrides still set it",
+                }
+            )
+    return out[:cap]
+
+
 def run(
     ctx: ServiceContext,
     schema: TargetSchema,
@@ -157,6 +241,7 @@ def run(
     files: list[SourceFile],
     *,
     limit: int | None,
+    overrides: list[dict[str, Any]] | None = None,
 ) -> tuple[dict[str, Any], dict[str, list[dict[str, Any]]]]:
     """Run both mappings on the same files. Returns (report without details, details)."""
     from forma.services.mapping import simulate
@@ -175,6 +260,9 @@ def run(
             "new_invalid_prices": max(0, new_m["invalid_prices"] - old_m["invalid_prices"]),
             "new_duplicates": max(0, new_m["duplicates"] - old_m["duplicates"]),
         }
+        conflicts = override_conflicts(schema, old_res.records, new_res.records, overrides or [])
+        report["override_conflicts"] = conflicts
+        report["delta"]["override_conflicts"] = len(conflicts)
     return report, details
 
 

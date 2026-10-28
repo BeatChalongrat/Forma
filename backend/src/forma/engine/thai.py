@@ -10,6 +10,7 @@ import datetime as dt
 import re
 
 THAI_DIGITS = str.maketrans("๐๑๒๓๔๕๖๗๘๙", "0123456789")
+VAT_RATE = 0.07  # Thai VAT; ops take it as a parameter, checks that suspect VAT use this default
 
 THAI_MONTHS: dict[str, int] = {
     "มกราคม": 1,
@@ -124,7 +125,7 @@ def parse_number_th_py(value: object) -> float | None:
     return -v if neg else v
 
 
-def vat_adjust_py(amount: float | None, mode: str, rate: float = 0.07) -> float | None:
+def vat_adjust_py(amount: float | None, mode: str, rate: float = VAT_RATE) -> float | None:
     """mode='add' → amount*(1+rate) ; mode='remove' → amount/(1+rate). Rounded to 4 dp."""
     if amount is None:
         return None

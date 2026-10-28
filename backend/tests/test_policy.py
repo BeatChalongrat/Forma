@@ -247,3 +247,22 @@ def test_impact_vs_the_approved_mapping(engine: PolicyEngine, schema: TargetSche
     assert small.impact["affected_records"] == 5 and not small.impact["high"] and small.risk_level != "high"
     strict = PolicyEngine({"review": {"high_impact_ratio": 0.05}})
     assert strict.evaluate(_doc(), schema, sandbox=sandbox(3), **kw).risk_level == "high"  # type: ignore[arg-type]
+
+
+def test_override_collisions_and_meaning_checks_route_to_review(
+    engine: PolicyEngine, schema: TargetSchema
+) -> None:
+    kw = {"findings": [], "rows_out": 100, "drift": "identical", "has_previous_approval": True}
+    delta = {"changed_records": 0, "lost": 0, "gained": 0, "changed_prices": 0, "new_errors": 0}
+    clash = {"delta": {**delta, "new_invalid_prices": 0, "new_duplicates": 0, "override_conflicts": 2}}
+    d = engine.evaluate(_doc(), schema, sandbox=clash, **kw)  # type: ignore[arg-type]
+    assert d.decision == "review" and any("2 persistent override" in r for r in d.reasons)
+    vat = [
+        {"pointer": "/prices/*/amount", "risk": "critical", "verdict": "vat_removed", "summary": "7% lower"}
+    ]
+    m = engine.evaluate(_doc(), schema, field_checks=vat, **kw)  # type: ignore[arg-type]
+    assert m.decision == "review" and m.risk_level == "high"
+    assert m.reasons[0] == "data check: /prices/*/amount: 7% lower"
+    assert m.risk_factors == ["meaning check on /prices/*/amount: 7% lower"]
+    same = [{"pointer": "/prices/*/amount", "risk": "critical", "verdict": "same", "summary": "same"}]
+    assert engine.evaluate(_doc(), schema, field_checks=same, **kw).decision == "auto_approve"  # type: ignore[arg-type]
