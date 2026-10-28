@@ -273,7 +273,8 @@ class TransformEngine:
             try:
                 items, fnd = self._collection(frames[cm.source], cm, out, root_id)
                 findings.extend(fnd)
-                collections[cm.target] = items
+                if items.width:  # a collection that cannot be linked is left out; its finding says why
+                    collections[cm.target] = items
             except Exception as e:
                 findings.append(Finding("compile", "error", f"{cm.target}: {e}", target=cm.target))
 

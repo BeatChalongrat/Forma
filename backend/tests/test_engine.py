@@ -327,6 +327,17 @@ def test_unbound_and_missing_sources(schema: TargetSchema, workbook: Path) -> No
     assert any("no sheet matches" in f.message for f in res2.errors)
 
 
+def test_collection_with_a_missing_link_column_is_left_out(schema: TargetSchema, workbook: Path) -> None:
+    """The approved mapping on a drifted file (sandbox): a renamed link column is an error, not a crash."""
+    doc = _mapping()
+    inv = next(c for c in doc.collections if c.target == "/inventory")
+    inv.link = [JoinKey(left="รหัสสินค้า", right="ไม่มีคอลัมน์นี้")]
+    res = TransformEngine(schema).run(doc, _bind(doc, workbook))
+    assert any(f.kind == "join" and "link column" in f.message for f in res.errors)
+    assert res.records and all("inventory" not in r for r in res.records)
+    assert any(r.get("prices") for r in res.records)  # the other collections are still built
+
+
 def test_missing_column_warning_and_dedupe_error(schema: TargetSchema, workbook: Path) -> None:
     doc = _mapping()
     doc.fields.append(FieldMapping(target="/barcode", expr=col("ไม่มีคอลัมน์นี้")))
