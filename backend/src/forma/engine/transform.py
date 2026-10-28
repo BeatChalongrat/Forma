@@ -612,59 +612,91 @@ class TransformEngine:
         mapping: MappingDocument,
         bindings: dict[str, BoundSource],
     ) -> list[dict[str, Any]]:
+        """Flat frame + collection frames → nested records.
+
+        Hot path (ADR-010 / docs/PERFORMANCE.md): everything that can be computed per *column* is done
+        in Polars first (date → ISO strings, collection link keys), then rows are walked as tuples with
+        pre-split pointer paths. Output is byte-identical to the previous per-cell implementation.
+        """
         target_cols = [c for c in out.columns if c.startswith("/")]
         row_col = ROW_COL_OF(out)
-        # group collection items by link key
+
+        # ---- collections: group items by link key -------------------------------------------
         coll_index: dict[str, dict[str, list[dict[str, Any]]]] = {}
-        coll_link_left: dict[str, list[str]] = {}
+        link_exprs: list[pl.Expr] = []
         for cm in mapping.collections:
             items = collections.get(cm.target)
             if items is None:
                 continue
-            idx: dict[str, list[dict[str, Any]]] = {}
             cols = [c for c in items.columns if c not in ("__link__", "__src_row__")]
-            for row in items.iter_rows(named=True):
-                item = {k: python_value(row[k]) for k in cols if row[k] is not None and row[k] != []}
+            items = items.with_columns(_date_to_str(items, cols))
+            idx: dict[str, list[dict[str, Any]]] = {}
+            link_i = items.columns.index("__link__")
+            src_i = items.columns.index("__src_row__")
+            col_i = [(items.columns.index(c), c) for c in cols]
+            for row in items.iter_rows():
+                item = {k: row[i] for i, k in col_i if row[i] is not None and row[i] != []}
                 if mapping.provenance:
-                    item["_row"] = row["__src_row__"]
-                idx.setdefault(row["__link__"], []).append(item)
+                    item["_row"] = row[src_i]
+                idx.setdefault(row[link_i], []).append(item)
             coll_index[cm.target] = idx
-            coll_link_left[cm.target] = [f"{root_id}.{k.left}" for k in cm.link]
-        norm_cache: dict[str, Sequence[str]] = {cm.target: cm.normalize_keys for cm in mapping.collections}
+            link_left = [f"{root_id}.{k.left}" for k in cm.link]
+            link_exprs.append(
+                pl.concat_str(
+                    [
+                        _normalize_key(pl.col(c), cm.normalize_keys).fill_null("")
+                        if c in out.columns
+                        else pl.lit("")
+                        for c in link_left
+                    ],
+                    separator="\x1f",
+                ).alias(f"__lk__{cm.target}")
+            )
 
         root_bound = bindings.get(root_id)
         meta_base = {
             **self.provenance_meta,
             "file": root_bound.file_name or root_bound.path.name if root_bound else None,
         }
+        meta_base = {k: v for k, v in meta_base.items() if v is not None}
         nullable = {f.pointer: f.nullable for f in self.schema.fields(include_system=True)}
         required_root = set(self.schema.required_leaf_pointers())
 
+        # ---- vectorised prep: dates → strings, link keys as columns ---------------------------
+        frame = out.with_columns([*_date_to_str(out, [*target_cols, *passthrough]), *link_exprs])
+        cols = frame.columns
+        plan = [
+            (cols.index(t), _segs(t), (t not in required_root and not nullable.get(t, False)))
+            for t in target_cols
+        ]
+        coll_plan = [
+            (cols.index(f"__lk__{target}"), target, _segs(target), idx) for target, idx in coll_index.items()
+        ]
+        pass_plan = [(cols.index(c), c.split(".", 1)[1]) for c in passthrough]
+        row_i = cols.index(row_col)
+        provenance = mapping.provenance
+
         records: list[dict[str, Any]] = []
-        for row in out.iter_rows(named=True):
+        for row in frame.iter_rows():
             rec: dict[str, Any] = {}
-            for t in target_cols:
-                v = python_value(row[t])
-                if v is None and t not in required_root and not nullable.get(t, False):
+            for i, segs, skip_null in plan:
+                v = row[i]
+                if v is None and skip_null:
                     continue
-                _set_pointer(rec, t, v)
-            for target, idx in coll_index.items():
-                key = "\x1f".join(_py_norm(row.get(c), norm_cache[target]) for c in coll_link_left[target])
-                linked = idx.get(key)
+                _set_segs(rec, segs, v)
+            for i, _target, segs, idx in coll_plan:
+                linked = idx.get(row[i])
                 if linked:
-                    _set_pointer(
-                        rec, target, [{k: v for k, v in it.items() if not k.startswith("_")} for it in linked]
+                    _set_segs(
+                        rec, segs, [{k: v for k, v in it.items() if not k.startswith("_")} for it in linked]
                     )
-            if passthrough:
-                attrs = {
-                    c.split(".", 1)[1]: python_value(row[c]) for c in passthrough if row.get(c) is not None
-                }
+            if pass_plan:
+                attrs = {name: row[i] for i, name in pass_plan if row[i] is not None}
                 if attrs:
                     rec["attributes"] = attrs
-            if mapping.provenance:
+            if provenance:
                 rec.setdefault("source_meta", {}).update(
-                    {k: v for k, v in meta_base.items() if v is not None}
-                    | {"lineage": {"root_row": row[row_col], "source": root_id}}
+                    meta_base | {"lineage": {"root_row": row[row_i], "source": root_id}}
                 )
             records.append(rec)
         return records
@@ -729,6 +761,35 @@ def _py_norm(v: Any, ops: Sequence[str]) -> str:
         elif op == "normalize_whitespace":
             s = re.sub(r"\s+", " ", s)
     return s
+
+
+def _date_to_str(frame: pl.DataFrame, cols: list[str]) -> list[pl.Expr]:
+    """Date/Datetime columns → ISO date strings in Polars (what ``python_value`` did per cell)."""
+    exprs: list[pl.Expr] = []
+    for c in cols:
+        if c not in frame.columns:
+            continue
+        dt_ = frame.schema[c]
+        if dt_ == pl.Date:
+            exprs.append(pl.col(c).cast(pl.String).alias(c))
+        elif isinstance(dt_, pl.Datetime):
+            exprs.append(pl.col(c).dt.date().cast(pl.String).alias(c))
+    return exprs
+
+
+def _segs(pointer: str) -> tuple[str, ...]:
+    return tuple(p for p in pointer.split("/") if p)
+
+
+def _set_segs(obj: dict[str, Any], segs: tuple[str, ...], value: Any) -> None:
+    cur: Any = obj
+    for p in segs[:-1]:
+        cur = cur[int(p)] if isinstance(cur, list) else cur.setdefault(p, {})
+    last = segs[-1]
+    if isinstance(cur, list):
+        cur[int(last)] = value
+    else:
+        cur[last] = value
 
 
 def _set_pointer(obj: dict[str, Any], pointer: str, value: Any) -> None:

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import datetime as dt
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any
 
@@ -10,6 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from forma.core.errors import NotFound, ValidationFailed
+from forma.core.telemetry import span
 from forma.db.models import AuditLog, Customer, ImportRound, MappingVersion, SourceFile
 from forma.fingerprint.fingerprint import Fingerprint, compare, fingerprint_profile, merge_fingerprints
 from forma.ingestion.readers import file_kind
@@ -108,7 +110,21 @@ def latest_approved_mapping(session: Session, customer_id: str) -> MappingVersio
     )
 
 
-def profile_round(ctx: ServiceContext, session: Session, round_id: str) -> dict[str, Any]:
+def _profile_file(path: Path) -> tuple[dict[str, Any], dict[str, Any], int]:
+    """Pure, process/thread-safe: profile + fingerprint one file (no DB)."""
+    prof = profile_workbook(path)
+    fp = fingerprint_profile(prof)
+    return prof.to_dict(), fp.to_dict(), len(prof.tables)
+
+
+def profile_round(
+    ctx: ServiceContext, session: Session, round_id: str, *, force: bool = False
+) -> dict[str, Any]:
+    """Profile every file of the round (concurrently), fingerprint, classify drift and wrong-file matches.
+
+    Idempotent: files already ``profiled`` keep their profile unless ``force``; drift and the round
+    summary are always recomputed because they depend on the customer's *current* approved format.
+    """
     r = get_round(session, round_id)
     previous = latest_approved_mapping(session, r.customer_id)
     prev_fps: dict[str, Fingerprint] = {}
@@ -118,48 +134,78 @@ def profile_round(ctx: ServiceContext, session: Session, round_id: str) -> dict[
     cur_fps: list[Fingerprint] = []
     other_matches: list[dict[str, Any]] = []
 
+    todo = [f for f in r.files if force or not (f.status == "profiled" and f.profile and f.fingerprint)]
+    computed: dict[str, tuple[dict[str, Any], dict[str, Any], int] | Exception] = {}
+    if todo:
+        workers = max(1, min(ctx.settings.file_workers, len(todo)))
+        with span("round.profile", round_id=r.id, files=len(todo), workers=workers):
+            if workers == 1:
+                for f in todo:
+                    try:
+                        computed[f.id] = _profile_file(Path(f.storage_path))
+                    except Exception as e:
+                        computed[f.id] = e
+            else:
+                with ThreadPoolExecutor(max_workers=workers, thread_name_prefix="forma-profile") as pool:
+                    futs = {pool.submit(_profile_file, Path(f.storage_path)): f.id for f in todo}
+                    for fut, fid in futs.items():
+                        try:
+                            computed[fid] = fut.result()
+                        except Exception as e:
+                            computed[fid] = e
+
     results: list[dict[str, Any]] = []
+    skipped = 0
     worst = "identical"
     for f in r.files:
-        try:
-            prof = profile_workbook(Path(f.storage_path))
-            fp = fingerprint_profile(prof)
-            f.profile = prof.to_dict()
-            f.fingerprint = fp.to_dict()
+        res = computed.get(f.id)
+        if isinstance(res, Exception):
+            f.status = "error"
+            f.error = str(res)[:1000]
+            f.profile = None
+            f.fingerprint = None
+            results.append({"file_id": f.id, "name": f.original_name, "error": f.error})
+            continue
+        if res is not None:
+            prof_d, fp_d, n_tables = res
+            f.profile = prof_d
+            f.fingerprint = fp_d
             f.status = "profiled"
             f.error = None
-            cur_fps.append(fp)
-            drift: dict[str, Any] | None = None
-            if prev_fps:
-                # per-file view: best match among previous files of this customer (informational)
-                reports = [compare(pfp, fp) for pfp in prev_fps.values()]
-                best = max(reports, key=lambda d: d.similarity)
-                drift = best.to_dict()
-            # wrong-file check against other customers' approved formats
-            other = _match_other_customer(session, r.customer_id, fp)
-            if other:
-                # Identical structure to another customer's approved format. For a returning customer this
-                # usually means the wrong file was sent; for a first-time customer it may simply be the same
-                # ERP template — policy routes it to review with the match named, never a hard block.
-                drift = {
-                    **(drift or {"classification": "unknown", "similarity": 0.0}),
-                    "matches_other_customer": other,
-                }
-                other_matches.append(other)
-            f.drift = drift
-            results.append(
-                {
-                    "file_id": f.id,
-                    "name": f.original_name,
-                    "tables": len(prof.tables),
-                    "fingerprint": fp.strict,
-                    "drift": drift,
-                }
-            )
-        except Exception as e:
-            f.status = "error"
-            f.error = str(e)[:1000]
-            results.append({"file_id": f.id, "name": f.original_name, "error": f.error})
+        else:
+            if f.status != "profiled" or not f.fingerprint:
+                continue
+            skipped += 1
+            n_tables = len((f.profile or {}).get("tables", []))
+        fp = Fingerprint.from_dict(f.fingerprint or {})
+        cur_fps.append(fp)
+        drift: dict[str, Any] | None = None
+        if prev_fps:
+            # per-file view: best match among previous files of this customer (informational)
+            reports = [compare(pfp, fp) for pfp in prev_fps.values()]
+            best = max(reports, key=lambda d: d.similarity)
+            drift = best.to_dict()
+        # wrong-file check against other customers' approved formats
+        other = _match_other_customer(session, r.customer_id, fp)
+        if other:
+            # Identical structure to another customer's approved format. For a returning customer this
+            # usually means the wrong file was sent; for a first-time customer it may simply be the same
+            # ERP template — policy routes it to review with the match named, never a hard block.
+            drift = {
+                **(drift or {"classification": "unknown", "similarity": 0.0}),
+                "matches_other_customer": other,
+            }
+            other_matches.append(other)
+        f.drift = drift
+        results.append(
+            {
+                "file_id": f.id,
+                "name": f.original_name,
+                "tables": n_tables,
+                "fingerprint": fp.strict,
+                "drift": drift,
+            }
+        )
     round_drift: dict[str, Any] | None = None
     if prev_round_fp is not None and cur_fps:
         rep = compare(prev_round_fp, merge_fingerprints(cur_fps))
@@ -173,6 +219,8 @@ def profile_round(ctx: ServiceContext, session: Session, round_id: str) -> dict[
         "drift_report": round_drift,
         "matches_other_customer": other_matches[0] if other_matches else None,
         "has_previous_approval": previous is not None,
+        "profiled_files": len(todo),
+        "skipped_files": skipped,
     }
     audit(session, "round.profile", "round", r.id, files=len(results), drift=r.summary["drift"])
     return r.summary

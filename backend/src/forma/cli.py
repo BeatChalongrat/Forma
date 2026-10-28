@@ -21,6 +21,49 @@ def serve(host: str = "127.0.0.1", port: int = 8000, reload: bool = False) -> No
 
 
 @app.command()
+def worker(backend: str | None = None, workers: int | None = None) -> None:
+    """Run a job worker. With FORMA_JOB_BACKEND=arq this is an arq worker (Redis); otherwise it drains the
+    database queue with the thread/process pool and keeps polling for new rows (single-node fallback)."""
+    import os
+    import time
+
+    from forma.core.logging import configure_logging
+    from forma.core.settings import get_settings
+    from forma.db.session import init_db
+    from forma.jobs import handlers as _h  # noqa: F401
+    from forma.jobs import runner
+
+    if backend:
+        os.environ["FORMA_JOB_BACKEND"] = backend
+    if workers:
+        os.environ["FORMA_WORKERS"] = str(workers)
+    get_settings.cache_clear()
+    s = get_settings()
+    configure_logging(s.log_level, s.log_format)
+    init_db()
+    if s.job_backend == "arq":
+        from arq.worker import run_worker
+
+        run_worker(runner.arq_worker_settings())
+        return
+    typer.echo(json.dumps(runner.start()))
+    try:
+        while True:
+            time.sleep(2.0)
+            from sqlalchemy import select
+
+            from forma.db.models import Job
+            from forma.db.session import session_scope
+
+            with session_scope() as sess:
+                ids = list(sess.scalars(select(Job.id).where(Job.status == "queued")))
+            for jid in ids:
+                runner.get_backend().submit(jid)
+    except KeyboardInterrupt:
+        runner.stop()
+
+
+@app.command()
 def profile(path: Path, out: Path | None = None) -> None:
     """Profile an Excel/CSV file: sheets, tables, columns, fingerprint."""
     from forma.fingerprint.fingerprint import fingerprint_profile
@@ -103,6 +146,48 @@ def synth(
 
     stats = generate_corpus(out, seed=seed, n_variants=variants, scale=scale)
     typer.echo(json.dumps(stats, ensure_ascii=False, indent=2))
+
+
+@app.command()
+def bench(
+    files: int = 300,
+    rows: int = 100_000,
+    distinct: int = 8,
+    backend: str | None = None,
+    workers: int | None = None,
+    out: Path = Path("../data/bench"),
+    corpus: Path | None = None,
+    fresh: bool = True,
+) -> None:
+    """End-to-end throughput benchmark on a throw-away database (see docs/PERFORMANCE.md)."""
+    import os
+    import shutil
+
+    from forma.core.settings import get_settings
+
+    out = out.resolve()
+    out.mkdir(parents=True, exist_ok=True)
+    run_dir = out / "run"
+    if fresh and run_dir.exists():
+        shutil.rmtree(run_dir, ignore_errors=True)
+    run_dir.mkdir(parents=True, exist_ok=True)
+    os.environ["FORMA_DATABASE_URL"] = f"sqlite:///{(run_dir / 'bench.db').as_posix()}"
+    os.environ["FORMA_DATA_DIR"] = str(run_dir / "data")
+    os.environ.setdefault("FORMA_LLM_PROVIDER", "mock")
+    if backend:
+        os.environ["FORMA_JOB_BACKEND"] = backend
+    if workers:
+        os.environ["FORMA_WORKERS"] = str(workers)
+    get_settings.cache_clear()
+    from forma.bench.run import run_bench
+
+    rep = run_bench(files=files, rows=rows, distinct=distinct, out_dir=out, corpus_dir=corpus)
+    typer.echo(
+        json.dumps(
+            {k: v for k, v in rep.items() if k not in ("batch1", "batch2")}, ensure_ascii=False, indent=2
+        )
+    )
+    typer.echo(f"wrote {out / 'report.json'} and {out / 'report.md'}")
 
 
 @app.command()

@@ -13,7 +13,7 @@ from typing import Any
 
 import polars as pl
 
-from forma.engine import thai
+from forma.engine import thai, thai_vec
 from forma.mapping_dsl.models import CallExpr, ColExpr, ConstExpr, Expr, Op
 
 _THAI_DIGITS_FROM = list("๐๑๒๓๔๕๖๗๘๙")
@@ -126,7 +126,7 @@ def _compile_call(e: CallExpr, ctx: CompileContext) -> pl.Expr:
             if to == "bool":
                 return _py_map(a[0], thai.parse_bool_py, pl.Boolean)
             if to == "date":
-                return _py_map(a[0], lambda v: thai.parse_date_th_py(v), pl.Date)
+                return _parse_date(a[0], formats=None, assume="auto", dayfirst=True)
             raise CompileError(f"cast: unsupported target {to!r}")
         case Op.REGEX_EXTRACT:
             return _as_str(a[0]).str.extract(str(p["pattern"]), int(p.get("group", 1)))
@@ -189,11 +189,7 @@ def _compile_call(e: CallExpr, ctx: CompileContext) -> pl.Expr:
             formats = p.get("formats")
             assume = str(p.get("assume_year", "auto"))
             dayfirst = bool(p.get("dayfirst", True))
-            return _py_map(
-                a[0],
-                lambda v: thai.parse_date_th_py(v, formats=formats, assume_year=assume, dayfirst=dayfirst),
-                pl.Date,
-            )
+            return _parse_date(a[0], formats=formats, assume=assume, dayfirst=dayfirst)
         case Op.PARSE_BOOL:
             return _py_map(a[0], thai.parse_bool_py, pl.Boolean)
         case Op.VAT_ADJUST:
@@ -205,9 +201,15 @@ def _compile_call(e: CallExpr, ctx: CompileContext) -> pl.Expr:
         case Op.UNIT_NORMALIZE:
             default = p.get("default")
             extra = p.get("synonyms") or {}
-            return _py_map(a[0], lambda v: thai.unit_normalize_py(v, default=default, extra=extra), pl.String)
+            if not thai_vec.ENABLED:
+                return _py_map(
+                    a[0], lambda v: thai.unit_normalize_py(v, default=default, extra=extra), pl.String
+                )
+            return thai_vec.unit_normalize_expr(a[0], default=default, extra=extra)
         case Op.PACK_SIZE:
-            return _py_map(a[0], thai.pack_size_py, pl.Int64)
+            if not thai_vec.ENABLED:
+                return _py_map(a[0], thai.pack_size_py, pl.Int64)
+            return thai_vec.pack_size_expr(a[0])
         case Op.ADD:
             out = _as_num(a[0])
             for x in a[1:]:
@@ -278,6 +280,16 @@ def _compile_call(e: CallExpr, ctx: CompileContext) -> pl.Expr:
             vals = [str(v).strip().lower() for v in p["values"]]
             return _as_str(a[0]).str.strip_chars().str.to_lowercase().is_in(vals).fill_null(False)
     raise CompileError(f"op {op} has no compiler branch")
+
+
+def _parse_date(x: pl.Expr, *, formats: list[str] | None, assume: str, dayfirst: bool) -> pl.Expr:
+    """Dates stay on the Python reference parser: it is regex-based and measured as fast as a Polars
+    fast path (docs/PERFORMANCE.md), so one implementation is kept (ADR-007)."""
+
+    def _py(v: Any) -> Any:
+        return thai.parse_date_th_py(v, formats=formats, assume_year=assume, dayfirst=dayfirst)
+
+    return _py_map(x, _py, pl.Date)
 
 
 def _cmp(x: pl.Expr, y: pl.Expr, kind: str) -> pl.Expr:

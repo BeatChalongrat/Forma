@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from forma.ai.agents import copilot_agent, diagnosis_agent
 from forma.api import serialize as ser
 from forma.api.schemas import (
+    BatchRunIn,
     ChangesIn,
     CopilotIn,
     CustomerIn,
@@ -24,7 +25,7 @@ from forma.api.schemas import (
     SchemaIn,
     SourcePreviewIn,
 )
-from forma.core.errors import NotFound, ValidationFailed
+from forma.core.errors import NotFound, PayloadTooLarge, ValidationFailed
 from forma.db.models import (
     ChangeSet,
     Customer,
@@ -38,6 +39,7 @@ from forma.db.models import (
     ReviewTask,
 )
 from forma.db.session import get_session
+from forma.export.exporter import MEDIA_TYPES
 from forma.jobs import runner
 from forma.mapping_dsl.models import MappingDocument, Op
 from forma.services import datasets as ds
@@ -201,9 +203,28 @@ async def upload_files(
     ctx: ServiceContext = Depends(ctx_dep),
 ) -> list[dict[str, Any]]:
     r = rs.get_round(session, round_id)
+    limit = ctx.settings.max_upload_mb * 1024 * 1024
     out = []
     for up in files:
-        data = await up.read()
+        if up.size is not None and up.size > limit:
+            raise PayloadTooLarge(
+                f"{up.filename} is {up.size / 1024 / 1024:.1f} MB; the limit is {ctx.settings.max_upload_mb} MB",
+                details={"file": up.filename, "size": up.size, "limit_bytes": limit},
+            )
+        chunks: list[bytes] = []
+        size = 0
+        while True:
+            chunk = await up.read(1024 * 1024)
+            if not chunk:
+                break
+            size += len(chunk)
+            if size > limit:
+                raise PayloadTooLarge(
+                    f"{up.filename} exceeds the upload limit of {ctx.settings.max_upload_mb} MB",
+                    details={"file": up.filename, "limit_bytes": limit},
+                )
+            chunks.append(chunk)
+        data = b"".join(chunks)
         if not data:
             raise ValidationFailed(f"{up.filename} is empty")
         out.append(ser.source_file(rs.add_file(ctx, session, r, up.filename or "upload.xlsx", data)))
@@ -295,11 +316,28 @@ def transform(
     return {
         "job_id": runner.enqueue(
             "transform_round",
-            {"round_id": round_id, "mapping_version_id": mapping_version_id, "actor": actor},
+            {"round_id": round_id, "mapping_version_id": mapping_version_id, "actor": actor, "force": True},
             round_id=round_id,
             sync=sync,
         )
     }
+
+
+@api.post("/rounds/batch-run")
+def batch_run(body: BatchRunIn, session: Session = Depends(get_session)) -> dict[str, Any]:
+    """Fan out one `run_pipeline` job per round under a single batch id (300-file rounds, bulk re-runs)."""
+    ids = list(dict.fromkeys(body.round_ids))
+    found = set(session.scalars(select(ImportRound.id).where(ImportRound.id.in_(ids))).all())
+    missing = [i for i in ids if i not in found]
+    if missing:
+        raise NotFound(f"unknown rounds: {missing[:5]}")
+    session.commit()
+    batch_id, job_ids = runner.enqueue_batch(
+        "run_pipeline",
+        [{"round_id": rid, "use_llm": body.use_llm, "actor": body.actor, "force": body.force} for rid in ids],
+        sync=body.sync,
+    )
+    return {"batch_id": batch_id, "job_ids": job_ids, "count": len(job_ids)}
 
 
 # ============================================================================================
@@ -535,8 +573,7 @@ def download_export(export_id: str, session: Session = Depends(get_session)) -> 
     e = session.get(ExportArtifact, export_id)
     if e is None:
         raise NotFound("export not found")
-    media = {"json": "application/json", "jsonl": "application/x-ndjson", "csv": "text/csv"}[e.fmt]
-    return FileResponse(e.path, media_type=media, filename=Path(e.path).name)
+    return FileResponse(e.path, media_type=MEDIA_TYPES[e.fmt], filename=Path(e.path).name)
 
 
 # ============================================================================================
@@ -834,12 +871,37 @@ def dashboard(
     }
 
 
+@api.get("/jobs")
+def list_jobs(
+    status: str | None = None, kind: str | None = None, limit: int = Query(100, le=1000)
+) -> list[dict[str, Any]]:
+    return runner.list_jobs(status=status, kind=kind, limit=limit)
+
+
+@api.get("/jobs/stats")
+def job_stats() -> dict[str, Any]:
+    return runner.queue_stats()
+
+
+@api.get("/jobs/batch/{batch_id}")
+def get_batch(batch_id: str) -> dict[str, Any]:
+    try:
+        return runner.batch_status(batch_id)
+    except KeyError as e:
+        raise NotFound("batch not found") from e
+
+
 @api.get("/jobs/{job_id}")
 def get_job(job_id: str) -> dict[str, Any]:
     try:
         return runner.job_status(job_id)
     except KeyError as e:
         raise NotFound("job not found") from e
+
+
+@api.post("/jobs/{job_id}/retry")
+def retry_job(job_id: str) -> dict[str, Any]:
+    return {"job_id": runner.retry_job(job_id)}
 
 
 @api.get("/audit")

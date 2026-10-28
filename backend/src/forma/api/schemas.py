@@ -60,3 +60,11 @@ class ProposeIn(BaseModel):
     use_llm: bool | None = None
     actor: str = "operator"
     sync: bool = False
+
+
+class BatchRunIn(BaseModel):
+    round_ids: list[str] = Field(min_length=1, max_length=2000)
+    use_llm: bool | None = None
+    actor: str = "operator"
+    force: bool = False
+    sync: bool = False
