@@ -1,0 +1,792 @@
+"""Deterministic baseline mapper.
+
+Produces a complete MappingDocument proposal from a WorkbookProfile using the target schema's
+synonyms, profiling hints and simple value-overlap checks. It runs offline, is fully explainable
+(every field carries evidence) and is the floor the LLM agents improve on — never the ceiling.
+"""
+
+from __future__ import annotations
+
+import dataclasses
+import re
+from dataclasses import dataclass
+from typing import Any
+
+from rapidfuzz import fuzz
+
+from forma.mapping_dsl.models import (
+    CollectionMapping,
+    FieldMapping,
+    FileMatch,
+    JoinKey,
+    MappingDocument,
+    MappingMeta,
+    QualityRule,
+    RecordSpec,
+    SheetSelect,
+    SourceRole,
+    SourceSpec,
+    Unpivot,
+    call,
+    col,
+    const,
+)
+from forma.profiling.profile import ColumnProfile, TableProfile, WorkbookProfile
+from forma.schema_registry import FieldSpec, TargetSchema
+
+ROLE_SIGNALS: dict[str, list[str]] = {
+    "pricing": ["price", "ราคา", "amount", "vat", "price list", "ประเภทราคา"],
+    "inventory": [
+        "stock",
+        "qty",
+        "quantity",
+        "on hand",
+        "warehouse",
+        "คงเหลือ",
+        "สต็อก",
+        "คลัง",
+        "จำนวน",
+        "balance",
+    ],
+    "promotions": [
+        "promo",
+        "promotion",
+        "discount",
+        "campaign",
+        "โปร",
+        "ส่วนลด",
+        "แคมเปญ",
+        "ลด",
+        "แถม",
+        "buy",
+        "get",
+    ],
+    "products": ["name", "ชื่อ", "description", "category", "หมวด", "brand", "unit", "หน่วย", "barcode", "ยี่ห้อ"],
+}
+HINT_BOOST: dict[str, dict[str, float]] = {
+    "sku": {"sku_like": 0.25, "barcode_like": -0.3, "long_text": -0.5},
+    "barcode": {"barcode_like": 0.4, "sku_like": -0.1},
+    "product_name": {"thai_text": 0.05, "long_text": 0.05, "sku_like": -0.4, "barcode_like": -0.5},
+    "description": {"long_text": 0.25},
+    "price.amount": {"price_like": 0.2, "percent": -0.4},
+    "discount.percent": {"percent": 0.3},
+    "promo.start_date": {"thai_date": 0.2},
+    "promo.end_date": {"thai_date": 0.2},
+    "price.effective_from": {"thai_date": 0.15},
+    "price.effective_to": {"thai_date": 0.15},
+    "unit.sell": {"unit_like": 0.3},
+    "stock.qty": {"price_like": -0.1},
+}
+TYPE_COMPAT: dict[str, set[str]] = {
+    "number": {"int", "float", "mixed", "string"},
+    "integer": {"int", "float", "mixed", "string"},
+    "string": {"string", "mixed", "int", "float", "date", "bool"},
+    "boolean": {"bool", "string", "int", "mixed"},
+    "array": {"string", "mixed"},
+}
+
+
+def file_name_pattern(name: str) -> str:
+    """Loose regex for a file name: digits/dates vary between rounds, the rest stays."""
+    stem = re.sub(r"\.[^.]+$", "", name)
+    parts = re.split(r"\d+", stem)
+    core = ".*".join(re.escape(p) for p in parts if p.strip(" _-"))
+    return f"(?i)^{core}" if core else "(?i).*"
+
+
+def norm(s: str) -> str:
+    s = s.strip().lower()
+    s = re.sub(r"[\s_\-./()\[\]:%]+", " ", s)
+    return re.sub(r"\s+", " ", s).strip()
+
+
+@dataclass
+class Match:
+    column: ColumnProfile
+    field: FieldSpec
+    score: float
+    evidence: list[str] = dataclasses.field(default_factory=list)
+
+
+@dataclass
+class HeuristicProposal:
+    mapping: MappingDocument
+    confidence: float
+    evidence: list[str]
+    open_questions: list[str]
+    table_roles: dict[int, str]  # profile table index → role
+    unmatched_columns: dict[str, list[str]]  # source id → columns we could not place
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "confidence": self.confidence,
+            "evidence": self.evidence,
+            "open_questions": self.open_questions,
+            "table_roles": self.table_roles,
+            "unmatched_columns": self.unmatched_columns,
+        }
+
+
+# --------------------------------------------------------------------------------------------
+def score_header(header: str, f: FieldSpec) -> tuple[float, str | None]:
+    h = norm(header)
+    if not h:
+        return 0.0, None
+    candidates = [*f.synonyms_en, *f.synonyms_th, f.name.replace("_", " ")]
+    best, why = 0.0, None
+    for c in candidates:
+        cn = norm(c)
+        if not cn:
+            continue
+        if h == cn:
+            return 1.0, f"header '{header}' == synonym '{c}'"
+        # containment both ways (short synonyms must be whole-word to avoid 'id' in 'width')
+        if len(cn) >= 3 and (cn in h or h in cn):
+            s = 0.85 if cn in h.split() or h in cn.split() else 0.75
+        else:
+            s = fuzz.token_set_ratio(h, cn) / 100.0
+            s = s * 0.9 if s >= 0.8 else s * 0.6
+        if s > best:
+            best, why = s, f"header '{header}' ≈ synonym '{c}' ({s:.2f})"
+    return best, why
+
+
+def match_columns(table: TableProfile, fields: list[FieldSpec]) -> list[Match]:
+    """Greedy best-first assignment of columns to target fields (one column → one field)."""
+    pairs: list[Match] = []
+    for c in table.columns:
+        for f in fields:
+            s, why = score_header(c.name, f)
+            if s < 0.55:
+                continue
+            ev = [why] if why else []
+            for hint, boost in HINT_BOOST.get(f.semantic or "", {}).items():
+                if hint in c.hints:
+                    s += boost
+                    ev.append(f"column hint {hint} ({boost:+.2f})")
+            ftype = next((t for t in f.json_type if t != "null"), "string")
+            if c.inferred_type not in TYPE_COMPAT.get(ftype, {"string"}) and c.inferred_type != "empty":
+                s -= 0.3
+                ev.append(f"type mismatch {c.inferred_type}→{ftype} (-0.30)")
+            if f.semantic == "sku" and c.unique_ratio < 0.5 and c.null_ratio < 0.5:
+                s -= 0.25
+                ev.append("low uniqueness for a key (-0.25)")
+            # tie-breakers: required / riskier fields win equal header scores
+            s += (0.04 if f.required else 0.0) + 0.01 * {"critical": 3, "high": 2, "medium": 1, "low": 0}[
+                f.risk
+            ]
+            if s >= 0.5:
+                pairs.append(Match(c, f, min(1.0, s), ev))
+    pairs.sort(key=lambda m: -m.score)
+    used_cols: set[str] = set()
+    used_fields: set[str] = set()
+    out: list[Match] = []
+    for m in pairs:
+        if m.column.name in used_cols or m.field.pointer in used_fields:
+            continue
+        used_cols.add(m.column.name)
+        used_fields.add(m.field.pointer)
+        out.append(m)
+    return out
+
+
+def table_role(table: TableProfile, schema: TargetSchema) -> tuple[str, float]:
+    """Classify a table by which part of the target schema its columns explain best."""
+    root_fields = [
+        f for f in schema.leaf_fields() if f.in_collection is None and f.semantic not in ("sku", "currency")
+    ]
+    scores: dict[str, float] = {"products": 0.0, "pricing": 0.0, "inventory": 0.0, "promotions": 0.0}
+    coll_for_role = {"pricing": "/prices", "inventory": "/inventory", "promotions": "/promotions"}
+    scores["products"] = sum(m.score for m in match_columns(table, root_fields))
+    for role, coll in coll_for_role.items():
+        fields = [f for f in schema.leaf_fields() if f.in_collection == coll]
+        scores[role] = sum(m.score for m in match_columns(table, fields))
+    headers = " ".join(norm(c.name) for c in table.columns)
+    for role, words in ROLE_SIGNALS.items():
+        if role == "products":
+            continue
+        scores[role] += 0.3 * sum(1 for w in words if norm(w) and norm(w) in headers)
+    # products tables are wide and keyed; satellites are narrow (key + 1-3 fields)
+    if len(table.columns) >= 5:
+        scores["products"] += 0.5
+    if table.key_candidates and any(norm(k) in headers for k in table.key_candidates):
+        scores["products"] += 0.3
+    # crosstab (months as columns) → pricing
+    if crosstab_value_columns(table):
+        scores["pricing"] += 2.0
+    role = max(scores, key=lambda k: scores[k])
+    total = sum(scores.values()) or 1.0
+    if scores[role] <= 0.5:
+        return "other", 0.2
+    return role, round(scores[role] / total, 2)
+
+
+_MONTH_HDR_RE = re.compile(
+    r"^(?:(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*[ -/]?\d{2,4}|\d{4}[-/]\d{1,2}|\d{1,2}[-/]\d{4}|"
+    r"(?:ม\.ค|ก\.พ|มี\.ค|เม\.ย|พ\.ค|มิ\.ย|ก\.ค|ส\.ค|ก\.ย|ต\.ค|พ\.ย|ธ\.ค)\.?\s*\d{2,4}|q[1-4][ -]?\d{2,4}|w\d{1,2})$",
+    re.IGNORECASE,
+)
+
+
+def crosstab_value_columns(table: TableProfile) -> list[str]:
+    """Columns whose *headers* are periods (months/quarters) and whose values are numeric."""
+    cols = [
+        c.name
+        for c in table.columns
+        if _MONTH_HDR_RE.match(norm(c.name).replace(" ", "")) or _MONTH_HDR_RE.match(c.name.strip())
+    ]
+    numeric = [c.name for c in table.columns if c.name in cols and c.inferred_type in ("int", "float")]
+    return numeric if len(numeric) >= 2 else []
+
+
+# --------------------------------------------------------------------------------------------
+def _expr_for(c: ColumnProfile, f: FieldSpec, source: str | None = None) -> Any:
+    src = col(c.name, source)
+    sem = f.semantic or ""
+    t = set(f.json_type)
+    if sem == "unit.sell":
+        return call("unit_normalize", src)
+    if sem == "unit.pack_size":
+        return call("pack_size", src)
+    if sem == "category_path":
+        sep = ">" if any(">" in s for s in c.samples) else "/" if any("/" in s for s in c.samples) else None
+        return call("split", src, separator=sep) if sep else call("to_list", src)
+    if sem == "status":
+        inverted = bool(re.search(r"block|ระงับ|lvorm|deleted|ลบ|disabled|inactive", norm(c.name)))
+        if inverted:  # header asks "is it blocked/deleted?" → yes means NOT active
+            return call(
+                "map_values",
+                src,
+                mapping={
+                    "x": "discontinued",
+                    "yes": "inactive",
+                    "y": "inactive",
+                    "true": "inactive",
+                    "1": "inactive",
+                    "ใช่": "inactive",
+                    "no": "active",
+                    "n": "active",
+                    "false": "active",
+                    "0": "active",
+                    "": "active",
+                },
+                default="active",
+            )
+        return call(
+            "map_values",
+            src,
+            mapping={
+                "active": "active",
+                "y": "active",
+                "yes": "active",
+                "true": "active",
+                "1": "active",
+                "ขาย": "active",
+                "ใช้งาน": "active",
+                "เปิด": "active",
+                "inactive": "inactive",
+                "n": "inactive",
+                "no": "inactive",
+                "false": "inactive",
+                "0": "inactive",
+                "ไม่ใช้งาน": "inactive",
+                "ไม่ขาย": "inactive",
+                "ปิด": "inactive",
+                "discontinued": "discontinued",
+                "เลิกขาย": "discontinued",
+                "ยกเลิก": "discontinued",
+                "x": "discontinued",
+            },
+            default="active",
+        )
+    if sem == "price.list_name":
+        return call(
+            "map_values",
+            src,
+            mapping={
+                "standard": "standard",
+                "retail": "standard",
+                "ปลีก": "standard",
+                "ราคาปลีก": "standard",
+                "list": "standard",
+                "default": "standard",
+                "zpr0": "standard",
+                "wholesale": "wholesale",
+                "ส่ง": "wholesale",
+                "ราคาส่ง": "wholesale",
+                "ขายส่ง": "wholesale",
+                "dealer": "wholesale",
+                "member": "member",
+                "สมาชิก": "member",
+                "online": "online",
+                "ออนไลน์": "online",
+            },
+            keep_unmapped=True,
+            fuzzy=True,
+        )
+    if sem == "promo.type":
+        return call(
+            "map_values",
+            src,
+            mapping={
+                "percent": "percent_off",
+                "%": "percent_off",
+                "ลด%": "percent_off",
+                "ลด %": "percent_off",
+                "percent_off": "percent_off",
+                "amount": "amount_off",
+                "บาท": "amount_off",
+                "ลดบาท": "amount_off",
+                "amount_off": "amount_off",
+                "fixed": "fixed_price",
+                "ราคาพิเศษ": "fixed_price",
+                "fixed_price": "fixed_price",
+                "tier": "tiered",
+                "tiered": "tiered",
+                "ขั้นบันได": "tiered",
+                "buy x get y": "buy_x_get_y",
+                "แถม": "buy_x_get_y",
+                "bxgy": "buy_x_get_y",
+                "buy_x_get_y": "buy_x_get_y",
+                "bundle": "bundle",
+                "ชุด": "bundle",
+                "set": "bundle",
+                "ซื้อแถม": "buy_x_get_y",
+                "แถมฟรี": "buy_x_get_y",
+                "fixed price": "fixed_price",
+                "special": "fixed_price",
+                "amount off": "amount_off",
+                "percent off": "percent_off",
+            },
+            default="percent_off",
+            fuzzy=True,
+        )
+    if "boolean" in t:
+        return call("parse_bool", src)
+    if f.fmt == "date":
+        return call("parse_date_th", src)
+    if "number" in t or "integer" in t:
+        return call("parse_number_th", src)
+    if "array" in t:
+        return call("split", src, separator=",")
+    if sem == "sku":
+        return call("trim", src)
+    return call("normalize_whitespace", src)
+
+
+def _vat_included_guess(headers: list[str]) -> tuple[bool, str]:
+    text = " ".join(norm(h) for h in headers)
+    if re.search(r"ไม่รวม|ก่อน vat|ex vat|excl|exclude|before vat|net", text):
+        return False, "header indicates VAT-exclusive"
+    if re.search(r"รวม vat|รวมภาษี|incl|inc vat|including|with vat", text):
+        return True, "header indicates VAT-inclusive"
+    return True, "no VAT marker in headers; assumed VAT-inclusive (Thai retail convention) — confirm"
+
+
+def propose_mapping(
+    profile: WorkbookProfile, schema: TargetSchema, *, customer_id: str | None = None
+) -> HeuristicProposal:
+    evidence: list[str] = []
+    questions: list[str] = []
+    if not profile.tables:
+        raise ValueError("profile contains no tables")
+
+    roles: dict[int, tuple[str, float]] = {i: table_role(t, schema) for i, t in enumerate(profile.tables)}
+    for i, t in enumerate(profile.tables):
+        if t.n_rows < 3 or len(t.columns) < 2:
+            roles[i] = ("other", 0.1)  # noise blocks (legends, footers, hidden calc sheets)
+    # root = table that explains most root-level target fields (sku + name weigh double); ties → more rows
+    root_fields_all = [
+        f for f in schema.leaf_fields() if f.in_collection is None and f.pointer != "/currency"
+    ]
+
+    def root_score(i: int) -> tuple[float, int]:
+        if roles[i][0] == "other":
+            return (-1.0, 0)
+        ms = match_columns(profile.tables[i], root_fields_all)
+        sem = {m.field.semantic for m in ms}
+        score = sum(m.score for m in ms) + (2.0 if {"sku", "product_name"} <= sem else 0.0)
+        if roles[i][0] in ("pricing", "inventory", "promotions"):
+            score -= 1.5
+        return (score, profile.tables[i].n_rows)
+
+    root_idx = max(range(len(profile.tables)), key=root_score)
+    roles[root_idx] = ("products", max(roles[root_idx][1], 0.6))
+    root = profile.tables[root_idx]
+    evidence.append(
+        f"root table: sheet '{root.sheet}' ({root.n_rows} rows) classified as {roles[root_idx][0]}"
+    )
+
+    root_fields = [f for f in schema.leaf_fields() if f.in_collection is None]
+    root_matches = match_columns(root, root_fields)
+    sku_match = next((m for m in root_matches if m.field.semantic == "sku"), None)
+    if sku_match is None:
+        # fall back to best key candidate
+        key = root.key_candidates[0] if root.key_candidates else root.columns[0].name
+        questions.append(f"No SKU-like header found in root table; using '{key}' as identity — confirm")
+        sku_col = next(c for c in root.columns if c.name == key)
+        root_matches.append(Match(sku_col, schema.field("/sku"), 0.4, [f"fallback: key candidate '{key}'"]))
+        sku_match = root_matches[-1]
+
+    def src_id(i: int) -> str:
+        base = roles[i][0] if roles[i][0] != "other" else "table"
+        return f"{base}_{i}" if sum(1 for j in roles if roles[j][0] == roles[i][0]) > 1 else base
+
+    sources: list[SourceSpec] = []
+    for i, t in enumerate(profile.tables):
+        if roles[i][0] == "other" and i != root_idx:
+            continue  # legends / footers / hidden calc sheets are not sources
+        is_csv = bool(t.file_name and t.file_name.lower().endswith((".csv", ".txt", ".tsv"))) or (
+            profile.meta.kind == "csv" and not t.file_name
+        )
+        sheet = None if is_csv else SheetSelect(name=profile.meta.sheets[t.sheet_index].name)
+        spec = t.table.to_spec().model_copy(
+            update={"data_end": None, "data_start": None}
+        )  # row counts change every round
+        fm = FileMatch(
+            name_pattern=file_name_pattern(t.file_name) if t.file_name else None,
+            sheet_names_any=[] if is_csv else [profile.meta.sheets[t.sheet_index].name],
+        )
+        role_val = roles[i][0]
+        sources.append(
+            SourceSpec(
+                id=src_id(i),
+                role=SourceRole(role_val) if role_val in {r.value for r in SourceRole} else SourceRole.OTHER,
+                file=fm,
+                sheet=sheet,
+                table=spec,
+            )
+        )
+    root_sid = src_id(root_idx)
+
+    fields: list[FieldMapping] = []
+    field_scores: list[float] = []
+    for m in root_matches:
+        if m.field.pointer == "/currency":
+            continue
+        fields.append(
+            FieldMapping(
+                target=m.field.pointer,
+                expr=_expr_for(m.column, m.field),
+                confidence=round(m.score, 2),
+                evidence=m.evidence,
+            )
+        )
+        field_scores.append(m.score)
+    mapped_targets = {f.target for f in fields}
+    if "/currency" not in mapped_targets:
+        fields.append(
+            FieldMapping(
+                target="/currency", expr=const("THB"), confidence=0.9, evidence=["default currency THB"]
+            )
+        )
+    if "/unit/sell_unit" in mapped_targets and "/unit/pack_size" not in mapped_targets:
+        unit_col = next(m.column for m in root_matches if m.field.pointer == "/unit/sell_unit")
+        if any(re.search(r"\d", s) for s in unit_col.samples):
+            fields.append(
+                FieldMapping(
+                    target="/unit/pack_size",
+                    expr=call("pack_size", col(unit_col.name)),
+                    confidence=0.6,
+                    evidence=["pack size parsed from unit text"],
+                )
+            )
+
+    collections: list[CollectionMapping] = []
+    joins_needed: list[tuple[str, str]] = []
+    unmatched: dict[str, list[str]] = {}
+    used_root_cols = {m.column.name for m in root_matches}
+
+    # price in root table → /prices collection from the root source
+    price_fields = [f for f in schema.leaf_fields() if f.in_collection == "/prices"]
+    root_price = match_columns(_subset(root, exclude=used_root_cols), price_fields)
+    amount = next((m for m in root_price if m.field.semantic == "price.amount"), None)
+    if amount is not None:
+        vat_inc, why = _vat_included_guess([amount.column.name])
+        items = [
+            FieldMapping(
+                target="/prices/*/price_list",
+                expr=const("standard"),
+                confidence=0.8,
+                evidence=["single price column → 'standard' list"],
+            ),
+            FieldMapping(
+                target="/prices/*/amount",
+                expr=call("parse_number_th", col(amount.column.name)),
+                confidence=round(amount.score, 2),
+                evidence=amount.evidence,
+            ),
+            FieldMapping(
+                target="/prices/*/vat_included",
+                expr=const(vat_inc),
+                confidence=0.6 if "assumed" in why else 0.9,
+                evidence=[why],
+            ),
+        ]
+        for m in root_price:
+            if m.field.semantic in ("price.effective_from", "price.effective_to"):
+                items.append(
+                    FieldMapping(
+                        target=m.field.pointer,
+                        expr=_expr_for(m.column, m.field),
+                        confidence=round(m.score, 2),
+                        evidence=m.evidence,
+                    )
+                )
+        used_root_cols |= {m.column.name for m in root_price}
+        collections.append(
+            CollectionMapping(
+                target="/prices",
+                source=root_sid,
+                link=[JoinKey(left=sku_match.column.name, right=sku_match.column.name)],
+                fields=items,
+            )
+        )
+        if "assumed" in why:
+            questions.append(f"Price column '{amount.column.name}': {why}")
+        field_scores.append(amount.score)
+
+    # satellite tables → collections with link keys
+    source_ids = {sp.id for sp in sources}
+    for i, t in enumerate(profile.tables):
+        if i == root_idx or src_id(i) not in source_ids:
+            continue
+        role = roles[i][0]
+        target = {"pricing": "/prices", "inventory": "/inventory", "promotions": "/promotions"}.get(role)
+        sid = src_id(i)
+        link_col = _find_link_column(t, sku_match.column)
+        if target is None or link_col is None:
+            unmatched[sid] = [c.name for c in t.columns]
+            if target is not None:
+                questions.append(
+                    f"Table '{t.sheet}' looks like {role} but no column links to root key '{sku_match.column.name}'"
+                )
+            continue
+        item_fields = [f for f in schema.leaf_fields() if f.in_collection == target]
+        value_cols = crosstab_value_columns(t) if target == "/prices" else []
+        if value_cols:
+            # months-as-columns price grid → unpivot to (sku, period, value)
+            src_spec = next(sp for sp in sources if sp.id == sid)
+            src_spec.table = src_spec.table.model_copy(
+                update={
+                    "unpivot": Unpivot(
+                        id_columns=[link_col.name],
+                        value_columns=value_cols,
+                        variable_name="period",
+                        value_name="value",
+                    )
+                }
+            )
+            vat_inc, why = _vat_included_guess([c.name for c in t.columns] + [t.sheet])
+            items = [
+                FieldMapping(
+                    target="/prices/*/price_list",
+                    expr=const("standard"),
+                    confidence=0.7,
+                    evidence=["crosstab price grid → 'standard'"],
+                ),
+                FieldMapping(
+                    target="/prices/*/amount",
+                    expr=call("parse_number_th", col("value", sid)),
+                    confidence=0.8,
+                    evidence=[f"unpivoted {len(value_cols)} period columns: {value_cols[:4]}"],
+                ),
+                FieldMapping(
+                    target="/prices/*/vat_included", expr=const(vat_inc), confidence=0.6, evidence=[why]
+                ),
+                FieldMapping(
+                    target="/prices/*/effective_from",
+                    expr=call("parse_date_th", call("concat", const("1 "), col("period", sid), separator="")),
+                    confidence=0.6,
+                    evidence=["period header → first day of period"],
+                ),
+            ]
+            questions.append(
+                f"Table '{t.sheet}' is a price grid by period ({value_cols[:3]}…); mapped every period as a price row — confirm which period applies"
+            )
+            collections.append(
+                CollectionMapping(
+                    target=target,
+                    source=sid,
+                    link=[JoinKey(left=sku_match.column.name, right=link_col.name)],
+                    fields=items,
+                )
+            )
+            evidence.append(f"table '{t.sheet}' → /prices via unpivot of {len(value_cols)} period columns")
+            field_scores.append(0.8)
+            continue
+        matches = match_columns(_subset(t, exclude={link_col.name}), item_fields)
+        items = []
+        for m in matches:
+            items.append(
+                FieldMapping(
+                    target=m.field.pointer,
+                    expr=_expr_for(m.column, m.field, sid),
+                    confidence=round(m.score, 2),
+                    evidence=m.evidence,
+                )
+            )
+            field_scores.append(m.score)
+        got = {f.target for f in items}
+        if target == "/prices":
+            if "/prices/*/amount" not in got:
+                unmatched[sid] = [c.name for c in t.columns]
+                questions.append(f"Pricing table '{t.sheet}' has no recognisable amount column")
+                continue
+            if "/prices/*/price_list" not in got:
+                items.append(
+                    FieldMapping(
+                        target="/prices/*/price_list",
+                        expr=const("standard"),
+                        confidence=0.7,
+                        evidence=["no price-list column; 'standard'"],
+                    )
+                )
+            if "/prices/*/vat_included" not in got:
+                vat_inc, why = _vat_included_guess([c.name for c in t.columns])
+                items.append(
+                    FieldMapping(
+                        target="/prices/*/vat_included", expr=const(vat_inc), confidence=0.6, evidence=[why]
+                    )
+                )
+                if "assumed" in why:
+                    questions.append(f"Pricing table '{t.sheet}': {why}")
+        if target == "/inventory":
+            if "/inventory/*/qty" not in got:
+                unmatched[sid] = [c.name for c in t.columns]
+                questions.append(f"Inventory table '{t.sheet}' has no recognisable quantity column")
+                continue
+            if "/inventory/*/warehouse_code" not in got:
+                items.append(
+                    FieldMapping(
+                        target="/inventory/*/warehouse_code",
+                        expr=const("MAIN"),
+                        confidence=0.7,
+                        evidence=["single warehouse assumed → MAIN"],
+                    )
+                )
+        if target == "/promotions":
+            if "/promotions/*/promo_code" not in got:
+                # synthesise a code from link + row? prefer any unique column
+                uniq = next((c for c in t.columns if c.unique_ratio > 0.95 and c.name != link_col.name), None)
+                if uniq is not None:
+                    items.append(
+                        FieldMapping(
+                            target="/promotions/*/promo_code",
+                            expr=col(uniq.name, sid),
+                            confidence=0.5,
+                            evidence=[f"unique column '{uniq.name}' used as promo code"],
+                        )
+                    )
+                else:
+                    items.append(
+                        FieldMapping(
+                            target="/promotions/*/promo_code",
+                            expr=call("concat", const("PROMO-"), col(link_col.name, sid), separator=""),
+                            confidence=0.4,
+                            evidence=["no promo code column; derived from SKU"],
+                        )
+                    )
+                    questions.append(
+                        f"Promotions table '{t.sheet}' has no promo code column; derived code from SKU"
+                    )
+            if "/promotions/*/type" not in got:
+                pct = "/promotions/*/discount_percent" in got
+                amt = "/promotions/*/discount_amount" in got
+                bxgy = "/promotions/*/get_qty" in got
+                guess = (
+                    "buy_x_get_y"
+                    if bxgy
+                    else "percent_off"
+                    if pct
+                    else "amount_off"
+                    if amt
+                    else "percent_off"
+                )
+                items.append(
+                    FieldMapping(
+                        target="/promotions/*/type",
+                        expr=const(guess),
+                        confidence=0.6,
+                        evidence=[f"type inferred from present columns → {guess}"],
+                    )
+                )
+        rest = [c.name for c in t.columns if c.name not in {m.column.name for m in matches} | {link_col.name}]
+        if rest:
+            unmatched[sid] = rest
+        collections.append(
+            CollectionMapping(
+                target=target,
+                source=sid,
+                link=[JoinKey(left=sku_match.column.name, right=link_col.name)],
+                fields=items,
+            )
+        )
+        evidence.append(
+            f"table '{t.sheet}' → {target} linked on '{link_col.name}' ↔ root '{sku_match.column.name}'"
+        )
+        joins_needed.append((root_sid, sid))
+
+    rest_root = [c.name for c in root.columns if c.name not in used_root_cols]
+    if rest_root:
+        unmatched[root_sid] = rest_root
+
+    quality = [
+        QualityRule(target="/sku", rule="unique", severity="warning"),
+        QualityRule(target="/product_name", rule="not_null"),
+    ]
+    if any(c.target == "/prices" for c in collections):
+        quality.append(QualityRule(target="/prices/*/amount", rule="positive", severity="warning"))
+
+    conf = round(sum(field_scores) / len(field_scores), 3) if field_scores else 0.0
+    conf = max(0.0, min(1.0, conf - 0.05 * len(questions)))
+    doc = MappingDocument(
+        meta=MappingMeta(
+            customer_id=customer_id,
+            target_schema=schema.ref,
+            created_by="system",
+            confidence=conf,
+            evidence=evidence,
+        ),
+        sources=sources,
+        joins=[],
+        record=RecordSpec(root_source=root_sid),
+        fields=fields,
+        collections=collections,
+        quality=quality,
+    )
+    return HeuristicProposal(doc, conf, evidence, questions, {i: r[0] for i, r in roles.items()}, unmatched)
+
+
+def _subset(t: TableProfile, exclude: set[str]) -> TableProfile:
+    return TableProfile(
+        t.sheet,
+        t.sheet_index,
+        t.table,
+        [c for c in t.columns if c.name not in exclude],
+        t.n_rows,
+        t.duplicate_key_candidates,
+        t.key_candidates,
+    )
+
+
+def _find_link_column(t: TableProfile, root_key: ColumnProfile) -> ColumnProfile | None:
+    """Column in a satellite table that refers to the root key: same header, SKU synonyms, or sample overlap."""
+    root_samples = {s.strip().upper().lstrip("0") for s in root_key.samples}
+    best, best_s = None, 0.0
+    for c in t.columns:
+        s = 0.0
+        if norm(c.name) == norm(root_key.name):
+            s += 1.0
+        s += fuzz.token_set_ratio(norm(c.name), norm(root_key.name)) / 200.0
+        for syn in ("sku", "item", "code", "รหัส", "product", "material", "article"):
+            if syn in norm(c.name):
+                s += 0.3
+                break
+        overlap = len({x.strip().upper().lstrip("0") for x in c.samples} & root_samples)
+        s += 0.15 * overlap
+        if "sku_like" in c.hints:
+            s += 0.2
+        if s > best_s:
+            best, best_s = c, s
+    return best if best_s >= 0.5 else None

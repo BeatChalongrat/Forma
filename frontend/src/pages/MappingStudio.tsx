@@ -1,0 +1,395 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Check, X, Save, Stethoscope, ChevronDown, ChevronRight, Braces, Plus, Trash2, Wand2 } from 'lucide-react'
+import { api, type Expr, type FieldMapping, type FieldSpec, type MappingDocument, type TableProfile } from '../lib/api'
+import { cn, describeExpr, fmtInt, pyRegex } from '../lib/utils'
+import { Badge, Confidence, RiskDot, Spinner, StatusBadge, Tabs, FindingRow, Modal } from '../components/ui'
+import { useToast } from '../lib/toast'
+
+type Group = { title: string; pointer: string | null; source: string; fields: FieldSpec[] }
+
+const OP_PRESETS: { op: string; label: string; params?: Record<string, unknown> }[] = [
+  { op: 'col', label: 'as is (column)' },
+  { op: 'trim', label: 'trim' },
+  { op: 'normalize_whitespace', label: 'normalize whitespace' },
+  { op: 'upper', label: 'UPPER' },
+  { op: 'parse_number_th', label: 'number (Thai-aware)' },
+  { op: 'parse_date_th', label: 'date (BE/CE, Thai months)' },
+  { op: 'parse_bool', label: 'boolean' },
+  { op: 'unit_normalize', label: 'unit → canonical' },
+  { op: 'pack_size', label: 'pack size from text' },
+  { op: 'vat_adjust', label: 'VAT add 7%', params: { mode: 'add', rate: 0.07 } },
+  { op: 'vat_adjust_remove', label: 'VAT remove 7%', params: { mode: 'remove', rate: 0.07 } },
+  { op: 'strip_leading_zeros', label: 'strip leading zeros' },
+  { op: 'to_list', label: 'wrap in list' },
+  { op: 'split', label: 'split by separator', params: { separator: ',' } },
+  { op: 'map_values', label: 'map values', params: { mapping: { '': '' }, default: null, fuzzy: true } },
+  { op: 'regex_extract', label: 'regex extract', params: { pattern: '(\\d+)', group: 1 } },
+  { op: 'const', label: 'constant' },
+]
+
+function exprLeaf(e: Expr | undefined): { col?: string; source?: string | null; op: string; params: Record<string, unknown>; constValue?: unknown } {
+  if (!e) return { op: 'col', params: {} }
+  if (e.op === 'col') return { col: e.name, source: e.source, op: 'col', params: {} }
+  if (e.op === 'const') return { op: 'const', params: {}, constValue: e.value }
+  const inner = e.args?.[0]
+  if (inner?.op === 'col') return { col: inner.name, source: inner.source, op: e.op, params: e.params ?? {} }
+  return { op: e.op, params: e.params ?? {} }
+}
+function buildExpr(leaf: { col?: string; source?: string | null; op: string; params: Record<string, unknown>; constValue?: unknown }): Expr {
+  if (leaf.op === 'const') return { op: 'const', value: leaf.constValue ?? null }
+  const col: Expr = { op: 'col', name: leaf.col ?? '', source: leaf.source ?? null }
+  if (leaf.op === 'col') return col
+  const op = leaf.op === 'vat_adjust_remove' ? 'vat_adjust' : leaf.op
+  return { op, args: [col], params: leaf.params }
+}
+
+export function MappingStudio() {
+  const { roundId = '', mappingId = '' } = useParams()
+  const qc = useQueryClient()
+  const toast = useToast()
+  const nav = useNavigate()
+  const { data: mv } = useQuery({ queryKey: ['mapping', mappingId], queryFn: () => api.mapping(mappingId) })
+  const { data: round } = useQuery({ queryKey: ['round', roundId], queryFn: () => api.round(roundId) })
+  const { data: schema } = useQuery({ queryKey: ['schema', mv?.target_schema], queryFn: () => api.schema(mv!.target_schema), enabled: !!mv })
+  const [doc, setDoc] = useState<MappingDocument | null>(null)
+  const [dirty, setDirty] = useState(false)
+  const [selected, setSelected] = useState<string | null>(null) // target pointer being edited
+  const [selectedSource, setSelectedSource] = useState<string | null>(null)
+  const [rightTab, setRightTab] = useState<'json' | 'source' | 'findings' | 'diagnosis'>('json')
+  const [showRaw, setShowRaw] = useState(false)
+  const [rawText, setRawText] = useState('')
+  const [comment, setComment] = useState('')
+  const [reject, setReject] = useState(false)
+
+  useEffect(() => { if (mv?.document && !doc) { setDoc(mv.document); setSelectedSource(mv.document.record.root_source) } }, [mv, doc])
+
+  // ---- profiles of this round (columns per source) --------------------------------------------
+  const tables: TableProfile[] = useMemo(() => {
+    const out: TableProfile[] = []
+    round?.files?.forEach((f) => f.profile?.tables.forEach((t) => out.push({ ...t, file_id: f.id, file_name: f.name })))
+    return out
+  }, [round])
+  const fileProfiles = useQuery({
+    queryKey: ['round-files-full', roundId, round?.files?.map((f) => f.id).join(',')],
+    queryFn: async () => Promise.all((round?.files ?? []).map((f) => api.file(roundId, f.id))),
+    enabled: !!round?.files?.length,
+  })
+  const allTables: TableProfile[] = useMemo(() => {
+    const out: TableProfile[] = []
+    fileProfiles.data?.forEach((f) => f.profile?.tables.forEach((t) => out.push({ ...t, file_id: f.id, file_name: f.name })))
+    return out.length ? out : tables
+  }, [fileProfiles.data, tables])
+
+  const columnsFor = useCallback((sourceId: string): string[] => {
+    const s = doc?.sources.find((x) => x.id === sourceId)
+    if (!s) return []
+    const sheetName = s.sheet?.name
+    const t = allTables.find((t) => (sheetName ? t.sheet === sheetName : true) && (s.file.name_pattern ? (pyRegex(s.file.name_pattern)?.test(t.file_name ?? '') ?? true) : true)) ?? allTables.find((t) => (sheetName ? t.sheet === sheetName : true))
+    const names = t?.columns.map((c) => c.name) ?? []
+    return Object.keys(s.rename).length ? names.map((n) => s.rename[n] ?? n) : names
+  }, [doc, allTables])
+
+  // ---- live preview --------------------------------------------------------------------------
+  const preview = useMutation({ mutationFn: (d: MappingDocument) => api.mappingPreview(roundId, d, 40) })
+  const timer = useRef<number | null>(null)
+  useEffect(() => {
+    if (!doc) return
+    if (timer.current) window.clearTimeout(timer.current)
+    timer.current = window.setTimeout(() => preview.mutate(doc), 500)
+    return () => { if (timer.current) window.clearTimeout(timer.current) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [doc])
+  const srcPreview = useQuery({
+    queryKey: ['source-preview', roundId, selectedSource, JSON.stringify(doc?.sources.find((s) => s.id === selectedSource) ?? null)],
+    queryFn: () => api.sourcePreview(roundId, doc!.sources.find((s) => s.id === selectedSource)!, 40),
+    enabled: !!doc && !!selectedSource && rightTab === 'source',
+  })
+  const diagnose = useMutation({ mutationFn: () => api.diagnose(mappingId) })
+
+  // ---- actions ---------------------------------------------------------------------------------
+  const approve = useMutation({ mutationFn: () => api.approveMapping(mappingId, { actor: 'operator', comment }), onSuccess: () => { qc.invalidateQueries(); toast.push({ kind: 'ok', title: 'Mapping approved', detail: 'Transform the round to produce the dataset.' }) }, onError: (e: Error) => toast.push({ kind: 'bad', title: 'Approve failed', detail: e.message }) })
+  const rejectM = useMutation({ mutationFn: () => api.rejectMapping(mappingId, { actor: 'operator', comment }), onSuccess: () => { qc.invalidateQueries(); setReject(false); toast.push({ kind: 'ok', title: 'Mapping rejected' }) } })
+  const save = useMutation({
+    mutationFn: () => api.editMapping(mappingId, doc!, 'operator'),
+    onSuccess: (m) => { qc.invalidateQueries(); toast.push({ kind: 'ok', title: `Saved as v${m.version}`, detail: 'New proposed version created; the previous one is kept in history.' }); nav(`/rounds/${roundId}/mapping/${m.id}`); setDoc(null); setDirty(false) },
+    onError: (e: Error & { details?: { issues?: { message: string }[] } }) => toast.push({ kind: 'bad', title: 'Mapping is not valid', detail: e.details?.issues?.map((i) => i.message).join('; ') ?? e.message }),
+  })
+
+  const update = (fn: (d: MappingDocument) => MappingDocument) => { setDoc((d) => (d ? fn(structuredClone(d)) : d)); setDirty(true) }
+
+  // ---- groups ----------------------------------------------------------------------------------
+  const groups: Group[] = useMemo(() => {
+    if (!schema?.fields || !doc) return []
+    const fields = schema.fields.filter((f) => !f.system && !f.is_collection && !f.json_type.includes('object'))
+    const root: Group = { title: 'Record', pointer: null, source: doc.record.root_source, fields: fields.filter((f) => !f.in_collection) }
+    const colls = schema.fields.filter((f) => f.is_collection).map((c) => ({ title: c.pointer.slice(1), pointer: c.pointer, source: doc.collections.find((x) => x.target === c.pointer)?.source ?? '', fields: fields.filter((f) => f.in_collection === c.pointer) }))
+    return [root, ...colls]
+  }, [schema, doc])
+
+  const getMapping = (ptr: string): { fm: FieldMapping | undefined; coll: string | null } => {
+    if (!doc) return { fm: undefined, coll: null }
+    const root = doc.fields.find((f) => f.target === ptr)
+    if (root) return { fm: root, coll: null }
+    for (const c of doc.collections) { const f = c.fields.find((x) => x.target === ptr); if (f) return { fm: f, coll: c.target } }
+    return { fm: undefined, coll: null }
+  }
+  const setFieldExpr = (ptr: string, coll: string | null, expr: Expr) => update((d) => {
+    if (coll) {
+      const c = d.collections.find((x) => x.target === coll)
+      if (c) { const f = c.fields.find((x) => x.target === ptr); if (f) { f.expr = expr; f.confidence = 1; f.evidence = ['edited by operator'] } else c.fields.push({ target: ptr, expr, confidence: 1, evidence: ['added by operator'] }) }
+    } else {
+      const f = d.fields.find((x) => x.target === ptr)
+      if (f) { f.expr = expr; f.confidence = 1; f.evidence = ['edited by operator'] } else d.fields.push({ target: ptr, expr, confidence: 1, evidence: ['added by operator'] })
+    }
+    return d
+  })
+  const removeField = (ptr: string, coll: string | null) => update((d) => {
+    if (coll) { const c = d.collections.find((x) => x.target === coll); if (c) c.fields = c.fields.filter((f) => f.target !== ptr) } else d.fields = d.fields.filter((f) => f.target !== ptr)
+    return d
+  })
+  const addCollection = (ptr: string) => update((d) => { if (!d.collections.find((c) => c.target === ptr)) d.collections.push({ target: ptr, source: d.record.root_source, link: [{ left: '', right: '' }], fields: [] }); return d })
+
+  if (!mv || !doc || !schema) return <div className="p-10 text-center"><Spinner /></div>
+  const pv = preview.data
+  const locked = mv.status !== 'proposed'
+
+  return (
+    <div className="h-screen flex flex-col">
+      {/* top bar */}
+      <div className="h-14 px-5 border-b border-line bg-surface flex items-center gap-4 shrink-0">
+        <div className="min-w-0 flex items-center gap-3">
+          <Link to={`/rounds/${roundId}`} className="text-muted hover:text-ink text-[12.5px]">← {round?.customer?.code} · {round?.label}</Link>
+          <span className="font-semibold">Mapping Studio</span>
+          <span className="text-muted tnum">v{mv.version}</span>
+          <StatusBadge status={mv.status} />
+          <Confidence value={mv.confidence} />
+          {dirty && <Badge tone="warn">unsaved edits</Badge>}
+        </div>
+        <div className="ml-auto flex items-center gap-2">
+          <button className={cn('btn btn-sm', showRaw && 'bg-signal-soft text-signal border-signal/30')} onClick={() => { setRawText(JSON.stringify(doc, null, 2)); setShowRaw(true) }}><Braces size={13} /> JSON</button>
+          <button className="btn btn-sm" onClick={() => { setRightTab('diagnosis'); diagnose.mutate() }}><Stethoscope size={13} /> Diagnose</button>
+          {dirty && <button className="btn btn-sm btn-primary" disabled={save.isPending} onClick={() => save.mutate()}><Save size={13} /> Save as new version</button>}
+          {!dirty && !locked && (
+            <>
+              <button className="btn btn-sm btn-danger" onClick={() => setReject(true)}><X size={13} /> Reject</button>
+              <button className="btn btn-sm btn-primary" disabled={approve.isPending} onClick={() => approve.mutate()}><Check size={13} /> Approve</button>
+            </>
+          )}
+          {!dirty && mv.status === 'approved' && <Link to={`/rounds/${roundId}`} className="btn btn-sm">Back to round</Link>}
+        </div>
+      </div>
+
+      {/* policy strip */}
+      <div className="px-5 py-2 border-b border-line bg-surface-2/60 text-[12.5px] flex items-center gap-4 shrink-0 overflow-x-auto">
+        <span className={cn('font-medium', mv.policy.decision === 'auto_approve' ? 'text-ok' : mv.policy.decision === 'block' ? 'text-bad' : 'text-warn')}>{mv.policy.decision?.replace('_', ' ')}</span>
+        {mv.policy.reasons.map((r, i) => <span key={i} className="text-ink-2 whitespace-nowrap">• {r}</span>)}
+        {mv.open_questions.length > 0 && <span className="text-warn whitespace-nowrap">• {mv.open_questions.length} open question{mv.open_questions.length > 1 ? 's' : ''}</span>}
+      </div>
+
+      <div className="flex-1 min-h-0 grid grid-cols-[240px_minmax(0,1fr)_380px]">
+        {/* LEFT: sources */}
+        <aside className="border-r border-line overflow-auto bg-surface">
+          <div className="px-4 pt-4 pb-2 text-[12px] text-muted">Sources — {doc.sources.length} table{doc.sources.length > 1 ? 's' : ''} from {round?.files?.length} file{(round?.files?.length ?? 0) > 1 ? 's' : ''}</div>
+          {doc.sources.map((s) => {
+            const cols = columnsFor(s.id)
+            const open = selectedSource === s.id
+            const used = new Set<string>()
+            doc.fields.forEach((f) => collectCols(f.expr, doc.record.root_source).forEach((c) => c.startsWith(s.id + '.') && used.add(c.slice(s.id.length + 1))))
+            doc.collections.forEach((c) => { c.fields.forEach((f) => collectCols(f.expr, c.source).forEach((x) => x.startsWith(s.id + '.') && used.add(x.slice(s.id.length + 1)))); if (c.source === s.id) c.link.forEach((l) => used.add(l.right)); if (doc.record.root_source === s.id) c.link.forEach((l) => used.add(l.left)) })
+            return (
+              <div key={s.id} className="border-b border-line">
+                <button className="w-full flex items-center gap-2 px-4 py-2.5 hover:bg-surface-2 text-left" onClick={() => { setSelectedSource(open ? null : s.id); if (!open) setRightTab('source') }}>
+                  {open ? <ChevronDown size={14} className="text-muted" /> : <ChevronRight size={14} className="text-muted" />}
+                  <span className="font-medium truncate">{s.id}</span>
+                  <Badge tone={s.id === doc.record.root_source ? 'signal' : 'neutral'} className="ml-auto h-5 text-[11px]">{s.id === doc.record.root_source ? 'root' : s.role}</Badge>
+                </button>
+                <div className="px-4 pb-2 -mt-1 text-[11.5px] text-muted truncate">{s.sheet?.name ? `sheet “${s.sheet.name}”` : 'CSV'}{' · '}header row {String((s.table as { header_row?: number | string }).header_row ?? 'auto')}</div>
+                {open && (
+                  <ul className="pb-2">
+                    {cols.map((c) => (
+                      <li key={c} className={cn('flex items-center gap-2 px-4 py-1 text-[12.5px]', used.has(c) ? 'text-ink' : 'text-muted')}>
+                        <span className={cn('w-1.5 h-1.5 rounded-full shrink-0', used.has(c) ? 'bg-signal' : 'bg-line-2')} />
+                        <span className="truncate">{c}</span>
+                        {selected && !locked && <button className="ml-auto btn btn-ghost btn-sm text-signal" onClick={() => { const { coll } = getMapping(selected); const leaf = exprLeaf(getMapping(selected).fm?.expr); setFieldExpr(selected, coll, buildExpr({ ...leaf, op: leaf.op === 'const' ? 'col' : leaf.op, col: c, source: s.id === (coll ? doc.collections.find((x) => x.target === coll)?.source : doc.record.root_source) ? null : s.id })) }}>use</button>}
+                      </li>
+                    ))}
+                    {!cols.length && <li className="px-4 py-1 text-[12px] text-muted">columns unavailable (profile missing)</li>}
+                  </ul>
+                )}
+              </div>
+            )
+          })}
+          <div className="p-4 text-[11.5px] text-muted leading-relaxed">Select a target field on the right, then click <span className="text-signal">use</span> on a column to point it there.</div>
+        </aside>
+
+        {/* CENTER: target fields */}
+        <section className="overflow-auto min-w-0">
+          {groups.map((g) => {
+            const coll = g.pointer ? doc.collections.find((c) => c.target === g.pointer) : null
+            return (
+              <div key={g.title} className="border-b border-line">
+                <div className="sticky top-0 z-10 bg-paper/95 backdrop-blur px-5 py-2.5 flex items-center gap-3 border-b border-line">
+                  <span className="font-semibold">{g.title}</span>
+                  {g.pointer ? (
+                    coll ? (
+                      <span className="text-[12px] text-muted flex items-center gap-2 flex-wrap">
+                        from <SourceSelect value={coll.source} sources={doc.sources.map((s) => s.id)} disabled={locked} onChange={(v) => update((d) => { const c = d.collections.find((x) => x.target === g.pointer); if (c) c.source = v; return d })} />
+                        linked by <Inline value={coll.link[0]?.left ?? ''} options={columnsFor(doc.record.root_source)} disabled={locked} onChange={(v) => update((d) => { const c = d.collections.find((x) => x.target === g.pointer); if (c) c.link[0] = { ...c.link[0], left: v }; return d })} />
+                        ↔ <Inline value={coll.link[0]?.right ?? ''} options={columnsFor(coll.source)} disabled={locked} onChange={(v) => update((d) => { const c = d.collections.find((x) => x.target === g.pointer); if (c) c.link[0] = { ...c.link[0], right: v }; return d })} />
+                        {!locked && <button className="btn btn-ghost btn-sm text-bad" title="Remove collection" onClick={() => update((d) => { d.collections = d.collections.filter((c) => c.target !== g.pointer); return d })}><Trash2 size={12} /></button>}
+                      </span>
+                    ) : (
+                      <span className="text-[12px] text-muted flex items-center gap-2">not mapped {!locked && <button className="btn btn-ghost btn-sm text-signal" onClick={() => addCollection(g.pointer!)}><Plus size={12} /> add collection</button>}</span>
+                    )
+                  ) : <span className="text-[12px] text-muted">root source: {doc.record.root_source} · identity: {schema.identity_keys.join(', ')}</span>}
+                </div>
+                {(g.pointer === null || coll) && (
+                  <ul>
+                    {g.fields.map((f) => {
+                      const { fm, coll: c } = getMapping(f.pointer)
+                      const isSel = selected === f.pointer
+                      return (
+                        <li key={f.pointer} className={cn('px-5 border-b border-line/70 last:border-0', isSel ? 'bg-signal-soft/50' : 'hover:bg-surface-2/50')}>
+                          <button className="w-full grid grid-cols-[minmax(140px,180px)_minmax(0,1fr)_104px_56px] items-center gap-3 py-2 text-left" onClick={() => setSelected(isSel ? null : f.pointer)}>
+                            <span className="flex items-center gap-2 min-w-0"><RiskDot risk={f.risk} /><span className={cn('mono truncate', !fm && 'text-muted')}>{f.pointer.replace(/^\/[^/]+\/\*\//, '').replace(/^\//, '')}</span>{f.required && <span className="text-[10px] text-muted">req</span>}</span>
+                            <span className={cn('truncate text-[12.5px]', fm ? 'text-ink' : 'text-muted italic')}>{fm ? describeExpr(fm.expr) : 'not mapped'}</span>
+                            <span>{fm && <Confidence value={fm.confidence} />}</span>
+                            <span className="text-[11px] text-muted text-right truncate">{f.format ?? f.json_type.filter((t) => t !== 'null')[0]}</span>
+                          </button>
+                          {isSel && <FieldEditor field={f} fm={fm} locked={locked} columns={columnsFor(c ? doc.collections.find((x) => x.target === c)!.source : doc.record.root_source)} onChange={(e) => setFieldExpr(f.pointer, c ?? (g.pointer || null), e)} onRemove={fm ? () => removeField(f.pointer, c) : undefined} />}
+                        </li>
+                      )
+                    })}
+                  </ul>
+                )}
+              </div>
+            )
+          })}
+          <div className="p-5 text-[12px] text-muted">
+            <div className="font-medium text-ink-2 mb-1">Why these mappings</div>
+            <ul className="flex flex-col gap-0.5">{doc.meta.evidence.map((e, i) => <li key={i}>• {e}</li>)}</ul>
+            {mv.open_questions.length > 0 && <><div className="font-medium text-warn mt-3 mb-1">Open questions</div><ul className="flex flex-col gap-0.5">{mv.open_questions.map((q, i) => <li key={i}>? {q}</li>)}</ul></>}
+          </div>
+        </section>
+
+        {/* RIGHT: preview */}
+        <aside className="border-l border-line bg-surface flex flex-col min-h-0">
+          <Tabs value={rightTab} onChange={setRightTab} items={[{ id: 'json', label: 'JSON output', count: pv?.records.length }, { id: 'source', label: 'Source rows' }, { id: 'findings', label: 'Findings', count: pv?.findings.length }, { id: 'diagnosis', label: 'Diagnosis' }]} />
+          <div className="flex-1 overflow-auto p-3">
+            {rightTab === 'json' && (
+              <>
+                {preview.isPending && <div className="text-muted text-[12px] mb-2 flex items-center gap-2"><Spinner /> re-running mapping on sample rows…</div>}
+                {pv && !pv.ok && <div className="text-bad text-[12.5px] mb-2">{pv.errors?.join('; ')}{pv.validation?.issues.filter((i) => i.level === 'error').map((i) => i.message).join('; ')}</div>}
+                {pv?.ok && <div className="text-[12px] text-muted mb-2 tnum">{fmtInt(pv.stats?.rows_out as number)} records from {fmtInt(pv.stats?.rows_in as number)} sample rows · {pv.stats?.duration_ms as number} ms</div>}
+                {pv?.records.slice(0, 20).map((r, i) => <pre key={i} className="mono text-[11.5px] leading-relaxed bg-surface-2 rounded-[var(--radius-md)] p-2.5 mb-2 overflow-auto whitespace-pre-wrap">{JSON.stringify(stripMeta(r), null, 1)}</pre>)}
+              </>
+            )}
+            {rightTab === 'source' && (
+              srcPreview.data ? (
+                <div className="overflow-auto -m-3">
+                  <div className="px-3 py-2 text-[12px] text-muted">{srcPreview.data.file} · extracted as <span className="font-medium text-ink">{selectedSource}</span></div>
+                  <table className="text-[12px] border-collapse min-w-full">
+                    <thead><tr>{srcPreview.data.columns.map((c) => <th key={c} className="sticky top-0 bg-surface-2 text-left px-2 py-1.5 border border-line font-medium whitespace-nowrap">{c}</th>)}</tr></thead>
+                    <tbody>{srcPreview.data.rows.map((row, i) => <tr key={i}>{row.map((v, j) => <td key={j} className="px-2 py-1 border border-line whitespace-nowrap max-w-[220px] truncate">{v === null ? '' : String(v)}</td>)}</tr>)}</tbody>
+                  </table>
+                </div>
+              ) : <div className="text-muted text-[12.5px]">{selectedSource ? (srcPreview.isLoading ? 'Loading…' : srcPreview.error ? String((srcPreview.error as Error).message) : '') : 'Select a source on the left.'}</div>
+            )}
+            {rightTab === 'findings' && (pv?.findings.length ? pv.findings.map((f, i) => <FindingRow key={i} f={f} />) : <div className="text-muted text-[12.5px]">No findings on the sample.</div>)}
+            {rightTab === 'diagnosis' && (
+              diagnose.isPending ? <div className="text-muted text-[12.5px] flex items-center gap-2"><Spinner /> analysing…</div> : diagnose.data ? (
+                <div className="flex flex-col gap-3 text-[12.5px]">
+                  {diagnose.data.summary_th && <div className="card p-3">{diagnose.data.summary_th}</div>}
+                  {!diagnose.data.ai && <Badge tone="neutral">rule-based — configure an LLM for AI root-cause analysis</Badge>}
+                  {diagnose.data.root_causes.map((rc, i) => (
+                    <div key={i} className="card p-3">
+                      <div className="font-medium">{rc.finding}</div>
+                      <div className="text-ink-2 mt-1">{rc.cause}</div>
+                      <div className="mt-1 text-signal">Fix: {rc.fix}</div>
+                    </div>
+                  ))}
+                  {diagnose.data.root_causes.length === 0 && <div className="text-muted">Nothing to diagnose — the mapping runs clean on the sample.</div>}
+                  {diagnose.data.patched_mapping && !locked && <button className="btn btn-primary btn-sm self-start" onClick={() => { setDoc(diagnose.data!.patched_mapping!); setDirty(true); toast.push({ kind: 'info', title: 'Patched mapping loaded', detail: 'Review the changes, then save as a new version.' }) }}><Wand2 size={13} /> Apply suggested patch</button>}
+                </div>
+              ) : <div className="text-muted text-[12.5px]">Click Diagnose to explain findings and get suggested fixes.</div>
+            )}
+          </div>
+        </aside>
+      </div>
+
+      <Modal open={showRaw} onClose={() => setShowRaw(false)} title="Mapping document (JSON)" width="max-w-4xl" footer={<><button className="btn" onClick={() => setShowRaw(false)}>Close</button>{!locked && <button className="btn btn-primary" onClick={() => { try { const d = JSON.parse(rawText) as MappingDocument; setDoc(d); setDirty(true); setShowRaw(false) } catch (e) { toast.push({ kind: 'bad', title: 'Invalid JSON', detail: (e as Error).message }) } }}>Apply</button>}</>}>
+        <textarea className="input mono h-[60vh] py-2 resize-none" value={rawText} onChange={(e) => setRawText(e.target.value)} spellCheck={false} />
+      </Modal>
+      <Modal open={reject} onClose={() => setReject(false)} title="Reject this mapping" width="max-w-md" footer={<><button className="btn" onClick={() => setReject(false)}>Cancel</button><button className="btn btn-danger" onClick={() => rejectM.mutate()}>Reject</button></>}>
+        <textarea className="input h-24 py-2" placeholder="Why? (kept in the audit log and shown to the AI on the next proposal)" value={comment} onChange={(e) => setComment(e.target.value)} />
+      </Modal>
+    </div>
+  )
+}
+
+function stripMeta(r: Record<string, unknown>) { const { source_meta: _m, ...rest } = r; return rest }
+
+function collectCols(e: Expr, def: string): string[] {
+  if (e.op === 'col') return [`${e.source ?? def}.${e.name}`]
+  return (e.args ?? []).flatMap((a) => collectCols(a, def))
+}
+
+function SourceSelect({ value, sources, onChange, disabled }: { value: string; sources: string[]; onChange: (v: string) => void; disabled?: boolean }) {
+  return <select className="input h-6 w-auto text-[12px] py-0 inline-block" value={value} disabled={disabled} onChange={(e) => onChange(e.target.value)}>{sources.map((s) => <option key={s}>{s}</option>)}</select>
+}
+function Inline({ value, options, onChange, disabled }: { value: string; options: string[]; onChange: (v: string) => void; disabled?: boolean }) {
+  return (
+    <select className="input h-6 w-auto max-w-[180px] text-[12px] py-0 inline-block" value={value} disabled={disabled} onChange={(e) => onChange(e.target.value)}>
+      {!options.includes(value) && <option value={value}>{value || '—'}</option>}
+      {options.map((o) => <option key={o}>{o}</option>)}
+    </select>
+  )
+}
+
+function FieldEditor({ field, fm, columns, locked, onChange, onRemove }: { field: FieldSpec; fm?: FieldMapping; columns: string[]; locked: boolean; onChange: (e: Expr) => void; onRemove?: () => void }) {
+  const leaf = exprLeaf(fm?.expr)
+  const [params, setParams] = useState(JSON.stringify(leaf.params ?? {}, null, 0))
+  const [constVal, setConstVal] = useState(leaf.constValue === undefined ? '' : JSON.stringify(leaf.constValue))
+  const [paramErr, setParamErr] = useState<string | null>(null)
+  useEffect(() => { setParams(JSON.stringify(leaf.params ?? {}, null, 0)); setConstVal(leaf.constValue === undefined ? '' : JSON.stringify(leaf.constValue)) }, [fm]) // eslint-disable-line react-hooks/exhaustive-deps
+  const complex = fm && fm.expr.op !== 'col' && fm.expr.op !== 'const' && fm.expr.args?.[0]?.op !== 'col'
+  const presetOp = leaf.op === 'vat_adjust' && (leaf.params.mode === 'remove') ? 'vat_adjust_remove' : leaf.op
+  const apply = (patch: Partial<typeof leaf>) => {
+    let p = leaf.params
+    try { p = JSON.parse(params || '{}'); setParamErr(null) } catch (e) { setParamErr((e as Error).message) }
+    const next = { ...leaf, params: p, ...patch }
+    if (patch.op) { const preset = OP_PRESETS.find((x) => x.op === patch.op); next.params = preset?.params ?? {}; setParams(JSON.stringify(next.params)) }
+    if (patch.op === 'const' || next.op === 'const') { try { next.constValue = constVal === '' ? null : JSON.parse(constVal) } catch { next.constValue = constVal } }
+    onChange(buildExpr(next))
+  }
+  return (
+    <div className="pb-3 pl-7 pr-2 text-[12.5px]">
+      <div className="text-muted mb-2">{field.description_th ?? field.description ?? ''}{field.synonyms_th.length ? <span className="ml-2">synonyms: {[...field.synonyms_th.slice(0, 4), ...field.synonyms_en.slice(0, 3)].join(', ')}</span> : null}{field.enum ? <span className="ml-2 mono">{field.enum.join(' | ')}</span> : null}</div>
+      {complex ? (
+        <div className="text-muted">This field uses a nested expression — edit it in the JSON view.</div>
+      ) : (
+        <div className="flex flex-wrap items-center gap-2">
+          <select className="input h-7 w-auto text-[12.5px] py-0" disabled={locked} value={presetOp} onChange={(e) => apply({ op: e.target.value })}>
+            {OP_PRESETS.map((p) => <option key={p.op} value={p.op}>{p.label}</option>)}
+          </select>
+          {presetOp !== 'const' ? (
+            <select className="input h-7 w-auto max-w-[260px] text-[12.5px] py-0" disabled={locked} value={leaf.col ?? ''} onChange={(e) => apply({ col: e.target.value })}>
+              <option value="">— choose column —</option>
+              {leaf.col && !columns.includes(leaf.col) && <option value={leaf.col}>{leaf.col} (missing)</option>}
+              {columns.map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
+          ) : (
+            <input className="input h-7 w-56 text-[12.5px] mono" disabled={locked} value={constVal} placeholder='"THB" · true · 7' onChange={(e) => setConstVal(e.target.value)} onBlur={() => apply({})} />
+          )}
+          {!['col', 'const', 'trim', 'upper', 'normalize_whitespace', 'parse_bool', 'pack_size', 'to_list', 'strip_leading_zeros'].includes(presetOp) && (
+            <input className={cn('input h-7 flex-1 min-w-[200px] text-[12px] mono', paramErr && 'border-bad')} disabled={locked} value={params} onChange={(e) => setParams(e.target.value)} onBlur={() => apply({})} title={paramErr ?? 'params (JSON)'} />
+          )}
+          {onRemove && !locked && <button className="btn btn-ghost btn-sm text-bad" onClick={onRemove}><Trash2 size={12} /> unmap</button>}
+        </div>
+      )}
+      {fm?.evidence?.length ? <ul className="mt-2 text-muted flex flex-col gap-0.5">{fm.evidence.map((e, i) => <li key={i}>• {e}</li>)}</ul> : null}
+    </div>
+  )
+}

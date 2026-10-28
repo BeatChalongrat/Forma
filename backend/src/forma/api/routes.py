@@ -1,0 +1,865 @@
+"""REST API. One router per bounded context, all mounted under /api."""
+
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Any
+
+from fastapi import APIRouter, Depends, File, Query, UploadFile
+from fastapi.responses import FileResponse, Response
+from sqlalchemy import func, select
+from sqlalchemy.orm import Session
+
+from forma.ai.agents import copilot_agent, diagnosis_agent
+from forma.api import serialize as ser
+from forma.api.schemas import (
+    ChangesIn,
+    CopilotIn,
+    CustomerIn,
+    Decision,
+    MappingEditIn,
+    MappingPreviewIn,
+    ProposeIn,
+    RoundIn,
+    SchemaIn,
+    SourcePreviewIn,
+)
+from forma.core.errors import NotFound, ValidationFailed
+from forma.db.models import (
+    ChangeSet,
+    Customer,
+    DatasetVersion,
+    ExportArtifact,
+    ImportRound,
+    Job,
+    LLMCall,
+    MappingVersion,
+    Override,
+    ReviewTask,
+)
+from forma.db.session import get_session
+from forma.jobs import runner
+from forma.mapping_dsl.models import MappingDocument, Op
+from forma.services import datasets as ds
+from forma.services import mapping as ms
+from forma.services import rounds as rs
+from forma.services.context import ServiceContext, get_context
+
+api = APIRouter(prefix="/api")
+
+
+def ctx_dep() -> ServiceContext:
+    return get_context()
+
+
+# ============================================================================================
+# Customers
+# ============================================================================================
+@api.get("/customers")
+def list_customers(session: Session = Depends(get_session)) -> list[dict[str, Any]]:
+    rows = session.scalars(select(Customer).order_by(Customer.code)).all()
+    counts = dict(
+        session.execute(select(ImportRound.customer_id, func.count()).group_by(ImportRound.customer_id)).all()
+    )
+    last = dict(
+        session.execute(
+            select(ImportRound.customer_id, func.max(ImportRound.created_at)).group_by(
+                ImportRound.customer_id
+            )
+        ).all()
+    )
+    approved = {
+        m.customer_id
+        for m in session.scalars(select(MappingVersion).where(MappingVersion.status == "approved"))
+    }
+    return [
+        ser.customer(
+            c,
+            rounds=counts.get(c.id, 0),
+            last_round_at=ser._dt(last.get(c.id)),
+            has_approved_mapping=c.id in approved,
+        )
+        for c in rows
+    ]
+
+
+@api.post("/customers", status_code=201)
+def create_customer(body: CustomerIn, session: Session = Depends(get_session)) -> dict[str, Any]:
+    return ser.customer(rs.create_customer(session, body.code, body.name, body.erp_type, body.notes))
+
+
+@api.get("/customers/{customer_id}")
+def get_customer(customer_id: str, session: Session = Depends(get_session)) -> dict[str, Any]:
+    c = rs.get_customer(session, customer_id)
+    rounds = session.scalars(
+        select(ImportRound).where(ImportRound.customer_id == c.id).order_by(ImportRound.created_at.desc())
+    ).all()
+    mappings = session.scalars(
+        select(MappingVersion)
+        .where(MappingVersion.customer_id == c.id)
+        .order_by(MappingVersion.created_at.desc())
+    ).all()
+    overrides = session.scalars(
+        select(Override).where(Override.customer_id == c.id, Override.active.is_(True))
+    ).all()
+    return ser.customer(
+        c,
+        rounds=[ser.import_round(r, files=False) for r in rounds],
+        mappings=[ser.mapping_version(m, document=False) for m in mappings],
+        overrides=[
+            {
+                "id": o.id,
+                "target": o.target,
+                "where": o.where,
+                "value": o.value,
+                "note": o.note,
+                "author": o.author,
+                "created_at": o.created_at.isoformat(),
+            }
+            for o in overrides
+        ],
+    )
+
+
+@api.delete("/customers/{customer_id}/overrides/{override_id}")
+def delete_override(
+    customer_id: str, override_id: str, session: Session = Depends(get_session)
+) -> dict[str, Any]:
+    o = session.get(Override, override_id)
+    if o is None or o.customer_id != customer_id:
+        raise NotFound("override not found")
+    o.active = False
+    return {"ok": True}
+
+
+# ============================================================================================
+# Import rounds & files
+# ============================================================================================
+@api.get("/rounds")
+def list_rounds(
+    status: str | None = None,
+    customer_id: str | None = None,
+    limit: int = Query(100, le=500),
+    session: Session = Depends(get_session),
+) -> list[dict[str, Any]]:
+    q = select(ImportRound).order_by(ImportRound.created_at.desc()).limit(limit)
+    if status:
+        q = q.where(ImportRound.status == status)
+    if customer_id:
+        q = q.where(ImportRound.customer_id == customer_id)
+    rounds = session.scalars(q).all()
+    customers = {c.id: c for c in session.scalars(select(Customer)).all()}
+    return [ser.import_round(r, customer_obj=customers.get(r.customer_id)) for r in rounds]
+
+
+@api.post("/rounds", status_code=201)
+def create_round(body: RoundIn, session: Session = Depends(get_session)) -> dict[str, Any]:
+    return ser.import_round(rs.create_round(session, body.customer_id, body.label, body.target_schema))
+
+
+@api.get("/rounds/{round_id}")
+def get_round(round_id: str, session: Session = Depends(get_session)) -> dict[str, Any]:
+    r = rs.get_round(session, round_id)
+    c = session.get(Customer, r.customer_id)
+    mappings = session.scalars(
+        select(MappingVersion)
+        .where(MappingVersion.round_id == r.id)
+        .order_by(MappingVersion.created_at.desc())
+    ).all()
+    datasets = session.scalars(
+        select(DatasetVersion).where(DatasetVersion.round_id == r.id).order_by(DatasetVersion.version.desc())
+    ).all()
+    tasks = session.scalars(
+        select(ReviewTask).where(ReviewTask.round_id == r.id).order_by(ReviewTask.created_at.desc())
+    ).all()
+    jobs = session.scalars(
+        select(Job).where(Job.round_id == r.id).order_by(Job.created_at.desc()).limit(10)
+    ).all()
+    d = ser.import_round(r, customer_obj=c)
+    d["mappings"] = [ser.mapping_version(m, document=False) for m in mappings]
+    d["datasets"] = [ser.dataset_version(x) for x in datasets]
+    d["review_tasks"] = [ser.review_task(t) for t in tasks]
+    d["jobs"] = [
+        {
+            "id": j.id,
+            "kind": j.kind,
+            "status": j.status,
+            "progress": j.progress,
+            "message": j.message,
+            "error": j.error,
+        }
+        for j in jobs
+    ]
+    return d
+
+
+@api.post("/rounds/{round_id}/files", status_code=201)
+async def upload_files(
+    round_id: str,
+    files: list[UploadFile] = File(...),
+    session: Session = Depends(get_session),
+    ctx: ServiceContext = Depends(ctx_dep),
+) -> list[dict[str, Any]]:
+    r = rs.get_round(session, round_id)
+    out = []
+    for up in files:
+        data = await up.read()
+        if not data:
+            raise ValidationFailed(f"{up.filename} is empty")
+        out.append(ser.source_file(rs.add_file(ctx, session, r, up.filename or "upload.xlsx", data)))
+    return out
+
+
+@api.get("/rounds/{round_id}/files/{file_id}")
+def get_file(round_id: str, file_id: str, session: Session = Depends(get_session)) -> dict[str, Any]:
+    r = rs.get_round(session, round_id)
+    f = next((x for x in r.files if x.id == file_id), None)
+    if f is None:
+        raise NotFound("file not found")
+    return ser.source_file(f, full=True)
+
+
+@api.get("/rounds/{round_id}/files/{file_id}/grid")
+def file_grid(
+    round_id: str,
+    file_id: str,
+    sheet: int = 0,
+    rows: int = Query(60, le=500),
+    session: Session = Depends(get_session),
+) -> dict[str, Any]:
+    """Raw cells of a sheet (for the side-by-side Excel view)."""
+    from forma.ingestion.readers import read_raw
+
+    r = rs.get_round(session, round_id)
+    f = next((x for x in r.files if x.id == file_id), None)
+    if f is None:
+        raise NotFound("file not found")
+    df = read_raw(Path(f.storage_path), sheet if f.kind == "excel" else None, n_rows=rows)
+    return {"sheet": sheet, "n_cols": df.width, "rows": [list(r_) for r_ in df.iter_rows()]}
+
+
+@api.post("/rounds/{round_id}/profile")
+def profile_round(
+    round_id: str, sync: bool = False, session: Session = Depends(get_session)
+) -> dict[str, Any]:
+    rs.get_round(session, round_id)
+    session.commit()
+    return {"job_id": runner.enqueue("profile_round", {"round_id": round_id}, round_id=round_id, sync=sync)}
+
+
+@api.post("/rounds/{round_id}/propose")
+def propose(
+    round_id: str, body: ProposeIn | None = None, session: Session = Depends(get_session)
+) -> dict[str, Any]:
+    body = body or ProposeIn()
+    rs.get_round(session, round_id)
+    session.commit()
+    return {
+        "job_id": runner.enqueue(
+            "propose_mapping",
+            {"round_id": round_id, "use_llm": body.use_llm, "actor": body.actor},
+            round_id=round_id,
+            sync=body.sync,
+        )
+    }
+
+
+@api.post("/rounds/{round_id}/run")
+def run_pipeline(
+    round_id: str, body: ProposeIn | None = None, session: Session = Depends(get_session)
+) -> dict[str, Any]:
+    """One click: profile → propose → (auto-approve) → transform."""
+    body = body or ProposeIn()
+    rs.get_round(session, round_id)
+    session.commit()
+    return {
+        "job_id": runner.enqueue(
+            "run_pipeline",
+            {"round_id": round_id, "use_llm": body.use_llm, "actor": body.actor},
+            round_id=round_id,
+            sync=body.sync,
+        )
+    }
+
+
+@api.post("/rounds/{round_id}/transform")
+def transform(
+    round_id: str,
+    mapping_version_id: str | None = None,
+    actor: str = "operator",
+    sync: bool = False,
+    session: Session = Depends(get_session),
+) -> dict[str, Any]:
+    rs.get_round(session, round_id)
+    session.commit()
+    return {
+        "job_id": runner.enqueue(
+            "transform_round",
+            {"round_id": round_id, "mapping_version_id": mapping_version_id, "actor": actor},
+            round_id=round_id,
+            sync=sync,
+        )
+    }
+
+
+# ============================================================================================
+# Mappings
+# ============================================================================================
+@api.get("/mappings/{mapping_id}")
+def get_mapping(mapping_id: str, session: Session = Depends(get_session)) -> dict[str, Any]:
+    return ser.mapping_version(ms.get_mapping(session, mapping_id))
+
+
+@api.post("/mappings/{mapping_id}/approve")
+def approve_mapping(
+    mapping_id: str, body: Decision, session: Session = Depends(get_session)
+) -> dict[str, Any]:
+    return ser.mapping_version(
+        ms.approve_mapping(session, mapping_id, body.actor, body.comment), document=False
+    )
+
+
+@api.post("/mappings/{mapping_id}/reject")
+def reject_mapping(
+    mapping_id: str, body: Decision, session: Session = Depends(get_session)
+) -> dict[str, Any]:
+    return ser.mapping_version(
+        ms.reject_mapping(session, mapping_id, body.actor, body.comment), document=False
+    )
+
+
+@api.post("/mappings/{mapping_id}/edit", status_code=201)
+def edit_mapping(
+    mapping_id: str,
+    body: MappingEditIn,
+    session: Session = Depends(get_session),
+    ctx: ServiceContext = Depends(ctx_dep),
+) -> dict[str, Any]:
+    return ser.mapping_version(ms.save_mapping_edit(ctx, session, mapping_id, body.document, body.actor))
+
+
+@api.post("/rounds/{round_id}/mapping-preview")
+def mapping_preview(
+    round_id: str,
+    body: MappingPreviewIn,
+    session: Session = Depends(get_session),
+    ctx: ServiceContext = Depends(ctx_dep),
+) -> dict[str, Any]:
+    return ms.preview_mapping(ctx, session, round_id, body.document, limit=body.limit)
+
+
+@api.post("/rounds/{round_id}/source-preview")
+def source_preview(
+    round_id: str,
+    body: SourcePreviewIn,
+    session: Session = Depends(get_session),
+    ctx: ServiceContext = Depends(ctx_dep),
+) -> dict[str, Any]:
+    return ms.source_preview(ctx, session, round_id, body.source, limit=body.limit)
+
+
+@api.get("/dsl")
+def dsl_reference() -> dict[str, Any]:
+    return {"ops": [o.value for o in Op], "json_schema": MappingDocument.json_schema_document()}
+
+
+# ============================================================================================
+# Review
+# ============================================================================================
+@api.get("/review")
+def review_queue(
+    status: str = "open", limit: int = Query(200, le=1000), session: Session = Depends(get_session)
+) -> list[dict[str, Any]]:
+    tasks = session.scalars(
+        select(ReviewTask)
+        .where(ReviewTask.status == status)
+        .order_by(ReviewTask.priority.desc(), ReviewTask.created_at.asc())
+        .limit(limit)
+    ).all()
+    customers = {c.id: c for c in session.scalars(select(Customer)).all()}
+    rounds = (
+        {
+            r.id: r
+            for r in session.scalars(
+                select(ImportRound).where(ImportRound.id.in_([t.round_id for t in tasks]))
+            ).all()
+        }
+        if tasks
+        else {}
+    )
+    out = []
+    for t in tasks:
+        c = customers.get(t.customer_id)
+        r = rounds.get(t.round_id)
+        out.append(
+            ser.review_task(
+                t,
+                customer={"id": c.id, "code": c.code, "name": c.name} if c else None,
+                round={"id": r.id, "label": r.label, "status": r.status} if r else None,
+            )
+        )
+    return out
+
+
+# ============================================================================================
+# Datasets
+# ============================================================================================
+@api.get("/datasets/{dataset_id}")
+def get_dataset(dataset_id: str, session: Session = Depends(get_session)) -> dict[str, Any]:
+    d = ds.get_dataset(session, dataset_id)
+    out = ser.dataset_version(d)
+    out["change_sets"] = [
+        ser.change_set(c)
+        for c in session.scalars(select(ChangeSet).where(ChangeSet.dataset_version_id == d.id))
+    ]
+    out["exports"] = [
+        ser.export_artifact(e)
+        for e in session.scalars(select(ExportArtifact).where(ExportArtifact.dataset_version_id == d.id))
+    ]
+    out["history"] = [
+        ser.dataset_version(v)
+        for v in session.scalars(
+            select(DatasetVersion)
+            .where(DatasetVersion.round_id == d.round_id)
+            .order_by(DatasetVersion.version.asc())
+        )
+    ]
+    return out
+
+
+@api.get("/datasets/{dataset_id}/rows")
+def dataset_rows(
+    dataset_id: str,
+    offset: int = 0,
+    limit: int = Query(100, le=1000),
+    q: str | None = None,
+    sort: str | None = None,
+    desc: bool = False,
+    session: Session = Depends(get_session),
+    ctx: ServiceContext = Depends(ctx_dep),
+) -> dict[str, Any]:
+    d = ds.get_dataset(session, dataset_id)
+    schema = ctx.registry.get_ref(ms.get_mapping(session, d.mapping_version_id).target_schema)
+    records = ds.read_records(Path(d.records_path))
+    if q:
+        ql = q.lower()
+        records = [
+            r for r in records if ql in str({k: v for k, v in r.items() if k != "source_meta"}).lower()
+        ]
+    if sort:
+        from forma.engine.transform import _get_pointer
+
+        records.sort(key=lambda r: (_get_pointer(r, sort) is None, str(_get_pointer(r, sort))), reverse=desc)
+    page = records[offset : offset + limit]
+    return {
+        "total": len(records),
+        "offset": offset,
+        "limit": limit,
+        "identity_keys": schema.identity_keys,
+        "rows": page,
+        "columns": [f.to_dict() for f in schema.fields()],
+        "findings": d.findings[:200],
+    }
+
+
+@api.post("/datasets/{dataset_id}/preview-changes")
+def preview_changes(
+    dataset_id: str,
+    body: ChangesIn,
+    session: Session = Depends(get_session),
+    ctx: ServiceContext = Depends(ctx_dep),
+) -> dict[str, Any]:
+    return ds.preview_changes(ctx, session, dataset_id, body.operations)
+
+
+@api.post("/datasets/{dataset_id}/changes", status_code=201)
+def apply_changes(
+    dataset_id: str,
+    body: ChangesIn,
+    session: Session = Depends(get_session),
+    ctx: ServiceContext = Depends(ctx_dep),
+) -> dict[str, Any]:
+    nv, cs = ds.apply_changes(
+        ctx, session, dataset_id, body.operations, kind=body.kind, actor=body.actor, note=body.note
+    )
+    return {"dataset": ser.dataset_version(nv), "change_set": ser.change_set(cs)}
+
+
+@api.post("/datasets/{dataset_id}/rollback", status_code=201)
+def rollback(
+    dataset_id: str,
+    body: Decision,
+    session: Session = Depends(get_session),
+    ctx: ServiceContext = Depends(ctx_dep),
+) -> dict[str, Any]:
+    return ser.dataset_version(ds.rollback(ctx, session, dataset_id, body.actor))
+
+
+@api.post("/datasets/{dataset_id}/approve")
+def approve_dataset(
+    dataset_id: str, body: Decision, session: Session = Depends(get_session)
+) -> dict[str, Any]:
+    return ser.dataset_version(ds.approve_dataset(session, dataset_id, body.actor))
+
+
+@api.get("/datasets/{dataset_id}/changes-report")
+def changes_report(
+    dataset_id: str, session: Session = Depends(get_session), ctx: ServiceContext = Depends(ctx_dep)
+) -> dict[str, Any]:
+    return ds.change_report(ctx, session, dataset_id)
+
+
+@api.get("/datasets/{dataset_id}/lineage/{identity}")
+def lineage(
+    dataset_id: str,
+    identity: str,
+    session: Session = Depends(get_session),
+    ctx: ServiceContext = Depends(ctx_dep),
+) -> dict[str, Any]:
+    return ds.lineage(ctx, session, dataset_id, identity)
+
+
+@api.post("/datasets/{dataset_id}/export", status_code=201)
+def export_dataset(
+    dataset_id: str,
+    fmt: str = "json",
+    actor: str = "operator",
+    session: Session = Depends(get_session),
+    ctx: ServiceContext = Depends(ctx_dep),
+) -> dict[str, Any]:
+    return ser.export_artifact(ds.export_dataset(ctx, session, dataset_id, fmt, actor))
+
+
+@api.get("/exports/{export_id}/download")
+def download_export(export_id: str, session: Session = Depends(get_session)) -> Response:
+    e = session.get(ExportArtifact, export_id)
+    if e is None:
+        raise NotFound("export not found")
+    media = {"json": "application/json", "jsonl": "application/x-ndjson", "csv": "text/csv"}[e.fmt]
+    return FileResponse(e.path, media_type=media, filename=Path(e.path).name)
+
+
+# ============================================================================================
+# AI: diagnosis & copilot
+# ============================================================================================
+@api.post("/mappings/{mapping_id}/diagnose")
+def diagnose(
+    mapping_id: str, session: Session = Depends(get_session), ctx: ServiceContext = Depends(ctx_dep)
+) -> dict[str, Any]:
+    m = ms.get_mapping(session, mapping_id)
+    schema = ctx.registry.get_ref(m.target_schema)
+    doc = MappingDocument.model_validate(m.document)
+    findings = ((m.policy or {}).get("simulation") or {}).get("findings", {})
+    r = session.get(ImportRound, m.round_id) if m.round_id else None
+    sim, problems = ms.simulate(ctx, doc, schema, r.files if r else [], limit=500)
+    flist = (
+        [f.to_dict() for f in sim.findings]
+        if sim
+        else [{"kind": "binding", "severity": "error", "message": p} for p in problems]
+    )
+    if ctx.llm.is_mock:
+        return {
+            "ai": False,
+            "findings": flist,
+            "summary_th": "ยังไม่ได้ตั้งค่า LLM (FORMA_LLM_PROVIDER) — แสดงผลตรวจสอบจาก engine เท่านั้น",
+            "root_causes": _rule_based_causes(flist),
+        }
+    res, patched = diagnosis_agent(ctx.llm, doc, schema, flist, sim.records[:5] if sim else [])
+    ms._record_llm(session, m.round_id, res)
+    out = dict(res.data)
+    out["ai"] = True
+    out["findings"] = flist
+    out["patched_mapping"] = patched.model_dump(mode="json", exclude_none=True) if patched else None
+    _ = findings
+    return out
+
+
+def _rule_based_causes(findings: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    out = []
+    for f in findings:
+        msg = f.get("message", "")
+        if f["kind"] == "join":
+            out.append(
+                {
+                    "finding": msg,
+                    "cause": "Link keys differ between tables (format, leading zeros, or missing rows).",
+                    "fix": "Check normalize_keys (strip_leading_zeros) or the link column.",
+                    "fix_kind": "mapping",
+                    "severity": "high",
+                }
+            )
+        elif f["kind"] == "dedupe":
+            out.append(
+                {
+                    "finding": msg,
+                    "cause": "The identity key is not unique in the source (several rows per SKU).",
+                    "fix": "Add warehouse/price list to identity, or dedupe with keep=first.",
+                    "fix_kind": "mapping",
+                    "severity": "high",
+                }
+            )
+        elif f["kind"] == "validation":
+            out.append(
+                {
+                    "finding": msg,
+                    "cause": "A value does not satisfy the target schema type/enum.",
+                    "fix": "Add map_values / parse_* op or fix the source cell.",
+                    "fix_kind": "mapping",
+                    "severity": "medium",
+                }
+            )
+        elif f["kind"] == "compile":
+            out.append(
+                {
+                    "finding": msg,
+                    "cause": "A referenced source column does not exist (renamed or moved header).",
+                    "fix": "Re-point the column in Mapping Studio.",
+                    "fix_kind": "mapping",
+                    "severity": "high",
+                }
+            )
+    return out
+
+
+@api.post("/datasets/{dataset_id}/copilot")
+def copilot(
+    dataset_id: str,
+    body: CopilotIn,
+    session: Session = Depends(get_session),
+    ctx: ServiceContext = Depends(ctx_dep),
+) -> dict[str, Any]:
+    """Natural-language edit → planned safe operations + impact preview (nothing is applied)."""
+    d = ds.get_dataset(session, dataset_id)
+    schema = ctx.registry.get_ref(ms.get_mapping(session, d.mapping_version_id).target_schema)
+    records = ds.read_records(Path(d.records_path))
+    if ctx.llm.is_mock:
+        plan = _rule_based_copilot(body.instruction)
+        if plan is None:
+            return {
+                "ai": False,
+                "operations": [],
+                "needs_clarification": "ยังไม่ได้ตั้งค่า LLM — รองรับคำสั่งพื้นฐาน เช่น 'ลดราคาหมวด X 5%' หรือ 'ตั้งสถานะ inactive ให้หมวด Y'",
+            }
+        ops = plan
+    else:
+        res = copilot_agent(ctx.llm, body.instruction, schema, records[:5])
+        ms._record_llm(session, d.round_id, res)
+        if res.data.get("needs_clarification"):
+            return {"ai": True, "operations": [], "needs_clarification": res.data["needs_clarification"]}
+        ops = _copilot_to_ops(res.data.get("operations", []))
+    _, impact = ds.apply_operations(records, ops, schema)
+    return {"ai": not ctx.llm.is_mock, "operations": ops, "impact": impact, "needs_clarification": None}
+
+
+def _copilot_to_ops(ops: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    out = []
+    for o in ops:
+        k = o.get("kind")
+        if k == "scale_field":
+            out.append(
+                {
+                    "kind": "scale_field",
+                    "target": o["target"],
+                    "factor": o.get("factor", 1.0),
+                    "where": o.get("where"),
+                    "explanation": o.get("explanation_th"),
+                }
+            )
+        elif k in ("set_field", "set_status"):
+            out.append(
+                {
+                    "kind": "set_field",
+                    "target": o["target"] if k == "set_field" else "/status",
+                    "value": o.get("value"),
+                    "where": o.get("where"),
+                    "explanation": o.get("explanation_th"),
+                }
+            )
+        elif k == "delete_rows":
+            out.append(
+                {"kind": "delete_rows", "where": o.get("where"), "explanation": o.get("explanation_th")}
+            )
+    return out
+
+
+def _rule_based_copilot(text: str) -> list[dict[str, Any]] | None:
+    import re
+
+    t = text.strip()
+    m = re.search(
+        r"(?:ลดราคา|discount|reduce price|ลด)\s*(?:หมวด|category)?\s*(\S+)\s*(\d+(?:\.\d+)?)\s*%", t, re.I
+    )
+    if m:
+        cat, pct = m.group(1), float(m.group(2))
+        where = {
+            "op": "contains",
+            "args": [{"op": "col", "name": "/category"}],
+            "params": {"pattern": cat, "literal": True},
+        }
+        return [
+            {
+                "kind": "scale_field",
+                "target": "/prices/*/amount",
+                "factor": round(1 - pct / 100, 4),
+                "where": where,
+                "explanation": f"ลดราคาสินค้าหมวด {cat} ลง {pct}%",
+            }
+        ]
+    m = re.search(
+        r"(?:ตั้งสถานะ|set status)\s*(active|inactive|discontinued)\s*(?:ให้|for|to)?\s*(?:หมวด|category)\s*(\S+)",
+        t,
+        re.I,
+    )
+    if m:
+        where = {
+            "op": "contains",
+            "args": [{"op": "col", "name": "/category"}],
+            "params": {"pattern": m.group(2), "literal": True},
+        }
+        return [
+            {
+                "kind": "set_field",
+                "target": "/status",
+                "value": m.group(1).lower(),
+                "where": where,
+                "explanation": f"ตั้งสถานะ {m.group(1)} ให้หมวด {m.group(2)}",
+            }
+        ]
+    return None
+
+
+# ============================================================================================
+# Schemas, policy, dashboard, jobs
+# ============================================================================================
+@api.get("/schemas")
+def list_schemas(ctx: ServiceContext = Depends(ctx_dep)) -> list[dict[str, Any]]:
+    return [s.to_summary() for s in ctx.registry.list()]
+
+
+@api.get("/schemas/{ref}")
+def get_schema(ref: str, ctx: ServiceContext = Depends(ctx_dep)) -> dict[str, Any]:
+    s = ctx.registry.get_ref(ref)
+    return {
+        **s.to_summary(),
+        "fields": [f.to_dict() for f in s.fields(include_system=True)],
+        "document": s.document,
+    }
+
+
+@api.post("/schemas", status_code=201)
+def register_schema(body: SchemaIn, ctx: ServiceContext = Depends(ctx_dep)) -> dict[str, Any]:
+    s = ctx.registry.register(body.document)
+    return s.to_summary()
+
+
+@api.get("/schemas/{a}/diff/{b}")
+def diff_schema(a: str, b: str, ctx: ServiceContext = Depends(ctx_dep)) -> dict[str, Any]:
+    return ctx.registry.diff(ctx.registry.get_ref(a), ctx.registry.get_ref(b))
+
+
+@api.get("/policy")
+def get_policy(ctx: ServiceContext = Depends(ctx_dep)) -> dict[str, Any]:
+    return ctx.policy.policy
+
+
+@api.get("/dashboard")
+def dashboard(
+    session: Session = Depends(get_session), ctx: ServiceContext = Depends(ctx_dep)
+) -> dict[str, Any]:
+    by_status = dict(
+        session.execute(select(ImportRound.status, func.count()).group_by(ImportRound.status)).all()
+    )
+    open_reviews = (
+        session.scalar(select(func.count()).select_from(ReviewTask).where(ReviewTask.status == "open")) or 0
+    )
+    customers = session.scalar(select(func.count()).select_from(Customer)) or 0
+    approved_mappings = (
+        session.scalar(
+            select(func.count()).select_from(MappingVersion).where(MappingVersion.status == "approved")
+        )
+        or 0
+    )
+    auto = (
+        session.scalar(
+            select(func.count()).select_from(MappingVersion).where(MappingVersion.approved_by == "policy")
+        )
+        or 0
+    )
+    total_mv = session.scalar(select(func.count()).select_from(MappingVersion)) or 0
+    reused = (
+        session.scalar(
+            select(func.count())
+            .select_from(MappingVersion)
+            .where(MappingVersion.created_by == "system", MappingVersion.confidence == 1.0)
+        )
+        or 0
+    )
+    rows = (
+        session.scalar(
+            select(func.sum(DatasetVersion.row_count)).where(
+                DatasetVersion.status.in_(["approved", "published"])
+            )
+        )
+        or 0
+    )
+    llm = session.execute(
+        select(
+            func.count(), func.sum(LLMCall.cost_usd), func.sum(LLMCall.input_tokens + LLMCall.output_tokens)
+        ).select_from(LLMCall)
+    ).one()
+    recent = session.scalars(select(ImportRound).order_by(ImportRound.updated_at.desc()).limit(8)).all()
+    cmap = {c.id: c for c in session.scalars(select(Customer)).all()}
+    failed_jobs = session.scalar(select(func.count()).select_from(Job).where(Job.status == "failed")) or 0
+    return {
+        "customers": customers,
+        "rounds_by_status": by_status,
+        "open_reviews": open_reviews,
+        "approved_mappings": approved_mappings,
+        "auto_approved_mappings": auto,
+        "mapping_versions": total_mv,
+        "reused_mappings": reused,
+        "published_rows": rows,
+        "failed_jobs": failed_jobs,
+        "llm": {
+            "calls": llm[0] or 0,
+            "cost_usd": round(llm[1] or 0.0, 4),
+            "tokens": int(llm[2] or 0),
+            "provider": ctx.llm.provider.name,
+            "model": ctx.llm.model,
+        },
+        "recent_rounds": [
+            ser.import_round(r, files=False, customer_obj=cmap.get(r.customer_id)) for r in recent
+        ],
+        "automation_rate": round(auto / total_mv, 3) if total_mv else None,
+    }
+
+
+@api.get("/jobs/{job_id}")
+def get_job(job_id: str) -> dict[str, Any]:
+    try:
+        return runner.job_status(job_id)
+    except KeyError as e:
+        raise NotFound("job not found") from e
+
+
+@api.get("/audit")
+def audit_log(
+    limit: int = Query(100, le=1000), entity_id: str | None = None, session: Session = Depends(get_session)
+) -> list[dict[str, Any]]:
+    from forma.db.models import AuditLog
+
+    q = select(AuditLog).order_by(AuditLog.created_at.desc()).limit(limit)
+    if entity_id:
+        q = q.where(AuditLog.entity_id == entity_id)
+    return [
+        {
+            "id": a.id,
+            "actor": a.actor,
+            "action": a.action,
+            "entity": a.entity,
+            "entity_id": a.entity_id,
+            "details": a.details,
+            "at": a.created_at.isoformat(),
+        }
+        for a in session.scalars(q)
+    ]

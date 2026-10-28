@@ -1,0 +1,192 @@
+"""Policy engine — turns proposal metadata, engine findings and drift into an approval decision."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any
+
+import yaml
+
+from forma.mapping_dsl.models import MappingDocument
+from forma.schema_registry import RISK_ORDER, TargetSchema
+
+
+@dataclass
+class PolicyDecision:
+    decision: str  # auto_approve | review | block
+    priority: int
+    reasons: list[str] = field(default_factory=list)
+    risk_score: float = 0.0
+    checks: dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "decision": self.decision,
+            "priority": self.priority,
+            "reasons": self.reasons,
+            "risk_score": round(self.risk_score, 3),
+            "checks": self.checks,
+        }
+
+
+DEFAULT_POLICY: dict[str, Any] = {
+    "auto_approve": {
+        "min_mapping_confidence": 0.95,
+        "min_field_confidence_critical": 0.9,
+        "min_field_confidence_high": 0.8,
+        "max_warning_findings": 5,
+        "allow_errors": False,
+        "allowed_drift": ["identical", "header_moved", "columns_added"],
+        "require_previous_approval_for_auto": True,
+        "max_row_change_ratio": 0.3,
+    },
+    "review": {
+        "priority_weights": {
+            "critical_field_low_confidence": 50,
+            "errors": 40,
+            "drift_columns_removed": 30,
+            "drift_columns_renamed": 20,
+            "unrelated_file": 100,
+            "new_customer": 15,
+            "warnings": 2,
+        }
+    },
+    "block": {"on_unrelated_file": True, "on_missing_identity": True, "on_zero_rows": True},
+    "risk_overrides": {},
+}
+
+
+class PolicyEngine:
+    def __init__(self, policy: dict[str, Any] | None = None) -> None:
+        self.policy = _merge(DEFAULT_POLICY, policy or {})
+
+    @classmethod
+    def load(cls, directory: Path) -> PolicyEngine:
+        p = directory / "approval.yaml"
+        if p.exists():
+            return cls(yaml.safe_load(p.read_text(encoding="utf-8")) or {})
+        return cls()
+
+    def risk_of(self, schema: TargetSchema, pointer: str) -> str:
+        try:
+            sem = schema.field(pointer).semantic
+        except Exception:
+            sem = None
+        if sem and sem in self.policy["risk_overrides"]:
+            return str(self.policy["risk_overrides"][sem])
+        return schema.risk_of(pointer)
+
+    def evaluate(
+        self,
+        mapping: MappingDocument,
+        schema: TargetSchema,
+        *,
+        findings: list[dict[str, Any]],
+        rows_out: int,
+        drift: str | None = None,
+        has_previous_approval: bool = False,
+        row_change_ratio: float | None = None,
+        reused_approved: bool = False,
+        other_customer: dict[str, Any] | None = None,
+    ) -> PolicyDecision:
+        aa = self.policy["auto_approve"]
+        w = self.policy["review"]["priority_weights"]
+        reasons: list[str] = []
+        priority = 0
+        checks: dict[str, Any] = {}
+        risk = 0.0
+
+        errors = [f for f in findings if f.get("severity") == "error"]
+        warnings = [f for f in findings if f.get("severity") == "warning"]
+        checks["errors"] = len(errors)
+        checks["warnings"] = len(warnings)
+        checks["rows_out"] = rows_out
+        checks["drift"] = drift
+        checks["reused_approved"] = reused_approved
+
+        # ---- hard blocks
+        blk = self.policy["block"]
+        if blk["on_unrelated_file"] and drift == "unrelated_file":
+            return PolicyDecision(
+                "block",
+                w["unrelated_file"],
+                ["file structure does not match this customer's approved format (possible wrong file)"],
+                1.0,
+                checks,
+            )
+        if blk["on_zero_rows"] and rows_out == 0:
+            return PolicyDecision("block", w["errors"], ["transformation produced zero records"], 1.0, checks)
+        if blk["on_missing_identity"] and any(
+            "identity" in str(f.get("message", "")) and f.get("severity") == "error" for f in findings
+        ):
+            reasons.append("identity keys missing on some rows")
+            priority += w["errors"]
+            risk += 0.4
+
+        # ---- confidence per field (critical/high)
+        low_critical: list[str] = []
+        low_high: list[str] = []
+        all_fields = list(mapping.fields) + [f for c in mapping.collections for f in c.fields]
+        for fm in all_fields:
+            r = self.risk_of(schema, fm.target)
+            conf = fm.confidence if fm.confidence is not None else (mapping.meta.confidence or 0.5)
+            if reused_approved:
+                conf = 1.0  # a human already approved these exact field mappings
+            if r == "critical" and conf < aa["min_field_confidence_critical"]:
+                low_critical.append(f"{fm.target} ({conf:.2f})")
+            elif r == "high" and conf < aa["min_field_confidence_high"]:
+                low_high.append(f"{fm.target} ({conf:.2f})")
+            risk += (1 - conf) * (RISK_ORDER.get(r, 1) + 1) / 4
+        checks["low_confidence_critical"] = low_critical
+        checks["low_confidence_high"] = low_high
+        if low_critical:
+            reasons.append("low confidence on critical fields: " + ", ".join(low_critical[:6]))
+            priority += w["critical_field_low_confidence"]
+        if low_high:
+            reasons.append("low confidence on high-risk fields: " + ", ".join(low_high[:6]))
+            priority += w["critical_field_low_confidence"] // 3
+
+        mconf = mapping.meta.confidence if mapping.meta.confidence is not None else 0.0
+        checks["mapping_confidence"] = mconf
+        if mconf < aa["min_mapping_confidence"]:
+            reasons.append(f"mapping confidence {mconf:.2f} < {aa['min_mapping_confidence']}")
+            priority += 10
+
+        if errors and not aa["allow_errors"]:
+            reasons.append(f"{len(errors)} engine/validation errors")
+            priority += w["errors"]
+            risk += 0.3
+        if len(warnings) > aa["max_warning_findings"]:
+            reasons.append(f"{len(warnings)} warnings > {aa['max_warning_findings']}")
+            priority += w["warnings"] * len(warnings)
+
+        if drift is not None and drift not in aa["allowed_drift"]:
+            reasons.append(f"schema drift: {drift}")
+            priority += w.get(f"drift_{drift}", 20)
+            risk += 0.2
+        if other_customer:
+            code = other_customer.get("customer_code") or other_customer.get("customer_id")
+            reasons.append(
+                f"structure is identical to customer {code}'s approved format — confirm this file belongs here"
+            )
+            priority += w["unrelated_file"] // 2
+            risk += 0.3
+        if aa["require_previous_approval_for_auto"] and not has_previous_approval:
+            reasons.append("first time this customer/format is seen")
+            priority += w["new_customer"]
+        if row_change_ratio is not None and row_change_ratio > aa["max_row_change_ratio"]:
+            reasons.append(f"row count changed {row_change_ratio:.0%} vs previous approved dataset")
+            priority += 15
+            risk += 0.15
+
+        if not reasons:
+            return PolicyDecision("auto_approve", 0, ["all policy checks passed"], min(risk, 1.0), checks)
+        return PolicyDecision("review", priority, reasons, min(risk, 1.0), checks)
+
+
+def _merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
+    out = dict(base)
+    for k, v in override.items():
+        out[k] = _merge(out[k], v) if isinstance(v, dict) and isinstance(out.get(k), dict) else v
+    return out
