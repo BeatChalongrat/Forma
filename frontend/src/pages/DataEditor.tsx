@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { Download, Search, Undo2, Sparkles, History, GitCompare, AlertCircle, CheckCircle2, Route, Trash2, ShieldAlert, X } from 'lucide-react'
 import { api, ApiError, type Answer, type AnomalyReport, type FieldSpec, type Operation, type Impact, type RowsPage, type Trace } from '../lib/api'
 import { cn, cellText, fmtInt, fmtNum, getPointer, timeAgo, describeExpr } from '../lib/utils'
-import { Badge, Drawer, Modal, Spinner, StatusBadge, Tabs, FindingRow } from '../components/ui'
+import { Badge, Drawer, HelpStrip, Modal, Spinner, StatusBadge, Tabs, FindingRow } from '../components/ui'
 import { useToast } from '../lib/toast'
 
 const ROW_H = 32
@@ -32,6 +32,9 @@ function parseValue(f: FieldSpec, text: string): { ok: true; value: unknown } | 
   return { ok: true, value }
 }
 
+const EDITOR_TABS = ['changes', 'findings', 'versions', 'diff', 'copilot'] as const
+type EditorTab = (typeof EDITOR_TABS)[number]
+
 export function DataEditor() {
   const { datasetId = '' } = useParams()
   const qc = useQueryClient()
@@ -52,7 +55,9 @@ export function DataEditor() {
   const [editing, setEditing] = useState<{ r: number; c: number; value: string } | null>(null)
   const [drawer, setDrawer] = useState<{ kind: 'record' | 'lineage'; identity: string; pointer?: string } | null>(null)
   const [saveOpen, setSaveOpen] = useState(false)
-  const [rightTab, setRightTab] = useState<'changes' | 'findings' | 'versions' | 'diff' | 'copilot'>('changes')
+  const [params] = useSearchParams() // ?tab= opens a panel, ?tool=trace explains tracing (links from the round page, the guide, Ctrl+K)
+  const [rightTab, setRightTab] = useState<EditorTab>(() => (EDITOR_TABS as readonly string[]).includes(params.get('tab') ?? '') ? (params.get('tab') as EditorTab) : 'changes')
+  const [traceTip, setTraceTip] = useState(() => params.get('tool') === 'trace')
   const [copilot, setCopilot] = useState('')
   const [answer, setAnswer] = useState<Answer | null>(null)
   const [ack, setAck] = useState<{ high: number; headline: string } | null>(null)
@@ -237,7 +242,7 @@ export function DataEditor() {
     <div className="h-screen flex flex-col">
       <div className="h-14 px-5 border-b border-line bg-surface flex items-center gap-3 shrink-0">
         <Link to={`/rounds/${ds.round_id}`} className="text-muted hover:text-ink text-[12.5px]">← Round</Link>
-        <span className="font-semibold">Data Editor</span>
+        <span className="heading">Data Editor</span>
         <span className="tnum text-muted">v{ds.version}</span>
         <StatusBadge status={ds.status} />
         <span className="tnum text-muted text-[12.5px]">{fmtInt(ds.row_count)} rows</span>
@@ -259,6 +264,19 @@ export function DataEditor() {
         <Sparkles size={14} className="text-signal" />
         <input className="input flex-1 bg-surface" placeholder='Tell the copilot what to change — "ลดราคาหมวด Electronics 5% เฉพาะที่ stock มากกว่า 100 ไม่รวมสินค้าในโปรโมชั่น" — or ask "ทำไม SKU บางรายการ join ไม่สำเร็จ?". Nothing is applied until you review and save.' value={copilot} onChange={(e) => setCopilot(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && submitCopilot()} />
         <button className="btn btn-sm btn-primary" disabled={!copilot || ask.isPending || question.isPending} onClick={submitCopilot}>{ask.isPending || question.isPending ? <Spinner className="border-t-white" /> : isQuestion(copilot) ? 'Ask' : 'Plan'}</button>
+      </div>
+
+      <div className="px-5 py-2 border-b border-line bg-surface shrink-0 flex flex-col gap-2">
+        {traceTip && (
+          <div className="flex items-center gap-3 rounded-[10px] border border-brand-blue/40 bg-signal-soft px-3.5 py-2 text-[12.5px]">
+            <Route size={15} className="text-signal shrink-0" />
+            <span className="flex-1"><b className="text-navy">Trace a value:</b> click any cell, then press <span className="kbd">T</span> or <b>Trace this value</b> (bottom bar) to see the file, sheet, row and column it came from — and why it changed. <span className="text-muted">— คลิกเซลล์ แล้วกด T เพื่อดูที่มา</span></span>
+            <button className="btn btn-ghost btn-sm" onClick={() => setTraceTip(false)} aria-label="Hide"><X size={13} /></button>
+          </div>
+        )}
+        <HelpStrip id="editor">
+          Edit like Excel: double-click or <span className="kbd">↵</span> to edit, paste a block from Excel, tick rows to change many at once. Every change waits in <b>Pending</b> until you review its impact and save it as a new version. Use <b>Changes &amp; anomalies</b> before approving. <span className="text-muted">— แก้เหมือน Excel ทุกการแก้รออยู่ใน Pending จนกว่าจะกดบันทึก ดู Changes &amp; anomalies ก่อนกด Approve data</span>
+        </HelpStrip>
       </div>
 
       <div className="flex-1 min-h-0 grid grid-cols-[1fr_360px]">
@@ -318,14 +336,14 @@ export function DataEditor() {
             <span className="tnum">{page ? `${fmtInt(offset + 1)}–${fmtInt(Math.min(offset + PAGE, page.total))} of ${fmtInt(page.total)}` : ''}</span>
             <button className="btn btn-ghost btn-sm" disabled={offset === 0} onClick={() => setOffset(Math.max(0, offset - PAGE))}>‹ prev</button>
             <button className="btn btn-ghost btn-sm" disabled={!page || offset + PAGE >= page.total} onClick={() => setOffset(offset + PAGE)}>next ›</button>
-            {sel && <button className="btn btn-ghost btn-sm" onClick={traceSelected}><Route size={12} /> Trace this value</button>}
+            <button className={cn('btn btn-sm', traceTip ? 'btn-outline' : 'btn-ghost')} disabled={!sel} onClick={traceSelected} title={sel ? 'ค่านี้มาจากเซลล์ไหนในไฟล์' : 'คลิกที่เซลล์ก่อน'}><Route size={12} /> Trace this value</button>
             <span className="ml-auto flex items-center gap-3"><span><span className="kbd">↵</span> edit</span><span><span className="kbd">⇧</span>+click range</span><span><span className="kbd">⌘C</span>/<span className="kbd">⌘V</span> copy · paste</span><span><span className="kbd">Del</span> clear</span><span><span className="kbd">T</span> trace</span><span><span className="kbd">⌘Z</span> undo</span></span>
           </div>
         </div>
 
         {/* right rail */}
         <aside className="border-l border-line bg-surface flex flex-col min-h-0">
-          <Tabs value={rightTab} onChange={setRightTab} items={[{ id: 'changes', label: 'Pending', count: pending.length }, { id: 'diff', label: <span className="flex items-center gap-1">Changes{ack && <ShieldAlert size={12} className="text-bad" />}</span> }, { id: 'copilot', label: 'Copilot' }, { id: 'findings', label: 'Findings', count: ds.findings.length }, { id: 'versions', label: 'Versions', count: ds.history?.length }]} />
+          <Tabs value={rightTab} onChange={setRightTab} items={[{ id: 'changes', label: 'Pending', count: pending.length, hint: 'การแก้ที่ยังไม่บันทึก' }, { id: 'diff', hint: 'เทียบกับรอบก่อน และของที่ดูผิดปกติ', label: <span className="flex items-center gap-1">Changes &amp; anomalies{ack && <ShieldAlert size={12} className="text-bad" />}</span> }, { id: 'copilot', label: 'Copilot', hint: 'คำตอบจาก Copilot' }, { id: 'findings', label: 'Problems', count: ds.findings.length, hint: 'record ที่ไม่ตรง format และปัญหาอื่น' }, { id: 'versions', label: 'Versions', count: ds.history?.length, hint: 'ทุกเวอร์ชัน ย้อนกลับได้' }]} />
           <div className="flex-1 overflow-auto p-3 text-[12.5px]">
             {rightTab === 'changes' && (pending.length ? (
               <ul className="flex flex-col gap-1">{pending.map((p, i) => <li key={i} className="flex items-start gap-2 py-1 border-b border-line/70"><Badge tone={p.kind.startsWith('delete') ? 'bad' : 'signal'} className="h-5 px-1.5 text-[11px] shrink-0">{p.kind.replace('_', ' ')}</Badge><span className="flex-1 break-words">{p.label}</span><button className="text-muted hover:text-bad" onClick={() => setPending((xs) => xs.filter((_, j) => j !== i))}>×</button></li>)}</ul>

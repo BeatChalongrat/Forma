@@ -4,7 +4,7 @@
 
 ```
                         ┌────────────────────────── Web app (React) ───────────────────────────┐
-                        │ Overview · Imports · Round · Mapping Studio · Review · Data Editor    │
+                        │ Home · Imports · Round (5 steps) · Studio · Review · Editor · Guide   │
                         └───────────────────────────────┬──────────────────────────────────────┘
                                                         │ REST (/api)
                         ┌───────────────────────────────┴──────────────────────────────────────┐

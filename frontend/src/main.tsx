@@ -2,6 +2,9 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { createBrowserRouter, RouterProvider } from 'react-router-dom'
+import '@fontsource-variable/montserrat'
+import '@fontsource-variable/noto-sans-thai'
+import '@fontsource-variable/jetbrains-mono'
 import './index.css'
 import { Shell } from './components/Shell'
 import { ToastProvider } from './lib/toast'
@@ -14,6 +17,7 @@ import { Customers, CustomerPage } from './pages/Customers'
 import { DataEditor } from './pages/DataEditor'
 import { SettingsPage } from './pages/Settings'
 import { OpsPage } from './pages/Ops'
+import { GuidePage } from './pages/Guide'
 import { AuthCallback } from './pages/AuthCallback'
 import { ensureAuthenticated } from './lib/auth'
 
@@ -35,6 +39,7 @@ const router = createBrowserRouter([
       { path: 'datasets/:datasetId', element: <DataEditor /> },
       { path: 'settings', element: <SettingsPage /> },
       { path: 'ops', element: <OpsPage /> },
+      { path: 'guide', element: <GuidePage /> },
     ],
   },
   { path: '/auth/callback', element: <AuthCallback /> },

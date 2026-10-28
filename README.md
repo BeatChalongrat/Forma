@@ -58,9 +58,12 @@ make api      # terminal 1
 make web      # terminal 2
 ```
 
-Then open http://localhost:5173 — the Overview shows the review queue, the Imports list shows the demo
-rounds (including the returning-customer sequences C900–C902 that exercise memory → drift → wrong file),
-and **New import** accepts your own files.
+Then open http://localhost:5173 — Home lists what needs a person (grouped by the next step), the Imports list
+shows the demo rounds (including the returning-customer sequences C900–C902 that exercise memory → drift → wrong file),
+and **New import** accepts your own files. Every round page shows its five steps
+(files → mapping → create data → check & approve → export) with the next action; **Feature guide** and
+**Ctrl K** find any feature by name, in English or Thai. The UI follows the aCommerce brand (Montserrat,
+navy/blue/lime), bundled so it works offline.
 
 ### Enable the AI agents (optional)
 
@@ -76,7 +79,7 @@ FORMA_LLM_API_KEY=sk-...
 # FORMA_LLM_BASE_URL=https://your-gateway/v1   # any /chat/completions-compatible gateway
 ```
 
-Token usage and cost per round are recorded in the `llm_calls` ledger and shown on the Overview.
+Token usage and cost per round are recorded in the `llm_calls` ledger and shown on Home.
 
 ### Use the real downstream format
 
