@@ -1,0 +1,881 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://forma.local/schemas/product/v1",
+  "title": "Product",
+  "description": "FORMA standard product record. DRAFT v1 — replace with the real downstream contract via the Schema Registry (no code change needed).",
+  "type": "object",
+  "x-forma": {
+    "schema_id": "product",
+    "version": 1,
+    "entity": "product",
+    "status": "draft",
+    "identity_keys": [
+      "/sku"
+    ],
+    "collections": {
+      "/prices": {
+        "identity_keys": [
+          "/price_list",
+          "/effective_from"
+        ]
+      },
+      "/promotions": {
+        "identity_keys": [
+          "/promo_code"
+        ]
+      },
+      "/inventory": {
+        "identity_keys": [
+          "/warehouse_code"
+        ]
+      }
+    },
+    "output_variants": {
+      "json": {
+        "shape": "nested"
+      },
+      "jsonl": {
+        "shape": "nested"
+      },
+      "csv": {
+        "shape": "flat",
+        "explode": "/prices",
+        "array_join": "|"
+      }
+    }
+  },
+  "required": [
+    "sku",
+    "product_name"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "sku": {
+      "type": "string",
+      "minLength": 1,
+      "x-forma": {
+        "semantic": "sku",
+        "risk": "critical",
+        "synonyms_en": [
+          "sku",
+          "item code",
+          "item no",
+          "product code",
+          "material",
+          "matnr",
+          "article",
+          "part no",
+          "code",
+          "id",
+          "internal reference",
+          "item number",
+          "material number",
+          "default code"
+        ],
+        "synonyms_th": [
+          "รหัสสินค้า",
+          "รหัส",
+          "เลขที่สินค้า",
+          "โค้ด",
+          "รหัสวัสดุ"
+        ],
+        "description_th": "รหัสสินค้าหลักของลูกค้า",
+        "examples": [
+          "A001",
+          "SKU-10021",
+          "000123"
+        ]
+      }
+    },
+    "product_name": {
+      "type": "string",
+      "x-forma": {
+        "semantic": "product_name",
+        "risk": "high",
+        "synonyms_en": [
+          "product name",
+          "name",
+          "description",
+          "item name",
+          "maktx",
+          "title",
+          "material description",
+          "item description"
+        ],
+        "synonyms_th": [
+          "ชื่อสินค้า",
+          "รายการ",
+          "ชื่อ",
+          "รายละเอียดสินค้า"
+        ],
+        "description_th": "ชื่อสินค้าที่แสดงให้ลูกค้าเห็น"
+      }
+    },
+    "description": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "x-forma": {
+        "semantic": "description",
+        "risk": "low",
+        "synonyms_en": [
+          "long description",
+          "details",
+          "remarks",
+          "spec"
+        ],
+        "synonyms_th": [
+          "รายละเอียด",
+          "คำอธิบาย",
+          "หมายเหตุ",
+          "สเปค"
+        ]
+      }
+    },
+    "barcode": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "x-forma": {
+        "semantic": "barcode",
+        "risk": "medium",
+        "synonyms_en": [
+          "barcode",
+          "ean",
+          "upc",
+          "gtin",
+          "ean13",
+          "ean11"
+        ],
+        "synonyms_th": [
+          "บาร์โค้ด",
+          "รหัสแท่ง"
+        ]
+      }
+    },
+    "brand": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "x-forma": {
+        "semantic": "brand",
+        "risk": "low",
+        "synonyms_en": [
+          "brand",
+          "manufacturer",
+          "vendor"
+        ],
+        "synonyms_th": [
+          "ยี่ห้อ",
+          "แบรนด์",
+          "ผู้ผลิต"
+        ]
+      }
+    },
+    "category": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "x-forma": {
+        "semantic": "category_path",
+        "risk": "medium",
+        "synonyms_en": [
+          "category",
+          "group",
+          "product group",
+          "class",
+          "department",
+          "sub category",
+          "matkl",
+          "material group",
+          "item category code",
+          "category code"
+        ],
+        "synonyms_th": [
+          "หมวด",
+          "หมวดหมู่",
+          "กลุ่มสินค้า",
+          "ประเภท",
+          "แผนก",
+          "หมวดย่อย"
+        ],
+        "description_th": "ลำดับหมวดหมู่จากกว้างไปแคบ"
+      }
+    },
+    "unit": {
+      "type": "object",
+      "additionalProperties": false,
+      "x-forma": {
+        "semantic": "unit",
+        "risk": "high"
+      },
+      "properties": {
+        "sell_unit": {
+          "type": "string",
+          "x-forma": {
+            "semantic": "unit.sell",
+            "risk": "high",
+            "synonyms_en": [
+              "unit",
+              "uom",
+              "sales unit",
+              "base unit",
+              "meins",
+              "base unit of measure",
+              "unit of measure"
+            ],
+            "synonyms_th": [
+              "หน่วย",
+              "หน่วยนับ",
+              "หน่วยขาย"
+            ],
+            "enum_hint": [
+              "PCS",
+              "PACK",
+              "BOX",
+              "CARTON",
+              "DOZEN",
+              "KG",
+              "G",
+              "L",
+              "ML",
+              "SET"
+            ]
+          }
+        },
+        "pack_size": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1,
+          "x-forma": {
+            "semantic": "unit.pack_size",
+            "risk": "high",
+            "synonyms_en": [
+              "pack size",
+              "qty per pack",
+              "units per case",
+              "pcs/ctn"
+            ],
+            "synonyms_th": [
+              "จำนวนต่อแพ็ค",
+              "ชิ้นต่อลัง",
+              "บรรจุ"
+            ]
+          }
+        }
+      }
+    },
+    "currency": {
+      "type": "string",
+      "default": "THB",
+      "pattern": "^[A-Z]{3}$",
+      "x-forma": {
+        "semantic": "currency",
+        "risk": "critical",
+        "synonyms_en": [
+          "currency",
+          "curr",
+          "ccy"
+        ],
+        "synonyms_th": [
+          "สกุลเงิน",
+          "เงินตรา"
+        ]
+      }
+    },
+    "prices": {
+      "type": "array",
+      "x-forma": {
+        "semantic": "prices",
+        "risk": "critical"
+      },
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "price_list",
+          "amount",
+          "vat_included"
+        ],
+        "properties": {
+          "price_list": {
+            "type": "string",
+            "default": "standard",
+            "x-forma": {
+              "semantic": "price.list_name",
+              "risk": "high",
+              "synonyms_en": [
+                "price list",
+                "price group",
+                "channel",
+                "tier",
+                "kschl",
+                "condition type",
+                "sales code",
+                "pricelist",
+                "customer price group"
+              ],
+              "synonyms_th": [
+                "ราคาขายกลุ่ม",
+                "ประเภทราคา",
+                "ช่องทาง"
+              ]
+            }
+          },
+          "amount": {
+            "type": "number",
+            "minimum": 0,
+            "x-forma": {
+              "semantic": "price.amount",
+              "risk": "critical",
+              "synonyms_en": [
+                "price",
+                "unit price",
+                "selling price",
+                "sale price",
+                "retail price",
+                "list price",
+                "amount",
+                "net price",
+                "cost",
+                "kbetr",
+                "condition amount",
+                "sales price",
+                "price amount"
+              ],
+              "synonyms_th": [
+                "ราคา",
+                "ราคาขาย",
+                "ราคาต่อหน่วย",
+                "ราคาปลีก",
+                "ราคาตั้ง",
+                "ราคาสุทธิ"
+              ]
+            }
+          },
+          "vat_included": {
+            "type": "boolean",
+            "x-forma": {
+              "semantic": "price.vat_included",
+              "risk": "critical",
+              "synonyms_en": [
+                "vat included",
+                "incl vat",
+                "inc. vat",
+                "ex vat"
+              ],
+              "synonyms_th": [
+                "รวม vat",
+                "รวมภาษี",
+                "ไม่รวมภาษี",
+                "ก่อน vat"
+              ]
+            }
+          },
+          "vat_rate": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "default": 0.07,
+            "x-forma": {
+              "semantic": "price.vat_rate",
+              "risk": "high"
+            }
+          },
+          "effective_from": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date",
+            "x-forma": {
+              "semantic": "price.effective_from",
+              "risk": "high",
+              "synonyms_en": [
+                "effective date",
+                "valid from",
+                "start date",
+                "datab",
+                "starting date",
+                "effective"
+              ],
+              "synonyms_th": [
+                "วันที่มีผล",
+                "เริ่ม",
+                "ตั้งแต่"
+              ]
+            }
+          },
+          "effective_to": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date",
+            "x-forma": {
+              "semantic": "price.effective_to",
+              "risk": "high",
+              "synonyms_en": [
+                "valid to",
+                "end date",
+                "expire",
+                "datbi",
+                "ending date"
+              ],
+              "synonyms_th": [
+                "สิ้นสุด",
+                "ถึงวันที่",
+                "หมดอายุ"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "promotions": {
+      "type": "array",
+      "x-forma": {
+        "semantic": "promotions",
+        "risk": "critical"
+      },
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "promo_code",
+          "type"
+        ],
+        "properties": {
+          "promo_code": {
+            "type": "string",
+            "x-forma": {
+              "semantic": "promo.code",
+              "risk": "high",
+              "synonyms_en": [
+                "promo code",
+                "promotion id",
+                "campaign"
+              ],
+              "synonyms_th": [
+                "รหัสโปรโมชั่น",
+                "โปรโมชั่น",
+                "แคมเปญ"
+              ]
+            }
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "x-forma": {
+              "semantic": "promo.name",
+              "risk": "low",
+              "synonyms_en": [
+                "promotion name",
+                "campaign name"
+              ],
+              "synonyms_th": [
+                "ชื่อโปรโมชั่น"
+              ]
+            }
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "percent_off",
+              "amount_off",
+              "fixed_price",
+              "tiered",
+              "buy_x_get_y",
+              "bundle"
+            ],
+            "x-forma": {
+              "semantic": "promo.type",
+              "risk": "critical",
+              "synonyms_en": [
+                "promo type",
+                "discount type"
+              ],
+              "synonyms_th": [
+                "ประเภทโปร",
+                "ประเภทส่วนลด"
+              ]
+            }
+          },
+          "discount_percent": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 100,
+            "x-forma": {
+              "semantic": "discount.percent",
+              "risk": "critical",
+              "synonyms_en": [
+                "discount %",
+                "disc%",
+                "percent off",
+                "discount percentage"
+              ],
+              "synonyms_th": [
+                "ส่วนลด %",
+                "ส่วนลด(%)",
+                "เปอร์เซ็นต์ส่วนลด",
+                "ลด%"
+              ]
+            }
+          },
+          "discount_amount": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "x-forma": {
+              "semantic": "discount.amount",
+              "risk": "critical",
+              "synonyms_en": [
+                "discount amount",
+                "disc amt",
+                "off"
+              ],
+              "synonyms_th": [
+                "ส่วนลด(บาท)",
+                "ลดบาท",
+                "จำนวนส่วนลด"
+              ]
+            }
+          },
+          "promo_price": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "x-forma": {
+              "semantic": "promo.price",
+              "risk": "critical",
+              "synonyms_en": [
+                "promo price",
+                "special price",
+                "sale price"
+              ],
+              "synonyms_th": [
+                "ราคาโปร",
+                "ราคาพิเศษ",
+                "ราคาลด"
+              ]
+            }
+          },
+          "min_qty": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0,
+            "x-forma": {
+              "semantic": "promo.min_qty",
+              "risk": "high",
+              "synonyms_en": [
+                "min qty",
+                "minimum quantity",
+                "from qty"
+              ],
+              "synonyms_th": [
+                "ซื้อขั้นต่ำ",
+                "จำนวนขั้นต่ำ",
+                "ตั้งแต่"
+              ]
+            }
+          },
+          "buy_qty": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "x-forma": {
+              "semantic": "promo.buy_qty",
+              "risk": "high",
+              "synonyms_en": [
+                "buy",
+                "buy qty"
+              ],
+              "synonyms_th": [
+                "ซื้อ"
+              ]
+            }
+          },
+          "get_qty": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "x-forma": {
+              "semantic": "promo.get_qty",
+              "risk": "high",
+              "synonyms_en": [
+                "get",
+                "free qty",
+                "get free"
+              ],
+              "synonyms_th": [
+                "แถม",
+                "ฟรี"
+              ]
+            }
+          },
+          "bundle_skus": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "x-forma": {
+              "semantic": "promo.bundle_skus",
+              "risk": "high",
+              "synonyms_en": [
+                "bundle items",
+                "bundle skus"
+              ],
+              "synonyms_th": [
+                "สินค้าในชุด"
+              ]
+            }
+          },
+          "channels": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "x-forma": {
+              "semantic": "promo.channels",
+              "risk": "medium",
+              "synonyms_en": [
+                "channel",
+                "store",
+                "branch"
+              ],
+              "synonyms_th": [
+                "ช่องทาง",
+                "สาขา"
+              ]
+            }
+          },
+          "start_date": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date",
+            "x-forma": {
+              "semantic": "promo.start_date",
+              "risk": "critical",
+              "synonyms_en": [
+                "start",
+                "start date",
+                "from",
+                "valid from"
+              ],
+              "synonyms_th": [
+                "เริ่ม",
+                "วันเริ่ม",
+                "ตั้งแต่",
+                "เริ่มโปร"
+              ]
+            }
+          },
+          "end_date": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date",
+            "x-forma": {
+              "semantic": "promo.end_date",
+              "risk": "critical",
+              "synonyms_en": [
+                "end",
+                "end date",
+                "to",
+                "valid to",
+                "until"
+              ],
+              "synonyms_th": [
+                "สิ้นสุด",
+                "ถึง",
+                "หมดโปร",
+                "วันสิ้นสุด"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "inventory": {
+      "type": "array",
+      "x-forma": {
+        "semantic": "inventory",
+        "risk": "high"
+      },
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "warehouse_code",
+          "qty"
+        ],
+        "properties": {
+          "warehouse_code": {
+            "type": "string",
+            "default": "MAIN",
+            "x-forma": {
+              "semantic": "stock.warehouse",
+              "risk": "high",
+              "synonyms_en": [
+                "warehouse",
+                "wh",
+                "location",
+                "plant",
+                "branch",
+                "store",
+                "werks",
+                "location code",
+                "lgort",
+                "storage location",
+                "site"
+              ],
+              "synonyms_th": [
+                "คลัง",
+                "คลังสินค้า",
+                "สาขา",
+                "ที่เก็บ"
+              ]
+            }
+          },
+          "qty": {
+            "type": "number",
+            "x-forma": {
+              "semantic": "stock.qty",
+              "risk": "high",
+              "synonyms_en": [
+                "stock",
+                "qty",
+                "quantity",
+                "on hand",
+                "available",
+                "balance",
+                "inventory",
+                "labst",
+                "unrestricted stock",
+                "quantity on hand",
+                "qty on hand",
+                "qty available",
+                "stock qty"
+              ],
+              "synonyms_th": [
+                "คงเหลือ",
+                "สต็อก",
+                "จำนวน",
+                "ยอดคงเหลือ",
+                "คงคลัง"
+              ]
+            }
+          },
+          "reserved": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "x-forma": {
+              "semantic": "stock.reserved",
+              "risk": "medium",
+              "synonyms_en": [
+                "reserved",
+                "allocated",
+                "committed"
+              ],
+              "synonyms_th": [
+                "จอง",
+                "สำรอง"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "active",
+        "inactive",
+        "discontinued"
+      ],
+      "default": "active",
+      "x-forma": {
+        "semantic": "status",
+        "risk": "medium",
+        "synonyms_en": [
+          "status",
+          "active",
+          "state",
+          "lvorm",
+          "blocked",
+          "deletion flag",
+          "is active"
+        ],
+        "synonyms_th": [
+          "สถานะ",
+          "ใช้งาน",
+          "เลิกขาย"
+        ]
+      }
+    },
+    "attributes": {
+      "type": "object",
+      "additionalProperties": {
+        "type": [
+          "string",
+          "number",
+          "boolean",
+          "null"
+        ]
+      },
+      "x-forma": {
+        "semantic": "attributes",
+        "risk": "low",
+        "description_th": "ฟิลด์เพิ่มเติมที่ไม่มีใน schema หลัก (เก็บไว้ไม่ให้ข้อมูลหาย)"
+      }
+    },
+    "source_meta": {
+      "type": "object",
+      "x-forma": {
+        "semantic": "meta",
+        "risk": "low",
+        "system": true
+      },
+      "properties": {
+        "customer_id": {
+          "type": "string"
+        },
+        "import_round_id": {
+          "type": "string"
+        },
+        "dataset_version_id": {
+          "type": "string"
+        },
+        "lineage": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      }
+    }
+  }
+}

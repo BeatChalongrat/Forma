@@ -1,0 +1,34 @@
+# FORMA approval policy — AI proposes, policy decides, humans gate what matters.
+# Decisions: auto_approve | review | block
+version: 1
+
+auto_approve:
+  min_mapping_confidence: 0.95          # meta.confidence of the proposal
+  min_field_confidence_critical: 0.90   # every critical-risk field must reach this
+  min_field_confidence_high: 0.80
+  max_warning_findings: 5               # engine warnings (joins, dedupe, quality) tolerated
+  allow_errors: false                   # any engine error → review
+  allowed_drift: [identical, header_moved, columns_added]   # for returning customers
+  require_previous_approval_for_auto: true   # a never-seen customer always goes to review
+  max_row_change_ratio: 0.30            # vs previous approved dataset for the same customer
+
+review:
+  priority_weights:                      # ordering of the review queue
+    critical_field_low_confidence: 50
+    errors: 40
+    drift_columns_removed: 30
+    drift_columns_renamed: 20
+    unrelated_file: 100
+    new_customer: 15
+    warnings: 2
+
+block:
+  on_unrelated_file: true               # wrong file for this customer → block, never auto
+  on_missing_identity: true
+  on_zero_rows: true
+
+risk_overrides:                          # per-semantic risk overrides (defaults come from the schema)
+  "price.amount": critical
+  "discount.percent": critical
+  "promo.start_date": critical
+  "promo.end_date": critical

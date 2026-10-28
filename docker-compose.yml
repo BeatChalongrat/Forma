@@ -1,0 +1,36 @@
+# Optional infrastructure for multi-user / production-like runs. Dev works with SQLite + local disk.
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: forma
+      POSTGRES_PASSWORD: forma
+      POSTGRES_DB: forma
+    ports: ["5432:5432"]
+    volumes: ["pgdata:/var/lib/postgresql/data"]
+  redis:
+    image: redis:7-alpine
+    ports: ["6379:6379"]
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: forma
+      MINIO_ROOT_PASSWORD: forma12345
+    ports: ["9000:9000", "9001:9001"]
+    volumes: ["minio:/data"]
+  api:
+    build: ./backend
+    environment:
+      FORMA_DATABASE_URL: postgresql+psycopg://forma:forma@postgres:5432/forma
+      FORMA_DATA_DIR: /data
+      FORMA_LLM_PROVIDER: ${FORMA_LLM_PROVIDER:-mock}
+      FORMA_LLM_API_KEY: ${FORMA_LLM_API_KEY:-}
+      FORMA_LLM_MODEL: ${FORMA_LLM_MODEL:-gpt-4.1-mini}
+    volumes: ["formadata:/data", "./target_schema:/app/target_schema", "./policies:/app/policies"]
+    ports: ["8000:8000"]
+    depends_on: [postgres]
+volumes:
+  pgdata: {}
+  minio: {}
+  formadata: {}
