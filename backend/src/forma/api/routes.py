@@ -142,9 +142,10 @@ def list_rounds(
     status: str | None = None,
     customer_id: str | None = None,
     limit: int = Query(100, le=500),
+    offset: int = Query(0, ge=0),
     session: Session = Depends(get_session),
 ) -> list[dict[str, Any]]:
-    q = select(ImportRound).order_by(ImportRound.created_at.desc()).limit(limit)
+    q = select(ImportRound).order_by(ImportRound.created_at.desc()).limit(limit).offset(offset)
     if status:
         q = q.where(ImportRound.status == status)
     if customer_id:
@@ -406,13 +407,17 @@ def dsl_reference() -> dict[str, Any]:
 # ============================================================================================
 @api.get("/review")
 def review_queue(
-    status: str = "open", limit: int = Query(200, le=1000), session: Session = Depends(get_session)
+    status: str = "open",
+    limit: int = Query(200, le=1000),
+    offset: int = Query(0, ge=0),
+    session: Session = Depends(get_session),
 ) -> list[dict[str, Any]]:
     tasks = session.scalars(
         select(ReviewTask)
         .where(ReviewTask.status == status)
         .order_by(ReviewTask.priority.desc(), ReviewTask.created_at.asc())
         .limit(limit)
+        .offset(offset)
     ).all()
     customers = {c.id: c for c in session.scalars(select(Customer)).all()}
     rounds = (
@@ -873,9 +878,12 @@ def dashboard(
 
 @api.get("/jobs")
 def list_jobs(
-    status: str | None = None, kind: str | None = None, limit: int = Query(100, le=1000)
+    status: str | None = None,
+    kind: str | None = None,
+    limit: int = Query(100, le=1000),
+    offset: int = Query(0, ge=0),
 ) -> list[dict[str, Any]]:
-    return runner.list_jobs(status=status, kind=kind, limit=limit)
+    return runner.list_jobs(status=status, kind=kind, limit=limit, offset=offset)
 
 
 @api.get("/jobs/stats")
@@ -906,11 +914,14 @@ def retry_job(job_id: str) -> dict[str, Any]:
 
 @api.get("/audit")
 def audit_log(
-    limit: int = Query(100, le=1000), entity_id: str | None = None, session: Session = Depends(get_session)
+    limit: int = Query(100, le=1000),
+    offset: int = Query(0, ge=0),
+    entity_id: str | None = None,
+    session: Session = Depends(get_session),
 ) -> list[dict[str, Any]]:
     from forma.db.models import AuditLog
 
-    q = select(AuditLog).order_by(AuditLog.created_at.desc()).limit(limit)
+    q = select(AuditLog).order_by(AuditLog.created_at.desc()).limit(limit).offset(offset)
     if entity_id:
         q = q.where(AuditLog.entity_id == entity_id)
     return [

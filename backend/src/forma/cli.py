@@ -10,6 +10,59 @@ import typer
 app = typer.Typer(no_args_is_help=True, help="FORMA — AI-native data transformation platform")
 schema_app = typer.Typer(help="Target schema registry")
 app.add_typer(schema_app, name="schema")
+db_app = typer.Typer(help="Database migrations (Alembic)")
+app.add_typer(db_app, name="db")
+
+
+@db_app.command("upgrade")
+def db_upgrade(revision: str = typer.Argument("head")) -> None:
+    """Apply migrations up to REVISION (default head)."""
+    from forma.db import migrate
+    from forma.db.session import get_engine
+
+    migrate.upgrade(get_engine(), revision)
+    typer.echo(json.dumps(migrate.status(get_engine())))
+
+
+@db_app.command("downgrade")
+def db_downgrade(revision: str) -> None:
+    """Revert migrations down to REVISION (e.g. -1 or a revision id)."""
+    from alembic import command
+
+    from forma.db import migrate
+    from forma.db.session import get_engine
+
+    command.downgrade(
+        migrate.alembic_config(get_engine().url.render_as_string(hide_password=False)), revision
+    )
+    typer.echo(json.dumps(migrate.status(get_engine())))
+
+
+@db_app.command("revision")
+def db_revision(m: str = typer.Option(..., "-m", "--message"), autogenerate: bool = True) -> None:
+    """Create a new migration from the model diff (edit the generated file before committing)."""
+    from forma.db import migrate
+
+    migrate.revision(m, autogenerate=autogenerate)
+
+
+@db_app.command("current")
+def db_current() -> None:
+    """Show current vs head revision."""
+    from forma.db import migrate
+    from forma.db.session import get_engine
+
+    typer.echo(json.dumps(migrate.status(get_engine())))
+
+
+@db_app.command("stamp")
+def db_stamp(revision: str = typer.Argument("head")) -> None:
+    """Mark the database as being at REVISION without running migrations."""
+    from forma.db import migrate
+    from forma.db.session import get_engine
+
+    migrate.stamp(get_engine(), revision)
+    typer.echo(json.dumps(migrate.status(get_engine())))
 
 
 @app.command()
