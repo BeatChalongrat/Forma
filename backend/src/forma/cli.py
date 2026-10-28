@@ -244,15 +244,27 @@ def bench(
 
 
 @app.command()
-def eval(corpus: Path = Path("../data/synthetic"), report: Path | None = None) -> None:
-    """Evaluate heuristic mapping + engine against the synthetic corpus ground truth."""
-    from forma.eval.evaluate import evaluate_corpus
+def eval(
+    corpus: Path = Path("../data/synthetic"), report: Path | None = None, baseline: Path | None = None
+) -> None:
+    """Evaluate heuristic mapping + engine against the synthetic corpus ground truth.
+
+    --baseline FILE: exit 1 when any summary metric drops below the stored baseline (CI gate)."""
+    from forma.eval.evaluate import compare_to_baseline, evaluate_corpus
 
     rep = evaluate_corpus(corpus)
     typer.echo(json.dumps(rep["summary"], ensure_ascii=False, indent=2))
     if report:
         report.write_text(json.dumps(rep, ensure_ascii=False, indent=2), encoding="utf-8")
         typer.echo(f"wrote {report}")
+    if baseline:
+        base = json.loads(baseline.read_text(encoding="utf-8"))
+        drops = compare_to_baseline(rep["summary"], base.get("summary", base))
+        if drops:
+            for d in drops:
+                typer.echo(f"REGRESSION {d}", err=True)
+            raise typer.Exit(code=1)
+        typer.echo("eval >= baseline")
 
 
 @app.command()
@@ -261,6 +273,40 @@ def seed(corpus: Path = Path("../data/synthetic"), run: bool = True) -> None:
     from forma.synth.seed import seed_database
 
     typer.echo(json.dumps(seed_database(corpus, run_pipeline=run), ensure_ascii=False, indent=2))
+
+
+config_app = typer.Typer(help="Effective configuration")
+app.add_typer(config_app, name="config")
+
+
+@config_app.command("show")
+def config_show(secrets: bool = False) -> None:
+    """Print the effective configuration (secrets masked unless --secrets)."""
+    from forma.core.settings import get_settings
+
+    typer.echo(json.dumps(get_settings().effective(mask_secrets=not secrets), ensure_ascii=False, indent=2))
+
+
+@config_app.command("example")
+def config_example(check: Path | None = None, out: Path | None = None) -> None:
+    """Generate .env.production.example from Settings (--check PATH fails when the file drifted)."""
+    from forma.core.config_example import render_env_example
+
+    text = render_env_example()
+    if check is not None:
+        current = check.read_text(encoding="utf-8") if check.exists() else ""
+        if current.replace("\r\n", "\n") != text:
+            typer.echo(
+                f"{check} is out of date; regenerate with: forma config example --out {check}", err=True
+            )
+            raise typer.Exit(code=1)
+        typer.echo(f"{check} is up to date")
+        return
+    if out is not None:
+        out.write_text(text, encoding="utf-8", newline="\n")
+        typer.echo(f"wrote {out}")
+    else:
+        typer.echo(text, nl=False)
 
 
 retention_app = typer.Typer(help="Retention policy (policies/retention.yaml)")

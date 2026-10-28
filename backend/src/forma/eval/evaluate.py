@@ -195,6 +195,31 @@ def _idx(rec: dict[str, Any], ptr: str) -> Any:
     return item.get(tail) if isinstance(item, dict) else None
 
 
+HIGHER_IS_BETTER = (
+    "mean_identity_recall",
+    "mean_field_accuracy",
+    "mean_critical_accuracy",
+    "variants_at_99",
+    "drift_correct",
+)
+
+
+def compare_to_baseline(
+    summary: dict[str, Any], baseline: dict[str, Any], *, tolerance: float = 1e-9
+) -> list[str]:
+    """Metrics that dropped below the baseline (CI gate). Ratios compare with a tiny tolerance; counts exactly."""
+    drops: list[str] = []
+    for key in HIGHER_IS_BETTER:
+        if key not in baseline or key not in summary:
+            continue
+        cur, base = float(summary[key]), float(baseline[key])
+        if cur + tolerance < base:
+            drops.append(f"{key}: {cur} < baseline {base}")
+    if summary.get("failed_variants") and not baseline.get("failed_variants"):
+        drops.append(f"failed_variants: {summary['failed_variants']}")
+    return drops
+
+
 def evaluate_corpus(corpus: Path) -> dict[str, Any]:
     reg = SchemaRegistry(_schema_dir(corpus))
     schema = reg.get("product")
