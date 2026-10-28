@@ -67,8 +67,8 @@ bench:               ## 300 files x 100K rows through the configured job backend
 bench-short:         ## CI-sized benchmark (6 files x 2K rows)
 	cd $(BACKEND) && .venv/bin/forma bench --files 6 --rows 2000 --distinct 3 --out ../data/bench_short
 
-reset:               ## wipe runtime data (DB, stored files, datasets, exports)
-	rm -rf data/forma.db* data/files data/datasets data/exports
+reset:               ## wipe runtime data (DB, stored files, datasets, exports, sandbox reports)
+	rm -rf data/forma.db* data/files data/datasets data/exports data/sandbox
 
 clean: reset
 	rm -rf $(BACKEND)/.venv frontend/node_modules frontend/dist
