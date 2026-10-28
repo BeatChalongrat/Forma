@@ -5,7 +5,7 @@ Customer 1──* ImportRound 1──* SourceFile            (sha256, immutable 
                  │
                  ├──* MappingVersion   (document, status, confidence, policy decision, agent log, parent)
                  ├──* ReviewTask       (kind, priority, reasons, resolution)
-                 └──* DatasetVersion   (records_path JSONL, row_count, findings, parent)
+                 └──* DatasetVersion   (records_key → JSONL object in storage, row_count, findings, parent)
                           ├──* ChangeSet   (operations, impact, kind one_time|persistent|copilot)
                           └──* ExportArtifact (fmt, path, sha256)
 Customer 1──* Override   (target, where, value — re-applied on every future import)

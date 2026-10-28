@@ -56,7 +56,16 @@ def create_app() -> FastAPI:
 
     @app.get("/health")
     def health() -> dict[str, str]:
+        """Liveness: the process is up. Never touches dependencies."""
         return {"status": "ok", "version": __version__, "env": s.env}
+
+    @app.get("/ready")
+    def ready() -> JSONResponse:
+        """Readiness: database, storage and job queue reachable. 503 when any check fails."""
+        from forma.api.health import readiness
+
+        body = readiness()
+        return JSONResponse(status_code=200 if body["status"] == "ok" else 503, content=body)
 
     app.include_router(api)
     return app

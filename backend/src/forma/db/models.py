@@ -86,7 +86,7 @@ class SourceFile(Base):
     original_name: Mapped[str] = mapped_column(String(512))
     size: Mapped[int] = mapped_column(Integer)
     kind: Mapped[str] = mapped_column(String(16))  # excel | csv
-    storage_path: Mapped[str] = mapped_column(Text)
+    storage_key: Mapped[str] = mapped_column(Text)  # ADR-012: storage key, never a path
     status: Mapped[str] = mapped_column(String(32), default="stored")  # stored | profiled | error | ignored
     duplicate_of: Mapped[str | None] = mapped_column(String(40))
     profile: Mapped[dict[str, Any] | None] = mapped_column(JSONType)
@@ -164,7 +164,7 @@ class DatasetVersion(Base):
     status: Mapped[str] = mapped_column(
         String(32), default="draft", index=True
     )  # draft | approved | published | superseded
-    records_path: Mapped[str] = mapped_column(Text)  # JSONL on disk
+    records_key: Mapped[str] = mapped_column(Text)  # ADR-012: JSONL object key
     row_count: Mapped[int] = mapped_column(Integer, default=0)
     stats: Mapped[dict[str, Any]] = mapped_column(JSONType, default=dict)
     findings: Mapped[list[Any]] = mapped_column(JSONType, default=list)
@@ -217,7 +217,7 @@ class ExportArtifact(Base):
     dataset_version_id: Mapped[str] = mapped_column(String(40), index=True)
     customer_id: Mapped[str] = mapped_column(String(40), index=True)
     fmt: Mapped[str] = mapped_column(String(16))
-    path: Mapped[str] = mapped_column(Text)
+    storage_key: Mapped[str] = mapped_column(Text)
     row_count: Mapped[int] = mapped_column(Integer)
     sha256: Mapped[str] = mapped_column(String(64))
     created_at: Mapped[dt.datetime] = mapped_column(UTCDateTime, default=utcnow)

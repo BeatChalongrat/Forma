@@ -176,6 +176,6 @@ def export_dataset(ctx: ServiceContext, payload: dict[str, Any], prog: JobProgre
         art = ds.export_dataset(
             ctx, s, payload["dataset_id"], payload["fmt"], actor=payload.get("actor", "operator")
         )
-        res = {"export_id": art.id, "path": art.path, "rows": art.row_count}
+        res = {"export_id": art.id, "key": art.storage_key, "rows": art.row_count}
     prog.mark("export", **res)
     return res

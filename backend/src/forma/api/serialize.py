@@ -166,5 +166,6 @@ def export_artifact(e: ExportArtifact) -> dict[str, Any]:
         "row_count": e.row_count,
         "sha256": e.sha256,
         "created_at": _dt(e.created_at),
-        "path": e.path,
+        "key": e.storage_key,
+        "path": e.storage_key,  # backwards-compatible name; it is a storage key (ADR-012)
     }
