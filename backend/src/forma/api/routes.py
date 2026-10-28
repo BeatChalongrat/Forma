@@ -347,7 +347,11 @@ def profile_round(
 ) -> dict[str, Any]:
     _round_scoped(session, p, round_id)
     session.commit()
-    return {"job_id": runner.enqueue("profile_round", {"round_id": round_id}, round_id=round_id, sync=sync)}
+    return {
+        "job_id": runner.enqueue(
+            "profile_round", {"round_id": round_id}, round_id=round_id, sync=sync, request_id=p.request_id
+        )
+    }
 
 
 @api.post("/rounds/{round_id}/propose")
@@ -414,6 +418,7 @@ def transform(
             {"round_id": round_id, "mapping_version_id": mapping_version_id, "actor": p.actor, "force": True},
             round_id=round_id,
             sync=sync,
+            request_id=p.request_id,
         )
     }
 
@@ -441,6 +446,7 @@ def batch_run(
         "run_pipeline",
         [{"round_id": rid, "use_llm": body.use_llm, "actor": p.actor, "force": body.force} for rid in ids],
         sync=body.sync,
+        request_id=p.request_id,
     )
     return {"batch_id": batch_id, "job_ids": job_ids, "count": len(job_ids)}
 
@@ -1098,6 +1104,19 @@ def get_job(job_id: str, p: Principal = Depends(current_principal)) -> dict[str,
 @api.post("/jobs/{job_id}/retry")
 def retry_job(job_id: str, p: Principal = Depends(require_role("admin"))) -> dict[str, Any]:
     return {"job_id": runner.retry_job(job_id)}
+
+
+@api.get("/ops")
+def ops_summary(
+    session: Session = Depends(get_session),
+    ctx: ServiceContext = Depends(ctx_dep),
+    p: Principal = Depends(require_role("admin")),
+) -> dict[str, Any]:
+    """Everything the Ops page shows: queue, workers, failures, spend, slowest rounds, health."""
+    from forma.api.health import readiness
+    from forma.api.ops import ops_summary as _ops
+
+    return _ops(session, ctx, readiness())
 
 
 @api.get("/audit")

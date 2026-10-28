@@ -235,9 +235,40 @@ class LLMClient:
         validate: Callable[[dict[str, Any]], list[str]] | None = None,
     ) -> StructuredResult:
         """Call the model until the JSON parses and passes ``validate`` (returns error strings)."""
+        from forma.core import metrics
+        from forma.core.telemetry import set_attrs, span
+
         usage = Usage(model=self.model)
         errors: list[str] = []
         text = ""
+        with span("llm.structured", model=self.model, provider=self.provider.name) as sp:
+            try:
+                res = self._structured(system, user, schema, validate, usage, errors, text)
+            except LLMError:
+                set_attrs(sp, attempts=usage.calls, input_tokens=usage.input_tokens, outcome="error")
+                metrics.observe_llm(_agent_name(), usage, ok=False)
+                raise
+            set_attrs(
+                sp,
+                attempts=res.attempts,
+                input_tokens=usage.input_tokens,
+                output_tokens=usage.output_tokens,
+                cost_usd=usage.cost_usd,
+                outcome="ok",
+            )
+            metrics.observe_llm(_agent_name(), usage, ok=True)
+            return res
+
+    def _structured(
+        self,
+        system: str,
+        user: str,
+        schema: dict[str, Any],
+        validate: Callable[[dict[str, Any]], list[str]] | None,
+        usage: Usage,
+        errors: list[str],
+        text: str,
+    ) -> StructuredResult:
         for attempt in range(1, self.max_retries + 2):
             prompt = (
                 user
@@ -261,6 +292,18 @@ class LLMClient:
                 return StructuredResult(data, usage, text, attempt)
         self.total_usage.add(usage)
         raise LLMError("structured output failed validation: " + "; ".join(errors[:5]))
+
+
+_AGENT: list[str] = ["unknown"]
+
+
+def set_agent(name: str) -> None:
+    """Name the agent for the next structured() call's span/metrics (agents set it before calling)."""
+    _AGENT[0] = name
+
+
+def _agent_name() -> str:
+    return _AGENT[0]
 
 
 def _parse_json(text: str) -> dict[str, Any]:

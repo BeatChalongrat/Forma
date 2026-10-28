@@ -13,6 +13,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from forma.core.telemetry import span
 from forma.db.models import DatasetVersion, ImportRound, MappingVersion
 from forma.db.session import session_scope
 from forma.jobs.runner import JobProgress, handler
@@ -96,7 +97,7 @@ def run_pipeline(ctx: ServiceContext, payload: dict[str, Any], prog: JobProgress
     if force or not (prog.done("profile") or skip_profile):
         prog.update(5, "profiling files")
         t0 = time.perf_counter()
-        with session_scope() as s:
+        with span("stage.profile", round_id=rid), session_scope() as s:
             rs.profile_round(ctx, s, rid, force=force)
         prog.mark("profile", duration_ms=_ms(t0))
     elif skip_profile and not prog.done("profile"):
@@ -119,7 +120,7 @@ def run_pipeline(ctx: ServiceContext, payload: dict[str, Any], prog: JobProgress
     if mv_id is None or status is None:
         prog.update(35, "proposing mapping")
         t0 = time.perf_counter()
-        with session_scope() as s:
+        with span("stage.propose", round_id=rid), session_scope() as s:
             mv = ms.propose_for_round(ctx, s, rid, use_llm=payload.get("use_llm"), actor=actor)
             mv_id, status = mv.id, mv.status
         prog.mark("propose", mapping_version_id=mv_id, status=status, duration_ms=_ms(t0))
@@ -139,7 +140,7 @@ def run_pipeline(ctx: ServiceContext, payload: dict[str, Any], prog: JobProgress
                 return out
         prog.update(70, "transforming")
         t0 = time.perf_counter()
-        with session_scope() as s:
+        with span("stage.transform", round_id=rid), session_scope() as s:
             dv = ds.transform_round(ctx, s, rid, mapping_version_id=mv_id, actor=actor)
             out["dataset_version_id"] = dv.id
             out["rows"] = dv.row_count
@@ -155,7 +156,7 @@ def transform_round(ctx: ServiceContext, payload: dict[str, Any], prog: JobProgr
         return dict(prog.stages["transform"])
     prog.update(10, "transforming")
     t0 = time.perf_counter()
-    with session_scope() as s:
+    with span("stage.transform", round_id=payload["round_id"]), session_scope() as s:
         dv = ds.transform_round(
             ctx,
             s,

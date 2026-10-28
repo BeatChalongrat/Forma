@@ -13,7 +13,7 @@ from typing import Any
 
 from forma.ai import guard
 from forma.ai.heuristics import HeuristicProposal
-from forma.ai.llm import LLMClient, LLMError, Usage
+from forma.ai.llm import LLMClient, LLMError, Usage, set_agent
 from forma.mapping_dsl.models import MappingDocument, Op
 from forma.mapping_dsl.validate import validate_mapping
 from forma.profiling.profile import WorkbookProfile
@@ -206,6 +206,7 @@ def schema_agent(client: LLMClient, profile: WorkbookProfile, schema: TargetSche
         },
         ensure_ascii=False,
     )
+    set_agent("schema")
     res = client.structured(
         system=system,
         user=user,
@@ -268,6 +269,7 @@ def mapping_agent(
         rep = validate_mapping(doc, schema)
         return [f"{i.code} at {i.path}: {i.message}" for i in rep.issues if i.level == "error"]
 
+    set_agent("mapping")
     try:
         res = client.structured(
             system=system, user=user, schema=MAPPING_AGENT_SCHEMA, validate=_guarded(schema, _validate)
@@ -357,6 +359,7 @@ def diagnosis_agent(
             return [f"{i.code}: {i.message}" for i in rep.issues if i.level == "error"]
         return []
 
+    set_agent("diagnosis")
     res = client.structured(
         system=system, user=user, schema=DIAGNOSIS_SCHEMA, validate=_guarded(schema, _validate)
     )
@@ -401,6 +404,7 @@ def adaptation_agent(
             return [f"mapping does not match the DSL: {str(e)[:800]}"]
         return [f"{i.code}: {i.message}" for i in validate_mapping(doc, schema).issues if i.level == "error"]
 
+    set_agent("adaptation")
     try:
         res = client.structured(
             system=system, user=user, schema=MAPPING_AGENT_SCHEMA, validate=_guarded(schema, _validate)
@@ -465,5 +469,6 @@ def copilot_agent(
         },
         ensure_ascii=False,
     )
+    set_agent("copilot")
     res = client.structured(system=system, user=user, schema=COPILOT_SCHEMA, validate=_guarded(schema))
     return AgentResult("copilot", res.data, res.usage, res.attempts)

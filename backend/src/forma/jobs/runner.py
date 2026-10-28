@@ -318,6 +318,7 @@ def enqueue_batch(
     *,
     round_ids: Sequence[str | None] | None = None,
     sync: bool = False,
+    request_id: str | None = None,
 ) -> tuple[str, list[str]]:
     """One batch id for many jobs; capacity is checked for the whole batch before any job is created."""
     if not sync:
@@ -326,7 +327,9 @@ def enqueue_batch(
     ids = []
     for i, p in enumerate(payloads):
         rid = round_ids[i] if round_ids else p.get("round_id")
-        ids.append(enqueue(kind, p, round_id=rid, sync=sync, batch_id=batch_id, check=False))
+        ids.append(
+            enqueue(kind, p, round_id=rid, sync=sync, batch_id=batch_id, request_id=request_id, check=False)
+        )
     return batch_id, ids
 
 
@@ -355,6 +358,17 @@ def run_job(job_id: str) -> bool:
     kind, payload = claimed
     ctx = get_context()
     prog = JobProgress(job_id)
+    import time
+
+    import structlog
+
+    from forma.core import metrics
+
+    with session_scope() as s:
+        j0 = s.get(Job, job_id)
+        req_id = j0.request_id if j0 else None
+    structlog.contextvars.bind_contextvars(job_id=job_id, job_kind=kind, request_id=req_id)
+    t0 = time.perf_counter()
     try:
         with _trace_job(job_id, kind):
             result = _HANDLERS[kind](ctx, payload, prog)
@@ -366,6 +380,7 @@ def run_job(job_id: str) -> bool:
                 j.progress = 100
                 j.message = None
                 j.finished_at = _utcnow()
+        metrics.observe_job(kind, "done", time.perf_counter() - t0)
         return True
     except Exception as e:
         log.error("job failed", job=job_id, kind=kind, error=str(e))
@@ -381,7 +396,10 @@ def run_job(job_id: str) -> bool:
                 if r:
                     r.status = "failed"
                     r.summary = {**(r.summary or {}), "error": str(e)[:500]}
+        metrics.observe_job(kind, "failed", time.perf_counter() - t0)
         return True
+    finally:
+        structlog.contextvars.unbind_contextvars("job_id", "job_kind", "request_id")
 
 
 def _trace_job(job_id: str, kind: str) -> Any:
