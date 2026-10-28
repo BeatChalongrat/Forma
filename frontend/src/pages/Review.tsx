@@ -3,8 +3,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { Check, X, ArrowRight } from 'lucide-react'
 import { api } from '../lib/api'
-import { cn, timeAgo } from '../lib/utils'
-import { PageHeader, Badge, Section, Confidence, Tabs, Empty } from '../components/ui'
+import { cn, fmtInt, timeAgo } from '../lib/utils'
+import { PageHeader, Badge, Section, Confidence, Tabs, Empty, RiskLevel } from '../components/ui'
 import { useToast } from '../lib/toast'
 
 export function ReviewCenter() {
@@ -45,10 +45,13 @@ export function ReviewCenter() {
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-medium">{t.customer?.code}</span><span className="text-muted">{t.customer?.name}</span>
                         <Badge tone={blocked ? 'bad' : t.kind === 'drift' ? 'warn' : 'signal'}>{blocked ? 'blocked' : t.kind}</Badge>
+                        <RiskLevel level={t.details.risk_level} factors={t.details.risk_factors} />
                         <span className="text-muted text-[12px]">{t.round?.label} · {timeAgo(t.created_at)}</span>
                         {t.resolver && <span className="text-muted text-[12px]">· {t.status} by {t.resolver}</span>}
                       </div>
                       <ul className="text-[12.5px] text-ink-2 mt-1 flex flex-col gap-0.5">{t.reasons.map((r, i) => <li key={i}>• {r}</li>)}</ul>
+                      {t.details.risk_level === 'high' && t.details.risk_factors?.length ? <div className="text-[12px] text-bad mt-1">High risk: {t.details.risk_factors.join(' · ')}</div> : null}
+                      {t.details.impact?.affected_records !== undefined && !t.details.impact.high ? <div className="text-[12px] text-muted mt-0.5 tnum">{fmtInt(t.details.impact.affected_records)} of {fmtInt(t.details.impact.of_records)} records change vs the approved mapping</div> : null}
                       {t.details.open_questions?.length ? <div className="text-[12px] text-warn mt-1">{t.details.open_questions.length} question{t.details.open_questions.length > 1 ? 's' : ''} from the mapper: {t.details.open_questions[0]}</div> : null}
                     </div>
                     <div className="flex items-center gap-2 shrink-0">

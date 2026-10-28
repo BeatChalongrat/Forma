@@ -38,6 +38,13 @@ export function RiskDot({ risk }: { risk: string }) {
   return <span className={cn('inline-block w-1.5 h-1.5 rounded-full', c)} title={`${risk} risk`} />
 }
 
+/** Trust level of a mapping decision (ADR-019): low = safe to automate, high = a human must decide. */
+export function RiskLevel({ level, factors }: { level?: string | null; factors?: string[] }) {
+  if (!level) return null
+  const tone: Tone = level === 'high' ? 'bad' : level === 'low' ? 'ok' : 'warn'
+  return <span title={factors?.length ? factors.join(' · ') : undefined}><Badge tone={tone}>{level} risk</Badge></span>
+}
+
 /** Confidence as a thin rail — evidence, not decoration. */
 export function Confidence({ value, className }: { value: number | null | undefined; className?: string }) {
   if (value === null || value === undefined) return <span className="text-muted">–</span>

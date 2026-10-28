@@ -53,9 +53,13 @@ ImportRound: uploaded ─▶ profiled ─▶ ┬─ auto_approved ─▶ transfo
 5. **Sandbox** — a new mapping for a customer with an approved one (drift re-proposal, AI adaptation,
    Studio edit) runs next to the approved mapping on the same files; rows, errors, invalid prices,
    duplicates, lost/gained records and every changed price are compared (ADR-018).
+   In the Studio, `POST /rounds/{id}/relationships` measures how every table of the round connects
+   (cardinality, match rate, orphan rows) and suggests key pairs; the Relationships view draws them and turns
+   an accepted connection into a collection link or a join of the mapping document (ADR-019).
 6. **Policy** — `policies/approval.yaml`: confidence thresholds per risk level, allowed drift kinds,
    warnings budget, first-time-customer rule, row-count sanity, hard blocks. Produces
-   `auto_approve | review | block` with reasons and a queue priority. A sandbox comparison that loses records or adds errors/invalid prices blocks; changed prices go to review. A `block` is not an ordinary review:
+   `auto_approve | review | block` with reasons, a queue priority and a risk level (low / medium / high, with
+   the factors and the records changed vs the approved mapping — ADR-019). A sandbox comparison that loses records or adds errors/invalid prices blocks; changed prices go to review. A `block` is not an ordinary review:
    approving it is an explicit override (`override_block`, approver role, mandatory reason, audited), and a
    Studio edit keeps the round's drift, so it cannot clear a wrong-file block.
 7. **Transform** — full run with the approved mapping; persistent overrides for the customer are

@@ -304,6 +304,7 @@ function PolicyTab() {
         <Section title="Review queue order (weights)"><div className="px-4 py-2">
           {Object.entries(p.review.priority_weights).map(([k, v]) => num(k.replace(/_/g, ' '), v, (n) => edit((x) => { x.review.priority_weights[k] = Math.round(n) })))}
           <div className="text-muted text-[12px] mt-2">Higher weight = earlier in the Review queue.</div>
+          <div className="mt-3">{num('High risk when this share of records changes', p.review.high_impact_ratio ?? 0.2, (v) => edit((x) => { x.review.high_impact_ratio = v }), { pct: true })}</div>
         </div></Section>
         <div className="flex flex-col gap-4">
           <Section title="Always block"><div className="px-4 py-2">

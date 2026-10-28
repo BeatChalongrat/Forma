@@ -110,3 +110,21 @@ class ConnectAIIn(BaseModel):
 class CompareIn(BaseModel):
     document: dict[str, Any] | None = None  # unsaved edits; omitted → the mapping as saved
     limit: int = Field(default=5000, ge=1, le=200_000)
+
+
+class RelEndIn(BaseModel):
+    node: str
+    column: str
+
+
+class RelProbeIn(BaseModel):
+    """A connection drawn by hand in the Studio, measured before it is added to the mapping."""
+
+    from_: RelEndIn = Field(alias="from")
+    to: RelEndIn
+
+
+class RelationshipsIn(BaseModel):
+    document: dict[str, Any] | None = None  # the Studio's current (possibly unsaved) mapping
+    limit: int = Field(default=20_000, ge=1, le=200_000)
+    probe: RelProbeIn | None = None
