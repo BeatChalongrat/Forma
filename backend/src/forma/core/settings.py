@@ -126,6 +126,10 @@ class Settings(BaseSettings):
         description="Encrypts secrets saved in the web app (AI API key). Required in prod to save them; "
         "changing it makes saved secrets unreadable until they are entered again.",
     )
+    sandbox_max_rows: int = Field(
+        default=50_000,
+        description="Rows per source the mapping sandbox runs the new and the approved mapping on (0 = all).",
+    )
     config_refresh_s: float = Field(
         default=5.0, description="How often each process checks for settings changed in the web app."
     )

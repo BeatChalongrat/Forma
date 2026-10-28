@@ -312,6 +312,14 @@ function PolicyTab() {
             {flag('Records without an identity key', !!p.block.on_missing_identity, (v) => edit((x) => { x.block.on_missing_identity = v }))}
             <div className="text-muted text-[12px] mt-2">A blocked mapping can only be approved by an approver with a written reason.</div>
           </div></Section>
+          <Section title="Sandbox: new mapping vs approved"><div className="px-4 py-2">
+            {flag('Compare every new mapping with the approved one', p.sandbox.enabled, (v) => edit((x) => { x.sandbox.enabled = v }))}
+            {num('Block when records go missing (more than)', p.sandbox.max_lost_records, (v) => edit((x) => { x.sandbox.max_lost_records = Math.round(v) }))}
+            {num('Block on extra errors (more than)', p.sandbox.max_new_errors, (v) => edit((x) => { x.sandbox.max_new_errors = Math.round(v) }))}
+            {num('Block on extra invalid prices (more than)', p.sandbox.max_new_invalid_prices, (v) => edit((x) => { x.sandbox.max_new_invalid_prices = Math.round(v) }))}
+            {num('Block on extra duplicates (more than)', p.sandbox.max_new_duplicates, (v) => edit((x) => { x.sandbox.max_new_duplicates = Math.round(v) }))}
+            {num('Changed prices a human must see (more than)', p.sandbox.max_changed_prices_auto, (v) => edit((x) => { x.sandbox.max_changed_prices_auto = Math.round(v) }))}
+          </div></Section>
           <Section title="Risk by meaning (overrides the format)"><div className="px-4 py-2">
             {Object.entries(p.risk_overrides).map(([sem, risk]) => (
               <div key={sem} className="flex items-center gap-2 py-1"><span className="mono flex-1 truncate">{sem}</span>

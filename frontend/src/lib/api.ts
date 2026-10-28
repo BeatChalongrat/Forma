@@ -72,7 +72,15 @@ export type MappingDocument = {
   sources: SourceSpec[]; joins: Record<string, unknown>[]; record: { root_source: string; filters: Expr[]; dedupe: { keys: string[]; keep: string } }
   fields: FieldMapping[]; collections: CollectionMapping[]; quality: Record<string, unknown>[]; provenance: boolean; attributes_passthrough: boolean
 }
-export type PolicyDecision = { decision: 'auto_approve' | 'review' | 'block'; priority: number; reasons: string[]; risk_score: number; checks: Record<string, unknown>; source?: string; simulation?: SimSummary | null }
+export type SandboxSide = { ok: boolean; problems?: string[]; rows_in?: number; rows_out?: number; errors?: number; warnings?: number; schema_errors?: number; duplicates?: number; missing_identity?: number; invalid_prices?: number }
+export type SandboxDelta = { lost: number; gained: number; changed_records: number; changed_prices: number; large_price_moves: number; new_errors: number; new_invalid_prices: number; new_duplicates: number }
+export type SandboxItem = { identity: string; pointer?: string; before?: unknown; after?: unknown; pct?: number | null; changes?: { pointer: string; before: unknown; after: unknown }[]; fields?: number }
+export type SandboxReport = {
+  rows_limit: number | null; old: SandboxSide; new: SandboxSide; delta: SandboxDelta | null
+  baseline_id: string | null; baseline_version?: number; verdict?: 'pass' | 'fail' | 'n/a'; problems?: string[]; message?: string
+  details?: Record<'price_changes' | 'changed' | 'lost' | 'gained', SandboxItem[]>
+}
+export type PolicyDecision = { decision: 'auto_approve' | 'review' | 'block'; priority: number; reasons: string[]; risk_score: number; checks: Record<string, unknown>; source?: string; simulation?: SimSummary | null; sandbox?: SandboxReport | null }
 export type MappingVersion = {
   id: string; customer_id: string; round_id: string | null; version: number; status: 'proposed' | 'approved' | 'rejected' | 'superseded'; target_schema: string
   confidence: number | null; created_by: string; model: string | null; policy: PolicyDecision; open_questions: string[]; validation: { ok: boolean; issues: { level: string; code: string; message: string; path: string }[] } | null
@@ -120,6 +128,7 @@ export type Policy = {
   review: { priority_weights: Record<string, number> }
   block: Record<string, boolean>
   risk_overrides: Record<string, string>
+  sandbox: { enabled: boolean; max_lost_records: number; max_new_errors: number; max_new_invalid_prices: number; max_new_duplicates: number; max_changed_prices_auto: number }
   [k: string]: unknown
 }
 export type PolicyView = { effective: Policy; file: Policy; source: 'ui' | 'file'; updated_by?: string; updated_at?: string }
@@ -175,6 +184,8 @@ export const api = {
   mappingPreview: (roundId: string, document: MappingDocument, limit = 50) => post<{ ok: boolean; records: Record<string, unknown>[]; findings: Finding[]; validation?: { ok: boolean; issues: { level: string; code: string; message: string; path: string }[] }; errors?: string[]; stats?: Record<string, unknown> }>(`/api/rounds/${roundId}/mapping-preview`, { document, limit }),
   sourcePreview: (roundId: string, source: SourceSpec, limit = 60) => post<{ file: string; columns: string[]; rows: unknown[][]; n_rows_preview: number }>(`/api/rounds/${roundId}/source-preview`, { source, limit }),
   diagnose: (mappingId: string) => post<{ ai: boolean; findings: Finding[]; root_causes: { finding: string; cause: string; fix: string; fix_kind?: string; severity?: string; evidence?: string[] }[]; summary_th?: string; patched_mapping?: MappingDocument | null }>(`/api/mappings/${mappingId}/diagnose`),
+  compareMapping: (id: string, document?: MappingDocument) => post<SandboxReport>(`/api/mappings/${id}/compare`, document ? { document } : {}),
+  sandboxList: (id: string, list: string, offset = 0, limit = 100) => get<{ report: SandboxReport | null; list: string; total: number; items: SandboxItem[] }>(`/api/mappings/${id}/sandbox?list=${list}&offset=${offset}&limit=${limit}`),
   dsl: () => get<{ ops: string[]; json_schema: unknown }>('/api/dsl'),
 
   review: (status = 'open') => get<ReviewTask[]>(`/api/review?status=${status}`),

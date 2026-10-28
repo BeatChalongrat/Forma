@@ -105,3 +105,8 @@ class DefaultFormatIn(BaseModel):
 class ConnectAIIn(BaseModel):
     api_key: str
     provider: str | None = None  # only when the key's prefix does not tell (gateways)
+
+
+class CompareIn(BaseModel):
+    document: dict[str, Any] | None = None  # unsaved edits; omitted → the mapping as saved
+    limit: int = Field(default=5000, ge=1, le=200_000)

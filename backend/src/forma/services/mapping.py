@@ -15,12 +15,14 @@ from forma.ai.agents import PROMPT_VERSION, AgentResult, adaptation_agent, mappi
 from forma.ai.heuristics import HeuristicProposal, propose_mapping
 from forma.ai.llm import LLMError
 from forma.core.errors import Conflict, NotFound, PolicyBlocked, ValidationFailed
+from forma.core.ids import new_id
 from forma.db.models import ImportRound, LLMCall, MappingVersion, ReviewTask, SourceFile
 from forma.engine.transform import BoundSource, TransformEngine, TransformResult
 from forma.mapping_dsl.models import MappingDocument, SourceSpec
 from forma.mapping_dsl.validate import validate_mapping
 from forma.profiling.profile import WorkbookProfile
 from forma.schema_registry import TargetSchema
+from forma.services import sandbox
 from forma.services.context import ServiceContext
 from forma.services.rounds import audit, get_round, latest_approved_mapping, round_profile
 
@@ -119,6 +121,37 @@ def simulate(
         return None, problems
     engine = TransformEngine(schema)
     return engine.run(mapping, bindings, limit=limit), []
+
+
+def _sandbox(
+    ctx: ServiceContext,
+    schema: TargetSchema,
+    doc: MappingDocument,
+    baseline: MappingVersion | None,
+    files: list[SourceFile],
+    mapping_version_id: str,
+) -> dict[str, Any] | None:
+    """Run ``doc`` and the approved ``baseline`` on the same files (ADR-018). The drill-down lists are
+    stored before the mapping row that points at them; the report itself goes into the row's policy."""
+    if baseline is None or not ctx.policy.policy["sandbox"]["enabled"]:
+        return None
+    try:
+        base_doc = MappingDocument.model_validate(baseline.document)
+    except Exception:
+        return None
+    report, details = sandbox.run(
+        ctx, schema, doc, base_doc, files, limit=ctx.settings.sandbox_max_rows or None
+    )
+    key = sandbox.details_key(baseline.customer_id, mapping_version_id)
+    sandbox.store_details(ctx, key, details)
+    report.update(baseline_id=baseline.id, baseline_version=baseline.version, details_key=key)
+    return report
+
+
+def _verdict(ctx: ServiceContext, report: dict[str, Any] | None) -> None:
+    if report is not None:
+        report["problems"] = ctx.policy.sandbox_problems(report)
+        report["verdict"] = "fail" if report["problems"] else "pass" if report.get("delta") else "n/a"
 
 
 def propose_for_round(
@@ -225,6 +258,11 @@ def propose_for_round(
         and prev_sim["rows_out"] < 3000
     ):
         row_change_ratio = abs(sim.stats["rows_out"] - prev_sim["rows_out"]) / prev_sim["rows_out"]
+    mv_id = new_id("map")
+    # 6) sandbox: a new mapping (not a verbatim reuse) runs next to the approved one on these files
+    sandbox_report = (
+        _sandbox(ctx, schema, doc, previous, r.files, mv_id) if rep.ok and source_kind != "memory" else None
+    )
     decision = ctx.policy.evaluate(
         doc,
         schema,
@@ -236,8 +274,11 @@ def propose_for_round(
         reused_approved=(source_kind == "memory"),
         row_change_ratio=row_change_ratio,
         llm_fallback=llm_fallback,
+        sandbox=sandbox_report,
     )
+    _verdict(ctx, sandbox_report)
     mv = MappingVersion(
+        id=mv_id,
         customer_id=r.customer_id,
         round_id=r.id,
         version=doc.meta.version,
@@ -255,6 +296,7 @@ def propose_for_round(
             "file_fingerprints": file_fps,
             "simulation": sim.summary() if sim else None,
             "sample": (sim.records[:5] if sim else []),
+            "sandbox": sandbox_report,
         },
         agent_log=agent_log,
         open_questions=open_questions,
@@ -469,6 +511,9 @@ def save_mapping_edit(
         if sim
         else [{"kind": "binding", "severity": "error", "message": p} for p in problems]
     )
+    mv_id = new_id("map")
+    approved = latest_approved_mapping(session, parent.customer_id)
+    sandbox_report = _sandbox(ctx, schema, doc, approved, r.files, mv_id) if r is not None else None
     decision = ctx.policy.evaluate(
         doc,
         schema,
@@ -477,8 +522,11 @@ def save_mapping_edit(
         # drift belongs to the round's files, not to the mapping: an edit cannot clear a wrong-file block
         drift=((parent.policy or {}).get("checks") or {}).get("drift"),
         has_previous_approval=True,
+        sandbox=sandbox_report,
     )
+    _verdict(ctx, sandbox_report)
     mv = MappingVersion(
+        id=mv_id,
         customer_id=parent.customer_id,
         round_id=parent.round_id,
         version=doc.meta.version,
@@ -495,6 +543,7 @@ def save_mapping_edit(
             "file_fingerprints": (parent.policy or {}).get("file_fingerprints", {}),
             "simulation": sim.summary() if sim else None,
             "sample": sim.records[:5] if sim else [],
+            "sandbox": sandbox_report,
         },
         agent_log=[{"agent": "human", "actor": actor, "parent": parent.id}],
         open_questions=[],
@@ -523,6 +572,58 @@ def save_mapping_edit(
     )
     audit(session, "mapping.edit", "mapping", mv.id, actor=actor, parent=parent.id)
     return mv
+
+
+SANDBOX_LISTS = ("price_changes", "changed", "lost", "gained")
+
+
+def sandbox_compare(
+    ctx: ServiceContext,
+    session: Session,
+    mapping_id: str,
+    document: dict[str, Any] | None = None,
+    *,
+    limit: int | None = 5000,
+) -> dict[str, Any]:
+    """On demand (the Studio's Compare tab): this mapping — or unsaved edits of it — against the approved
+    one, on the round's files. Nothing is stored; the policy's verdict is included."""
+    m = get_mapping(session, mapping_id)
+    r = session.get(ImportRound, m.round_id) if m.round_id else None
+    if r is None:
+        raise Conflict("this mapping has no import round to compare on")
+    schema = ctx.registry.get_ref(m.target_schema)
+    try:
+        doc = MappingDocument.model_validate(document if document is not None else m.document)
+    except Exception as e:
+        raise ValidationFailed(f"invalid mapping: {str(e)[:800]}") from e
+    rep = validate_mapping(doc, schema)
+    if not rep.ok:
+        raise ValidationFailed("mapping failed validation", details=rep.to_dict())
+    baseline = latest_approved_mapping(session, m.customer_id)
+    if baseline is not None and baseline.id == m.id and document is None:
+        baseline = session.get(MappingVersion, m.parent_id) if m.parent_id else None
+    if baseline is None:
+        return {"baseline_id": None, "message": "no approved mapping to compare with yet", "delta": None}
+    report, details = sandbox.run(
+        ctx, schema, doc, MappingDocument.model_validate(baseline.document), r.files, limit=limit
+    )
+    report.update(baseline_id=baseline.id, baseline_version=baseline.version)
+    _verdict(ctx, report)
+    return {**report, "details": {k: v[:200] for k, v in details.items()}}
+
+
+def sandbox_details(
+    ctx: ServiceContext, session: Session, mapping_id: str, kind: str, offset: int, limit: int
+) -> dict[str, Any]:
+    """Drill into the comparison stored with a mapping version (which prices changed, which records went)."""
+    if kind not in SANDBOX_LISTS:
+        raise ValidationFailed(f"list must be one of {SANDBOX_LISTS}")
+    report = (get_mapping(session, mapping_id).policy or {}).get("sandbox")
+    if not report:
+        return {"report": None, "list": kind, "total": 0, "items": []}
+    key = report.get("details_key")
+    items = sandbox.load_details(ctx, key).get(kind, []) if key and ctx.storage.exists(key) else []
+    return {"report": report, "list": kind, "total": len(items), "items": items[offset : offset + limit]}
 
 
 def preview_mapping(
