@@ -69,6 +69,7 @@ def test_full_flow_on_postgres(pg_env: Path) -> None:
         ds = j["result"]["dataset_version_id"]
         rows = c.get(f"/api/datasets/{ds}/rows?limit=5").json()
         assert rows["total"] == 12
+        c.post(f"/api/datasets/{ds}/approve", json={})
         exp = c.post(f"/api/datasets/{ds}/export?fmt=csv").json()
         dl = c.get(f"/api/exports/{exp['id']}/download")
         assert dl.status_code == 200 and dl.content.startswith("﻿".encode())

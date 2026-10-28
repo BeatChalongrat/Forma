@@ -135,7 +135,7 @@ export function DataEditor() {
           {pending.length > 0 && <><button className="btn btn-sm" onClick={() => setPending([])}><Undo2 size={13} /> Discard</button><button className="btn btn-sm btn-primary" onClick={() => { preview.mutate(); setSaveOpen(true) }}>Review {pending.length} change{pending.length > 1 ? 's' : ''}</button></>}
           {!pending.length && ds.status === 'draft' && <button className="btn btn-sm" onClick={() => approve.mutate()}><CheckCircle2 size={13} /> Approve data</button>}
           {!pending.length && ds.parent_id && <button className="btn btn-sm" onClick={() => rollback.mutate()} title="New version with the parent's content"><History size={13} /> Roll back</button>}
-          {!pending.length && <div className="flex items-center rounded-[var(--radius-md)] border border-line overflow-hidden">{['json', 'jsonl', 'csv'].map((f) => <button key={f} className="h-8 px-2.5 text-[12.5px] font-medium hover:bg-surface-2 border-r border-line last:border-0 flex items-center gap-1" onClick={() => doExport.mutate(f)}><Download size={12} /> {f.toUpperCase()}</button>)}</div>}
+          {!pending.length && (ds.status === 'approved' || ds.status === 'published') && <div className="flex items-center rounded-[var(--radius-md)] border border-line overflow-hidden">{['json', 'jsonl', 'csv'].map((f) => <button key={f} className="h-8 px-2.5 text-[12.5px] font-medium hover:bg-surface-2 border-r border-line last:border-0 flex items-center gap-1" onClick={() => doExport.mutate(f)}><Download size={12} /> {f.toUpperCase()}</button>)}</div>}
         </div>
       </div>
 

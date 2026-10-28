@@ -159,11 +159,12 @@ def run_bench(
         p1, wall1 = _run_batch(
             "run_pipeline", [{"round_id": r, "use_llm": False} for r in round_ids], round_ids
         )
-        # approve every proposed mapping (an operator would do this once per customer)
+        # approve every proposed mapping (an operator would do this once per customer); policy blocks stay
         t_appr = time.perf_counter()
         with session_scope() as sess:
             for mv in sess.scalars(select(MappingVersion).where(MappingVersion.status == "proposed")):
-                ms.approve_mapping(sess, mv.id, "bench", "approved by bench")
+                if (mv.policy or {}).get("decision") != "block":
+                    ms.approve_mapping(sess, mv.id, "bench", "approved by bench")
         approve_s = time.perf_counter() - t_appr
         p2, wall2 = _run_batch(
             "transform_round", [{"round_id": r, "force": True} for r in round_ids], round_ids

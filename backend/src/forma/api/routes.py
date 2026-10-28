@@ -469,7 +469,10 @@ def approve_mapping(
     p: Principal = Depends(require_role("reviewer")),
 ) -> dict[str, Any]:
     _mapping_scoped(session, p, mapping_id)
-    return ser.mapping_version(ms.approve_mapping(session, mapping_id, p.actor, body.comment), document=False)
+    if body.override_block and not p.has_role("approver"):
+        raise Forbidden("overriding a policy block needs the approver role", details={"required": "approver"})
+    mv = ms.approve_mapping(session, mapping_id, p.actor, body.comment, override_block=body.override_block)
+    return ser.mapping_version(mv, document=False)
 
 
 @api.post("/mappings/{mapping_id}/reject")

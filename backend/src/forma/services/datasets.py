@@ -575,6 +575,9 @@ def export_dataset(
     if fmt not in FORMATS:
         raise ValidationFailed(f"format must be one of {FORMATS}")
     dv = get_dataset(session, dataset_id)
+    # exporting publishes: only data a human approved may leave (approved_data → published)
+    if dv.status not in ("approved", "published"):
+        raise Conflict(f"dataset is {dv.status}; approve it before exporting", details={"status": dv.status})
     schema = ctx.registry.get_ref(get_mapping(session, dv.mapping_version_id).target_schema)
     src = ctx.records_path(dv)
     stamp = dt.datetime.now(dt.UTC).strftime("%Y%m%dT%H%M%SZ")
@@ -595,7 +598,7 @@ def export_dataset(
         sha256=digest,
     )
     session.add(art)
-    if dv.status in ("approved", "draft"):
+    if dv.status == "approved":
         dv.status = "published"
     r = session.get(ImportRound, dv.round_id)
     if r:

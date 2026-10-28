@@ -156,6 +156,10 @@ def test_dev_mode_roles_and_actor_recording(client: TestClient, isolated_env: Pa
     job = c.post(f"/api/rounds/{rid}/transform?sync=true", headers={"X-Forma-User": "reviewer"}).json()
     ds = c.get(f"/api/jobs/{job['job_id']}").json()["result"]["dataset_version_id"]
     assert (
+        c.post(f"/api/datasets/{ds}/approve", json={}, headers={"X-Forma-User": "reviewer"}).status_code
+        == 200
+    )
+    assert (
         c.post(f"/api/datasets/{ds}/export?fmt=json", headers={"X-Forma-User": "reviewer"}).status_code == 403
     )
     assert (

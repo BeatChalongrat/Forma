@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { Check, X, Save, Stethoscope, ChevronDown, ChevronRight, Braces, Plus, Trash2, Wand2 } from 'lucide-react'
+import { Check, X, Save, Stethoscope, ChevronDown, ChevronRight, Braces, Plus, Trash2, Wand2, ShieldAlert } from 'lucide-react'
 import { api, type Expr, type FieldMapping, type FieldSpec, type MappingDocument, type TableProfile } from '../lib/api'
 import { cn, describeExpr, fmtInt, pyRegex } from '../lib/utils'
 import { Badge, Confidence, RiskDot, Spinner, StatusBadge, Tabs, FindingRow, Modal } from '../components/ui'
@@ -62,6 +62,7 @@ export function MappingStudio() {
   const [rawText, setRawText] = useState('')
   const [comment, setComment] = useState('')
   const [reject, setReject] = useState(false)
+  const [overrideOpen, setOverrideOpen] = useState(false)
 
   useEffect(() => { if (mv?.document && !doc) { setDoc(mv.document); setSelectedSource(mv.document.record.root_source) } }, [mv, doc])
 
@@ -109,7 +110,7 @@ export function MappingStudio() {
   const diagnose = useMutation({ mutationFn: () => api.diagnose(mappingId) })
 
   // ---- actions ---------------------------------------------------------------------------------
-  const approve = useMutation({ mutationFn: () => api.approveMapping(mappingId, { actor: 'operator', comment }), onSuccess: () => { qc.invalidateQueries(); toast.push({ kind: 'ok', title: 'Mapping approved', detail: 'Transform the round to produce the dataset.' }) }, onError: (e: Error) => toast.push({ kind: 'bad', title: 'Approve failed', detail: e.message }) })
+  const approve = useMutation({ mutationFn: (overrideBlock: boolean) => api.approveMapping(mappingId, { actor: 'operator', comment, override_block: overrideBlock }), onSuccess: () => { qc.invalidateQueries(); setOverrideOpen(false); toast.push({ kind: 'ok', title: 'Mapping approved', detail: 'Transform the round to produce the dataset.' }) }, onError: (e: Error) => toast.push({ kind: 'bad', title: 'Approve failed', detail: e.message }) })
   const rejectM = useMutation({ mutationFn: () => api.rejectMapping(mappingId, { actor: 'operator', comment }), onSuccess: () => { qc.invalidateQueries(); setReject(false); toast.push({ kind: 'ok', title: 'Mapping rejected' }) } })
   const save = useMutation({
     mutationFn: () => api.editMapping(mappingId, doc!, 'operator'),
@@ -174,7 +175,9 @@ export function MappingStudio() {
           {!dirty && !locked && (
             <>
               <button className="btn btn-sm btn-danger" onClick={() => setReject(true)}><X size={13} /> Reject</button>
-              <button className="btn btn-sm btn-primary" disabled={approve.isPending} onClick={() => approve.mutate()}><Check size={13} /> Approve</button>
+              {mv.policy.decision === 'block'
+                ? <button className="btn btn-sm" onClick={() => setOverrideOpen(true)} title="Blocked by policy — approving needs the approver role and a reason"><ShieldAlert size={13} /> Override block…</button>
+                : <button className="btn btn-sm btn-primary" disabled={approve.isPending} onClick={() => approve.mutate(false)}><Check size={13} /> Approve</button>}
             </>
           )}
           {!dirty && mv.status === 'approved' && <Link to={`/rounds/${roundId}`} className="btn btn-sm">Back to round</Link>}
@@ -324,6 +327,12 @@ export function MappingStudio() {
       </Modal>
       <Modal open={reject} onClose={() => setReject(false)} title="Reject this mapping" width="max-w-md" footer={<><button className="btn" onClick={() => setReject(false)}>Cancel</button><button className="btn btn-danger" onClick={() => rejectM.mutate()}>Reject</button></>}>
         <textarea className="input h-24 py-2" placeholder="Why? (kept in the audit log and shown to the AI on the next proposal)" value={comment} onChange={(e) => setComment(e.target.value)} />
+      </Modal>
+      <Modal open={overrideOpen} onClose={() => setOverrideOpen(false)} title="Override the policy block" width="max-w-md" footer={<><button className="btn" onClick={() => setOverrideOpen(false)}>Cancel</button><button className="btn btn-danger" disabled={!comment.trim() || approve.isPending} onClick={() => approve.mutate(true)}><ShieldAlert size={13} /> Approve anyway</button></>}>
+        <div className="space-y-3 text-[13px]">
+          <ul className="text-ink-2 space-y-1">{mv.policy.reasons.map((r, i) => <li key={i}>• {r}</li>)}</ul>
+          <textarea className="input h-24 py-2" placeholder="Why is this safe to approve? (required, kept in the audit log)" value={comment} onChange={(e) => setComment(e.target.value)} />
+        </div>
       </Modal>
     </div>
   )

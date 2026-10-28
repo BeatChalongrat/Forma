@@ -65,6 +65,7 @@ def test_full_flow_on_minio(s3_env: Path) -> None:
         grid = c.get(f"/api/rounds/{rid}/files/{files[0]['id']}/grid?rows=5").json()
         assert grid["rows"]
         # export → pre-signed redirect, and the object is downloadable from MinIO
+        c.post(f"/api/datasets/{ds}/approve", json={})
         exp = c.post(f"/api/datasets/{ds}/export?fmt=jsonl").json()
         assert exp["key"].startswith(f"exports/{cust['id']}/")
         r = c.get(f"/api/exports/{exp['id']}/download", follow_redirects=False)
