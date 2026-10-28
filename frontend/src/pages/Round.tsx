@@ -64,6 +64,7 @@ export function RoundPage() {
               <span>source: {latestMapping.policy.source ?? latestMapping.created_by}</span>
               <span className="flex items-center gap-1.5">confidence <Confidence value={latestMapping.confidence} /></span>
               {latestMapping.policy.simulation && <span className="tnum">{fmtInt(latestMapping.policy.simulation.rows_out)} rows simulated · {latestMapping.policy.simulation.findings.error} errors · {latestMapping.policy.simulation.findings.warning} warnings</span>}
+              {latestMapping.policy.sandbox?.delta && <span className={cn('tnum', latestMapping.policy.sandbox.verdict === 'fail' && 'text-bad font-medium')}>vs approved v{latestMapping.policy.sandbox.baseline_version}: {fmtInt(latestMapping.policy.sandbox.delta.changed_prices)} prices change · {fmtInt(latestMapping.policy.sandbox.delta.lost)} records missing</span>}
             </div>
           </div>
           <Link to={`/rounds/${r.id}/mapping/${latestMapping.id}`} className="btn btn-primary shrink-0">Open Mapping Studio <ArrowRight size={14} /></Link>

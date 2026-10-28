@@ -50,10 +50,21 @@ DEFAULT_POLICY: dict[str, Any] = {
             "unrelated_file": 100,
             "new_customer": 15,
             "warnings": 2,
+            "sandbox_failed": 60,
+            "sandbox_changed_values": 25,
         }
     },
     "block": {"on_unrelated_file": True, "on_missing_identity": True, "on_zero_rows": True},
     "risk_overrides": {},
+    # Mapping simulation sandbox (ADR-018): a new mapping vs the approved one, on the same real files.
+    "sandbox": {
+        "enabled": True,
+        "max_lost_records": 0,  # records the approved mapping produces that the new one drops → block
+        "max_new_errors": 0,  # engine + schema errors beyond the approved mapping's → block
+        "max_new_invalid_prices": 0,  # records without a valid price beyond the approved mapping's → block
+        "max_new_duplicates": 0,  # duplicate identities beyond the approved mapping's → block
+        "max_changed_prices_auto": 0,  # more changed prices than this → a human reviews (never auto)
+    },
 }
 
 
@@ -101,6 +112,14 @@ def validate_policy(policy: dict[str, Any]) -> list[str]:
     for k, v in p["block"].items():
         if k not in DEFAULT_POLICY["block"] or not isinstance(v, bool):
             problems.append(f"block.{k} must be a known switch set to true or false")
+    for k, v in p["sandbox"].items():
+        if k == "enabled":
+            if not isinstance(v, bool):
+                problems.append("sandbox.enabled must be true or false")
+        elif k not in DEFAULT_POLICY["sandbox"]:
+            problems.append(f"sandbox.{k} is not a known setting")
+        elif isinstance(v, bool) or not isinstance(v, int) or v < 0:
+            problems.append(f"sandbox.{k} must be a whole number ≥ 0")
     for sem, risk in p["risk_overrides"].items():
         if risk not in RISK_ORDER:
             problems.append(f"risk_overrides.{sem} must be one of {list(RISK_ORDER)}")
@@ -116,6 +135,23 @@ class PolicyEngine:
         """``approval.yaml``, with the version saved in the web app on top when there is one."""
         base = file_policy(directory)
         return cls(_merge(base, override) if override else base)
+
+    def sandbox_problems(self, report: dict[str, Any] | None) -> list[str]:
+        """Why the sandbox comparison must stop this mapping; ``[]`` when it may go on (ADR-018)."""
+        sb = self.policy["sandbox"]
+        delta = (report or {}).get("delta")
+        if not sb.get("enabled") or not delta:
+            return []
+        out: list[str] = []
+        if delta["lost"] > sb["max_lost_records"]:
+            out.append(f"sandbox: {delta['lost']} records the approved mapping produces are missing")
+        if delta["new_errors"] > sb["max_new_errors"]:
+            out.append(f"sandbox: {delta['new_errors']} more errors than the approved mapping")
+        if delta["new_invalid_prices"] > sb["max_new_invalid_prices"]:
+            out.append(f"sandbox: {delta['new_invalid_prices']} more records without a valid price")
+        if delta["new_duplicates"] > sb["max_new_duplicates"]:
+            out.append(f"sandbox: {delta['new_duplicates']} more duplicate records")
+        return out
 
     def risk_of(self, schema: TargetSchema, pointer: str) -> str:
         try:
@@ -139,6 +175,7 @@ class PolicyEngine:
         reused_approved: bool = False,
         other_customer: dict[str, Any] | None = None,
         llm_fallback: bool = False,
+        sandbox: dict[str, Any] | None = None,
     ) -> PolicyDecision:
         aa = self.policy["auto_approve"]
         w = self.policy["review"]["priority_weights"]
@@ -155,6 +192,8 @@ class PolicyEngine:
         checks["drift"] = drift
         checks["reused_approved"] = reused_approved
         checks["llm_fallback"] = llm_fallback
+        if sandbox is not None:
+            checks["sandbox"] = sandbox.get("delta")
 
         # ---- hard blocks
         blk = self.policy["block"]
@@ -168,6 +207,17 @@ class PolicyEngine:
             )
         if blk["on_zero_rows"] and rows_out == 0:
             return PolicyDecision("block", w["errors"], ["transformation produced zero records"], 1.0, checks)
+        sandbox_failures = self.sandbox_problems(sandbox)
+        if sandbox_failures:
+            return PolicyDecision("block", w.get("sandbox_failed", 60), sandbox_failures, 1.0, checks)
+        changed = (sandbox or {}).get("delta") or {}
+        if self.policy["sandbox"]["enabled"] and changed.get("changed_prices", 0) > int(
+            self.policy["sandbox"]["max_changed_prices_auto"]
+        ):
+            reasons.append(
+                f"sandbox: {changed['changed_prices']} prices differ from the approved mapping's output"
+            )
+            priority += w.get("sandbox_changed_values", 25)
         if blk["on_missing_identity"] and any(
             "identity" in str(f.get("message", "")) and f.get("severity") == "error" for f in findings
         ):

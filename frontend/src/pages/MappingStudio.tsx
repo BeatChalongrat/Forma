@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Check, X, Save, Stethoscope, ChevronDown, ChevronRight, Braces, Plus, Trash2, Wand2, ShieldAlert } from 'lucide-react'
-import { api, type Expr, type FieldMapping, type FieldSpec, type MappingDocument, type TableProfile } from '../lib/api'
+import { api, type SandboxItem, type SandboxReport, type Expr, type FieldMapping, type FieldSpec, type MappingDocument, type TableProfile } from '../lib/api'
 import { cn, describeExpr, fmtInt, pyRegex } from '../lib/utils'
 import { Badge, Confidence, RiskDot, Spinner, StatusBadge, Tabs, FindingRow, Modal } from '../components/ui'
 import { useToast } from '../lib/toast'
@@ -57,7 +57,7 @@ export function MappingStudio() {
   const [dirty, setDirty] = useState(false)
   const [selected, setSelected] = useState<string | null>(null) // target pointer being edited
   const [selectedSource, setSelectedSource] = useState<string | null>(null)
-  const [rightTab, setRightTab] = useState<'json' | 'source' | 'findings' | 'diagnosis'>('json')
+  const [rightTab, setRightTab] = useState<'json' | 'source' | 'findings' | 'diagnosis' | 'compare'>('json')
   const [showRaw, setShowRaw] = useState(false)
   const [rawText, setRawText] = useState('')
   const [comment, setComment] = useState('')
@@ -279,7 +279,7 @@ export function MappingStudio() {
 
         {/* RIGHT: preview */}
         <aside className="border-l border-line bg-surface flex flex-col min-h-0">
-          <Tabs value={rightTab} onChange={setRightTab} items={[{ id: 'json', label: 'JSON output', count: pv?.records.length }, { id: 'source', label: 'Source rows' }, { id: 'findings', label: 'Findings', count: pv?.findings.length }, { id: 'diagnosis', label: 'Diagnosis' }]} />
+          <Tabs value={rightTab} onChange={setRightTab} items={[{ id: 'json', label: 'JSON output', count: pv?.records.length }, { id: 'source', label: 'Source rows' }, { id: 'findings', label: 'Findings', count: pv?.findings.length }, { id: 'diagnosis', label: 'Diagnosis' }, { id: 'compare', label: <span className="flex items-center gap-1">Compare{mv.policy.sandbox?.verdict === 'fail' && <span className="w-1.5 h-1.5 rounded-full bg-bad" />}</span> }]} />
           <div className="flex-1 overflow-auto p-3">
             {rightTab === 'json' && (
               <>
@@ -301,6 +301,7 @@ export function MappingStudio() {
               ) : <div className="text-muted text-[12.5px]">{selectedSource ? (srcPreview.isLoading ? 'Loading…' : srcPreview.error ? String((srcPreview.error as Error).message) : '') : 'Select a source on the left.'}</div>
             )}
             {rightTab === 'findings' && (pv?.findings.length ? pv.findings.map((f, i) => <FindingRow key={i} f={f} />) : <div className="text-muted text-[12.5px]">No findings on the sample.</div>)}
+            {rightTab === 'compare' && <ComparePanel mappingId={mappingId} stored={mv.policy.sandbox ?? null} draft={dirty ? doc : null} />}
             {rightTab === 'diagnosis' && (
               diagnose.isPending ? <div className="text-muted text-[12.5px] flex items-center gap-2"><Spinner /> analysing…</div> : diagnose.data ? (
                 <div className="flex flex-col gap-3 text-[12.5px]">
@@ -400,5 +401,86 @@ function FieldEditor({ field, fm, columns, locked, onChange, onRemove }: { field
       )}
       {fm?.evidence?.length ? <ul className="mt-2 text-muted flex flex-col gap-0.5">{fm.evidence.map((e, i) => <li key={i}>• {e}</li>)}</ul> : null}
     </div>
+  )
+}
+
+// ---------------------------------------------------------------------------------------------
+// Sandbox (ADR-018): this mapping next to the approved one, on the round's real files
+// ---------------------------------------------------------------------------------------------
+type SandboxList = 'price_changes' | 'changed' | 'lost' | 'gained'
+
+function ComparePanel({ mappingId, stored, draft }: { mappingId: string; stored: SandboxReport | null; draft: MappingDocument | null }) {
+  const run = useMutation({ mutationFn: (d: MappingDocument | undefined) => api.compareMapping(mappingId, d) })
+  const report = draft ? run.data ?? null : run.data ?? stored
+  const live = !!run.data
+  return (
+    <div className="flex flex-col gap-3 text-[12.5px]">
+      <div className="flex flex-wrap items-center gap-2">
+        <button className="btn btn-sm" disabled={run.isPending} onClick={() => run.mutate(draft ?? undefined)}>
+          {run.isPending ? <><Spinner /> running both mappings…</> : draft ? 'Compare these edits with the approved mapping' : report ? 'Run again' : 'Compare with the approved mapping'}
+        </button>
+        {run.error && <span className="text-bad">{(run.error as Error).message}</span>}
+      </div>
+      {!report && !run.isPending && <div className="text-muted">{draft ? 'Your unsaved edits are compared only when you ask.' : 'No comparison stored with this version (first mapping of this customer, or a verbatim reuse).'}</div>}
+      {report && <SandboxView mappingId={mappingId} report={report} live={live} />}
+    </div>
+  )
+}
+
+function SandboxView({ mappingId, report, live }: { mappingId: string; report: SandboxReport; live: boolean }) {
+  const [list, setList] = useState<SandboxList>('price_changes')
+  const stored = useQuery({ queryKey: ['sandbox', mappingId, list], queryFn: () => api.sandboxList(mappingId, list, 0, 200), enabled: !live && !!report.delta })
+  if (!report.baseline_id) return <div className="text-muted">{report.message ?? 'Nothing to compare with yet.'}</div>
+  const d = report.delta
+  const o = report.old
+  const n = report.new
+  const rows: [string, number | undefined, number | undefined, boolean][] = [
+    ['Output rows', o.rows_out, n.rows_out, false],
+    ['Errors', o.errors, n.errors, (n.errors ?? 0) > (o.errors ?? 0)],
+    ['Records without a valid price', o.invalid_prices, n.invalid_prices, (n.invalid_prices ?? 0) > (o.invalid_prices ?? 0)],
+    ['Duplicate records', o.duplicates, n.duplicates, (n.duplicates ?? 0) > (o.duplicates ?? 0)],
+    ['Rows without identity', o.missing_identity, n.missing_identity, (n.missing_identity ?? 0) > (o.missing_identity ?? 0)],
+  ]
+  const items: SandboxItem[] = live ? report.details?.[list] ?? [] : stored.data?.items ?? []
+  const totals: Record<SandboxList, number> = { price_changes: d?.changed_prices ?? 0, changed: d?.changed_records ?? 0, lost: d?.lost ?? 0, gained: d?.gained ?? 0 }
+  const fmt = (v: unknown) => (v === null || v === undefined ? '∅' : typeof v === 'number' ? v.toLocaleString() : typeof v === 'object' ? JSON.stringify(v) : String(v))
+  return (
+    <>
+      <div className={cn('rounded-[var(--radius-md)] px-3 py-2', report.verdict === 'fail' ? 'bg-bad-soft text-bad' : report.verdict === 'pass' ? 'bg-ok-soft text-ok' : 'bg-surface-2 text-ink-2')}>
+        <div className="font-medium">{report.verdict === 'fail' ? 'Blocked — this mapping would make the data worse' : report.verdict === 'pass' ? 'Nothing lost or broken compared with the approved mapping' : 'Could not compare'}</div>
+        {report.problems?.map((p, i) => <div key={i}>• {p}</div>)}
+        {!o.ok && <div>The approved mapping cannot read these files: {o.problems?.join('; ')}</div>}
+      </div>
+      <div className="text-muted">vs approved v{report.baseline_version} · same files · {report.rows_limit ? `first ${fmtInt(report.rows_limit)} rows per source` : 'all rows'}{live ? ' · not saved' : ''}</div>
+      <table className="w-full tnum">
+        <thead><tr className="text-muted text-left"><th className="py-1 font-normal">Metric</th><th className="py-1 font-normal text-right">Approved</th><th className="py-1 font-normal text-right">This mapping</th></tr></thead>
+        <tbody>{rows.map(([label, a, b, worse]) => (
+          <tr key={label} className="border-t border-line"><td className="py-1.5">{label}</td><td className="text-right">{a === undefined ? '–' : fmtInt(a)}</td><td className={cn('text-right', worse && 'text-bad font-medium')}>{b === undefined ? '–' : fmtInt(b)}</td></tr>
+        ))}</tbody>
+      </table>
+      {d && (
+        <>
+          <div className="flex flex-wrap gap-1.5">{(['price_changes', 'changed', 'lost', 'gained'] as SandboxList[]).map((k) => (
+            <button key={k} className={cn('chip', list === k ? 'bg-signal-soft text-signal border-signal/30' : 'bg-surface-2 border-line', k === 'lost' && totals[k] > 0 && 'text-bad')} onClick={() => setList(k)}>
+              {{ price_changes: 'Changed prices', changed: 'Changed records', lost: 'Missing records', gained: 'New records' }[k]} <span className="tnum ml-1">{fmtInt(totals[k])}</span>
+            </button>
+          ))}{d.large_price_moves > 0 && <Badge tone="warn">{fmtInt(d.large_price_moves)} prices move ≥ 20%</Badge>}</div>
+          <div className="border border-line rounded-[var(--radius-md)] max-h-[360px] overflow-auto">
+            {stored.isLoading && !live ? <div className="p-3"><Spinner /></div> : items.length === 0 ? <div className="p-3 text-muted">None.</div> : (
+              <table className="w-full text-[12px]">
+                <tbody>{items.map((it, i) => (
+                  <tr key={i} className="border-b border-line last:border-0 align-top">
+                    <td className="px-2 py-1.5 mono whitespace-nowrap">{it.identity}</td>
+                    {list === 'price_changes' && <><td className="px-2 py-1.5 text-right tnum">{fmt(it.before)}</td><td className="px-1 text-muted">→</td><td className="px-2 py-1.5 tnum">{fmt(it.after)}</td><td className={cn('px-2 py-1.5 text-right tnum', it.pct != null && Math.abs(it.pct) >= 20 && 'text-warn font-medium')}>{it.pct == null ? '' : `${it.pct > 0 ? '+' : ''}${it.pct}%`}</td></>}
+                    {list === 'changed' && <td className="px-2 py-1.5 text-muted">{it.changes?.slice(0, 3).map((c) => `${c.pointer}: ${fmt(c.before)} → ${fmt(c.after)}`).join(' · ')}{(it.fields ?? 0) > 3 ? ` · +${(it.fields ?? 0) - 3} more` : ''}</td>}
+                  </tr>
+                ))}</tbody>
+              </table>
+            )}
+          </div>
+          {totals[list] > items.length && <div className="text-muted">Showing {fmtInt(items.length)} of {fmtInt(totals[list])}.</div>}
+        </>
+      )}
+    </>
   )
 }

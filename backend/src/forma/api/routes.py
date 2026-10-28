@@ -14,6 +14,7 @@ from forma.api import serialize as ser
 from forma.api.schemas import (
     BatchRunIn,
     ChangesIn,
+    CompareIn,
     CopilotIn,
     CustomerIn,
     CustomerPatch,
@@ -531,6 +532,34 @@ def mapping_preview(
 ) -> dict[str, Any]:
     _round_scoped(session, p, round_id)
     return ms.preview_mapping(ctx, session, round_id, body.document, limit=body.limit)
+
+
+@api.post("/mappings/{mapping_id}/compare")
+def compare_mapping(
+    mapping_id: str,
+    body: CompareIn,
+    session: Session = Depends(get_session),
+    ctx: ServiceContext = Depends(ctx_dep),
+    p: Principal = Depends(current_principal),
+) -> dict[str, Any]:
+    """Sandbox (ADR-018): this mapping, or unsaved edits of it, next to the approved one on real files."""
+    _mapping_scoped(session, p, mapping_id)
+    return ms.sandbox_compare(ctx, session, mapping_id, body.document, limit=body.limit)
+
+
+@api.get("/mappings/{mapping_id}/sandbox")
+def mapping_sandbox(
+    mapping_id: str,
+    list: str = "price_changes",
+    offset: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=1000),
+    session: Session = Depends(get_session),
+    ctx: ServiceContext = Depends(ctx_dep),
+    p: Principal = Depends(current_principal),
+) -> dict[str, Any]:
+    """The comparison stored with this version, and one page of a drill-down list."""
+    _mapping_scoped(session, p, mapping_id)
+    return ms.sandbox_details(ctx, session, mapping_id, list, offset, limit)
 
 
 @api.post("/rounds/{round_id}/source-preview")

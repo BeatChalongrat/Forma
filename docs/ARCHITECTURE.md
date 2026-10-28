@@ -50,19 +50,22 @@ ImportRound: uploaded ─▶ profiled ─▶ ┬─ auto_approved ─▶ transfo
    *heuristic draft* (synonyms + hints + value overlap, fully explainable), *AI* (schema agent → mapping
    agent, or adaptation agent when the format drifted) if an LLM is configured. The result is validated
    statically against the target schema and simulated on a sample.
-5. **Policy** — `policies/approval.yaml`: confidence thresholds per risk level, allowed drift kinds,
+5. **Sandbox** — a new mapping for a customer with an approved one (drift re-proposal, AI adaptation,
+   Studio edit) runs next to the approved mapping on the same files; rows, errors, invalid prices,
+   duplicates, lost/gained records and every changed price are compared (ADR-018).
+6. **Policy** — `policies/approval.yaml`: confidence thresholds per risk level, allowed drift kinds,
    warnings budget, first-time-customer rule, row-count sanity, hard blocks. Produces
-   `auto_approve | review | block` with reasons and a queue priority. A `block` is not an ordinary review:
+   `auto_approve | review | block` with reasons and a queue priority. A sandbox comparison that loses records or adds errors/invalid prices blocks; changed prices go to review. A `block` is not an ordinary review:
    approving it is an explicit override (`override_block`, approver role, mandatory reason, audited), and a
    Studio edit keeps the round's drift, so it cannot clear a wrong-file block.
-6. **Transform** — full run with the approved mapping; persistent overrides for the customer are
+7. **Transform** — full run with the approved mapping; persistent overrides for the customer are
    re-applied; records are validated against the schema; a `DatasetVersion` (JSONL on disk) is created.
-7. **Edit** — the Data Editor stages cell edits, bulk/copilot operations and deletions; the API previews
+8. **Edit** — the Data Editor stages cell edits, bulk/copilot operations and deletions; the API previews
    impact (rows, cells, before/after) and schema validity; applying creates a new version + `ChangeSet`.
    *Persistent* edits also create `Override` rules for future rounds. Rollback = new version from parent.
-8. **Change intelligence** — the dataset is diffed against the customer's previous published dataset:
+9. **Change intelligence** — the dataset is diffed against the customer's previous published dataset:
    SKUs added/removed, changed fields, price moves (large ones flagged), promotion changes.
-9. **Export** — JSON (nested), JSONL, or CSV flattened per the schema's `output_variants`; atomic write;
+10. **Export** — JSON (nested), JSONL, or CSV flattened per the schema's `output_variants`; atomic write;
    artifact recorded with sha256. Exporting publishes, so only an approved (or already published) dataset
    can be exported; a draft is refused with 409.
 
