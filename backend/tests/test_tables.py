@@ -109,6 +109,25 @@ def test_extract_drops_total_rows_th_and_en(grid: Grid) -> None:
     assert kept.height == 10
 
 
+def test_total_rows_need_a_standalone_label_and_numbers_only(grid: Grid) -> None:
+    lookalikes: list[list[object]] = [
+        ["SUM-01", "ชุดของขวัญ", "120.00", "ชิ้น"],
+        ["Summer Pack", "แพ็คฤดูร้อน", "89.00", "แพ็ค"],
+        ["รวมมิตร", "ผลไม้รวม", "35.00", "ถุง"],
+        ["Total Care", "แชมพู", "159.00", "ขวด"],
+    ]
+    totals: list[list[object]] = [
+        ["Grand Total:", N, "9,999.00", N],
+        ["Sub-total", N, "฿1,500", "-"],
+        ["รวมทั้งสิ้น 12 รายการ", N, "1,234.50", N],
+        [N, "ยอดรวม", "(200)", N],
+        ["รวม", N, "999", N],
+    ]
+    f = extract_table(grid([HDR, *DATA, *lookalikes, *totals]), TableSpec())
+    assert f.height == len(DATA) + len(lookalikes)
+    assert f["รหัสสินค้า"].to_list()[-len(lookalikes) :] == [r[0] for r in lookalikes]
+
+
 def test_fill_down(grid: Grid) -> None:
     rows: list[list[object]] = [
         ["Cat", "SKU", "Qty"],

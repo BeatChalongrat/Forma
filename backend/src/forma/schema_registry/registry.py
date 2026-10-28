@@ -11,6 +11,7 @@ goes through this module. Nothing else in the codebase may hard-code target fiel
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -22,6 +23,7 @@ from forma.core.errors import NotFound, ValidationFailed
 
 Risk = Literal["critical", "high", "medium", "low"]
 RISK_ORDER: dict[str, int] = {"critical": 3, "high": 2, "medium": 1, "low": 0}
+_SCHEMA_ID_RE = re.compile(r"[a-z0-9][a-z0-9_-]{0,63}")  # also the file name: <schema_id>.v<n>.json
 
 
 @dataclass(frozen=True)
@@ -302,9 +304,20 @@ class SchemaRegistry:
         """Validate and add a new schema (new version if the id already exists)."""
         Draft202012Validator.check_schema(document)
         xf = document.setdefault("x-forma", {})
-        sid = str(xf.get("schema_id") or document.get("title", "schema")).lower()
+        # the id becomes a file name: an explicit one must already be safe, a title is slugified
+        if xf.get("schema_id"):
+            sid = str(xf["schema_id"]).strip().lower()
+        else:
+            sid = re.sub(r"[^a-z0-9_-]+", "_", str(document.get("title") or "schema").lower()).strip("_-")
+        if not _SCHEMA_ID_RE.fullmatch(sid):
+            raise ValidationFailed(
+                "x-forma.schema_id must be 1-64 characters of a-z, 0-9, '_' or '-'",
+                details={"schema_id": sid},
+            )
         existing = [v for (s, v) in self._cache if s == sid]
         version = int(xf.get("version") or (max(existing) + 1 if existing else 1))
+        if version < 1:
+            raise ValidationFailed("x-forma.version must be a positive integer", details={"version": version})
         if (sid, version) in self._cache:
             version = max(existing) + 1
         xf["schema_id"], xf["version"] = sid, version

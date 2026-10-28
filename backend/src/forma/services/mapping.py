@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 from forma.ai.agents import PROMPT_VERSION, AgentResult, adaptation_agent, mapping_agent, schema_agent
 from forma.ai.heuristics import HeuristicProposal, propose_mapping
 from forma.ai.llm import LLMError
-from forma.core.errors import Conflict, NotFound, ValidationFailed
+from forma.core.errors import Conflict, NotFound, PolicyBlocked, ValidationFailed
 from forma.db.models import ImportRound, LLMCall, MappingVersion, ReviewTask, SourceFile
 from forma.engine.transform import BoundSource, TransformEngine, TransformResult
 from forma.mapping_dsl.models import MappingDocument, SourceSpec
@@ -379,11 +379,26 @@ def get_mapping(session: Session, mapping_id: str) -> MappingVersion:
 
 
 def approve_mapping(
-    session: Session, mapping_id: str, actor: str, comment: str | None = None
+    session: Session,
+    mapping_id: str,
+    actor: str,
+    comment: str | None = None,
+    *,
+    override_block: bool = False,
 ) -> MappingVersion:
     m = get_mapping(session, mapping_id)
     if m.status not in ("proposed", "approved"):
         raise Conflict(f"mapping is {m.status}; cannot approve")
+    # a policy block (wrong file, zero rows) is not an ordinary review: approving it is an explicit,
+    # justified override that the audit log records
+    blocked = m.status == "proposed" and (m.policy or {}).get("decision") == "block"
+    if blocked and not override_block:
+        raise PolicyBlocked(
+            "mapping is blocked by policy; approving it needs an explicit override with a reason",
+            details={"reasons": (m.policy or {}).get("reasons", [])},
+        )
+    if blocked and not (comment or "").strip():
+        raise ValidationFailed("overriding a policy block needs a comment explaining why")
     m.status = "approved"
     m.approved_by = actor
     m.approved_at = dt.datetime.now(dt.UTC)
@@ -400,7 +415,7 @@ def approve_mapping(
         r = session.get(ImportRound, m.round_id)
         if r:
             r.status = "approved"
-    audit(session, "mapping.approve", "mapping", m.id, actor=actor, comment=comment)
+    audit(session, "mapping.approve", "mapping", m.id, actor=actor, comment=comment, override_block=blocked)
     return m
 
 
@@ -459,6 +474,8 @@ def save_mapping_edit(
         schema,
         findings=findings,
         rows_out=sim.stats["rows_out"] if sim else 0,
+        # drift belongs to the round's files, not to the mapping: an edit cannot clear a wrong-file block
+        drift=((parent.policy or {}).get("checks") or {}).get("drift"),
         has_previous_approval=True,
     )
     mv = MappingVersion(

@@ -23,6 +23,7 @@ class RoundIn(BaseModel):
 class Decision(BaseModel):
     actor: str = "operator"
     comment: str | None = None
+    override_block: bool = False  # approve a policy-blocked mapping (approver role + comment required)
 
 
 class MappingEditIn(BaseModel):

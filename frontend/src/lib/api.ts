@@ -151,7 +151,7 @@ export const api = {
   ops: () => get<OpsSummary>('/api/ops'),
 
   mapping: (id: string) => get<MappingVersion>(`/api/mappings/${id}`),
-  approveMapping: (id: string, b: { actor: string; comment?: string }) => post<MappingVersion>(`/api/mappings/${id}/approve`, b),
+  approveMapping: (id: string, b: { actor: string; comment?: string; override_block?: boolean }) => post<MappingVersion>(`/api/mappings/${id}/approve`, b),
   rejectMapping: (id: string, b: { actor: string; comment?: string }) => post<MappingVersion>(`/api/mappings/${id}/reject`, b),
   editMapping: (id: string, document: MappingDocument, actor = 'operator') => post<MappingVersion>(`/api/mappings/${id}/edit`, { document, actor }),
   mappingPreview: (roundId: string, document: MappingDocument, limit = 50) => post<{ ok: boolean; records: Record<string, unknown>[]; findings: Finding[]; validation?: { ok: boolean; issues: { level: string; code: string; message: string; path: string }[] }; errors?: string[]; stats?: Record<string, unknown> }>(`/api/rounds/${roundId}/mapping-preview`, { document, limit }),

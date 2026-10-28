@@ -15,17 +15,15 @@ import polars as pl
 
 from forma.mapping_dsl.models import TableSpec
 
-TOTAL_MARKERS = (
-    "total",
-    "grand total",
-    "sum",
-    "subtotal",
-    "รวม",
-    "รวมทั้งสิ้น",
-    "รวมทั้งหมด",
-    "ยอดรวม",
-    "sum total",
+# A total row is labelled by its first non-null cell. Short markers must stand alone ("Total",
+# "Total:", "รวม 25 รายการ") so data that merely starts with the same letters ("SUM-01", "Summer…",
+# "รวมมิตร") is kept; Thai compounds are unambiguous and match as prefixes.
+TOTAL_LABEL_RE = (
+    r"^(?:(?:grand\s*|sub\s*-?\s*|sum\s*)?total|sum|รวม)(?:$|[\s:(\[])"
+    r"|^(?:รวมทั้งสิ้น|รวมทั้งหมด|ยอดรวม|รวมยอด|รวมเงิน|รวมสุทธิ)"
 )
+# Any other cell with a word in it means the row is data, not a total ("Total Care Shampoo", "PCS").
+_WORD_RE = r"[A-Za-zก-๎]{2,}"
 _NUM_RE = re.compile(r"^[-+]?[\d,]*\.?\d+%?$|^[-+]?฿?[\d,]+(\.\d+)?$")
 _DATE_RE = re.compile(r"^\d{1,4}[-/.]\d{1,2}[-/.]\d{1,4}")
 
@@ -343,13 +341,14 @@ def extract_table(df: pl.DataFrame, spec: TableSpec, *, rename: dict[str, str] |
     # drop fully blank rows
     if body.height:
         body = body.filter(~pl.all_horizontal(pl.all().is_null()))
-    # drop total rows (first non-null text cell starts with a total marker)
+    # drop total rows: a total label in the first non-null cell and nothing but numbers beside it
     if spec.drop_total_rows and body.height and body.width:
         first_text = pl.coalesce([pl.col(c) for c in body.columns]).str.to_lowercase().str.strip_chars()
-        cond = pl.lit(False)
-        for m in TOTAL_MARKERS:
-            cond = cond | first_text.str.starts_with(m)
-        body = body.filter(~cond.fill_null(False))
+        words = pl.sum_horizontal(
+            [pl.col(c).str.contains(_WORD_RE).fill_null(False).cast(pl.Int32) for c in body.columns]
+        )
+        cond = first_text.str.contains(TOTAL_LABEL_RE).fill_null(False) & (words <= 1)
+        body = body.filter(~cond)
     # fill down (merged cells)
     for c in spec.fill_down:
         if c in body.columns:

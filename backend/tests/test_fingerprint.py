@@ -169,9 +169,16 @@ def test_columns_added_removed_and_header_moved() -> None:
 def test_types_changed_and_sheets() -> None:
     prev = fingerprint_profile(_profile({"สินค้า": PRODUCTS, "Stock": STOCK}))
     retyped = [(c, "string" if c == "ราคาขาย" else t) for c, t in PRODUCTS]
-    # types alone do not change the strict hash …
-    assert compare(prev, fingerprint_profile(_profile({"สินค้า": retyped, "Stock": STOCK}))).is_identical
-    # … but once headers differ the type change is reported and outranks columns_added
+    # types are not part of the strict hash, but a retyped column is still drift: no verbatim reuse
+    same_headers = fingerprint_profile(_profile({"สินค้า": retyped, "Stock": STOCK}))
+    assert same_headers.strict == prev.strict
+    rep0 = compare(prev, same_headers)
+    assert rep0.classification == "types_changed" and not rep0.is_identical
+    assert rep0.changes == [{"kind": "types_changed", "header": "ราคาขาย", "from": "float", "to": "string"}]
+    # whole-baht prices one round and satang the next is the same data, as is a column left empty
+    noise = [(c, "int" if c == "ราคาขาย" else "empty" if c == "สถานะ" else t) for c, t in PRODUCTS]
+    assert compare(prev, fingerprint_profile(_profile({"สินค้า": noise, "Stock": STOCK}))).is_identical
+    # once headers differ too the type change is reported and outranks columns_added
     cur = fingerprint_profile(_profile({"สินค้า": [*retyped, ("Barcode", "string")], "Stock": STOCK}))
     rep = compare(prev, cur)
     assert rep.classification == "types_changed"

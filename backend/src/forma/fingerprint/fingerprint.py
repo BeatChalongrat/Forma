@@ -44,7 +44,7 @@ class TableShape:
 
 @dataclass
 class Fingerprint:
-    strict: str  # hash incl. sheet names + header positions
+    strict: str  # hash of sheet names + ordered headers (types are compared by ``compare``, not hashed)
     loose: str  # hash of sorted normalised headers only (sheet/position independent)
     tables: list[TableShape]
     kind: str
@@ -145,9 +145,35 @@ class DriftReport:
         }
 
 
+# int ↔ float flips with the data (whole-baht prices one round, satang the next) and the same DSL ops
+# parse both, so they are one family; mixed/empty columns carry no type signal at all.
+_TYPE_FAMILY = {"int": "number", "float": "number"}
+_NO_TYPE_SIGNAL = ("mixed", "empty")
+
+
+def _type_changes(previous: Fingerprint, current: Fingerprint) -> list[dict[str, Any]]:
+    """Columns whose inferred type changed, for tables on the same (normalised) sheet."""
+    changes: list[dict[str, Any]] = []
+    prev_by_sheet = {t.sheet: t for t in previous.tables}
+    for t in current.tables:
+        p = prev_by_sheet.get(t.sheet)
+        if p is None:
+            continue
+        ptypes = dict(zip(p.headers, p.types, strict=False))
+        for h, ty in zip(t.headers, t.types, strict=False):
+            old = ptypes.get(h)
+            if old is None or old in _NO_TYPE_SIGNAL or ty in _NO_TYPE_SIGNAL:
+                continue
+            if _TYPE_FAMILY.get(old, old) != _TYPE_FAMILY.get(ty, ty):
+                changes.append({"kind": "types_changed", "header": h, "from": old, "to": ty})
+    return changes
+
+
 def compare(previous: Fingerprint, current: Fingerprint, *, unrelated_threshold: float = 0.35) -> DriftReport:
     if previous.strict == current.strict:
-        return DriftReport("identical", 1.0)
+        # same sheets and headers, but a column that now holds other data must not reuse the mapping
+        retyped = _type_changes(previous, current)
+        return DriftReport("types_changed", 1.0, retyped) if retyped else DriftReport("identical", 1.0)
     prev_h = set(previous.all_headers())
     cur_h = set(current.all_headers())
     common = prev_h & cur_h
@@ -188,21 +214,11 @@ def compare(previous: Fingerprint, current: Fingerprint, *, unrelated_threshold:
     prev_by_sheet = {t.sheet: t for t in previous.tables}
     for t in current.tables:
         p = prev_by_sheet.get(t.sheet)
-        if p is None:
-            continue
-        if p.header_row != t.header_row:
+        if p is not None and p.header_row != t.header_row:
             changes.append(
                 {"kind": "header_moved", "sheet": t.sheet, "from": p.header_row, "to": t.header_row}
             )
-        ptypes = dict(zip(p.headers, p.types, strict=False))
-        for h, ty in zip(t.headers, t.types, strict=False):
-            if (
-                h in ptypes
-                and ptypes[h] != ty
-                and "mixed" not in (ty, ptypes[h])
-                and "empty" not in (ty, ptypes[h])
-            ):
-                changes.append({"kind": "types_changed", "header": h, "from": ptypes[h], "to": ty})
+    changes += _type_changes(previous, current)
 
     # main-table check: the biggest previous table must find a counterpart; shared generic satellite
     # tables (e.g. an identical 'Promotions' sheet) must not make an unrelated file look related.

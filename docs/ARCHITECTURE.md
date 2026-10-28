@@ -44,14 +44,17 @@ ImportRound: uploaded ─▶ profiled ─▶ ┬─ auto_approved ─▶ transfo
 3. **Fingerprint & drift** — the round's tables are hashed into a structural fingerprint and compared with the
    customer's last approved format (`identical · header_moved · columns_added · columns_renamed ·
    columns_removed · sheets_added/removed · types_changed · unrelated_file`), and with other customers'
-   approved formats (wrong-file signal).
+   approved formats (wrong-file signal). Identical headers with a retyped column are `types_changed`, not
+   `identical` (int/float count as one family; mixed/empty columns carry no type signal).
 4. **Mapping** — in order: *memory* (identical/moved structure → reuse the approved mapping verbatim),
    *heuristic draft* (synonyms + hints + value overlap, fully explainable), *AI* (schema agent → mapping
    agent, or adaptation agent when the format drifted) if an LLM is configured. The result is validated
    statically against the target schema and simulated on a sample.
 5. **Policy** — `policies/approval.yaml`: confidence thresholds per risk level, allowed drift kinds,
    warnings budget, first-time-customer rule, row-count sanity, hard blocks. Produces
-   `auto_approve | review | block` with reasons and a queue priority.
+   `auto_approve | review | block` with reasons and a queue priority. A `block` is not an ordinary review:
+   approving it is an explicit override (`override_block`, approver role, mandatory reason, audited), and a
+   Studio edit keeps the round's drift, so it cannot clear a wrong-file block.
 6. **Transform** — full run with the approved mapping; persistent overrides for the customer are
    re-applied; records are validated against the schema; a `DatasetVersion` (JSONL on disk) is created.
 7. **Edit** — the Data Editor stages cell edits, bulk/copilot operations and deletions; the API previews
@@ -60,7 +63,8 @@ ImportRound: uploaded ─▶ profiled ─▶ ┬─ auto_approved ─▶ transfo
 8. **Change intelligence** — the dataset is diffed against the customer's previous published dataset:
    SKUs added/removed, changed fields, price moves (large ones flagged), promotion changes.
 9. **Export** — JSON (nested), JSONL, or CSV flattened per the schema's `output_variants`; atomic write;
-   artifact recorded with sha256.
+   artifact recorded with sha256. Exporting publishes, so only an approved (or already published) dataset
+   can be exported; a draft is refused with 409.
 
 ## Mapping memory and self-healing
 

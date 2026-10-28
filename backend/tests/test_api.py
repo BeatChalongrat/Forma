@@ -451,6 +451,68 @@ def test_file_matching_another_customer_goes_to_review(client: TestClient, isola
     assert c.get("/api/dashboard").json()["failed_jobs"] == 1
 
 
+def test_export_needs_approved_data_and_block_needs_explicit_override(
+    client: TestClient, isolated_env: Path
+) -> None:
+    c = client
+    cust = c.post("/api/customers", json={"code": "B1", "name": "b"}).json()
+    r1 = c.post("/api/rounds", json={"customer_id": cust["id"]}).json()
+    _upload(c, r1["id"], make_workbook(isolated_env / FILE_NAME))
+    mv1 = _run(c, r1["id"])["result"]["mapping_version_id"]
+    assert c.post(f"/api/mappings/{mv1}/approve", json={}).status_code == 200
+    job = c.post(f"/api/rounds/{r1['id']}/transform", params={"sync": "true"}).json()
+    ds = c.get(f"/api/jobs/{job['job_id']}").json()["result"]["dataset_version_id"]
+    # a draft dataset is not publishable: exporting is refused until a human approves the data
+    draft = c.post(f"/api/datasets/{ds}/export", params={"fmt": "json"})
+    assert draft.status_code == 409 and draft.json()["details"]["status"] == "draft"
+    assert c.get(f"/api/datasets/{ds}").json()["status"] == "draft"
+    assert c.post(f"/api/datasets/{ds}/approve", json={}).json()["status"] == "approved"
+    assert c.post(f"/api/datasets/{ds}/export", params={"fmt": "json"}).status_code == 201
+    assert c.get(f"/api/datasets/{ds}").json()["status"] == "published"
+
+    # next round brings an unrelated workbook → policy blocks it as a probable wrong file
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "MARA"  # type: ignore[union-attr]
+    ws.append(["Material", "Material Description", "Base Unit", "Net Price"])  # type: ignore[union-attr]
+    for i in range(1, 11):
+        ws.append([f"MAT-{i:04d}", f"Part {i}", "EA", i * 3.5])  # type: ignore[union-attr]
+    wb.save(isolated_env / "wrong.xlsx")
+    r2 = c.post("/api/rounds", json={"customer_id": cust["id"]}).json()
+    _upload(c, r2["id"], isolated_env / "wrong.xlsx", name="export_C001.xlsx")
+    mv2 = _run(c, r2["id"])["result"]["mapping_version_id"]
+    m2 = c.get(f"/api/mappings/{mv2}").json()
+    assert m2["status"] == "proposed" and m2["policy"]["decision"] == "block"
+    # an edit cannot launder the block: the wrong-file drift belongs to the round, not the mapping
+    edited = c.post(f"/api/mappings/{mv2}/edit", json={"document": m2["document"]})
+    assert edited.status_code == 201, edited.text
+    mv3 = edited.json()["id"]
+    assert c.get(f"/api/mappings/{mv3}").json()["policy"]["decision"] == "block"
+    # plain approval is refused; the override needs the approver role and a reason
+    plain = c.post(f"/api/mappings/{mv3}/approve", json={"comment": "looks fine"})
+    assert plain.status_code == 403 and plain.json()["error"] == "policy_blocked"
+    by_reviewer = c.post(
+        f"/api/mappings/{mv3}/approve",
+        json={"override_block": True, "comment": "new ERP"},
+        headers={"X-Forma-User": "reviewer"},
+    )
+    assert by_reviewer.status_code == 403 and by_reviewer.json()["error"] == "forbidden"
+    no_reason = c.post(
+        f"/api/mappings/{mv3}/approve", json={"override_block": True}, headers={"X-Forma-User": "approver"}
+    )
+    assert no_reason.status_code == 422
+    assert c.get(f"/api/mappings/{mv3}").json()["status"] == "proposed"
+    ok = c.post(
+        f"/api/mappings/{mv3}/approve",
+        json={"override_block": True, "comment": "customer moved to SAP this month"},
+        headers={"X-Forma-User": "approver"},
+    )
+    assert ok.status_code == 200 and ok.json()["status"] == "approved"
+    audit = c.get(f"/api/audit?entity_id={mv3}").json()
+    approval = next(a for a in audit if a["action"] == "mapping.approve")
+    assert approval["actor"] == "approver" and approval["details"]["override_block"] is True
+
+
 class _FakeProvider:
     """A non-mock provider so the API takes its real-LLM branches without any network."""
 
