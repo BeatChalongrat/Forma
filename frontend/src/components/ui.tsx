@@ -42,7 +42,7 @@ export function RiskDot({ risk }: { risk: string }) {
 export function RiskLevel({ level, factors }: { level?: string | null; factors?: string[] }) {
   if (!level) return null
   const tone: Tone = level === 'high' ? 'bad' : level === 'low' ? 'ok' : 'warn'
-  return <span title={factors?.length ? factors.join(' · ') : undefined}><Badge tone={tone}>{level} risk</Badge></span>
+  return <span className='whitespace-nowrap' title={factors?.length ? factors.join(' · ') : undefined}><Badge tone={tone} className='whitespace-nowrap'>{level} risk</Badge></span>
 }
 
 /** Confidence as a thin rail — evidence, not decoration. */

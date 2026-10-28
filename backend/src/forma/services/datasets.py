@@ -166,26 +166,80 @@ def transform_round(
 #   {"kind": "scale_field", "target": "/prices/*/amount", "factor": 0.95, "where": <expr>}
 #   {"kind": "delete_rows", "where": <expr>}  |  {"kind": "delete_row", "identity": "<sku>"}
 #   {"kind": "set_item", "identity": "<sku>", "target": "/prices/0/amount", "value": 100}
+# set_field / scale_field / delete_rows also take "identities": [...] — the rows picked in the editor
+# (combined with "where" when both are given).
 
 
 def _identity_of(rec: dict[str, Any], schema: TargetSchema) -> str:
     return "|".join(str(_get_pointer(rec, k)) for k in schema.identity_keys)
 
 
-def _flat_frame(records: list[dict[str, Any]], schema: TargetSchema) -> pl.DataFrame:
-    """Root-level leaf pointers as columns (used to evaluate `where` expressions)."""
+def derived_columns(schema: TargetSchema) -> list[dict[str, Any]]:
+    """Per-record figures over collections that a `where` can test — e.g. ``count(/promotions)`` (is the
+    SKU in a promotion?) or ``sum(/inventory/*/qty)`` (total stock). Names come from the schema."""
+    out: list[dict[str, Any]] = []
+    leaves = schema.leaf_fields()
+    for c in schema.collections():
+        out.append({"name": f"count({c.pointer})", "collection": c.pointer, "key": None, "fn": "count"})
+        for f in leaves:
+            if f.in_collection == c.pointer and {"number", "integer"} & set(f.json_type):
+                key = f.pointer.rsplit("/", 1)[-1]
+                for fn in ("sum", "min", "max"):
+                    out.append({"name": f"{fn}({f.pointer})", "collection": c.pointer, "key": key, "fn": fn})
+    return out
+
+
+def where_names(where: Any) -> set[str]:
+    """Column names a `where` expression reads (to compute only the derived figures it needs)."""
+    out: set[str] = set()
+    if isinstance(where, dict):
+        if where.get("op") == "col" and where.get("name"):
+            out.add(str(where["name"]))
+        for v in where.values():
+            out |= where_names(v)
+    elif isinstance(where, list):
+        for v in where:
+            out |= where_names(v)
+    return out
+
+
+def _aggregate(rec: dict[str, Any], d: dict[str, Any]) -> float | None:
+    items = _get_pointer(rec, d["collection"])
+    items = [x for x in items if isinstance(x, dict)] if isinstance(items, list) else []
+    if d["fn"] == "count":
+        return float(len(items))
+    nums = [
+        float(v) for it in items if isinstance(v := it.get(d["key"]), int | float) and not isinstance(v, bool)
+    ]
+    if not nums:
+        return None
+    return float(sum(nums)) if d["fn"] == "sum" else min(nums) if d["fn"] == "min" else max(nums)
+
+
+def _flat_frame(
+    records: list[dict[str, Any]], schema: TargetSchema, need: set[str] | None = None
+) -> pl.DataFrame:
+    """Root-level leaf pointers as columns (used to evaluate `where` expressions), plus the derived
+    collection figures named in ``need``."""
     cols = [f.pointer for f in schema.leaf_fields() if f.in_collection is None]
+    derived = [d for d in derived_columns(schema) if need and d["name"] in need]
     data: dict[str, list[Any]] = {c: [] for c in cols}
     data["__i__"] = []
+    numbers: dict[str, list[Any]] = {d["name"]: [] for d in derived}
     for i, r in enumerate(records):
         data["__i__"].append(i)
         for c in cols:
             v = _get_pointer(r, c)
             data[c].append(orjson.dumps(v).decode() if isinstance(v, list | dict) else v)
+        for d in derived:
+            numbers[d["name"]].append(_aggregate(r, d))
     return pl.DataFrame(
         {
-            k: pl.Series(k, v, dtype=pl.String if k != "__i__" else pl.Int64, strict=False)
-            for k, v in data.items()
+            **{
+                k: pl.Series(k, v, dtype=pl.String if k != "__i__" else pl.Int64, strict=False)
+                for k, v in data.items()
+            },
+            **{k: pl.Series(k, v, dtype=pl.Float64) for k, v in numbers.items()},
         }
     )
 
@@ -220,11 +274,12 @@ def apply_operations(
     changes: list[dict[str, Any]] = []
     deleted: set[int] = set()
     frame_cache: pl.DataFrame | None = None
+    need = set().union(*(where_names(op.get("where")) for op in operations)) if operations else set()
 
     def frame() -> pl.DataFrame:
         nonlocal frame_cache
         if frame_cache is None:
-            frame_cache = _flat_frame(recs, schema)
+            frame_cache = _flat_frame(recs, schema, need)
         return frame_cache
 
     for op in operations:
@@ -253,6 +308,9 @@ def apply_operations(
                 )
         elif kind in ("set_field", "scale_field", "delete_rows"):
             idxs = _where_mask(frame(), op.get("where"))
+            if op.get("identities") is not None:
+                picked = {str(x) for x in op["identities"]}
+                idxs = [i for i in idxs if _identity_of(recs[i], schema) in picked]
             for i in idxs:
                 if kind == "delete_rows":
                     deleted.add(i)
@@ -369,7 +427,20 @@ def apply_changes(
     session.add(cs)
     if kind == "persistent":
         for op in operations:
-            if op.get("kind") in ("set_cell", "set_field"):
+            if op.get("kind") == "set_field" and op.get("identities") is not None:
+                # rows picked by hand: one override per record, so a later import finds them by identity
+                for ident in op["identities"]:
+                    session.add(
+                        Override(
+                            customer_id=dv.customer_id,
+                            target=op["target"],
+                            where={"identity": str(ident)},
+                            value=op.get("value"),
+                            author=actor,
+                            note=note,
+                        )
+                    )
+            elif op.get("kind") in ("set_cell", "set_field"):
                 session.add(
                     Override(
                         customer_id=dv.customer_id,
@@ -443,8 +514,54 @@ def rollback(ctx: ServiceContext, session: Session, dataset_id: str, actor: str)
     return nv
 
 
-def approve_dataset(session: Session, dataset_id: str, actor: str) -> DatasetVersion:
+def anomaly_report(ctx: ServiceContext, session: Session, dv: DatasetVersion) -> dict[str, Any]:
+    """Anomalies of a dataset version: within the round, vs last published round, vs the usual size."""
+    from forma.services import anomalies
+
+    cfg = ctx.policy.policy["anomaly"]
+    schema = ctx.registry.get_ref(get_mapping(session, dv.mapping_version_id).target_schema)
+    prev = previous_published(session, dv.customer_id, dv.round_id)
+    history = [
+        d.row_count
+        for d in session.scalars(
+            select(DatasetVersion)
+            .where(
+                DatasetVersion.customer_id == dv.customer_id,
+                DatasetVersion.round_id != dv.round_id,
+                DatasetVersion.status.in_(["approved", "published"]),
+            )
+            .order_by(DatasetVersion.created_at.desc())
+        )
+    ][: int(cfg["history_rounds"])]
+    return anomalies.detect(
+        schema,
+        records_of(ctx, dv),
+        cfg,
+        previous=records_of(ctx, prev) if prev is not None else None,
+        history_rows=history or None,
+    )
+
+
+def approve_dataset(
+    session: Session,
+    dataset_id: str,
+    actor: str,
+    *,
+    ctx: ServiceContext | None = None,
+    acknowledge_anomalies: bool = False,
+    comment: str | None = None,
+) -> DatasetVersion:
     dv = get_dataset(session, dataset_id)
+    acknowledged = None
+    if ctx is not None and ctx.policy.policy["anomaly"]["block_approval_on_high"]:
+        rep = anomaly_report(ctx, session, dv)
+        if rep["high"] and not acknowledge_anomalies:
+            # the policy decides (rule 6): unusual data reaches publication only when a person says so
+            raise Conflict(
+                f"{rep['high']} high-severity anomalies; review them and acknowledge to approve",
+                details={"high": rep["high"], "headline": rep["headline"]},
+            )
+        acknowledged = rep["high"] or None
     for other in session.scalars(
         select(DatasetVersion).where(
             DatasetVersion.round_id == dv.round_id,
@@ -457,7 +574,14 @@ def approve_dataset(session: Session, dataset_id: str, actor: str) -> DatasetVer
     r = session.get(ImportRound, dv.round_id)
     if r:
         r.status = "approved_data"
-    audit(session, "dataset.approve", "dataset", dv.id, actor=actor)
+    audit(
+        session,
+        "dataset.approve",
+        "dataset",
+        dv.id,
+        actor=actor,
+        **({"acknowledged_anomalies": acknowledged, "comment": comment} if acknowledged else {}),
+    )
     return dv
 
 
@@ -557,14 +681,16 @@ def change_report(ctx: ServiceContext, session: Session, dataset_id: str) -> dic
     schema = ctx.registry.get_ref(get_mapping(session, dv.mapping_version_id).target_schema)
     prev = previous_published(session, dv.customer_id, dv.round_id)
     cur = records_of(ctx, dv)
+    anomalies = anomaly_report(ctx, session, dv)
     if prev is None:
-        return {"has_previous": False, "current_rows": len(cur)}
+        return {"has_previous": False, "current_rows": len(cur), "anomalies": anomalies}
     old = records_of(ctx, prev)
     return {
         "has_previous": True,
         "previous_dataset_id": prev.id,
         "previous_round_id": prev.round_id,
         **diff_datasets(schema, old, cur),
+        "anomalies": anomalies,
     }
 
 

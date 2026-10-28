@@ -12,6 +12,7 @@
 | 7 Production | scale, reliability, security, observability, deployment | **done** — see below | ADR-010 … ADR-016 |
 | 7+ Safety | mapping simulation sandbox: new vs approved mapping on real files, drill-down, policy block | **done** | ADR-018 |
 | 7+ Trust & visual mapping | risk level (low/medium/high + factors + records affected) on every decision; relationship discovery between all tables, diagram in the Studio, drag-to-map | **done** | ADR-019 |
+| 7+ Signature features | spreadsheet editing (paste, ranges, bulk on picked rows) + override collisions; cell-level lineage with cause of change; self-healing per-field review checked on data; anomaly detection + approval gate; copilot conditions across collections + evidence-based answers | **done** | ADR-020 … ADR-024 |
 | 7+ Operability | any target format without code (semantic mapping, exact export shape), settings in the web app (AI key, policy, formats, customers) | **done** | ADR-017 |
 
 ## Phase 7 — production hardening (done)

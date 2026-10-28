@@ -2,16 +2,35 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useVirtualizer } from '@tanstack/react-virtual'
-import { Download, Search, Undo2, Sparkles, History, GitCompare, AlertCircle, CheckCircle2, Route, Trash2 } from 'lucide-react'
-import { api, type FieldSpec, type Operation, type Impact, type RowsPage } from '../lib/api'
+import { Download, Search, Undo2, Sparkles, History, GitCompare, AlertCircle, CheckCircle2, Route, Trash2, ShieldAlert, X } from 'lucide-react'
+import { api, ApiError, type Answer, type AnomalyReport, type FieldSpec, type Operation, type Impact, type RowsPage, type Trace } from '../lib/api'
 import { cn, cellText, fmtInt, fmtNum, getPointer, timeAgo, describeExpr } from '../lib/utils'
-import { Badge, Drawer, Modal, Spinner, StatusBadge, Tabs, FindingRow, Confidence } from '../components/ui'
+import { Badge, Drawer, Modal, Spinner, StatusBadge, Tabs, FindingRow } from '../components/ui'
 import { useToast } from '../lib/toast'
 
 const ROW_H = 32
 const PAGE = 500
 
-type Pending = Operation & { label: string }
+type Pending = Operation & { label: string; batch?: number }
+type Cell = { r: number; c: number }
+
+const isQuestion = (t: string) => /^(ทำไม|เพราะอะไร|อะไร|ทำไง|ยังไง|why|what|how|which)/i.test(t.trim()) || t.trim().endsWith('?')
+
+// typed value from what a person typed or pasted, by the field's JSON type (null = empty)
+function parseValue(f: FieldSpec, text: string): { ok: true; value: unknown } | { ok: false; error: string } {
+  const raw = text.trim()
+  if (raw === '') return { ok: true, value: null }
+  if (f.json_type.includes('number') || f.json_type.includes('integer')) {
+    const n = Number(raw.replace(/,/g, ''))
+    if (Number.isNaN(n)) return { ok: false, error: `${f.name}: "${raw}" is not a number` }
+    return { ok: true, value: f.json_type.includes('integer') ? Math.round(n) : n }
+  }
+  if (f.json_type.includes('boolean')) return { ok: true, value: ['true', '1', 'yes', 'y'].includes(raw.toLowerCase()) }
+  let value: unknown = raw
+  if (f.json_type.includes('array')) { try { value = raw.startsWith('[') ? JSON.parse(raw) : raw.split(/[|,]/).map((x) => x.trim()).filter(Boolean) } catch { return { ok: false, error: `${f.name}: invalid list` } } }
+  if (f.enum && !f.enum.includes(value)) return { ok: false, error: `${f.name}: must be one of ${f.enum.join(', ')}` }
+  return { ok: true, value }
+}
 
 export function DataEditor() {
   const { datasetId = '' } = useParams()
@@ -27,12 +46,17 @@ export function DataEditor() {
   const { data: page, isLoading } = useQuery({ queryKey: ['rows', datasetId, offset, qDebounced, sort], queryFn: () => api.rows(datasetId, { offset, limit: PAGE, q: qDebounced || undefined, sort: sort?.ptr, desc: sort?.desc }), placeholderData: (prev) => prev })
 
   const [pending, setPending] = useState<Pending[]>([])
-  const [sel, setSel] = useState<{ r: number; c: number } | null>(null)
+  const [sel, setSel] = useState<Cell | null>(null)
+  const [anchor, setAnchor] = useState<Cell | null>(null) // other corner of a range (shift-click / shift-arrows)
+  const [picked, setPicked] = useState<Set<string>>(new Set()) // rows ticked for a bulk edit
   const [editing, setEditing] = useState<{ r: number; c: number; value: string } | null>(null)
-  const [drawer, setDrawer] = useState<{ kind: 'record' | 'lineage'; identity: string } | null>(null)
+  const [drawer, setDrawer] = useState<{ kind: 'record' | 'lineage'; identity: string; pointer?: string } | null>(null)
   const [saveOpen, setSaveOpen] = useState(false)
-  const [rightTab, setRightTab] = useState<'changes' | 'findings' | 'versions' | 'diff'>('changes')
+  const [rightTab, setRightTab] = useState<'changes' | 'findings' | 'versions' | 'diff' | 'copilot'>('changes')
   const [copilot, setCopilot] = useState('')
+  const [answer, setAnswer] = useState<Answer | null>(null)
+  const [ack, setAck] = useState<{ high: number; headline: string } | null>(null)
+  const batchSeq = useRef(0)
 
   const columns: FieldSpec[] = useMemo(() => (page?.columns ?? []).filter((f) => !f.system && !f.in_collection && !f.is_collection && !f.json_type.includes('object')).concat((page?.columns ?? []).filter((f) => f.is_collection)), [page])
   const identityOf = useCallback((row: Record<string, unknown>) => (page?.identity_keys ?? []).map((k) => String(getPointer(row, k))).join('|'), [page])
@@ -43,13 +67,16 @@ export function DataEditor() {
     if (!pending.length) return base
     const byId = new Map<string, Record<string, unknown>>()
     const deleted = new Set<string>()
-    pending.forEach((p) => { if (p.kind === 'delete_row' && p.identity) deleted.add(p.identity) })
+    pending.forEach((p) => { if (p.kind === 'delete_row' && p.identity) deleted.add(p.identity); if (p.kind === 'delete_rows' && p.identities) p.identities.forEach((i) => deleted.add(i)) })
     const out = base.filter((r) => !deleted.has(identityOf(r))).map((r) => structuredClone(r))
     out.forEach((r) => byId.set(identityOf(r), r))
-    pending.forEach((p) => { if (p.kind === 'set_cell' && p.identity && p.target) { const r = byId.get(p.identity); if (r) setPointerLocal(r, p.target, p.value) } })
+    pending.forEach((p) => {
+      if (p.kind === 'set_cell' && p.identity && p.target) { const r = byId.get(p.identity); if (r) setPointerLocal(r, p.target, p.value) }
+      if (p.kind === 'set_field' && p.identities && p.target && !p.target.includes('*')) p.identities.forEach((i) => { const r = byId.get(i); if (r) setPointerLocal(r, p.target!, p.value) })
+    })
     return out
   }, [page, pending, identityOf])
-  const editedCells = useMemo(() => new Set(pending.filter((p) => p.kind === 'set_cell').map((p) => `${p.identity}|${p.target}`)), [pending])
+  const editedCells = useMemo(() => new Set(pending.flatMap((p) => (p.kind === 'set_cell' ? [`${p.identity}|${p.target}`] : p.kind === 'set_field' && p.identities ? p.identities.map((i) => `${i}|${p.target}`) : []))), [pending])
 
   // virtualization
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -60,19 +87,94 @@ export function DataEditor() {
     const onKey = (e: KeyboardEvent) => {
       if (editing || drawer || saveOpen) return
       if ((e.target as HTMLElement)?.tagName === 'INPUT' || (e.target as HTMLElement)?.tagName === 'TEXTAREA') return
+      if ((e.metaKey || e.ctrlKey) && e.key === 'z') { e.preventDefault(); undo(); return }
       if (!sel) return
-      if (e.key === 'ArrowDown') { e.preventDefault(); setSel((s) => s && { ...s, r: Math.min(rows.length - 1, s.r + 1) }) }
-      if (e.key === 'ArrowUp') { e.preventDefault(); setSel((s) => s && { ...s, r: Math.max(0, s.r - 1) }) }
-      if (e.key === 'ArrowRight') { e.preventDefault(); setSel((s) => s && { ...s, c: Math.min(columns.length - 1, s.c + 1) }) }
-      if (e.key === 'ArrowLeft') { e.preventDefault(); setSel((s) => s && { ...s, c: Math.max(0, s.c - 1) }) }
+      const move = (dr: number, dc: number) => {
+        e.preventDefault()
+        if (e.shiftKey) setAnchor((a) => a ?? sel)
+        else setAnchor(null)
+        setSel((s) => s && { r: Math.min(rows.length - 1, Math.max(0, s.r + dr)), c: Math.min(columns.length - 1, Math.max(0, s.c + dc)) })
+      }
+      if (e.key === 'ArrowDown') move(1, 0)
+      if (e.key === 'ArrowUp') move(-1, 0)
+      if (e.key === 'ArrowRight') move(0, 1)
+      if (e.key === 'ArrowLeft') move(0, -1)
       if (e.key === 'Enter') { e.preventDefault(); startEdit(sel.r, sel.c) }
-      if ((e.metaKey || e.ctrlKey) && e.key === 'z') { e.preventDefault(); setPending((p) => p.slice(0, -1)) }
+      if (e.key === 'Escape') setAnchor(null)
+      if ((e.metaKey || e.ctrlKey) && e.key === 'c') { e.preventDefault(); copyRange() }
+      if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); clearRange() }
+      if (e.key === 't' || e.key === 'T') { e.preventDefault(); traceSelected() }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sel, editing, drawer, saveOpen, rows.length, columns.length])
+  }, [sel, anchor, editing, drawer, saveOpen, rows.length, columns.length, pending])
   useEffect(() => { if (sel) rowVirt.scrollToIndex(sel.r) }, [sel, rowVirt])
+  // paste a block from Excel / Sheets (tab-separated) starting at the selected cell
+  useEffect(() => {
+    const onPaste = (e: ClipboardEvent) => {
+      if (editing || drawer || saveOpen || !sel) return
+      if ((e.target as HTMLElement)?.tagName === 'INPUT' || (e.target as HTMLElement)?.tagName === 'TEXTAREA') return
+      const text = e.clipboardData?.getData('text/plain')
+      if (!text) return
+      e.preventDefault()
+      pasteBlock(text.replace(/\r/g, '').replace(/\n$/, '').split('\n').map((line) => line.split('\t')))
+    }
+    window.addEventListener('paste', onPaste)
+    return () => window.removeEventListener('paste', onPaste)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sel, editing, drawer, saveOpen, rows, columns, pending])
+
+  const range = sel ? { r0: Math.min(sel.r, (anchor ?? sel).r), r1: Math.max(sel.r, (anchor ?? sel).r), c0: Math.min(sel.c, (anchor ?? sel).c), c1: Math.max(sel.c, (anchor ?? sel).c) } : null
+  const inRange = (r: number, c: number) => !!range && (range.r0 !== range.r1 || range.c0 !== range.c1) && r >= range.r0 && r <= range.r1 && c >= range.c0 && c <= range.c1
+  const undo = () => setPending((p) => { const last = p[p.length - 1]; return last?.batch === undefined ? p.slice(0, -1) : p.filter((x) => x.batch !== last.batch) })
+  // stage set_cell edits; a later edit of the same cell replaces the earlier one
+  const stageCells = (cells: { identity: string; f: FieldSpec; value: unknown; before: unknown }[]) => {
+    if (!cells.length) return
+    const batch = ++batchSeq.current
+    const keys = new Set(cells.map((x) => `${x.identity}|${x.f.pointer}`))
+    setPending((p) => [...p.filter((x) => !(x.kind === 'set_cell' && keys.has(`${x.identity}|${x.target}`))), ...cells.map((x) => ({ kind: 'set_cell' as const, identity: x.identity, target: x.f.pointer, value: x.value, batch, label: `${x.identity} · ${x.f.name}: ${cellText(x.before) || '∅'} → ${cellText(x.value) || '∅'}` }))])
+  }
+  const original = (row: Record<string, unknown>) => page?.rows.find((r) => identityOf(r) === identityOf(row)) ?? row
+  const pasteBlock = (grid: string[][]) => {
+    if (!sel || ds?.status === 'published') return
+    const cells: { identity: string; f: FieldSpec; value: unknown; before: unknown }[] = []
+    const errs: string[] = []
+    grid.forEach((line, i) => line.forEach((text, j) => {
+      const row = rows[sel.r + i]
+      const f = columns[sel.c + j]
+      if (!row || !f || f.is_collection) return
+      const v = parseValue(f, text)
+      if (!v.ok) { errs.push(v.error); return }
+      const before = getPointer(original(row), f.pointer)
+      if (JSON.stringify(before) !== JSON.stringify(v.value)) cells.push({ identity: identityOf(row), f, value: v.value, before })
+    }))
+    stageCells(cells)
+    toast.push({ kind: errs.length ? 'bad' : 'ok', title: `Pasted ${cells.length} cell${cells.length === 1 ? '' : 's'}`, detail: errs.length ? `${errs.length} skipped — ${errs[0]}` : 'Review and save when ready.' })
+  }
+  const copyRange = () => {
+    if (!range) return
+    const lines = []
+    for (let r = range.r0; r <= range.r1; r++) lines.push(columns.slice(range.c0, range.c1 + 1).map((f) => cellText(getPointer(rows[r], f.pointer))).join('\t'))
+    void navigator.clipboard?.writeText(lines.join('\n'))
+    toast.push({ kind: 'info', title: `Copied ${(range.r1 - range.r0 + 1) * (range.c1 - range.c0 + 1)} cells` })
+  }
+  const clearRange = () => {
+    if (!range || ds?.status === 'published') return
+    const cells: { identity: string; f: FieldSpec; value: unknown; before: unknown }[] = []
+    for (let r = range.r0; r <= range.r1; r++) for (let c = range.c0; c <= range.c1; c++) {
+      const f = columns[c]
+      if (!f || f.is_collection || f.required) continue
+      const before = getPointer(original(rows[r]), f.pointer)
+      if (before !== null && before !== undefined) cells.push({ identity: identityOf(rows[r]), f, value: null, before })
+    }
+    stageCells(cells)
+  }
+  const traceSelected = () => {
+    if (!sel || !rows[sel.r]) return
+    const f = columns[sel.c]
+    setDrawer({ kind: 'lineage', identity: identityOf(rows[sel.r]), pointer: f && !f.is_collection ? f.pointer : undefined })
+  }
 
   const startEdit = (r: number, c: number) => {
     const f = columns[c]
@@ -84,15 +186,10 @@ export function DataEditor() {
     if (!editing) return
     const f = columns[editing.c]
     const row = rows[editing.r]
-    const raw = editing.value.trim()
-    let value: unknown = raw
-    if (raw === '') value = null
-    else if (f.json_type.includes('number') || f.json_type.includes('integer')) { const n = Number(raw.replace(/,/g, '')); if (Number.isNaN(n)) { toast.push({ kind: 'bad', title: 'Not a number' }); return } value = f.json_type.includes('integer') ? Math.round(n) : n }
-    else if (f.json_type.includes('boolean')) value = ['true', '1', 'yes', 'y'].includes(raw.toLowerCase())
-    else if (f.json_type.includes('array')) value = raw.startsWith('[') ? JSON.parse(raw) : raw.split(/[|,]/).map((s) => s.trim()).filter(Boolean)
-    if (f.enum && !f.enum.includes(value)) { toast.push({ kind: 'bad', title: `Must be one of ${f.enum.join(', ')}` }); return }
-    const before = getPointer(page?.rows.find((r) => identityOf(r) === identityOf(row)) ?? row, f.pointer)
-    if (JSON.stringify(before) !== JSON.stringify(value)) setPending((p) => [...p.filter((x) => !(x.kind === 'set_cell' && x.identity === identityOf(row) && x.target === f.pointer)), { kind: 'set_cell', identity: identityOf(row), target: f.pointer, value, label: `${identityOf(row)} · ${f.name}: ${cellText(before) || '∅'} → ${cellText(value) || '∅'}` }])
+    const v = parseValue(f, editing.value)
+    if (!v.ok) { toast.push({ kind: 'bad', title: v.error }); return }
+    const before = getPointer(original(row), f.pointer)
+    if (JSON.stringify(before) !== JSON.stringify(v.value)) stageCells([{ identity: identityOf(row), f, value: v.value, before }])
     setEditing(null)
   }
 
@@ -103,19 +200,32 @@ export function DataEditor() {
     onError: (e: Error & { details?: { errors?: { pointer: string; message: string }[] } }) => toast.push({ kind: 'bad', title: 'Changes rejected by the schema', detail: e.details?.errors?.slice(0, 3).map((x) => `${x.pointer}: ${x.message}`).join('; ') ?? e.message }),
   })
   const rollback = useMutation({ mutationFn: () => api.rollback(datasetId), onSuccess: (d) => { qc.invalidateQueries(); toast.push({ kind: 'ok', title: `Rolled back → v${d.version}` }); nav(`/datasets/${d.id}`) } })
-  const approve = useMutation({ mutationFn: () => api.approveDataset(datasetId), onSuccess: () => { qc.invalidateQueries(); toast.push({ kind: 'ok', title: 'Dataset approved' }) } })
+  const approve = useMutation({
+    mutationFn: (b: { acknowledge_anomalies?: boolean; comment?: string }) => api.approveDataset(datasetId, b),
+    onSuccess: () => { qc.invalidateQueries(); setAck(null); toast.push({ kind: 'ok', title: 'Dataset approved' }) },
+    // the policy holds data with high-severity anomalies until a person acknowledges them (ADR-022)
+    onError: (e: Error) => { const d = e instanceof ApiError ? (e.details as { high?: number; headline?: string } | undefined) : undefined; if (d?.high) { setAck({ high: d.high, headline: d.headline ?? '' }); setRightTab('diff') } else toast.push({ kind: 'bad', title: 'Approve failed', detail: e.message }) },
+  })
   const doExport = useMutation({ mutationFn: (fmt: string) => api.exportDataset(datasetId, fmt), onSuccess: (a) => { qc.invalidateQueries(); window.open(api.downloadUrl(a.id), '_blank'); toast.push({ kind: 'ok', title: `Exported ${a.row_count} rows as ${a.fmt.toUpperCase()}` }) } })
+  const question = useMutation({ mutationFn: () => api.ask(datasetId, copilot), onSuccess: (a) => { setAnswer(a); setRightTab('copilot'); setCopilot('') }, onError: (e: Error) => toast.push({ kind: 'bad', title: 'Could not answer', detail: e.message }) })
+  const submitCopilot = () => { if (!copilot.trim()) return; if (isQuestion(copilot)) question.mutate(); else ask.mutate() }
   const ask = useMutation({
     mutationFn: () => api.copilot(datasetId, copilot),
     onSuccess: (r) => {
       if (r.needs_clarification) { toast.push({ kind: 'info', title: 'Copilot needs more detail', detail: r.needs_clarification }); return }
       if (!r.operations.length) { toast.push({ kind: 'info', title: 'No operations planned' }); return }
-      setPending((p) => [...p, ...r.operations.map((o) => ({ ...o, label: `${o.explanation ?? o.kind} · ${r.impact ? `${r.impact.rows_affected} rows` : ''}` }))])
+      const batch = ++batchSeq.current
+      setPending((p) => [...p, ...r.operations.map((o) => ({ ...o, batch, label: `${o.explanation ?? o.kind} · ${r.impact ? `${r.impact.rows_affected} rows` : ''}` }))])
       setCopilot('')
       toast.push({ kind: 'ok', title: 'Plan added to pending changes', detail: `${r.impact?.rows_affected ?? '?'} rows affected — review and save when ready.` })
     },
   })
   const { data: report } = useQuery({ queryKey: ['change-report', datasetId], queryFn: () => api.changeReport(datasetId), enabled: rightTab === 'diff' })
+
+  const pricePointer = (page?.columns ?? []).map((c) => c.pointer).find((p) => (page?.columns ?? []).find((c) => c.pointer === p)?.semantic === 'price.amount')
+  const stageBulk = (op: Operation, label: string) => { const batch = ++batchSeq.current; setPending((p) => [...p, { ...op, identities: [...picked], batch, label }]) }
+  const pageIds = rows.map(identityOf)
+  const allPicked = pageIds.length > 0 && pageIds.every((i) => picked.has(i))
 
   if (!ds) return <div className="p-10 text-center"><Spinner /></div>
   const errors = ds.findings.filter((f) => f.severity === 'error').length
@@ -133,7 +243,7 @@ export function DataEditor() {
         <div className="relative ml-4"><Search size={13} className="absolute left-2.5 top-2.5 text-muted" /><input className="input pl-7 w-72" placeholder="Search any field…" value={q} onChange={(e) => setQ(e.target.value)} /></div>
         <div className="ml-auto flex items-center gap-2">
           {pending.length > 0 && <><button className="btn btn-sm" onClick={() => setPending([])}><Undo2 size={13} /> Discard</button><button className="btn btn-sm btn-primary" onClick={() => { preview.mutate(); setSaveOpen(true) }}>Review {pending.length} change{pending.length > 1 ? 's' : ''}</button></>}
-          {!pending.length && ds.status === 'draft' && <button className="btn btn-sm" onClick={() => approve.mutate()}><CheckCircle2 size={13} /> Approve data</button>}
+          {!pending.length && ds.status === 'draft' && <button className="btn btn-sm" disabled={approve.isPending} onClick={() => approve.mutate({})}><CheckCircle2 size={13} /> Approve data</button>}
           {!pending.length && ds.parent_id && <button className="btn btn-sm" onClick={() => rollback.mutate()} title="New version with the parent's content"><History size={13} /> Roll back</button>}
           {!pending.length && (ds.status === 'approved' || ds.status === 'published') && <div className="flex items-center rounded-[var(--radius-md)] border border-line overflow-hidden">{['json', 'jsonl', 'csv'].map((f) => <button key={f} className="h-8 px-2.5 text-[12.5px] font-medium hover:bg-surface-2 border-r border-line last:border-0 flex items-center gap-1" onClick={() => doExport.mutate(f)}><Download size={12} /> {f.toUpperCase()}</button>)}</div>}
         </div>
@@ -142,16 +252,23 @@ export function DataEditor() {
       {/* copilot bar */}
       <div className="px-5 py-2 border-b border-line bg-surface-2/60 flex items-center gap-2 shrink-0">
         <Sparkles size={14} className="text-signal" />
-        <input className="input flex-1 bg-surface" placeholder='Tell the copilot what to change — e.g. "ลดราคาหมวด Electronics 5%" or "ตั้งสถานะ inactive ให้หมวด Snacks". Nothing is applied until you review and save.' value={copilot} onChange={(e) => setCopilot(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && copilot && ask.mutate()} />
-        <button className="btn btn-sm btn-primary" disabled={!copilot || ask.isPending} onClick={() => ask.mutate()}>{ask.isPending ? <Spinner className="border-t-white" /> : 'Plan'}</button>
+        <input className="input flex-1 bg-surface" placeholder='Tell the copilot what to change — "ลดราคาหมวด Electronics 5% เฉพาะที่ stock มากกว่า 100 ไม่รวมสินค้าในโปรโมชั่น" — or ask "ทำไม SKU บางรายการ join ไม่สำเร็จ?". Nothing is applied until you review and save.' value={copilot} onChange={(e) => setCopilot(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && submitCopilot()} />
+        <button className="btn btn-sm btn-primary" disabled={!copilot || ask.isPending || question.isPending} onClick={submitCopilot}>{ask.isPending || question.isPending ? <Spinner className="border-t-white" /> : isQuestion(copilot) ? 'Ask' : 'Plan'}</button>
       </div>
 
       <div className="flex-1 min-h-0 grid grid-cols-[1fr_360px]">
         {/* grid */}
         <div className="min-w-0 flex flex-col">
+          {picked.size > 0 && ds.status !== 'published' && (
+            <BulkBar count={picked.size} fields={columns.filter((c) => !c.is_collection && !c.system)} pricePointer={pricePointer}
+              onSet={(fld, text) => { const v = parseValue(fld, text); if (!v.ok) { toast.push({ kind: 'bad', title: v.error }); return } stageBulk({ kind: 'set_field', target: fld.pointer, value: v.value }, `set ${fld.name} = ${cellText(v.value) || '∅'} on ${picked.size} rows`) }}
+              onScale={(pct) => pricePointer && stageBulk({ kind: 'scale_field', target: pricePointer, factor: Math.round((1 + pct / 100) * 10000) / 10000 }, `price ${pct > 0 ? '+' : ''}${pct}% on ${picked.size} rows`)}
+              onDelete={() => { stageBulk({ kind: 'delete_rows' }, `delete ${picked.size} rows`); setPicked(new Set()) }}
+              onClear={() => setPicked(new Set())} />
+          )}
           <div ref={scrollRef} className="flex-1 overflow-auto relative select-none" onMouseDown={() => editing && commitEdit()}>
             <div className="sticky top-0 z-10 flex bg-surface border-b border-line" style={{ width: 56 + 36 + columns.reduce((a, f) => a + widths(f), 0) }}>
-              <div className="w-14 shrink-0 px-2 text-[11px] text-muted leading-8 tnum border-r border-line">#</div>
+              <label className="w-14 shrink-0 px-2 text-[11px] text-muted leading-8 tnum border-r border-line flex items-center gap-1.5" title="Select every row on this page"><input type="checkbox" className="accent-[var(--color-signal)]" checked={allPicked} onChange={() => setPicked((p) => { const n = new Set(p); pageIds.forEach((i) => (allPicked ? n.delete(i) : n.add(i))); return n })} />#</label>
               {columns.map((f) => (
                 <button key={f.pointer} className="shrink-0 h-8 px-2.5 text-left text-[12px] font-medium text-ink-2 border-r border-line hover:bg-surface-2 flex items-center gap-1.5 truncate" style={{ width: widths(f) }} onClick={() => !f.is_collection && setSort((s) => (s?.ptr === f.pointer ? (s.desc ? null : { ptr: f.pointer, desc: true }) : { ptr: f.pointer, desc: false }))} title={f.pointer}>
                   <span className="truncate">{f.pointer.slice(1).replace('/', '.')}</span>
@@ -168,15 +285,18 @@ export function DataEditor() {
                 const rowErr = page?.findings.some((f) => f.identity === id && f.severity === 'error')
                 return (
                   <div key={vi.key} className={cn('absolute left-0 flex border-b border-line/70 hover:bg-surface-2/50', rowErr && 'bg-bad-soft/40')} style={{ top: vi.start, height: ROW_H, width: 56 + 36 + columns.reduce((a, f) => a + widths(f), 0) }}>
-                    <div className="w-14 shrink-0 px-2 text-[11px] text-muted leading-8 tnum border-r border-line/70 cursor-pointer hover:text-signal" onClick={() => setDrawer({ kind: 'record', identity: id })} title="Open record">{offset + vi.index + 1}</div>
+                    <div className={cn('w-14 shrink-0 px-2 text-[11px] text-muted leading-8 tnum border-r border-line/70 flex items-center gap-1.5', picked.has(id) && 'bg-signal-soft')}>
+                      <input type="checkbox" className="accent-[var(--color-signal)]" checked={picked.has(id)} onChange={() => setPicked((p) => { const n = new Set(p); if (n.has(id)) n.delete(id); else n.add(id); return n })} />
+                      <span className="cursor-pointer hover:text-signal" onClick={() => setDrawer({ kind: 'record', identity: id })} title="Open record">{offset + vi.index + 1}</span>
+                    </div>
                     {columns.map((f, c) => {
                       const v = getPointer(row, f.pointer)
                       const isSel = sel?.r === vi.index && sel?.c === c
                       const isEd = editing?.r === vi.index && editing?.c === c
                       const edited = editedCells.has(`${id}|${f.pointer}`)
                       return (
-                        <div key={f.pointer} className={cn('shrink-0 h-8 px-2.5 text-[12.5px] leading-8 border-r border-line/70 truncate relative', f.json_type.includes('number') && 'text-right tnum', isSel && 'outline outline-2 outline-signal -outline-offset-2 z-[1]', edited && 'bg-signal-soft text-signal')} style={{ width: widths(f) }}
-                          onMouseDown={(e) => { e.stopPropagation(); if (editing && !isEd) commitEdit(); setSel({ r: vi.index, c }) }} onDoubleClick={() => (f.is_collection ? setDrawer({ kind: 'record', identity: id }) : startEdit(vi.index, c))}>
+                        <div key={f.pointer} className={cn('shrink-0 h-8 px-2.5 text-[12.5px] leading-8 border-r border-line/70 truncate relative', f.json_type.includes('number') && 'text-right tnum', isSel && 'outline outline-2 outline-signal -outline-offset-2 z-[1]', inRange(vi.index, c) && !isSel && 'bg-signal-soft/70', edited && 'bg-signal-soft text-signal')} style={{ width: widths(f) }}
+                          onMouseDown={(e) => { e.stopPropagation(); if (editing && !isEd) commitEdit(); if (e.shiftKey && sel) setAnchor((a) => a ?? sel); else setAnchor(null); setSel({ r: vi.index, c }) }} onDoubleClick={() => (f.is_collection ? setDrawer({ kind: 'record', identity: id }) : startEdit(vi.index, c))}>
                           {isEd ? (
                             <input autoFocus className="absolute inset-0 w-full h-full px-2.5 bg-surface text-ink outline-none border-2 border-signal" value={editing.value} onChange={(e) => setEditing({ ...editing, value: e.target.value })} onKeyDown={(e) => { if (e.key === 'Enter') commitEdit(); if (e.key === 'Escape') setEditing(null) }} onMouseDown={(e) => e.stopPropagation()} />
                           ) : f.is_collection ? <CollectionCell value={v} fields={(page?.columns ?? []).filter((x) => x.in_collection === f.pointer)} /> : (v === null || v === undefined ? <span className="text-muted/60">∅</span> : cellText(v))}
@@ -193,19 +313,21 @@ export function DataEditor() {
             <span className="tnum">{page ? `${fmtInt(offset + 1)}–${fmtInt(Math.min(offset + PAGE, page.total))} of ${fmtInt(page.total)}` : ''}</span>
             <button className="btn btn-ghost btn-sm" disabled={offset === 0} onClick={() => setOffset(Math.max(0, offset - PAGE))}>‹ prev</button>
             <button className="btn btn-ghost btn-sm" disabled={!page || offset + PAGE >= page.total} onClick={() => setOffset(offset + PAGE)}>next ›</button>
-            <span className="ml-auto flex items-center gap-3"><span><span className="kbd">↵</span> edit</span><span><span className="kbd">esc</span> cancel</span><span><span className="kbd">⌘Z</span> undo</span><span>double-click a nested cell to edit items</span></span>
+            {sel && <button className="btn btn-ghost btn-sm" onClick={traceSelected}><Route size={12} /> Trace this value</button>}
+            <span className="ml-auto flex items-center gap-3"><span><span className="kbd">↵</span> edit</span><span><span className="kbd">⇧</span>+click range</span><span><span className="kbd">⌘C</span>/<span className="kbd">⌘V</span> copy · paste</span><span><span className="kbd">Del</span> clear</span><span><span className="kbd">T</span> trace</span><span><span className="kbd">⌘Z</span> undo</span></span>
           </div>
         </div>
 
         {/* right rail */}
         <aside className="border-l border-line bg-surface flex flex-col min-h-0">
-          <Tabs value={rightTab} onChange={setRightTab} items={[{ id: 'changes', label: 'Pending', count: pending.length }, { id: 'findings', label: 'Findings', count: ds.findings.length }, { id: 'diff', label: 'vs last round' }, { id: 'versions', label: 'Versions', count: ds.history?.length }]} />
+          <Tabs value={rightTab} onChange={setRightTab} items={[{ id: 'changes', label: 'Pending', count: pending.length }, { id: 'diff', label: <span className="flex items-center gap-1">Changes{ack && <ShieldAlert size={12} className="text-bad" />}</span> }, { id: 'copilot', label: 'Copilot' }, { id: 'findings', label: 'Findings', count: ds.findings.length }, { id: 'versions', label: 'Versions', count: ds.history?.length }]} />
           <div className="flex-1 overflow-auto p-3 text-[12.5px]">
             {rightTab === 'changes' && (pending.length ? (
               <ul className="flex flex-col gap-1">{pending.map((p, i) => <li key={i} className="flex items-start gap-2 py-1 border-b border-line/70"><Badge tone={p.kind.startsWith('delete') ? 'bad' : 'signal'} className="h-5 px-1.5 text-[11px] shrink-0">{p.kind.replace('_', ' ')}</Badge><span className="flex-1 break-words">{p.label}</span><button className="text-muted hover:text-bad" onClick={() => setPending((xs) => xs.filter((_, j) => j !== i))}>×</button></li>)}</ul>
             ) : <div className="text-muted leading-relaxed">Edit cells directly (double-click or <span className="kbd">↵</span>), delete rows, or ask the copilot. Changes stay here until you review their impact and save them as a new version — nothing is overwritten.</div>)}
             {rightTab === 'findings' && (ds.findings.length ? ds.findings.map((f, i) => <FindingRow key={i} f={f} />) : <div className="text-muted">No findings. Every record passed the schema and quality rules.</div>)}
-            {rightTab === 'diff' && <DiffPanel report={report} />}
+            {rightTab === 'diff' && <DiffPanel report={report} ack={ack} acking={approve.isPending} onAcknowledge={(comment) => approve.mutate({ acknowledge_anomalies: true, comment })} onTrace={(identity, kind) => setDrawer({ kind: 'lineage', identity, pointer: /price|discount|promo/.test(kind) && pricePointer ? pricePointer.replace('/*/', '/0/') : undefined })} />}
+            {rightTab === 'copilot' && <AnswerPanel answer={answer} pending={question.isPending} onTrace={(identity, pointer) => setDrawer({ kind: 'lineage', identity, pointer })} />}
             {rightTab === 'versions' && (
               <ul className="flex flex-col gap-1">
                 {ds.history?.slice().reverse().map((v) => (
@@ -222,7 +344,7 @@ export function DataEditor() {
       </div>
 
       <RecordDrawer open={drawer?.kind === 'record'} identity={drawer?.identity ?? ''} rows={rows} identityOf={identityOf} columns={page?.columns ?? []} onClose={() => setDrawer(null)} onLineage={() => setDrawer({ kind: 'lineage', identity: drawer!.identity })} onEdit={(target, value, label) => setPending((p) => [...p, { kind: 'set_item', identity: drawer!.identity, target, value, label }])} />
-      <LineageDrawer open={drawer?.kind === 'lineage'} datasetId={datasetId} identity={drawer?.identity ?? ''} onClose={() => setDrawer(null)} />
+      <TraceDrawer open={drawer?.kind === 'lineage'} datasetId={datasetId} identity={drawer?.identity ?? ''} pointer={drawer?.pointer} onPointer={(p) => setDrawer((d) => d && { ...d, pointer: p })} onClose={() => setDrawer(null)} />
 
       <Modal open={saveOpen} onClose={() => setSaveOpen(false)} title="Review changes before saving" width="max-w-3xl"
         footer={<SaveFooter pending={apply.isPending} valid={!!preview.data && preview.data.validation_errors.length === 0} onCancel={() => setSaveOpen(false)} onSave={(kind, note) => apply.mutate({ kind, note })} />}>
@@ -292,19 +414,93 @@ function SaveFooter({ pending, valid, onCancel, onSave }: { pending: boolean; va
   )
 }
 
-function DiffPanel({ report }: { report?: import('../lib/api').ChangeReport }) {
+function BulkBar({ count, fields, pricePointer, onSet, onScale, onDelete, onClear }: { count: number; fields: FieldSpec[]; pricePointer?: string; onSet: (f: FieldSpec, text: string) => void; onScale: (pct: number) => void; onDelete: () => void; onClear: () => void }) {
+  const [ptr, setPtr] = useState(fields[0]?.pointer ?? '')
+  const [val, setVal] = useState('')
+  const [pct, setPct] = useState('')
+  const fld = fields.find((x) => x.pointer === ptr)
+  return (
+    <div className="px-3 py-2 border-b border-line bg-signal-soft/50 flex items-center gap-2 text-[12.5px] flex-wrap shrink-0">
+      <span className="font-medium tnum">{fmtInt(count)} row{count > 1 ? 's' : ''} selected</span>
+      <span className="text-muted ml-2">set</span>
+      <select className="input h-7 w-auto py-0" value={ptr} onChange={(e) => { setPtr(e.target.value); setVal('') }}>{fields.map((x) => <option key={x.pointer} value={x.pointer}>{x.pointer.slice(1)}</option>)}</select>
+      <span className="text-muted">to</span>
+      {fld?.enum ? <select className="input h-7 w-auto py-0" value={val} onChange={(e) => setVal(e.target.value)}><option value="">–</option>{fld.enum.map((v) => <option key={String(v)} value={String(v)}>{String(v)}</option>)}</select> : <input className="input h-7 w-36" value={val} onChange={(e) => setVal(e.target.value)} placeholder="value (empty = clear)" />}
+      <button className="btn btn-sm" disabled={!fld} onClick={() => fld && onSet(fld, val)}>Apply</button>
+      {pricePointer && <><span className="text-muted ml-3">price</span><input className="input h-7 w-16 tnum" value={pct} onChange={(e) => setPct(e.target.value)} placeholder="-5" /><span className="text-muted">%</span><button className="btn btn-sm" disabled={!pct || Number.isNaN(Number(pct))} onClick={() => onScale(Number(pct))}>Apply</button></>}
+      <button className="btn btn-sm btn-ghost text-bad ml-2" onClick={onDelete}><Trash2 size={12} /> Delete rows</button>
+      <button className="btn btn-sm btn-ghost ml-auto" onClick={onClear}><X size={12} /> Clear selection</button>
+    </div>
+  )
+}
+
+const SEVERITY_TONE = { high: 'bad', medium: 'warn', low: 'neutral' } as const
+
+function AnomalyView({ an, onTrace }: { an: AnomalyReport; onTrace: (identity: string, kind: string) => void }) {
+  return (
+    <div className="flex flex-col gap-2.5">
+      <div className="grid grid-cols-3 gap-2">
+        <div className="card p-2"><div className="text-muted text-[11.5px]">Normal records</div><div className={cn('tnum text-[17px] font-semibold', an.normal_pct >= 95 ? 'text-ok' : 'text-warn')}>{an.normal_pct}%</div></div>
+        <div className="card p-2"><div className="text-muted text-[11.5px]">Anomalies</div><div className="tnum text-[17px] font-semibold">{fmtInt(an.items.length + an.dataset.length)}</div></div>
+        <div className="card p-2"><div className="text-muted text-[11.5px]">High severity</div><div className={cn('tnum text-[17px] font-semibold', an.high ? 'text-bad' : '')}>{fmtInt(an.high)}</div></div>
+      </div>
+      <div className={cn('rounded-[var(--radius-md)] px-3 py-2', an.high ? 'bg-bad-soft text-bad' : an.items.length ? 'bg-warn-soft text-warn' : 'bg-ok-soft text-ok')}>{an.headline}</div>
+      {an.baseline && <div className="text-muted text-[12px] tnum">usual size: {fmtNum(an.baseline.avg_rows, 0)} records over {an.baseline.rounds} round(s) · now {fmtInt(an.baseline.current_rows)}</div>}
+      {an.dataset.map((a, i) => <div key={i} className="flex gap-2"><Badge tone={SEVERITY_TONE[a.severity]}>{a.severity}</Badge><span>{a.message}</span></div>)}
+      {Object.keys(an.by_kind).length > 0 && <div className="flex flex-wrap gap-1">{Object.entries(an.by_kind).map(([k, v]) => <Badge key={k} tone="neutral">{k.replace(/_/g, ' ')} · {v}</Badge>)}</div>}
+      {an.items.length > 0 && (
+        <div><div className="font-medium mb-1">Check first</div>
+          <ul className="flex flex-col">{an.items.slice(0, 40).map((a, i) => (
+            <li key={i} className="flex items-start gap-2 py-1 border-b border-line/60 cursor-pointer hover:bg-surface-2" onClick={() => a.identity && onTrace(a.identity, a.kind)} title="Trace this record">
+              <Badge tone={SEVERITY_TONE[a.severity]} className="h-5 px-1.5 text-[10.5px] shrink-0">{a.severity}</Badge><span className="mono shrink-0">{a.identity}</span><span className="text-ink-2">{a.message}</span>
+            </li>))}</ul>
+          {an.items.length > 40 && <div className="text-muted text-[12px] mt-1">+{an.items.length - 40} more</div>}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function DiffPanel({ report, ack, acking, onAcknowledge, onTrace }: { report?: import('../lib/api').ChangeReport; ack: { high: number; headline: string } | null; acking: boolean; onAcknowledge: (comment: string) => void; onTrace: (identity: string, kind: string) => void }) {
+  const [comment, setComment] = useState('')
   if (!report) return <div className="text-muted flex items-center gap-2"><Spinner /> comparing with the previous published round…</div>
-  if (!report.has_previous) return <div className="text-muted"><GitCompare size={14} className="inline mr-1" /> No previous published dataset for this customer yet. From the next round on, this panel shows SKUs added/removed and every price or promotion change.</div>
   return (
     <div className="flex flex-col gap-3">
-      <div className="grid grid-cols-3 gap-2">
-        {[['Added SKUs', report.added_count, 'ok'], ['Removed SKUs', report.removed_count, 'bad'], ['Changed', report.changed_count, 'info'], ['Price changes', report.price_change_count, 'warn'], ['Large moves ≥20%', report.large_price_moves?.length, 'bad'], ['Promo changes', report.promotion_changes, 'info']].map(([k, v]) => <div key={String(k)} className="card p-2"><div className="text-muted text-[11.5px]">{k}</div><div className="tnum text-[17px] font-semibold">{fmtInt(v as number)}</div></div>)}
-      </div>
-      <div className="text-muted">{fmtInt(report.previous_rows)} → {fmtInt(report.current_rows)} rows</div>
-      {report.large_price_moves?.length ? <div><div className="font-medium mb-1">Large price moves</div><ul className="mono text-[12px]">{report.large_price_moves.slice(0, 15).map((p, i) => <li key={i} className={cn(p.pct && p.pct > 0 ? 'text-warn' : 'text-ok')}>{p.identity}: {fmtNum(p.before)} → {fmtNum(p.after)} ({p.pct?.toFixed(1)}%)</li>)}</ul></div> : null}
-      {report.added?.length ? <div><div className="font-medium mb-1">Added</div><div className="mono text-[12px] text-ink-2 break-words">{report.added.slice(0, 40).join(', ')}{report.added.length > 40 ? ' …' : ''}</div></div> : null}
-      {report.removed?.length ? <div><div className="font-medium mb-1">Removed</div><div className="mono text-[12px] text-ink-2 break-words">{report.removed.slice(0, 40).join(', ')}{report.removed.length > 40 ? ' …' : ''}</div></div> : null}
-      {report.changed?.length ? <div><div className="font-medium mb-1">Changed records</div><ul className="text-[12px] flex flex-col gap-1">{report.changed.slice(0, 25).map((c) => <li key={c.identity}><span className="mono">{c.identity}</span> <span className="text-muted">{c.changes.map((x) => `${x.pointer}: ${cellText(x.before)} → ${cellText(x.after)}`).join('; ')}</span></li>)}</ul></div> : null}
+      {ack && (
+        <div className="card p-3 border-bad/40 flex flex-col gap-2">
+          <div className="font-medium text-bad flex items-center gap-1.5"><ShieldAlert size={14} /> {ack.high} high-severity anomalies hold this approval</div>
+          <div className="text-ink-2">Check the list below. Approving anyway is recorded in the audit log with your note.</div>
+          <input className="input" placeholder="Why is this data correct? (e.g. price list update confirmed by the buyer)" value={comment} onChange={(e) => setComment(e.target.value)} />
+          <button className="btn btn-sm btn-danger self-start" disabled={!comment.trim() || acking} onClick={() => onAcknowledge(comment)}><CheckCircle2 size={13} /> I reviewed them — approve</button>
+        </div>
+      )}
+      {report.anomalies && <AnomalyView an={report.anomalies} onTrace={onTrace} />}
+      {!report.has_previous ? <div className="text-muted"><GitCompare size={14} className="inline mr-1" /> No previous published dataset for this customer yet. From the next round on, this panel also shows SKUs added/removed and every price or promotion change.</div> : (
+        <>
+          <div className="font-medium mt-1">vs last published round</div>
+          <div className="grid grid-cols-3 gap-2">
+            {[['Added SKUs', report.added_count], ['Removed SKUs', report.removed_count], ['Changed', report.changed_count], ['Price changes', report.price_change_count], ['Large moves ≥20%', report.large_price_moves?.length], ['Promo changes', report.promotion_changes]].map(([k, v]) => <div key={String(k)} className="card p-2"><div className="text-muted text-[11.5px]">{k}</div><div className="tnum text-[17px] font-semibold">{fmtInt(v as number)}</div></div>)}
+          </div>
+          <div className="text-muted">{fmtInt(report.previous_rows)} → {fmtInt(report.current_rows)} rows</div>
+          {report.large_price_moves?.length ? <div><div className="font-medium mb-1">Large price moves</div><ul className="mono text-[12px]">{report.large_price_moves.slice(0, 15).map((p, i) => <li key={i} className={cn('cursor-pointer hover:underline', p.pct && p.pct > 0 ? 'text-warn' : 'text-ok')} onClick={() => onTrace(p.identity, 'price')}>{p.identity}: {fmtNum(p.before)} → {fmtNum(p.after)} ({p.pct?.toFixed(1)}%)</li>)}</ul></div> : null}
+          {report.added?.length ? <div><div className="font-medium mb-1">Added</div><div className="mono text-[12px] text-ink-2 break-words">{report.added.slice(0, 40).join(', ')}{report.added.length > 40 ? ' …' : ''}</div></div> : null}
+          {report.removed?.length ? <div><div className="font-medium mb-1">Removed</div><div className="mono text-[12px] text-ink-2 break-words">{report.removed.slice(0, 40).join(', ')}{report.removed.length > 40 ? ' …' : ''}</div></div> : null}
+          {report.changed?.length ? <div><div className="font-medium mb-1">Changed records</div><ul className="text-[12px] flex flex-col gap-1">{report.changed.slice(0, 25).map((c) => <li key={c.identity}><span className="mono">{c.identity}</span> <span className="text-muted">{c.changes.map((x) => `${x.pointer}: ${cellText(x.before)} → ${cellText(x.after)}`).join('; ')}</span></li>)}</ul></div> : null}
+        </>
+      )}
+    </div>
+  )
+}
+
+function AnswerPanel({ answer, pending, onTrace }: { answer: Answer | null; pending: boolean; onTrace: (identity: string, pointer?: string) => void }) {
+  if (pending) return <div className="text-muted flex items-center gap-2"><Spinner /> looking at the data…</div>
+  if (!answer) return <div className="text-muted leading-relaxed">Ask a question in the copilot bar — "ทำไม SKU บางรายการ join ไม่สำเร็จ?", "ทำไมราคา A001 เป็นแบบนี้?", "มีอะไรผิดปกติที่ควรตรวจก่อน?". Answers are built from the data (findings, table links, lineage, anomalies) and show their evidence.</div>
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="card p-3"><Badge tone="neutral">{answer.intent}</Badge><div className="mt-1.5 leading-relaxed">{answer.answer}</div></div>
+      {answer.suggestions.length > 0 && <div><div className="font-medium mb-1">What to do</div><ul className="flex flex-col gap-1">{answer.suggestions.map((x, i) => <li key={i}>• {x}</li>)}</ul></div>}
+      {answer.evidence.length > 0 && <div><div className="font-medium mb-1">Evidence</div><ul className="flex flex-col gap-1 mono text-[11.5px] text-ink-2">{answer.evidence.map((e, i) => <li key={i} className="break-words">{typeof e === 'string' ? e : <span className="flex flex-col card p-2">{Object.entries(e as Record<string, unknown>).map(([k, v]) => <span key={k}><span className="text-muted">{k.replace(/_/g, ' ')}:</span> {Array.isArray(v) ? v.map((x) => (typeof x === 'object' ? JSON.stringify(x) : String(x))).join(', ') : typeof v === 'object' && v !== null ? Object.values(v).join(' · ') : String(v)}</span>)}</span>}</li>)}</ul></div>}
+      {answer.trace && <button className="btn btn-sm self-start" onClick={() => onTrace(answer.trace!.identity, answer.trace!.pointer ?? undefined)}><Route size={13} /> Open lineage</button>}
     </div>
   )
 }
@@ -350,21 +546,74 @@ function EditableCell({ value, field, onCommit }: { value: unknown; field: Field
   return <input autoFocus className="input h-6 text-[12.5px] py-0" value={ed} onChange={(e) => setEd(e.target.value)} onBlur={commit} onKeyDown={(e) => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') setEd(null) }} />
 }
 
-function LineageDrawer({ open, datasetId, identity, onClose }: { open: boolean; datasetId: string; identity: string; onClose: () => void }) {
-  const { data } = useQuery({ queryKey: ['lineage', datasetId, identity], queryFn: () => api.lineage(datasetId, identity), enabled: open && !!identity })
+const cellRef = (c: { sheet: string | null; source: string; column: string | null; row: number | null }) => `${c.sheet ?? c.source}!${c.column ?? '?'}${c.row ?? ''}`
+const CAUSE_TONE: Record<string, string> = { source_changed: 'bg-info-soft text-info', mapping_changed: 'bg-warn-soft text-warn', manual: 'bg-signal-soft text-signal', previous_edit: 'bg-warn-soft text-warn', unchanged: 'bg-ok-soft text-ok', new_record: 'bg-surface-2 text-ink-2', no_baseline: 'bg-surface-2 text-ink-2', unknown: 'bg-surface-2 text-ink-2' }
+
+function Step({ title, children }: { title: string; children: React.ReactNode }) {
+  return <div className="flex gap-3 py-1.5 border-b border-line/60 last:border-0"><div className="w-32 shrink-0 text-muted text-[11px] uppercase tracking-wide pt-0.5">{title}</div><div className="flex-1 min-w-0 break-words">{children}</div></div>
+}
+
+function TraceDrawer({ open, datasetId, identity, pointer, onPointer, onClose }: { open: boolean; datasetId: string; identity: string; pointer?: string; onPointer: (p: string) => void; onClose: () => void }) {
+  const { data, error } = useQuery({ queryKey: ['trace', datasetId, identity, pointer ?? ''], queryFn: () => api.trace(datasetId, identity, pointer), enabled: open && !!identity })
+  const focus = data?.focus
   return (
-    <Drawer open={open} onClose={onClose} title={<span>Lineage <span className="mono text-muted">{identity}</span></span>} width="w-[640px]">
-      {!data ? <Spinner /> : (
+    <Drawer open={open} onClose={onClose} title={<span>Lineage <span className="mono text-muted">{identity}</span></span>} width="w-[720px]">
+      {error ? <div className="text-bad">{(error as Error).message}</div> : !data ? <Spinner /> : (
         <div className="flex flex-col gap-4 text-[12.5px]">
-          <div className="card p-3"><div className="text-muted">Source</div><div className="mono">{String((data.source_meta as { file?: string })?.file ?? '')} · root row {String((data.source_meta as { lineage?: { root_row?: number } })?.lineage?.root_row ?? '')}</div><div className="text-muted mt-1">mapping version <span className="mono text-ink">{data.mapping_version}</span></div></div>
-          <div><div className="font-medium mb-1">How each field was derived</div>
-            <table className="table text-[12px]"><thead><tr><th>Target</th><th>Expression</th><th>Confidence</th></tr></thead>
-              <tbody>{data.fields.map((f) => <tr key={f.target}><td className="mono">{f.target}</td><td className="mono">{describeExpr(f.expr)}</td><td><Confidence value={f.confidence} /></td></tr>)}
-                {data.collections.flatMap((c) => c.fields.map((f) => <tr key={f.target}><td className="mono">{f.target}</td><td className="mono">{describeExpr(f.expr)} <span className="text-muted">from {c.source}</span></td><td><Confidence value={f.confidence} /></td></tr>))}</tbody></table></div>
-          <div><div className="font-medium mb-1">Manual edits</div>{data.edits.length ? <ul className="flex flex-col gap-1">{data.edits.map((e) => <li key={e.change_set}><span className="text-muted">{e.kind} by {e.author} · {timeAgo(e.at)}</span> {e.changes.map((c) => `${c.target}: ${cellText(c.before)} → ${cellText(c.after)}`).join('; ')}</li>)}</ul> : <div className="text-muted">None — this record is exactly what the mapping produced.</div>}</div>
+          <div className="text-muted">{data.source.file} · sheet {data.source.sheet ?? data.source.source} · row {data.source.row ?? '?'} · mapping v{data.mapping_version} · dataset v{data.version}</div>
+          {data.problems.length > 0 && <div className="text-warn">{data.problems.join('; ')}</div>}
+          {focus && <FocusView f={focus} mappingVersion={data.mapping_version} />}
+          <div>
+            <div className="font-medium mb-1">Every value of this record — click one to trace it</div>
+            <table className="table text-[12px]"><thead><tr><th>Field</th><th>Value</th><th>From</th></tr></thead>
+              <tbody>{data.fields.map((x) => {
+                const edited = x.mapped !== null && x.mapped !== undefined && JSON.stringify(x.mapped) !== JSON.stringify(x.value)
+                return (
+                  <tr key={x.pointer} className={cn('cursor-pointer hover:bg-surface-2', x.pointer === pointer && 'bg-signal-soft/60')} onClick={() => onPointer(x.pointer)}>
+                    <td className="mono">{x.pointer}</td>
+                    <td>{cellText(x.value) || <span className="text-muted">∅</span>}{edited && <span className="text-signal"> · edited (mapped {cellText(x.mapped) || '∅'})</span>}</td>
+                    <td className="mono text-muted">{x.cells.length ? x.cells.map(cellRef).join(', ') : x.expr ? describeExpr(x.expr) : ''}</td>
+                  </tr>
+                )
+              })}</tbody></table>
+          </div>
+          {data.overrides.length > 0 && <div><div className="font-medium mb-1">Persistent overrides on this record</div><ul className="flex flex-col gap-1">{data.overrides.map((o) => <li key={o.id}><span className="mono">{o.target}</span> = {cellText(o.value)} <span className="text-muted">by {o.author}{o.note ? ` · “${o.note}”` : ''}</span></li>)}</ul></div>}
+          <div>
+            <div className="font-medium mb-1">History of this record</div>
+            <ul className="flex flex-col gap-1.5">{data.history.map((h) => (
+              <li key={h.dataset_id} className="card p-2">
+                <div className="flex items-center gap-2"><span className="tnum font-medium">v{h.version}</span><Badge tone={h.kind === 'transform' ? 'neutral' : 'signal'}>{h.kind.replace('_', ' ')}</Badge><span className="text-muted">by {h.by} · {timeAgo(h.at)}</span>{h.note && <span className="text-muted">“{h.note}”</span>}</div>
+                {h.changes.length > 0 && <ul className="mt-1 mono text-[11.5px]">{h.changes.map((c, i) => <li key={i}>{c.pointer}: {cellText(c.before) || '∅'} → <span className="text-signal">{cellText(c.after) || '∅'}</span></li>)}</ul>}
+                {!h.present && <div className="text-bad mt-1">record deleted in this version</div>}
+              </li>
+            ))}</ul>
+          </div>
         </div>
       )}
     </Drawer>
+  )
+}
+
+function FocusView({ f, mappingVersion }: { f: NonNullable<Trace['focus']>; mappingVersion: number }) {
+  const edited = f.mapped !== null && f.mapped !== undefined && JSON.stringify(f.mapped) !== JSON.stringify(f.value)
+  return (
+    <div className="card p-3">
+      <div className="font-medium mono mb-1">{f.pointer}</div>
+      <Step title="Source">{f.cells.length ? f.cells.map((c, i) => (
+        <div key={i}><span className="mono">{c.file} · {c.sheet ?? c.source} · row {c.row ?? '?'} · column {c.column ?? '?'}</span> <span className="text-muted">({c.header})</span> = <span className="mono">"{cellText(c.raw)}"</span> {c.verified === true && <Badge tone="ok" className="h-5 text-[10.5px]">read back from the file</Badge>}{c.verified === false && <Badge tone="warn" className="h-5 text-[10.5px]">position approximate</Badge>}</div>
+      )) : <span className="text-muted">no source cell — a constant or a default</span>}</Step>
+      <Step title={`Mapping v${mappingVersion}`}><span className="mono">{f.expr ? describeExpr(f.expr) : '–'}</span> → <b>{cellText(f.mapped) || '∅'}</b></Step>
+      {(f.edits.length > 0 || f.overrides.length > 0) && <Step title="Manual changes">
+        {f.overrides.map((o) => <div key={o.id}>persistent override → {cellText(o.value)} <span className="text-muted">by {o.author}{o.note ? ` · “${o.note}”` : ''}</span></div>)}
+        {f.edits.map((e, i) => <div key={i}>v{e.version} {e.kind.replace('_', ' ')} by {e.by} · {timeAgo(e.at)}: {cellText(e.before) || '∅'} → <span className="text-signal">{cellText(e.after) || '∅'}</span>{e.note ? <span className="text-muted"> “{e.note}”</span> : null}</div>)}
+      </Step>}
+      <Step title="Final JSON"><span className={cn('mono', edited && 'text-signal')}>"{f.pointer.split('/').pop()}": {JSON.stringify(f.value)}</span></Step>
+      <div className={cn('rounded-[var(--radius-md)] px-3 py-2 mt-2', CAUSE_TONE[f.cause.kind] ?? 'bg-surface-2')}>
+        <div className="font-medium">Why this value{f.previous ? ` — last round (${f.previous.round.label ?? 'previous'}): ${cellText(f.previous.value) || '∅'}` : ''}</div>
+        <div>{f.cause.summary}</div>
+        {f.cause.evidence?.map((e, i) => <div key={i} className="mono text-[11.5px] opacity-90">• {e}</div>)}
+      </div>
+    </div>
   )
 }
 

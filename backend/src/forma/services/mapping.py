@@ -17,13 +17,13 @@ from forma.ai.llm import LLMError
 from forma.ai.policy import PolicyDecision
 from forma.core.errors import Conflict, NotFound, PolicyBlocked, ValidationFailed
 from forma.core.ids import new_id
-from forma.db.models import ImportRound, LLMCall, MappingVersion, ReviewTask, SourceFile
+from forma.db.models import ImportRound, LLMCall, MappingVersion, Override, ReviewTask, SourceFile
 from forma.engine.transform import BoundSource, TransformEngine, TransformResult
 from forma.mapping_dsl.models import MappingDocument, SourceSpec
 from forma.mapping_dsl.validate import validate_mapping
 from forma.profiling.profile import WorkbookProfile
 from forma.schema_registry import TargetSchema
-from forma.services import sandbox
+from forma.services import healing, sandbox
 from forma.services.context import ServiceContext
 from forma.services.rounds import audit, get_round, latest_approved_mapping, round_profile
 
@@ -133,6 +133,24 @@ def _risk(decision: PolicyDecision) -> dict[str, Any]:
     }
 
 
+def active_overrides(session: Session, customer_id: str) -> list[dict[str, Any]]:
+    rows = session.scalars(
+        select(Override).where(Override.customer_id == customer_id, Override.active.is_(True))
+    ).all()
+    return [
+        {
+            "id": o.id,
+            "target": o.target,
+            "where": o.where or {},
+            "value": o.value,
+            "author": o.author,
+            "note": o.note,
+            "created_at": o.created_at.isoformat() if o.created_at else None,
+        }
+        for o in rows
+    ]
+
+
 def _sandbox(
     ctx: ServiceContext,
     schema: TargetSchema,
@@ -140,6 +158,7 @@ def _sandbox(
     baseline: MappingVersion | None,
     files: list[SourceFile],
     mapping_version_id: str,
+    overrides: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any] | None:
     """Run ``doc`` and the approved ``baseline`` on the same files (ADR-018). The drill-down lists are
     stored before the mapping row that points at them; the report itself goes into the row's policy."""
@@ -150,12 +169,70 @@ def _sandbox(
     except Exception:
         return None
     report, details = sandbox.run(
-        ctx, schema, doc, base_doc, files, limit=ctx.settings.sandbox_max_rows or None
+        ctx, schema, doc, base_doc, files, limit=ctx.settings.sandbox_max_rows or None, overrides=overrides
     )
     key = sandbox.details_key(baseline.customer_id, mapping_version_id)
     sandbox.store_details(ctx, key, details)
     report.update(baseline_id=baseline.id, baseline_version=baseline.version, details_key=key)
     return report
+
+
+FIELD_REVIEW_ROWS = 5000  # records of the new mapping compared with last round's published data
+
+
+def _field_review(
+    ctx: ServiceContext,
+    session: Session,
+    schema: TargetSchema,
+    baseline: MappingVersion,
+    doc: MappingDocument,
+    after: list[dict[str, Any]] | None,
+    customer_id: str,
+    round_id: str | None,
+) -> dict[str, Any]:
+    """Field-by-field changes vs the approved mapping, each checked on the data (ADR-021)."""
+    from forma.services.datasets import iter_records, previous_published
+
+    after = (after or [])[:FIELD_REVIEW_ROWS]
+    before: list[dict[str, Any]] = []
+    prev = previous_published(session, customer_id, round_id or "")
+    if prev is not None and after:
+        wanted = {sandbox._identity(r, schema) for r in after}
+        before = [r for r in iter_records(ctx.records_path(prev)) if sandbox._identity(r, schema) in wanted]
+    out = healing.review(
+        schema,
+        MappingDocument.model_validate(baseline.document),
+        doc,
+        before,
+        after,
+        risk_of=lambda p: ctx.policy.risk_of(schema, p),
+    )
+    out.update(
+        baseline_id=baseline.id,
+        baseline_version=baseline.version,
+        compared_with=prev.id if prev is not None else None,
+    )
+    return out
+
+
+def field_review(ctx: ServiceContext, session: Session, mapping_id: str) -> dict[str, Any]:
+    """The Studio's "What changed" view: stored with the proposal, or computed for older versions."""
+    m = get_mapping(session, mapping_id)
+    stored = (m.policy or {}).get("field_review")
+    if stored:
+        return dict(stored)
+    baseline = latest_approved_mapping(session, m.customer_id)
+    if baseline is not None and baseline.id == m.id:
+        baseline = session.get(MappingVersion, m.parent_id) if m.parent_id else None
+    if baseline is None:
+        return {"baseline_id": None, "fields": [], "checks": [], "needs_decision": [], "counts": {}}
+    schema = ctx.registry.get_ref(m.target_schema)
+    doc = MappingDocument.model_validate(m.document)
+    r = session.get(ImportRound, m.round_id) if m.round_id else None
+    sim, _ = simulate(ctx, doc, schema, r.files if r else [], limit=FIELD_REVIEW_ROWS)
+    return _field_review(
+        ctx, session, schema, baseline, doc, sim.records if sim else None, m.customer_id, m.round_id
+    )
 
 
 def _verdict(ctx: ServiceContext, report: dict[str, Any] | None) -> None:
@@ -271,7 +348,15 @@ def propose_for_round(
     mv_id = new_id("map")
     # 6) sandbox: a new mapping (not a verbatim reuse) runs next to the approved one on these files
     sandbox_report = (
-        _sandbox(ctx, schema, doc, previous, r.files, mv_id) if rep.ok and source_kind != "memory" else None
+        _sandbox(ctx, schema, doc, previous, r.files, mv_id, active_overrides(session, r.customer_id))
+        if rep.ok and source_kind != "memory"
+        else None
+    )
+    # 7) self-healing review: what changed per field vs the approved mapping, checked on the data
+    review = (
+        _field_review(ctx, session, schema, previous, doc, sim.records if sim else None, r.customer_id, r.id)
+        if previous is not None and rep.ok and source_kind != "memory"
+        else None
     )
     decision = ctx.policy.evaluate(
         doc,
@@ -285,6 +370,7 @@ def propose_for_round(
         row_change_ratio=row_change_ratio,
         llm_fallback=llm_fallback,
         sandbox=sandbox_report,
+        field_checks=review["checks"] if review else None,
     )
     _verdict(ctx, sandbox_report)
     mv = MappingVersion(
@@ -307,6 +393,7 @@ def propose_for_round(
             "simulation": sim.summary() if sim else None,
             "sample": (sim.records[:5] if sim else []),
             "sandbox": sandbox_report,
+            "field_review": review,
         },
         agent_log=agent_log,
         open_questions=open_questions,
@@ -524,7 +611,11 @@ def save_mapping_edit(
     )
     mv_id = new_id("map")
     approved = latest_approved_mapping(session, parent.customer_id)
-    sandbox_report = _sandbox(ctx, schema, doc, approved, r.files, mv_id) if r is not None else None
+    sandbox_report = (
+        _sandbox(ctx, schema, doc, approved, r.files, mv_id, active_overrides(session, parent.customer_id))
+        if r is not None
+        else None
+    )
     decision = ctx.policy.evaluate(
         doc,
         schema,
@@ -616,7 +707,13 @@ def sandbox_compare(
     if baseline is None:
         return {"baseline_id": None, "message": "no approved mapping to compare with yet", "delta": None}
     report, details = sandbox.run(
-        ctx, schema, doc, MappingDocument.model_validate(baseline.document), r.files, limit=limit
+        ctx,
+        schema,
+        doc,
+        MappingDocument.model_validate(baseline.document),
+        r.files,
+        limit=limit,
+        overrides=active_overrides(session, m.customer_id),
     )
     report.update(baseline_id=baseline.id, baseline_version=baseline.version)
     _verdict(ctx, report)

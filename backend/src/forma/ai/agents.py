@@ -453,18 +453,26 @@ COPILOT_SCHEMA: dict[str, Any] = {
 
 
 def copilot_agent(
-    client: LLMClient, instruction: str, schema: TargetSchema, sample_records: list[dict[str, Any]]
+    client: LLMClient,
+    instruction: str,
+    schema: TargetSchema,
+    sample_records: list[dict[str, Any]],
+    *,
+    derived: list[str] | None = None,
 ) -> AgentResult:
     system = (
         SYSTEM_BASE.format(ops=_ops_list())
         + "\nTask: translate the operator's natural-language instruction into SAFE, reviewable data operations over target fields."
         " Never apply anything; only plan. Use `where` as a DSL boolean expression whose col names are target pointers (e.g. {op:'eq',args:[{op:'col',name:'/category'},{op:'const',value:'Electronics'}]})."
+        " Conditions over collections use the derived figures as col names, e.g. sum(/inventory/*/qty) for total"
+        " stock or count(/promotions) for 'in a promotion' (0 = not in one)."
         " If the instruction is ambiguous, set needs_clarification (Thai) and return no operations."
     )
     user = json.dumps(
         {
             "instruction": _clip(instruction, 2000),
             "target_fields": _field_catalogue(schema),
+            "derived_figures": derived or [],
             "sample_records": cap_samples(sample_records),
         },
         ensure_ascii=False,

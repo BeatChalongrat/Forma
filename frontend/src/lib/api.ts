@@ -73,15 +73,24 @@ export type MappingDocument = {
   fields: FieldMapping[]; collections: CollectionMapping[]; quality: Record<string, unknown>[]; provenance: boolean; attributes_passthrough: boolean
 }
 export type SandboxSide = { ok: boolean; problems?: string[]; rows_in?: number; rows_out?: number; errors?: number; warnings?: number; schema_errors?: number; duplicates?: number; missing_identity?: number; invalid_prices?: number }
-export type SandboxDelta = { lost: number; gained: number; changed_records: number; changed_prices: number; large_price_moves: number; new_errors: number; new_invalid_prices: number; new_duplicates: number }
+export type SandboxDelta = { lost: number; gained: number; changed_records: number; changed_prices: number; large_price_moves: number; new_errors: number; new_invalid_prices: number; new_duplicates: number; override_conflicts?: number }
+export type OverrideConflict = { override_id: string | null; target: string; identity?: string; kind: 'no_record' | 'value_changed' | 'scope_changed' | 'field_dropped'; value?: unknown; before?: unknown; after?: unknown; message: string }
 export type SandboxItem = { identity: string; pointer?: string; before?: unknown; after?: unknown; pct?: number | null; changes?: { pointer: string; before: unknown; after: unknown }[]; fields?: number }
 export type SandboxReport = {
   rows_limit: number | null; old: SandboxSide; new: SandboxSide; delta: SandboxDelta | null
   baseline_id: string | null; baseline_version?: number; verdict?: 'pass' | 'fail' | 'n/a'; problems?: string[]; message?: string
   details?: Record<'price_changes' | 'changed' | 'lost' | 'gained', SandboxItem[]>
+  override_conflicts?: OverrideConflict[]
 }
 export type RiskLevel = 'low' | 'medium' | 'high'
-export type PolicyDecision = { decision: 'auto_approve' | 'review' | 'block'; priority: number; reasons: string[]; risk_score: number; risk_level?: RiskLevel; risk_factors?: string[]; impact?: { affected_records: number; of_records: number; ratio: number | null; changed_prices: number; high?: boolean }; checks: Record<string, unknown>; source?: string; simulation?: SimSummary | null; sandbox?: SandboxReport | null }
+export type PolicyDecision = { decision: 'auto_approve' | 'review' | 'block'; priority: number; reasons: string[]; risk_score: number; risk_level?: RiskLevel; risk_factors?: string[]; impact?: { affected_records: number; of_records: number; ratio: number | null; changed_prices: number; high?: boolean }; checks: Record<string, unknown>; source?: string; simulation?: SimSummary | null; sandbox?: SandboxReport | null; field_review?: FieldReview | null }
+export type DataCheck = { verdict: 'same' | 'vat_added' | 'vat_removed' | 'scaled' | 'different' | 'no_data'; summary: string; pairs: number; equal_share?: number; ratio?: number; examples?: { identity: string; before: unknown; after: unknown }[] }
+export type FieldChange = {
+  pointer: string; status: 'unchanged' | 'changed' | 'added' | 'removed'; risk: string | null; check: DataCheck | null
+  before: { expr: Expr; reads: string[]; collection?: string | null } | null
+  after: { expr: Expr; reads: string[]; collection?: string | null; confidence: number; evidence: string[] } | null
+}
+export type FieldReview = { baseline_id: string | null; baseline_version?: number; compared_with?: string | null; counts: Partial<Record<FieldChange['status'], number>>; needs_decision: string[]; fields: FieldChange[] }
 export type RelNode = { id: string; sheet: string | null; file: string | null; role: string; root: boolean; used: boolean; collections: string[]; rows: number; columns: { name: string; key: boolean; mapped: boolean }[]; source_spec?: SourceSpec }
 export type RelEdge = {
   from: { node: string; column: string }; to: { node: string; column: string }; kind: 'link' | 'join' | 'suggested'; used: boolean; collection?: string; expected?: string; missing?: boolean
@@ -137,10 +146,11 @@ export type Policy = {
   block: Record<string, boolean>
   risk_overrides: Record<string, string>
   sandbox: { enabled: boolean; max_lost_records: number; max_new_errors: number; max_new_invalid_prices: number; max_new_duplicates: number; max_changed_prices_auto: number }
+  anomaly?: { max_price_change_pct: number; max_discount_pct: number; max_stock_drop_pct: number; max_removed_pct: number; row_count_tolerance_pct: number; outlier_mad: number; history_rounds: number; block_approval_on_high: boolean }
   [k: string]: unknown
 }
 export type PolicyView = { effective: Policy; file: Policy; source: 'ui' | 'file'; updated_by?: string; updated_at?: string }
-export type Operation = { kind: 'set_cell' | 'set_field' | 'scale_field' | 'delete_rows' | 'delete_row' | 'set_item'; target?: string; identity?: string; value?: unknown; factor?: number; where?: Expr | null; explanation?: string }
+export type Operation = { kind: 'set_cell' | 'set_field' | 'scale_field' | 'delete_rows' | 'delete_row' | 'set_item'; target?: string; identity?: string; value?: unknown; factor?: number; where?: Expr | null; identities?: string[]; explanation?: string }
 export type Impact = { rows_affected: number; cells_changed: number; rows_deleted: number; fields: string[]; sample: { row: number; identity: string; target: string | null; before: unknown; after: unknown }[] }
 export type RowsPage = { total: number; offset: number; limit: number; identity_keys: string[]; rows: Record<string, unknown>[]; columns: FieldSpec[]; findings: Finding[] }
 export type Dashboard = {
@@ -150,7 +160,22 @@ export type Dashboard = {
 export type ChangeReport = {
   has_previous: boolean; current_rows: number; previous_rows?: number; previous_dataset_id?: string; added?: string[]; removed?: string[]; added_count?: number; removed_count?: number; changed_count?: number
   changed?: { identity: string; changes: { pointer: string; before: unknown; after: unknown }[] }[]; price_changes?: { identity: string; before: number; after: number; pct: number | null }[]; price_change_count?: number; large_price_moves?: { identity: string; before: number; after: number; pct: number | null }[]; promotion_changes?: number
+  anomalies?: AnomalyReport
 }
+export type Anomaly = { identity?: string; kind: string; severity: 'high' | 'medium' | 'low'; message: string; pointer?: string; value?: unknown; expected?: unknown; score?: number }
+export type AnomalyReport = { records: number; anomalous_records: number; normal_pct: number; high: number; medium: number; low: number; by_kind: Record<string, number>; dataset: Anomaly[]; items: Anomaly[]; baseline: { rounds: number; avg_rows: number; current_rows: number } | null; headline: string }
+export type SourceCell = { source: string; file: string | null; sheet: string | null; row: number | null; column: string | null; header: string; raw: unknown; verified: boolean | null }
+export type TraceField = { pointer: string; field: string; item: number | null; value: unknown; mapped: unknown; expr: Expr | null; confidence?: number; evidence?: string[]; cells: SourceCell[] }
+export type TraceStep = { dataset_id: string; version: number; kind: string; by: string; at: string; note: string | null; present: boolean; changes: { pointer: string; before: unknown; after: unknown }[] }
+export type OverrideRule = { id: string; target: string; where: Record<string, unknown>; value: unknown; author: string; note: string | null; created_at: string | null }
+export type Cause = { kind: 'no_baseline' | 'new_record' | 'unchanged' | 'manual' | 'source_changed' | 'mapping_changed' | 'previous_edit' | 'unknown'; summary: string; evidence?: string[] }
+export type Trace = {
+  identity: string; dataset_id: string; version: number; mapping_version_id: string; mapping_version: number
+  source: { file: string | null; sheet: string | null; row: number | null; source: string }
+  fields: TraceField[]; history: TraceStep[]; overrides: OverrideRule[]; problems: string[]
+  focus: (TraceField & { edits: { version: number; kind: string; by: string; at: string; note: string | null; before: unknown; after: unknown }[]; overrides: OverrideRule[]; previous: ({ round: { id: string; label: string | null; dataset_id: string } } & Partial<TraceField>) | null; cause: Cause }) | null
+}
+export type Answer = { intent: string; ai: boolean; answer: string; evidence: unknown[]; suggestions: string[]; trace?: { identity: string; pointer: string | null } }
 
 // ---------------------------------------------------------------------------------------------
 export const api = {
@@ -204,7 +229,10 @@ export const api = {
   previewChanges: (id: string, operations: Operation[]) => post<{ impact: Impact; validation_errors: { row: number; pointer: string; message: string }[]; rows_after: number }>(`/api/datasets/${id}/preview-changes`, { operations }),
   applyChanges: (id: string, b: { operations: Operation[]; kind: string; actor: string; note?: string }) => post<{ dataset: DatasetVersion; change_set: ChangeSet }>(`/api/datasets/${id}/changes`, b),
   rollback: (id: string, actor = 'operator') => post<DatasetVersion>(`/api/datasets/${id}/rollback`, { actor }),
-  approveDataset: (id: string, actor = 'operator') => post<DatasetVersion>(`/api/datasets/${id}/approve`, { actor }),
+  approveDataset: (id: string, b: { acknowledge_anomalies?: boolean; comment?: string } = {}) => post<DatasetVersion>(`/api/datasets/${id}/approve`, { actor: 'operator', ...b }),
+  trace: (id: string, identity: string, pointer?: string) => get<Trace>(`/api/datasets/${id}/trace/${encodeURIComponent(identity)}` + qs(pointer ? { pointer } : undefined)),
+  ask: (id: string, question: string) => post<Answer>(`/api/datasets/${id}/ask`, { question }),
+  fieldReview: (mappingId: string) => get<FieldReview>(`/api/mappings/${mappingId}/field-review`),
   changeReport: (id: string) => get<ChangeReport>(`/api/datasets/${id}/changes-report`),
   lineage: (id: string, identity: string) => get<{ record: Record<string, unknown>; source_meta: Record<string, unknown>; mapping_version: string; fields: FieldMapping[]; collections: CollectionMapping[]; edits: { change_set: string; kind: string; author: string; at: string; changes: Impact['sample'] }[] }>(`/api/datasets/${id}/lineage/${encodeURIComponent(identity)}`),
   exportDataset: (id: string, fmt: string) => post<ExportArtifact>(`/api/datasets/${id}/export?fmt=${fmt}`),

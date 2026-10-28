@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from forma.ai.agents import copilot_agent, diagnosis_agent
 from forma.api import serialize as ser
 from forma.api.schemas import (
+    AskIn,
     BatchRunIn,
     ChangesIn,
     CompareIn,
@@ -46,8 +47,10 @@ from forma.export.exporter import MEDIA_TYPES
 from forma.jobs import runner
 from forma.mapping_dsl.models import MappingDocument, Op
 from forma.schema_registry import PROVENANCE_KEY, TargetSchema
+from forma.services import assistant
 from forma.services import config as cfg
 from forma.services import datasets as ds
+from forma.services import lineage as lin
 from forma.services import mapping as ms
 from forma.services import relationships as rel
 from forma.services import rounds as rs
@@ -557,6 +560,18 @@ def round_relationships(
     )
 
 
+@api.get("/mappings/{mapping_id}/field-review")
+def mapping_field_review(
+    mapping_id: str,
+    session: Session = Depends(get_session),
+    ctx: ServiceContext = Depends(ctx_dep),
+    p: Principal = Depends(current_principal),
+) -> dict[str, Any]:
+    """Self-healing (ADR-021): each field that changed vs the approved mapping, checked on the data."""
+    _mapping_scoped(session, p, mapping_id)
+    return ms.field_review(ctx, session, mapping_id)
+
+
 @api.post("/mappings/{mapping_id}/compare")
 def compare_mapping(
     mapping_id: str,
@@ -755,10 +770,20 @@ def approve_dataset(
     dataset_id: str,
     body: Decision,
     session: Session = Depends(get_session),
+    ctx: ServiceContext = Depends(ctx_dep),
     p: Principal = Depends(require_role("reviewer")),
 ) -> dict[str, Any]:
     _dataset_scoped(session, p, dataset_id)
-    return ser.dataset_version(ds.approve_dataset(session, dataset_id, p.actor))
+    return ser.dataset_version(
+        ds.approve_dataset(
+            session,
+            dataset_id,
+            p.actor,
+            ctx=ctx,
+            acknowledge_anomalies=body.acknowledge_anomalies,
+            comment=body.comment,
+        )
+    )
 
 
 @api.get("/datasets/{dataset_id}/changes-report")
@@ -782,6 +807,20 @@ def lineage(
 ) -> dict[str, Any]:
     _dataset_scoped(session, p, dataset_id)
     return ds.lineage(ctx, session, dataset_id, identity)
+
+
+@api.get("/datasets/{dataset_id}/trace/{identity}")
+def trace(
+    dataset_id: str,
+    identity: str,
+    pointer: str | None = None,
+    session: Session = Depends(get_session),
+    ctx: ServiceContext = Depends(ctx_dep),
+    p: Principal = Depends(current_principal),
+) -> dict[str, Any]:
+    """Explainable lineage (ADR-020): every value back to its Excel cell; with ``pointer``, why it changed."""
+    _dataset_scoped(session, p, dataset_id)
+    return lin.trace(ctx, session, dataset_id, identity, pointer)
 
 
 @api.post("/datasets/{dataset_id}/export", status_code=201)
@@ -921,22 +960,37 @@ def copilot(
     schema = ctx.registry.get_ref(ms.get_mapping(session, d.mapping_version_id).target_schema)
     records = ds.records_of(ctx, d)
     if ctx.llm.is_mock:
-        plan = _rule_based_copilot(body.instruction, schema)
+        plan = assistant.rule_based_plan(body.instruction, schema)
         if plan is None:
             return {
                 "ai": False,
                 "operations": [],
-                "needs_clarification": "ยังไม่ได้ตั้งค่า LLM — รองรับคำสั่งพื้นฐาน เช่น 'ลดราคาหมวด X 5%' หรือ 'ตั้งสถานะ inactive ให้หมวด Y'",
+                "needs_clarification": "ยังไม่ได้ตั้งค่า LLM — รองรับคำสั่ง เช่น 'ลดราคาหมวด X 5% เฉพาะที่ stock มากกว่า 100 "
+                "และไม่รวมสินค้าที่อยู่ในโปรโมชั่น' หรือ 'ตั้งสถานะ inactive ให้หมวด Y' (ต้องระบุว่าใช้กับสินค้ากลุ่มไหน)",
             }
         ops = plan
     else:
-        res = copilot_agent(ctx.llm, body.instruction, schema, records[:5])
+        derived = [d["name"] for d in ds.derived_columns(schema)]
+        res = copilot_agent(ctx.llm, body.instruction, schema, records[:5], derived=derived)
         ms._record_llm(session, d.round_id, res)
         if res.data.get("needs_clarification"):
             return {"ai": True, "operations": [], "needs_clarification": res.data["needs_clarification"]}
         ops = _copilot_to_ops(res.data.get("operations", []), schema)
     _, impact = ds.apply_operations(records, ops, schema)
     return {"ai": not ctx.llm.is_mock, "operations": ops, "impact": impact, "needs_clarification": None}
+
+
+@api.post("/datasets/{dataset_id}/ask")
+def ask(
+    dataset_id: str,
+    body: AskIn,
+    session: Session = Depends(get_session),
+    ctx: ServiceContext = Depends(ctx_dep),
+    p: Principal = Depends(current_principal),
+) -> dict[str, Any]:
+    """Questions about the data ("why did 120 SKUs not join?") answered from evidence (ADR-023)."""
+    _dataset_scoped(session, p, dataset_id)
+    return assistant.answer(ctx, session, dataset_id, body.question)
 
 
 def _copilot_to_ops(ops: list[dict[str, Any]], schema: TargetSchema) -> list[dict[str, Any]]:
@@ -969,58 +1023,6 @@ def _copilot_to_ops(ops: list[dict[str, Any]], schema: TargetSchema) -> list[dic
                 {"kind": "delete_rows", "where": o.get("where"), "explanation": o.get("explanation_th")}
             )
     return out
-
-
-def _rule_based_copilot(text: str, schema: TargetSchema) -> list[dict[str, Any]] | None:
-    import re
-
-    # fields by meaning (ADR-001): the category path, the status, and the price amount wherever it lives
-    category = schema.semantic_field("category_path")
-    status = schema.semantic_field("status")
-    prices = sorted(schema.semantic_pointers("price.amount"))
-    if category is None:
-        return None
-    t = text.strip()
-    m = re.search(
-        r"(?:ลดราคา|discount|reduce price|ลด)\s*(?:หมวด|category)?\s*(\S+)\s*(\d+(?:\.\d+)?)\s*%", t, re.I
-    )
-    if m and prices:
-        cat, pct = m.group(1), float(m.group(2))
-        where = {
-            "op": "contains",
-            "args": [{"op": "col", "name": category.pointer}],
-            "params": {"pattern": cat, "literal": True},
-        }
-        return [
-            {
-                "kind": "scale_field",
-                "target": prices[0],
-                "factor": round(1 - pct / 100, 4),
-                "where": where,
-                "explanation": f"ลดราคาสินค้าหมวด {cat} ลง {pct}%",
-            }
-        ]
-    m = re.search(
-        r"(?:ตั้งสถานะ|set status)\s*(active|inactive|discontinued)\s*(?:ให้|for|to)?\s*(?:หมวด|category)\s*(\S+)",
-        t,
-        re.I,
-    )
-    if m and status is not None:
-        where = {
-            "op": "contains",
-            "args": [{"op": "col", "name": category.pointer}],
-            "params": {"pattern": m.group(2), "literal": True},
-        }
-        return [
-            {
-                "kind": "set_field",
-                "target": status.pointer,
-                "value": m.group(1).lower(),
-                "where": where,
-                "explanation": f"ตั้งสถานะ {m.group(1)} ให้หมวด {m.group(2)}",
-            }
-        ]
-    return None
 
 
 # ============================================================================================

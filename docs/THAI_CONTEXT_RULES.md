@@ -21,7 +21,9 @@ them from column hints; the AI is told to use them.
 Thai retail price lists are usually VAT-inclusive (7%). Headers decide: `รวม VAT` / `incl` → inclusive;
 `ไม่รวม` / `ก่อน VAT` / `ex VAT` / `excl` → exclusive. When no marker exists the mapper assumes inclusive and
 records the assumption as an open question so a reviewer confirms it. `vat_adjust(mode=add|remove, rate=0.07)`
-converts explicitly; the target carries `vat_included` so downstream never guesses.
+converts explicitly; the target carries `vat_included` so downstream never guesses. The rate is the named
+constant `engine.thai.VAT_RATE`; the self-healing data check (ADR-021) uses it to recognise a price column
+that now includes or excludes VAT (a steady ×1.07 or ÷1.07 against last round).
 
 ## Units — `unit_normalize`, `pack_size`
 | Source | sell_unit | pack_size |

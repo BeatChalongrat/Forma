@@ -243,7 +243,13 @@ def test_end_to_end(schema: TargetSchema, workbook: Path) -> None:
     # provenance
     assert r1["source_meta"]["customer_id"] == "c1"
     assert r1["source_meta"]["file"] == workbook.name
-    assert r1["source_meta"]["lineage"] == {"root_row": 0, "source": "products"}
+    # lineage names the source row of the record, of each collection item and of each joined lookup row
+    assert r1["source_meta"]["lineage"] == {
+        "root_row": 0,
+        "source": "products",
+        "items": {"/inventory": [0], "/prices": [0]},
+        "joined": {"cats": 0},
+    }
     # the dedupe kept the first row: A003 is 'inactive', not 'active'
     assert by_sku["A003"]["product_name"] == "มันฝรั่งทอด"
     # attributes passthrough: unmapped columns are kept
