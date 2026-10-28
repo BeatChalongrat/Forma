@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import copy
 import datetime as dt
 from collections.abc import Iterator
@@ -14,6 +15,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from forma.core.errors import Conflict, NotFound, ValidationFailed
+from forma.core.ids import new_id
 from forma.db.models import ChangeSet, DatasetVersion, ExportArtifact, ImportRound, Override
 from forma.engine.ops import CompileContext, compile_expr
 from forma.engine.transform import TransformEngine, _get_pointer, _set_pointer
@@ -28,13 +30,18 @@ from forma.services.rounds import audit, get_round, latest_approved_mapping
 # --------------------------------------------------------------------------------------------
 # Storage helpers
 # --------------------------------------------------------------------------------------------
-def _write_records(path: Path, records: list[dict[str, Any]]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(".tmp")
-    with tmp.open("wb") as f:
-        for r in records:
-            f.write(orjson.dumps(r) + b"\n")
-    tmp.replace(path)
+def write_version_object(ctx: ServiceContext, key: str, records: list[dict[str, Any]]) -> int:
+    """Write a dataset version as JSONL to storage (temp file → put). Returns the byte size."""
+    tmp = ctx.tmp_dir / (key.replace("/", "_") + ".tmp")
+    try:
+        with tmp.open("wb") as f:
+            for r in records:
+                f.write(orjson.dumps(r) + b"\n")
+        size = tmp.stat().st_size
+        ctx.storage.put(key, tmp)
+    finally:
+        tmp.unlink(missing_ok=True)
+    return size
 
 
 def iter_records(path: Path) -> Iterator[dict[str, Any]]:
@@ -47,6 +54,37 @@ def iter_records(path: Path) -> Iterator[dict[str, Any]]:
 
 def read_records(path: Path) -> list[dict[str, Any]]:
     return list(iter_records(path))
+
+
+def records_of(ctx: ServiceContext, dv: DatasetVersion) -> list[dict[str, Any]]:
+    return read_records(ctx.records_path(dv))
+
+
+def _new_version(
+    ctx: ServiceContext,
+    session: Session,
+    records: list[dict[str, Any]],
+    *,
+    stamp_meta: bool,
+    **fields: Any,
+) -> DatasetVersion:
+    """Atomic dataset version creation (ADR-015): the JSONL object is written *first*, the DB row last;
+    a failure in between deletes the object so no partial version is ever visible."""
+    dv_id = new_id("dsv")
+    key = ctx.dataset_key(fields["customer_id"], dv_id)
+    if stamp_meta:
+        for d in records:
+            d.setdefault("source_meta", {})["dataset_version_id"] = dv_id
+    write_version_object(ctx, key, records)
+    try:
+        dv = DatasetVersion(id=dv_id, records_key=key, row_count=len(records), **fields)
+        session.add(dv)
+        session.flush()
+    except BaseException:
+        with contextlib.suppress(Exception):
+            ctx.storage.delete(key)
+        raise
+    return dv
 
 
 def get_dataset(session: Session, dataset_id: str) -> DatasetVersion:
@@ -80,7 +118,7 @@ def transform_round(
         raise Conflict("mapping is not approved")
     schema = ctx.registry.get_ref(mv.target_schema)
     doc = MappingDocument.model_validate(mv.document)
-    bindings, problems = bind_sources(doc, r.files)
+    bindings, problems = bind_sources(doc, r.files, resolve=ctx.storage.local_path)
     if problems:
         raise ValidationFailed("cannot bind mapping sources to files", details={"problems": problems})
     prev_version = session.scalar(
@@ -93,27 +131,21 @@ def transform_round(
     override_impact: dict[str, Any] = {}
     if apply_overrides:
         records, override_impact = apply_persistent_overrides(session, r.customer_id, schema, records)
-    dv = DatasetVersion(
+    dv = _new_version(
+        ctx,
+        session,
+        records,
+        stamp_meta=True,
         round_id=r.id,
         customer_id=r.customer_id,
         mapping_version_id=mv.id,
         version=(prev_version.version + 1) if prev_version else 1,
         status="draft",
-        records_path="",
-        row_count=len(records),
         stats={**res.stats, "overrides": override_impact},
         findings=findings,
         parent_id=prev_version.id if prev_version else None,
         created_by=actor,
     )
-    session.add(dv)
-    session.flush()
-    path = ctx.datasets_dir / r.customer_id / f"{dv.id}.jsonl"
-    _write_records(path, records)
-    dv.records_path = str(path)
-    for d in records:
-        d.get("source_meta", {})["dataset_version_id"] = dv.id
-    _write_records(path, records)
     r.status = "transformed"
     r.summary = {
         **(r.summary or {}),
@@ -283,7 +315,7 @@ def preview_changes(
 ) -> dict[str, Any]:
     dv = get_dataset(session, dataset_id)
     schema = ctx.registry.get_ref(get_mapping(session, dv.mapping_version_id).target_schema)
-    records = read_records(Path(dv.records_path))
+    records = records_of(ctx, dv)
     new, impact = apply_operations(records, operations, schema)
     errors = schema.validate_records(new, limit=50)
     return {"impact": impact, "validation_errors": errors, "rows_after": len(new)}
@@ -302,32 +334,27 @@ def apply_changes(
     dv = get_dataset(session, dataset_id)
     mv = get_mapping(session, dv.mapping_version_id)
     schema = ctx.registry.get_ref(mv.target_schema)
-    records = read_records(Path(dv.records_path))
+    records = records_of(ctx, dv)
     new, impact = apply_operations(records, operations, schema)
     errors = schema.validate_records(new, limit=50)
     if errors:
         raise ValidationFailed("edits would violate the target schema", details={"errors": errors})
-    nv = DatasetVersion(
+    nv = _new_version(
+        ctx,
+        session,
+        new,
+        stamp_meta=True,
         round_id=dv.round_id,
         customer_id=dv.customer_id,
         mapping_version_id=dv.mapping_version_id,
         version=dv.version + 1,
         status="draft",
-        records_path="",
-        row_count=len(new),
         stats={**dv.stats, "last_change": impact},
         findings=dv.findings,
         parent_id=dv.id,
         created_by=actor,
         note=note,
     )
-    session.add(nv)
-    session.flush()
-    for d in new:
-        d.setdefault("source_meta", {})["dataset_version_id"] = nv.id
-    path = ctx.datasets_dir / dv.customer_id / f"{nv.id}.jsonl"
-    _write_records(path, new)
-    nv.records_path = str(path)
     dv.status = "superseded" if dv.status == "draft" else dv.status
     cs = ChangeSet(
         dataset_version_id=dv.id,
@@ -395,26 +422,23 @@ def rollback(ctx: ServiceContext, session: Session, dataset_id: str, actor: str)
     if not dv.parent_id:
         raise Conflict("this version has no parent to roll back to")
     parent = get_dataset(session, dv.parent_id)
-    records = read_records(Path(parent.records_path))
-    nv = DatasetVersion(
+    records = records_of(ctx, parent)
+    nv = _new_version(
+        ctx,
+        session,
+        records,
+        stamp_meta=False,
         round_id=dv.round_id,
         customer_id=dv.customer_id,
         mapping_version_id=parent.mapping_version_id,
         version=dv.version + 1,
         status="draft",
-        records_path="",
-        row_count=len(records),
         stats=parent.stats,
         findings=parent.findings,
         parent_id=dv.id,
         created_by=actor,
         note=f"rollback to v{parent.version}",
     )
-    session.add(nv)
-    session.flush()
-    path = ctx.datasets_dir / dv.customer_id / f"{nv.id}.jsonl"
-    _write_records(path, records)
-    nv.records_path = str(path)
     audit(session, "dataset.rollback", "dataset", nv.id, actor=actor, to=parent.id)
     return nv
 
@@ -530,10 +554,10 @@ def change_report(ctx: ServiceContext, session: Session, dataset_id: str) -> dic
     dv = get_dataset(session, dataset_id)
     schema = ctx.registry.get_ref(get_mapping(session, dv.mapping_version_id).target_schema)
     prev = previous_published(session, dv.customer_id, dv.round_id)
-    cur = read_records(Path(dv.records_path))
+    cur = records_of(ctx, dv)
     if prev is None:
         return {"has_previous": False, "current_rows": len(cur)}
-    old = read_records(Path(prev.records_path))
+    old = records_of(ctx, prev)
     return {
         "has_previous": True,
         "previous_dataset_id": prev.id,
@@ -552,15 +576,21 @@ def export_dataset(
         raise ValidationFailed(f"format must be one of {FORMATS}")
     dv = get_dataset(session, dataset_id)
     schema = ctx.registry.get_ref(get_mapping(session, dv.mapping_version_id).target_schema)
-    src = Path(dv.records_path)
+    src = ctx.records_path(dv)
     stamp = dt.datetime.now(dt.UTC).strftime("%Y%m%dT%H%M%SZ")
-    dest = ctx.exports_dir / dv.customer_id / f"{dv.round_id}_{dv.id}_{stamp}.{fmt}"
-    _, digest, _size = write_export(lambda: iter_records(src), fmt, schema, dest)
+    name = f"{dv.round_id}_{dv.id}_{stamp}.{fmt}"
+    key = ctx.export_key(dv.customer_id, name)
+    tmp = ctx.tmp_dir / name
+    try:
+        _, digest, _size = write_export(lambda: iter_records(src), fmt, schema, tmp)
+        ctx.storage.put(key, tmp)  # atomic publish: the object appears only once fully written
+    finally:
+        tmp.unlink(missing_ok=True)
     art = ExportArtifact(
         dataset_version_id=dv.id,
         customer_id=dv.customer_id,
         fmt=fmt,
-        path=str(dest),
+        storage_key=key,
         row_count=dv.row_count,
         sha256=digest,
     )
@@ -580,7 +610,7 @@ def lineage(ctx: ServiceContext, session: Session, dataset_id: str, identity: st
     mv = get_mapping(session, dv.mapping_version_id)
     schema = ctx.registry.get_ref(mv.target_schema)
     doc = MappingDocument.model_validate(mv.document)
-    rec = next((r for r in read_records(Path(dv.records_path)) if _identity_of(r, schema) == identity), None)
+    rec = next((r for r in records_of(ctx, dv) if _identity_of(r, schema) == identity), None)
     if rec is None:
         raise NotFound(f"record {identity} not in dataset")
     fields = [

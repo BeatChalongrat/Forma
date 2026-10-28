@@ -140,3 +140,53 @@ def test_cli_db_commands(isolated_env: Path) -> None:
     res = runner.invoke(app, ["db", "stamp", "head"])
     assert res.exit_code == 0, res.output
     assert '"pending": false' in res.output
+
+
+def test_storage_key_migration_converts_legacy_paths(isolated_env: Path) -> None:
+    """Rows written before ADR-012 hold absolute paths under the data dir; 0002 turns them into keys."""
+    from alembic import command
+
+    from forma.core.settings import get_settings
+    from forma.db import migrate
+    from forma.db.session import get_engine
+
+    eng = get_engine()
+    cfg = migrate.alembic_config(eng.url.render_as_string(hide_password=False))
+    command.upgrade(cfg, "06c905910cbb")
+    root = get_settings().data_path
+    legacy = root / "files" / "ab" / "abcd" / "x.xlsx"
+    legacy.parent.mkdir(parents=True)
+    legacy.write_bytes(b"x")
+    with eng.begin() as conn:
+        conn.execute(
+            text(
+                "INSERT INTO customers (id, code, name, active, created_at) VALUES ('cus_1', 'L', 'l', 1, '2026-01-01')"
+            )
+        )
+        conn.execute(
+            text(
+                "INSERT INTO import_rounds (id, customer_id, status, target_schema, summary, created_at, updated_at) "
+                "VALUES ('rnd_1', 'cus_1', 'uploaded', 'product', '{}', '2026-01-01', '2026-01-01')"
+            )
+        )
+        conn.execute(
+            text(
+                "INSERT INTO source_files (id, round_id, customer_id, sha256, original_name, size, kind, storage_path, status, created_at) "
+                "VALUES ('fil_1', 'rnd_1', 'cus_1', 'abcd', 'x.xlsx', 1, 'excel', :p, 'stored', '2026-01-01')"
+            ),
+            {"p": str(legacy)},
+        )
+        conn.execute(
+            text(
+                "INSERT INTO source_files (id, round_id, customer_id, sha256, original_name, size, kind, storage_path, status, created_at) "
+                "VALUES ('fil_2', 'rnd_1', 'cus_1', 'ef01', 'y.xlsx', 1, 'excel', 'files/ef/ef01/y.xlsx', 'stored', '2026-01-01')"
+            )
+        )
+    command.upgrade(cfg, "head")
+    with eng.connect() as conn:
+        rows = dict(conn.execute(text("SELECT id, storage_key FROM source_files")).fetchall())
+    assert rows["fil_1"] == "files/ab/abcd/x.xlsx"
+    assert rows["fil_2"] == "files/ef/ef01/y.xlsx"
+    command.downgrade(cfg, "06c905910cbb")
+    with eng.connect() as conn:
+        assert "storage_path" in [c["name"] for c in inspect(eng).get_columns("source_files")]

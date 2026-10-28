@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import datetime as dt
 import re
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -28,9 +29,16 @@ from forma.services.rounds import audit, get_round, latest_approved_mapping, rou
 # Binding DSL sources to the round's files
 # --------------------------------------------------------------------------------------------
 def bind_sources(
-    mapping: MappingDocument, files: list[SourceFile]
+    mapping: MappingDocument,
+    files: list[SourceFile],
+    *,
+    resolve: Callable[[str], Path] | None = None,
 ) -> tuple[dict[str, BoundSource], list[str]]:
-    """Resolve each DSL source to a physical file of the round. Returns (bindings, problems)."""
+    """Resolve each DSL source to a physical file of the round. Returns (bindings, problems).
+
+    ``resolve`` turns a storage key into a local path (``ctx.storage.local_path``); without it keys are
+    taken as paths (unit tests on local files)."""
+    resolve = resolve or Path
     bindings: dict[str, BoundSource] = {}
     problems: list[str] = []
     usable = [f for f in files if f.status == "profiled"]
@@ -41,7 +49,7 @@ def bind_sources(
                 f"source {s.id!r}: no file in this round matches (pattern={s.file.name_pattern!r}, sheets={s.file.sheet_names_any})"
             )
             continue
-        bindings[s.id] = BoundSource(Path(cand.storage_path), None, cand.id, cand.original_name)
+        bindings[s.id] = BoundSource(resolve(cand.storage_key), None, cand.id, cand.original_name)
     return bindings, problems
 
 
@@ -106,7 +114,7 @@ def simulate(
     *,
     limit: int | None = 3000,
 ) -> tuple[TransformResult | None, list[str]]:
-    bindings, problems = bind_sources(mapping, files)
+    bindings, problems = bind_sources(mapping, files, resolve=ctx.storage.local_path)
     if problems:
         return None, problems
     engine = TransformEngine(schema)
@@ -531,7 +539,7 @@ def source_preview(
     if f is None:
         raise ValidationFailed("no file in this round matches the source")
     frame = load_source_frame(
-        spec, BoundSource(Path(f.storage_path), None, f.id, f.original_name), limit=limit
+        spec, BoundSource(ctx.storage.local_path(f.storage_key), None, f.id, f.original_name), limit=limit
     )
     return {
         "file": f.original_name,

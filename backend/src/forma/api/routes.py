@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, Depends, File, Query, UploadFile
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import RedirectResponse, Response, StreamingResponse
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -248,6 +247,7 @@ def file_grid(
     sheet: int = 0,
     rows: int = Query(60, le=500),
     session: Session = Depends(get_session),
+    ctx: ServiceContext = Depends(ctx_dep),
 ) -> dict[str, Any]:
     """Raw cells of a sheet (for the side-by-side Excel view)."""
     from forma.ingestion.readers import read_raw
@@ -256,7 +256,7 @@ def file_grid(
     f = next((x for x in r.files if x.id == file_id), None)
     if f is None:
         raise NotFound("file not found")
-    df = read_raw(Path(f.storage_path), sheet if f.kind == "excel" else None, n_rows=rows)
+    df = read_raw(ctx.storage.local_path(f.storage_key), sheet if f.kind == "excel" else None, n_rows=rows)
     return {"sheet": sheet, "n_cols": df.width, "rows": [list(r_) for r_ in df.iter_rows()]}
 
 
@@ -483,7 +483,7 @@ def dataset_rows(
 ) -> dict[str, Any]:
     d = ds.get_dataset(session, dataset_id)
     schema = ctx.registry.get_ref(ms.get_mapping(session, d.mapping_version_id).target_schema)
-    records = ds.read_records(Path(d.records_path))
+    records = ds.records_of(ctx, d)
     if q:
         ql = q.lower()
         records = [
@@ -574,11 +574,23 @@ def export_dataset(
 
 
 @api.get("/exports/{export_id}/download")
-def download_export(export_id: str, session: Session = Depends(get_session)) -> Response:
+def download_export(
+    export_id: str, session: Session = Depends(get_session), ctx: ServiceContext = Depends(ctx_dep)
+) -> Response:
+    """Pre-signed redirect when the storage supports it (S3/MinIO), streamed proxy otherwise."""
     e = session.get(ExportArtifact, export_id)
     if e is None:
         raise NotFound("export not found")
-    return FileResponse(e.path, media_type=MEDIA_TYPES[e.fmt], filename=Path(e.path).name)
+    name = e.storage_key.rsplit("/", 1)[-1]
+    url = ctx.storage.url(e.storage_key, expires_s=ctx.settings.s3_presign_s, filename=name)
+    if url:
+        return RedirectResponse(url, status_code=307)
+    fh = ctx.storage.open(e.storage_key)
+    return StreamingResponse(
+        iter(lambda: fh.read(1024 * 1024), b""),
+        media_type=MEDIA_TYPES[e.fmt],
+        headers={"Content-Disposition": f'attachment; filename="{name}"'},
+    )
 
 
 # ============================================================================================
@@ -673,7 +685,7 @@ def copilot(
     """Natural-language edit → planned safe operations + impact preview (nothing is applied)."""
     d = ds.get_dataset(session, dataset_id)
     schema = ctx.registry.get_ref(ms.get_mapping(session, d.mapping_version_id).target_schema)
-    records = ds.read_records(Path(d.records_path))
+    records = ds.records_of(ctx, d)
     if ctx.llm.is_mock:
         plan = _rule_based_copilot(body.instruction)
         if plan is None:

@@ -90,7 +90,7 @@ def add_file(
         original_name=name,
         size=stored.size,
         kind=kind,
-        storage_path=str(stored.path),
+        storage_key=stored.key,
         duplicate_of=dup.id if dup else None,
     )
     session.add(f)
@@ -142,12 +142,14 @@ def profile_round(
             if workers == 1:
                 for f in todo:
                     try:
-                        computed[f.id] = _profile_file(Path(f.storage_path))
+                        computed[f.id] = _profile_file(ctx.storage.local_path(f.storage_key))
                     except Exception as e:
                         computed[f.id] = e
             else:
                 with ThreadPoolExecutor(max_workers=workers, thread_name_prefix="forma-profile") as pool:
-                    futs = {pool.submit(_profile_file, Path(f.storage_path)): f.id for f in todo}
+                    futs = {
+                        pool.submit(_profile_file, ctx.storage.local_path(f.storage_key)): f.id for f in todo
+                    }
                     for fut, fid in futs.items():
                         try:
                             computed[fid] = fut.result()
