@@ -79,7 +79,11 @@ ImportRound: uploaded ─▶ profiled ─▶ ┬─ auto_approved ─▶ transfo
    (price jumps and outliers, discounts, promotion dates, stock, removed SKUs, unusual size) with "% normal".
    Approving data with high-severity anomalies needs an acknowledgement (ADR-022). Data with records that
    break the target schema is never approved or exported, whatever is acknowledged (ADR-026).
-10. **Export** — JSON (nested), JSONL, or CSV flattened per the schema's `output_variants`; atomic write;
+10. **Bulk upload** (optional entry) — many files at once; each is matched to its customer by format (a
+   customer code in the file name confirms or names it; disagreement waits for a person), becomes a one-file
+   round, and — when the policy's publish checks all pass — is approved and exported as JSON without a
+   person; one JSON per file, all of them in one zip (ADR-027).
+11. **Export** — JSON (nested), JSONL, or CSV flattened per the schema's `output_variants`; atomic write;
    artifact recorded with sha256. Exporting publishes, so only an approved (or already published) dataset
    can be exported; a draft is refused with 409.
 

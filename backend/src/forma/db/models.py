@@ -100,6 +100,46 @@ class SourceFile(Base):
     round: Mapped[ImportRound] = relationship(back_populates="files")
 
 
+class Batch(Base):
+    """A bulk upload (ADR-027): many files at once, each matched to its customer by format and processed
+    into one JSON of its own."""
+
+    __tablename__ = "batches"
+    id: Mapped[str] = mapped_column(String(40), primary_key=True, default=lambda: new_id("bch"))
+    label: Mapped[str | None] = mapped_column(String(255))
+    auto_publish: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_by: Mapped[str] = mapped_column(String(128))
+    created_at: Mapped[dt.datetime] = mapped_column(UTCDateTime, default=utcnow)
+
+    items: Mapped[list[BatchItem]] = relationship(back_populates="batch", order_by="BatchItem.created_at")
+
+
+class BatchItem(Base):
+    """One file of a bulk upload. Stored before its customer is known; becomes a round once matched."""
+
+    __tablename__ = "batch_items"
+    id: Mapped[str] = mapped_column(String(40), primary_key=True, default=lambda: new_id("bit"))
+    batch_id: Mapped[str] = mapped_column(ForeignKey("batches.id"), index=True)
+    file_name: Mapped[str] = mapped_column(String(512))
+    sha256: Mapped[str] = mapped_column(String(64))
+    size: Mapped[int] = mapped_column(Integer)
+    kind: Mapped[str] = mapped_column(String(16))
+    storage_key: Mapped[str] = mapped_column(Text)
+    # received → (identified) needs_customer | attached → the round's own status takes over; failed
+    status: Mapped[str] = mapped_column(String(32), default="received", index=True)
+    profile: Mapped[dict[str, Any] | None] = mapped_column(JSONType)
+    fingerprint: Mapped[dict[str, Any] | None] = mapped_column(JSONType)
+    match: Mapped[dict[str, Any] | None] = mapped_column(
+        JSONType
+    )  # known (exact / same columns / similar) | unknown
+    customer_id: Mapped[str | None] = mapped_column(String(40), index=True)
+    round_id: Mapped[str | None] = mapped_column(String(40), index=True)
+    error: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[dt.datetime] = mapped_column(UTCDateTime, default=utcnow)
+
+    batch: Mapped[Batch] = relationship(back_populates="items")
+
+
 class MappingVersion(Base):
     __tablename__ = "mapping_versions"
     id: Mapped[str] = mapped_column(String(40), primary_key=True, default=lambda: new_id("map"))

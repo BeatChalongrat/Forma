@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
-import { Activity, BookOpen, Home, Inbox, LogOut, Moon, Search, Settings, ShieldCheck, Sun, Upload, Users, WifiOff, type LucideIcon } from 'lucide-react'
+import { Activity, BookOpen, Home, Inbox, LogOut, Moon, Search, Settings, ShieldCheck, Sun, Users, WifiOff, type LucideIcon } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../lib/api'
 import { useTheme } from '../lib/theme'
@@ -74,10 +74,6 @@ export function Shell() {
           <div className="mt-2.5 font-bold text-navy tracking-[0.2em] text-[13px] leading-none">FORMA</div>
           <div className="text-[11px] text-muted mt-1">ERP files → clean JSON</div>
         </Link>
-        <div className="px-3">
-          <NavLink to="/imports/new" className="btn btn-primary btn-lg w-full justify-center"><Upload size={15} /> New import</NavLink>
-          <div className="hint-th text-center mt-1.5">อัปโหลดไฟล์ที่ลูกค้าส่งมา</div>
-        </div>
         <nav className="px-2 pt-3 flex flex-col overflow-auto">
           {GROUPS.filter((g) => !g.admin || isAdmin).map((g) => (
             <div key={g.title} className="mt-2">

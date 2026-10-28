@@ -52,6 +52,7 @@ from forma.services import config as cfg
 from forma.services import datasets as ds
 from forma.services import lineage as lin
 from forma.services import mapping as ms
+from forma.services import publishing as pub
 from forma.services import relationships as rel
 from forma.services import rounds as rs
 from forma.services.context import ServiceContext, get_context
@@ -295,6 +296,33 @@ def get_round(
     return d
 
 
+async def read_upload(up: UploadFile, limit_mb: int) -> bytes:
+    """An uploaded file's bytes, refused past ``FORMA_MAX_UPLOAD_MB`` (checked while reading) or when empty."""
+    limit = limit_mb * 1024 * 1024
+    if up.size is not None and up.size > limit:
+        raise PayloadTooLarge(
+            f"{up.filename} is {up.size / 1024 / 1024:.1f} MB; the limit is {limit_mb} MB",
+            details={"file": up.filename, "size": up.size, "limit_bytes": limit},
+        )
+    chunks: list[bytes] = []
+    size = 0
+    while True:
+        chunk = await up.read(1024 * 1024)
+        if not chunk:
+            break
+        size += len(chunk)
+        if size > limit:
+            raise PayloadTooLarge(
+                f"{up.filename} exceeds the upload limit of {limit_mb} MB",
+                details={"file": up.filename, "limit_bytes": limit},
+            )
+        chunks.append(chunk)
+    data = b"".join(chunks)
+    if not data:
+        raise ValidationFailed(f"{up.filename} is empty")
+    return data
+
+
 @api.post("/rounds/{round_id}/files", status_code=201)
 async def upload_files(
     round_id: str,
@@ -304,30 +332,9 @@ async def upload_files(
     p: Principal = Depends(require_role("importer")),
 ) -> list[dict[str, Any]]:
     r = _round_scoped(session, p, round_id)
-    limit = ctx.settings.max_upload_mb * 1024 * 1024
     out = []
     for up in files:
-        if up.size is not None and up.size > limit:
-            raise PayloadTooLarge(
-                f"{up.filename} is {up.size / 1024 / 1024:.1f} MB; the limit is {ctx.settings.max_upload_mb} MB",
-                details={"file": up.filename, "size": up.size, "limit_bytes": limit},
-            )
-        chunks: list[bytes] = []
-        size = 0
-        while True:
-            chunk = await up.read(1024 * 1024)
-            if not chunk:
-                break
-            size += len(chunk)
-            if size > limit:
-                raise PayloadTooLarge(
-                    f"{up.filename} exceeds the upload limit of {ctx.settings.max_upload_mb} MB",
-                    details={"file": up.filename, "limit_bytes": limit},
-                )
-            chunks.append(chunk)
-        data = b"".join(chunks)
-        if not data:
-            raise ValidationFailed(f"{up.filename} is empty")
+        data = await read_upload(up, ctx.settings.max_upload_mb)
         out.append(ser.source_file(rs.add_file(ctx, session, r, up.filename or "upload.xlsx", data)))
     return out
 
@@ -501,7 +508,18 @@ def approve_mapping(
     if body.override_block and not p.has_role("approver"):
         raise Forbidden("overriding a policy block needs the approver role", details={"required": "approver"})
     mv = ms.approve_mapping(session, mapping_id, p.actor, body.comment, override_block=body.override_block)
-    return ser.mapping_version(mv, document=False)
+    r = session.get(ImportRound, mv.round_id) if mv.round_id else None
+    out = ser.mapping_version(mv, document=False)
+    if r is not None and (r.summary or {}).get("auto_publish"):
+        # a bulk-upload round (ADR-027): once a person approves the mapping, finish it automatically
+        session.commit()
+        runner.enqueue(
+            "run_pipeline",
+            {"round_id": r.id, "actor": p.actor, "auto_publish": True},
+            round_id=r.id,
+            request_id=p.request_id,
+        )
+    return out
 
 
 @api.post("/mappings/{mapping_id}/reject")
@@ -774,16 +792,18 @@ def approve_dataset(
     p: Principal = Depends(require_role("reviewer")),
 ) -> dict[str, Any]:
     _dataset_scoped(session, p, dataset_id)
-    return ser.dataset_version(
-        ds.approve_dataset(
-            session,
-            dataset_id,
-            p.actor,
-            ctx=ctx,
-            acknowledge_anomalies=body.acknowledge_anomalies,
-            comment=body.comment,
-        )
+    dv = ds.approve_dataset(
+        session,
+        dataset_id,
+        p.actor,
+        ctx=ctx,
+        acknowledge_anomalies=body.acknowledge_anomalies,
+        comment=body.comment,
     )
+    r = session.get(ImportRound, dv.round_id)
+    if r is not None:
+        pub.after_manual_approval(ctx, session, r)  # a bulk-upload round: its JSON is written at once
+    return ser.dataset_version(dv)
 
 
 @api.get("/datasets/{dataset_id}/changes-report")

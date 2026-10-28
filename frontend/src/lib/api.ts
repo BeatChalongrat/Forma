@@ -57,10 +57,22 @@ export type WorkbookProfile = { meta: { file_name: string; kind: string; sheets:
 export type RoundStatus = 'uploaded' | 'profiled' | 'review' | 'auto_approved' | 'approved' | 'transformed' | 'approved_data' | 'published' | 'blocked' | 'rejected' | 'failed'
 export type ImportRound = {
   id: string; customer_id: string; label: string | null; status: RoundStatus; target_schema: string; notes: string | null
-  summary: { drift?: string | null; drift_report?: DriftReport | null; decision?: string; mapping_version_id?: string; dataset_version_id?: string; rows?: number; errors?: number; error?: string; simulation?: SimSummary | null; has_previous_approval?: boolean }
+  summary: { drift?: string | null; drift_report?: DriftReport | null; decision?: string; mapping_version_id?: string; dataset_version_id?: string; rows?: number; errors?: number; error?: string; simulation?: SimSummary | null; has_previous_approval?: boolean; batch_id?: string; auto_publish?: boolean; publish?: PublishDecision }
   created_at: string; updated_at: string; files?: SourceFile[]; customer?: { id: string; code: string; name: string }
   mappings?: MappingVersion[]; datasets?: DatasetVersion[]; review_tasks?: ReviewTask[]; jobs?: Job[]
 }
+/** what the policy decided after the data was created, for rounds that publish automatically (ADR-027) */
+export type PublishDecision = { decision: 'publish' | 'review'; reasons: string[]; export_id?: string }
+export type BatchMatch = { kind: 'known' | 'unknown'; how?: 'exact' | 'same_columns' | 'similar' | 'file_name'; named?: boolean; customer_id?: string; customer_code?: string | null; similarity?: number | null; classification?: string; reason?: string; candidates?: { customer_id: string; customer_code: string | null; similarity: number | null }[] }
+export type BatchItemState = 'processing' | 'needs_customer' | 'needs_review' | 'needs_data_check' | 'ready' | 'failed'
+export type BatchItem = {
+  id: string; file_name: string; size: number; match: BatchMatch | null; customer: { id: string; code: string | null; name: string | null } | null
+  round_id: string | null; round_status: string | null; mapping_version_id: string | null; dataset_version_id: string | null
+  publish: PublishDecision | null; export_id: string | null; json_name: string; rows: number | null
+  state: BatchItemState; step: number; message: string; reasons?: string[]
+}
+export type BatchSummary = { id: string; label: string | null; auto_publish: boolean; created_by: string; created_at: string; total: number; counts: Partial<Record<BatchItemState, number>>; done: boolean; stuck: number }
+export type Batch = BatchSummary & { items: BatchItem[] }
 export type SimSummary = { rows_in: number; rows_out: number; findings: { error: number; warning: number; info: number }; duration_ms?: number }
 export type Finding = { kind: string; severity: 'error' | 'warning' | 'info'; message: string; target: string | null; row: number | null; identity: string | null; details: Record<string, unknown> }
 export type Expr = { op: string; name?: string; source?: string | null; value?: unknown; args?: Expr[]; params?: Record<string, unknown> }
@@ -157,6 +169,7 @@ export type Policy = {
   block: Record<string, boolean>
   risk_overrides: Record<string, string>
   sandbox: { enabled: boolean; max_lost_records: number; max_new_errors: number; max_new_invalid_prices: number; max_new_duplicates: number; max_changed_prices_auto: number }
+  publish?: { enabled: boolean; max_high_anomalies: number; max_error_findings: number }
   anomaly?: { max_price_change_pct: number; max_discount_pct: number; max_stock_drop_pct: number; max_removed_pct: number; row_count_tolerance_pct: number; outlier_mad: number; history_rounds: number; block_approval_on_high: boolean }
   [k: string]: unknown
 }
@@ -205,6 +218,18 @@ export const api = {
     files.forEach((f) => fd.append('files', f))
     return request<SourceFile[]>(`/api/rounds/${roundId}/files`, { method: 'POST', body: fd })
   },
+  createUpload: (files: File[], o: { label?: string; auto_publish: boolean }) => {
+    const fd = new FormData()
+    files.forEach((f) => fd.append('files', f))
+    if (o.label) fd.append('label', o.label)
+    fd.append('auto_publish', String(o.auto_publish))
+    return request<Batch>('/api/batches', { method: 'POST', body: fd })
+  },
+  uploads: () => get<BatchSummary[]>('/api/batches'),
+  upload: (id: string) => get<Batch>(`/api/batches/${id}`),
+  assignUpload: (id: string, b: { item_ids: string[]; customer_id?: string; new_customer?: { code: string; name: string; erp_type?: string } }) => post<Batch>(`/api/batches/${id}/assign`, b),
+  resumeUpload: (id: string) => post<Batch>(`/api/batches/${id}/resume`, {}),
+  uploadDownloadUrl: (id: string) => `/api/batches/${id}/download`,
   file: (roundId: string, fileId: string) => get<SourceFile>(`/api/rounds/${roundId}/files/${fileId}`),
   fileGrid: (roundId: string, fileId: string, sheet = 0, rows = 60) => get<{ sheet: number; n_cols: number; rows: (string | null)[][] }>(`/api/rounds/${roundId}/files/${fileId}/grid?sheet=${sheet}&rows=${rows}`),
   runPipeline: (roundId: string, b?: { use_llm?: boolean | null; actor?: string }) => post<{ job_id: string }>(`/api/rounds/${roundId}/run`, b ?? {}),

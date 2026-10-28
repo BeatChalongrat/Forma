@@ -17,8 +17,10 @@ from forma.core.telemetry import span
 from forma.db.models import DatasetVersion, ImportRound, MappingVersion
 from forma.db.session import session_scope
 from forma.jobs.runner import JobProgress, handler
+from forma.services import batches as bs
 from forma.services import datasets as ds
 from forma.services import mapping as ms
+from forma.services import publishing as pub
 from forma.services import rounds as rs
 from forma.services.context import ServiceContext
 
@@ -80,7 +82,8 @@ def propose_mapping(ctx: ServiceContext, payload: dict[str, Any], prog: JobProgr
 
 @handler("run_pipeline")
 def run_pipeline(ctx: ServiceContext, payload: dict[str, Any], prog: JobProgress) -> dict[str, Any]:
-    """Upload → profile → propose → (auto) transform. The one-click path for returning customers.
+    """Upload → profile → propose → (auto) transform → (asked for: policy-decided) publish. The one-click
+    path for returning customers; bulk uploads set ``auto_publish`` (ADR-027).
 
     Resumable: a crashed run re-queued by ``recover_stale`` continues from the first unfinished stage.
     """
@@ -127,27 +130,78 @@ def run_pipeline(ctx: ServiceContext, payload: dict[str, Any], prog: JobProgress
     out.update({"mapping_version_id": mv_id, "mapping_status": status})
 
     # ---- transform ----------------------------------------------------------------------
-    if status == "approved":
-        if not force and prog.done("transform"):
-            out["dataset_version_id"] = prog.stages["transform"].get("dataset_version_id")
-            out["rows"] = prog.stages["transform"].get("rows")
-            return out
+    if status != "approved":
+        return out
+    if not force and prog.done("transform"):
+        out["dataset_version_id"] = prog.stages["transform"].get("dataset_version_id")
+        out["rows"] = prog.stages["transform"].get("rows")
+    else:
         with session_scope() as s:
             existing = None if force else _existing_dataset(s, rid, mv_id)
             if existing is not None:
                 out["dataset_version_id"], out["rows"] = existing.id, existing.row_count
                 prog.mark("transform", dataset_version_id=existing.id, rows=existing.row_count, skipped=True)
-                return out
-        prog.update(70, "transforming")
+        if "dataset_version_id" not in out:
+            prog.update(70, "transforming")
+            t0 = time.perf_counter()
+            with span("stage.transform", round_id=rid), session_scope() as s:
+                dv = ds.transform_round(ctx, s, rid, mapping_version_id=mv_id, actor=actor)
+                out["dataset_version_id"] = dv.id
+                out["rows"] = dv.row_count
+            prog.mark(
+                "transform",
+                dataset_version_id=out["dataset_version_id"],
+                rows=out["rows"],
+                duration_ms=_ms(t0),
+            )
+
+    # ---- publish (only when asked; the policy decides) ------------------------------------
+    if payload.get("auto_publish"):
+        if not force and prog.done("publish"):
+            out["publish"] = prog.stages["publish"].get("result")
+            return out
+        prog.update(90, "deciding whether to publish")
         t0 = time.perf_counter()
-        with span("stage.transform", round_id=rid), session_scope() as s:
-            dv = ds.transform_round(ctx, s, rid, mapping_version_id=mv_id, actor=actor)
-            out["dataset_version_id"] = dv.id
-            out["rows"] = dv.row_count
-        prog.mark(
-            "transform", dataset_version_id=out["dataset_version_id"], rows=out["rows"], duration_ms=_ms(t0)
-        )
+        with span("stage.publish", round_id=rid), session_scope() as s:
+            out["publish"] = pub.auto_publish(ctx, s, rid)
+        prog.mark("publish", result=out["publish"], duration_ms=_ms(t0))
     return out
+
+
+@handler("process_batch_item")
+def process_batch_item(ctx: ServiceContext, payload: dict[str, Any], prog: JobProgress) -> dict[str, Any]:
+    """One file of a bulk upload (ADR-027): identify its customer by format, make it a round, run the
+    pipeline with automatic publishing. A file nobody's format matches stops at ``needs_customer``."""
+    item_id = payload["item_id"]
+    actor = payload.get("actor", "system")
+    with session_scope() as s:
+        item = bs.get_item(s, item_id)
+        round_id, status = item.round_id, item.status
+    if round_id is None and status in ("received", "identified"):
+        if not prog.done("identify"):
+            prog.update(5, "matching the format")
+            t0 = time.perf_counter()
+            with span("stage.identify", item_id=item_id), session_scope() as s:
+                item = bs.get_item(s, item_id)
+                match = bs.identify(ctx, s, item)
+            prog.mark("identify", match=match, duration_ms=_ms(t0))
+        match = prog.stages["identify"]["match"]
+        if match.get("kind") != "known":
+            return {"item_id": item_id, "state": "needs_customer", "match": match}
+        with session_scope() as s:
+            item = bs.get_item(s, item_id)
+            round_id = bs.attach(ctx, s, item, match["customer_id"], actor).id
+        prog.mark("attach", round_id=round_id)
+    if round_id is None:
+        return {"item_id": item_id, "state": status}
+    with session_scope() as s:
+        auto = bool((rs.get_round(s, round_id).summary or {}).get("auto_publish"))
+    out = run_pipeline(
+        ctx,
+        {"round_id": round_id, "actor": actor, "use_llm": payload.get("use_llm"), "auto_publish": auto},
+        prog,
+    )
+    return {"item_id": item_id, "round_id": round_id, **out}
 
 
 @handler("transform_round")

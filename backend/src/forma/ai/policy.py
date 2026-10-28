@@ -83,6 +83,12 @@ DEFAULT_POLICY: dict[str, Any] = {
         "history_rounds": 5,  # published rounds the row-count baseline averages
         "block_approval_on_high": True,  # approving data with high-severity anomalies needs an acknowledgement
     },
+    # Automatic publishing (ADR-027): data approved and exported without a person when every check passes.
+    "publish": {
+        "enabled": True,  # a round asked to publish automatically (bulk upload) may be; False: people approve all
+        "max_high_anomalies": 0,  # more high-severity anomalies than this → a person checks the data
+        "max_error_findings": 0,  # engine errors (duplicate identities, broken joins) → a person checks
+    },
 }
 
 
@@ -147,6 +153,14 @@ def validate_policy(policy: dict[str, Any]) -> list[str]:
                 problems.append(f"anomaly.{k} must be true or false")
         else:
             number(f"anomaly.{k}", v, 0)
+    for k, v in p["publish"].items():
+        if k not in DEFAULT_POLICY["publish"]:
+            problems.append(f"publish.{k} is not a known setting")
+        elif isinstance(DEFAULT_POLICY["publish"][k], bool):
+            if not isinstance(v, bool):
+                problems.append(f"publish.{k} must be true or false")
+        elif isinstance(v, bool) or not isinstance(v, int) or v < 0:
+            problems.append(f"publish.{k} must be a whole number ≥ 0")
     for sem, risk in p["risk_overrides"].items():
         if risk not in RISK_ORDER:
             problems.append(f"risk_overrides.{sem} must be one of {list(RISK_ORDER)}")
@@ -168,6 +182,52 @@ class PolicyEngine:
         """``approval.yaml``, with the version saved in the web app on top when there is one."""
         base = file_policy(directory)
         return cls(_merge(base, override) if override else base)
+
+    def evaluate_publish(
+        self,
+        *,
+        mapping_approved_by: str | None,
+        rows: int,
+        invalid_records: int,
+        error_findings: int,
+        high_anomalies: int,
+    ) -> PolicyDecision:
+        """May this dataset be approved and exported without a person (ADR-027)? ``publish`` with the checks
+        that passed, or ``review`` with every reason a person has to look first."""
+        pp = self.policy["publish"]
+        held: list[str] = []
+        if not pp["enabled"]:
+            held.append("automatic publishing is turned off in the approval policy")
+        if not mapping_approved_by:
+            held.append("the mapping is not approved")
+        if rows == 0:
+            held.append("the data has no records")
+        if invalid_records:
+            held.append(f"{invalid_records} records do not match the target format")
+        if error_findings > pp["max_error_findings"]:
+            held.append(f"{error_findings} engine errors (duplicate identities, broken links)")
+        if high_anomalies > pp["max_high_anomalies"]:
+            held.append(f"{high_anomalies} high-severity anomalies vs the last round")
+        checks = {
+            "mapping_approved_by": mapping_approved_by,
+            "rows": rows,
+            "invalid_records": invalid_records,
+            "error_findings": error_findings,
+            "high_anomalies": high_anomalies,
+        }
+        if held:
+            return PolicyDecision("review", 50, held, checks=checks, risk_level="medium")
+        passed = [
+            "mapping approved automatically"
+            if mapping_approved_by == "policy"
+            else f"mapping approved by {mapping_approved_by}",
+            f"all {rows} records match the target format",
+            "no engine errors",
+            "no high-severity anomalies"
+            if not high_anomalies
+            else f"{high_anomalies} high-severity anomalies (within the limit)",
+        ]
+        return PolicyDecision("publish", 0, passed, checks=checks, risk_level="low")
 
     def sandbox_problems(self, report: dict[str, Any] | None) -> list[str]:
         """Why the sandbox comparison must stop this mapping; ``[]`` when it may go on (ADR-018)."""
