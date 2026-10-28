@@ -57,16 +57,65 @@ DEFAULT_POLICY: dict[str, Any] = {
 }
 
 
+def file_policy(directory: Path) -> dict[str, Any]:
+    """``approval.yaml`` as written (the baseline the web app edits on top of)."""
+    p = directory / "approval.yaml"
+    return dict(yaml.safe_load(p.read_text(encoding="utf-8")) or {}) if p.exists() else {}
+
+
+def validate_policy(policy: dict[str, Any]) -> list[str]:
+    """Why a policy edited in the web app cannot be used; ``[]`` when it can (ADR-017)."""
+    from forma.fingerprint.fingerprint import DRIFT_KINDS
+
+    p = _merge(DEFAULT_POLICY, policy)
+    problems: list[str] = []
+    unknown = set(policy) - set(DEFAULT_POLICY) - {"version"}
+    if unknown:
+        problems.append(f"unknown sections: {sorted(unknown)}")
+    aa = p["auto_approve"]
+
+    def number(path: str, v: Any, lo: float, hi: float | None = None) -> None:
+        if isinstance(v, bool) or not isinstance(v, int | float) or v < lo or (hi is not None and v > hi):
+            problems.append(f"{path} must be a number from {lo}" + (f" to {hi}" if hi is not None else " up"))
+
+    for k in ("min_mapping_confidence", "min_field_confidence_critical", "min_field_confidence_high"):
+        number(f"auto_approve.{k}", aa.get(k), 0, 1)
+    number("auto_approve.max_row_change_ratio", aa.get("max_row_change_ratio"), 0)
+    mwf = aa.get("max_warning_findings")
+    if isinstance(mwf, bool) or not isinstance(mwf, int) or mwf < 0:
+        problems.append("auto_approve.max_warning_findings must be a whole number ≥ 0")
+    for k in ("allow_errors", "require_previous_approval_for_auto"):
+        if not isinstance(aa.get(k), bool):
+            problems.append(f"auto_approve.{k} must be true or false")
+    drift = aa.get("allowed_drift")
+    allowed = set(DRIFT_KINDS) - {"unrelated_file"}  # a wrong file is never auto-approved
+    if not isinstance(drift, list) or not set(drift) <= allowed:
+        problems.append(f"auto_approve.allowed_drift must be a subset of {sorted(allowed)}")
+    weights = p["review"].get("priority_weights", {})
+    known = set(DEFAULT_POLICY["review"]["priority_weights"]) | {f"drift_{k}" for k in DRIFT_KINDS}
+    for k, v in weights.items():
+        if k not in known:
+            problems.append(f"review.priority_weights.{k} is not a known weight")
+        elif isinstance(v, bool) or not isinstance(v, int) or v < 0:
+            problems.append(f"review.priority_weights.{k} must be a whole number ≥ 0")
+    for k, v in p["block"].items():
+        if k not in DEFAULT_POLICY["block"] or not isinstance(v, bool):
+            problems.append(f"block.{k} must be a known switch set to true or false")
+    for sem, risk in p["risk_overrides"].items():
+        if risk not in RISK_ORDER:
+            problems.append(f"risk_overrides.{sem} must be one of {list(RISK_ORDER)}")
+    return problems
+
+
 class PolicyEngine:
     def __init__(self, policy: dict[str, Any] | None = None) -> None:
         self.policy = _merge(DEFAULT_POLICY, policy or {})
 
     @classmethod
-    def load(cls, directory: Path) -> PolicyEngine:
-        p = directory / "approval.yaml"
-        if p.exists():
-            return cls(yaml.safe_load(p.read_text(encoding="utf-8")) or {})
-        return cls()
+    def load(cls, directory: Path, override: dict[str, Any] | None = None) -> PolicyEngine:
+        """``approval.yaml``, with the version saved in the web app on top when there is one."""
+        base = file_policy(directory)
+        return cls(_merge(base, override) if override else base)
 
     def risk_of(self, schema: TargetSchema, pointer: str) -> str:
         try:

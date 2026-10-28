@@ -145,7 +145,7 @@ def validate_mapping(doc: MappingDocument, schema: TargetSchema) -> ValidationRe
             f.risk == "critical"
             and f.in_collection is None
             and f.pointer not in seen
-            and f.pointer not in ("/currency",)
+            and f.default is None  # a schema default (e.g. currency THB) covers an unmapped field
         ):
             rep.warn("critical_unmapped", f"critical field {f.pointer} is not mapped", "/fields")
     for i, fm in enumerate(doc.fields):

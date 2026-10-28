@@ -17,7 +17,7 @@ class CustomerIn(BaseModel):
 class RoundIn(BaseModel):
     customer_id: str
     label: str | None = None
-    target_schema: str = "product"
+    target_schema: str | None = None  # None → the customer's format, else the default format
 
 
 class Decision(BaseModel):
@@ -69,3 +69,34 @@ class BatchRunIn(BaseModel):
     actor: str = "operator"
     force: bool = False
     sync: bool = False
+
+
+class CustomerPatch(BaseModel):
+    """Only the fields sent are changed (``model_fields_set``); ``null`` clears an optional one."""
+
+    code: str | None = None
+    name: str | None = None
+    erp_type: str | None = None
+    notes: str | None = None
+    active: bool | None = None
+    default_target_schema: str | None = None
+
+
+class AISettingsIn(BaseModel):
+    """Only the fields sent are changed. ``null``/"" puts a field back to the server value;
+    ``api_key`` replaces the saved key, "" or ``null`` removes it."""
+
+    provider: str | None = None
+    model: str | None = None
+    base_url: str | None = None
+    timeout_s: float | None = None
+    max_retries: int | None = None
+    api_key: str | None = None
+
+
+class PolicyIn(BaseModel):
+    policy: dict[str, Any]
+
+
+class DefaultFormatIn(BaseModel):
+    target_schema: str

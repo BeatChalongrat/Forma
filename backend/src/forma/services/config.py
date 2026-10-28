@@ -1,0 +1,277 @@
+"""Runtime configuration edited in the web app (ADR-017): AI provider, approval policy, default target
+format, target schemas registered in the UI.
+
+Environment variables and the files under ``policies/`` and ``target_schema/`` stay the baseline; what an
+admin saves here is layered on top and recorded in the audit log. Every write bumps one ``revision`` row,
+and each process reloads its policy, schema registry and LLM client when it sees a new revision
+(``ServiceContext``), so a change applies to the API and every worker without a restart.
+"""
+
+from __future__ import annotations
+
+import copy
+from dataclasses import dataclass, field
+from typing import Any
+
+from sqlalchemy import select
+from sqlalchemy.exc import OperationalError, ProgrammingError
+from sqlalchemy.orm import Session
+
+from forma.ai.policy import DEFAULT_POLICY, _merge, file_policy, validate_policy
+from forma.core import secrets
+from forma.core.errors import NotFound, ValidationFailed
+from forma.core.settings import Settings
+from forma.db.models import AppSetting, StoredSchema
+from forma.db.session import session_scope
+from forma.schema_registry import SchemaRegistry, TargetSchema
+from forma.services.rounds import audit
+
+REVISION_KEY = "revision"
+AI_KEY = "ai"
+POLICY_KEY = "policy"
+DEFAULTS_KEY = "defaults"
+PROVIDERS = ("mock", "openai", "openai_compatible", "anthropic")
+FALLBACK_TARGET_SCHEMA = "product"
+
+
+@dataclass
+class ConfigSnapshot:
+    revision: int = 0
+    ai: dict[str, Any] = field(default_factory=dict)
+    policy: dict[str, Any] | None = None
+    defaults: dict[str, Any] = field(default_factory=dict)
+    schemas: list[dict[str, Any]] = field(default_factory=list)
+
+
+# --------------------------------------------------------------------------------------------
+# revision + snapshot (what ServiceContext reloads from)
+# --------------------------------------------------------------------------------------------
+def revision(session: Session) -> int:
+    row = session.get(AppSetting, REVISION_KEY)
+    return int((row.value or {}).get("n", 0)) if row else 0
+
+
+def read_revision() -> int | None:
+    """Current revision, or ``None`` before the tables exist (fresh database, CLI without a DB)."""
+    try:
+        with session_scope() as s:
+            return revision(s)
+    except (OperationalError, ProgrammingError):
+        return None
+
+
+def snapshot() -> ConfigSnapshot:
+    try:
+        with session_scope() as s:
+            rows = {r.key: dict(r.value or {}) for r in s.scalars(select(AppSetting))}
+            schemas = [
+                copy.deepcopy(r.document)
+                for r in s.scalars(
+                    select(StoredSchema).order_by(StoredSchema.schema_id, StoredSchema.version)
+                )
+            ]
+    except (OperationalError, ProgrammingError):
+        return ConfigSnapshot()
+    return ConfigSnapshot(
+        revision=int(rows.get(REVISION_KEY, {}).get("n", 0)),
+        ai=rows.get(AI_KEY, {}),
+        policy=rows[POLICY_KEY].get("policy") if POLICY_KEY in rows else None,
+        defaults=rows.get(DEFAULTS_KEY, {}),
+        schemas=schemas,
+    )
+
+
+def _put(session: Session, key: str, value: dict[str, Any] | None, actor: str) -> None:
+    row = session.get(AppSetting, key)
+    if value is None:
+        if row is not None:
+            session.delete(row)
+    elif row is None:
+        session.add(AppSetting(key=key, value=value, updated_by=actor))
+    else:
+        row.value, row.updated_by = value, actor
+    rev = session.get(AppSetting, REVISION_KEY)
+    n = int((rev.value or {}).get("n", 0)) + 1 if rev else 1
+    if rev is None:
+        session.add(AppSetting(key=REVISION_KEY, value={"n": n}, updated_by=actor))
+    else:
+        rev.value, rev.updated_by = {"n": n}, actor
+    session.flush()
+
+
+def _row(session: Session, key: str) -> AppSetting | None:
+    return session.get(AppSetting, key)
+
+
+def _stamp(row: AppSetting | None) -> dict[str, Any]:
+    return {"updated_by": row.updated_by, "updated_at": row.updated_at.isoformat()} if row else {}
+
+
+# --------------------------------------------------------------------------------------------
+# AI provider
+# --------------------------------------------------------------------------------------------
+def llm_settings(base: Settings, ai: dict[str, Any]) -> Settings:
+    """``Settings`` with the web app's AI choices applied (the API key decrypted for this process only)."""
+    update: dict[str, Any] = {}
+    for name, attr in (
+        ("provider", "llm_provider"),
+        ("model", "llm_model"),
+        ("base_url", "llm_base_url"),
+        ("timeout_s", "llm_timeout_s"),
+        ("max_retries", "llm_max_retries"),
+    ):
+        if name in ai:
+            update[attr] = ai[name]
+    if ai.get("api_key_enc"):
+        update["llm_api_key"] = secrets.decrypt(base, ai["api_key_enc"])
+    return base.model_copy(update=update) if update else base
+
+
+def ai_view(session: Session, base: Settings) -> dict[str, Any]:
+    """What the Settings page shows: effective values, where each comes from, never the key itself."""
+    from forma.ai.llm import LLMClient
+
+    row = _row(session, AI_KEY)
+    ai = dict(row.value or {}) if row else {}
+    eff = llm_settings(base, ai)
+    client = LLMClient.from_settings(eff)
+    key_source = "ui" if ai.get("api_key_enc") else "env" if base.llm_api_key else None
+    active = client.provider.name if not client.is_mock else "mock"
+    warning = None
+    if eff.llm_provider != "mock" and client.is_mock:
+        warning = f"{eff.llm_provider} is selected but has no API key (or gateway URL): AI runs offline"
+    elif ai.get("api_key_enc") and eff.llm_api_key is None:
+        warning = "the saved API key cannot be decrypted (FORMA_SECRET_KEY changed): enter it again"
+    return {
+        "provider": eff.llm_provider,
+        "model": eff.llm_model,
+        "base_url": eff.llm_base_url,
+        "timeout_s": eff.llm_timeout_s,
+        "max_retries": eff.llm_max_retries,
+        "api_key_set": bool(eff.llm_api_key),
+        "api_key_hint": secrets.hint(eff.llm_api_key),
+        "api_key_source": key_source,
+        "sources": {
+            k: ("ui" if k in ai else "server")
+            for k in ("provider", "model", "base_url", "timeout_s", "max_retries")
+        },
+        "active_provider": active,
+        "offline": client.is_mock,
+        "warning": warning,
+        "providers": list(PROVIDERS),
+        **_stamp(row),
+    }
+
+
+def update_ai(session: Session, base: Settings, patch: dict[str, Any], actor: str) -> None:
+    """Partial update. ``api_key``: a string replaces it, ``""``/``None`` removes the saved one (the
+    server's FORMA_LLM_API_KEY applies again); a field set to ``None`` goes back to the server value."""
+    row = _row(session, AI_KEY)
+    ai = dict(row.value or {}) if row else {}
+    changed: list[str] = []
+    for k in ("provider", "model", "base_url", "timeout_s", "max_retries"):
+        if k not in patch:
+            continue
+        v = patch[k]
+        if v is None or v == "":
+            ai.pop(k, None)
+        elif k == "provider" and v not in PROVIDERS:
+            raise ValidationFailed(f"provider must be one of {list(PROVIDERS)}")
+        elif k == "timeout_s" and (not isinstance(v, int | float) or not 1 <= v <= 600):
+            raise ValidationFailed("timeout_s must be between 1 and 600 seconds")
+        elif k == "max_retries" and (not isinstance(v, int) or not 0 <= v <= 10):
+            raise ValidationFailed("max_retries must be a whole number from 0 to 10")
+        elif k == "base_url" and not str(v).startswith(("http://", "https://")):
+            raise ValidationFailed("base_url must start with http:// or https://")
+        else:
+            ai[k] = v.strip() if isinstance(v, str) else v
+        changed.append(k)
+    if "api_key" in patch:
+        key = patch["api_key"]
+        if key:
+            ai["api_key_enc"] = secrets.encrypt(base, str(key).strip())
+        else:
+            ai.pop("api_key_enc", None)
+        changed.append("api_key")
+    if not changed:
+        return
+    _put(session, AI_KEY, ai or None, actor)
+    audit(session, "settings.ai.update", "settings", AI_KEY, actor=actor, changed=changed)  # never the key
+
+
+# --------------------------------------------------------------------------------------------
+# approval policy
+# --------------------------------------------------------------------------------------------
+def policy_view(session: Session, base: Settings) -> dict[str, Any]:
+    row = _row(session, POLICY_KEY)
+    baseline = file_policy(base.resolve(base.policies_dir))
+    override = (row.value or {}).get("policy") if row else None
+    return {
+        "effective": _merge(_merge(DEFAULT_POLICY, baseline), override or {}),
+        "file": _merge(DEFAULT_POLICY, baseline),
+        "source": "ui" if override else "file",
+        **_stamp(row),
+    }
+
+
+def update_policy(session: Session, base: Settings, policy: dict[str, Any], actor: str) -> None:
+    """Save a complete policy (as the Settings form sends it). Rejected with reasons when unusable."""
+    problems = validate_policy(policy)
+    if problems:
+        raise ValidationFailed("policy is not valid", details={"problems": problems})
+    before = policy_view(session, base)["effective"]
+    _put(session, POLICY_KEY, {"policy": policy}, actor)
+    audit(session, "settings.policy.update", "settings", POLICY_KEY, actor=actor, before=before, after=policy)
+
+
+def reset_policy(session: Session, base: Settings, actor: str) -> None:
+    before = policy_view(session, base)["effective"]
+    _put(session, POLICY_KEY, None, actor)
+    audit(session, "settings.policy.reset", "settings", POLICY_KEY, actor=actor, before=before)
+
+
+# --------------------------------------------------------------------------------------------
+# target formats
+# --------------------------------------------------------------------------------------------
+def default_target_schema(session: Session) -> str:
+    row = _row(session, DEFAULTS_KEY)
+    return (
+        str((row.value or {}).get("target_schema") or FALLBACK_TARGET_SCHEMA)
+        if row
+        else FALLBACK_TARGET_SCHEMA
+    )
+
+
+def set_default_target_schema(session: Session, registry: SchemaRegistry, ref: str, actor: str) -> None:
+    resolve_target_schema(session, registry, ref, None)  # 422 when it does not exist
+    row = _row(session, DEFAULTS_KEY)
+    _put(session, DEFAULTS_KEY, {**(dict(row.value or {}) if row else {}), "target_schema": ref}, actor)
+    audit(session, "settings.default_schema", "settings", DEFAULTS_KEY, actor=actor, target_schema=ref)
+
+
+def store_schema(session: Session, schema: TargetSchema, actor: str) -> None:
+    if session.get(StoredSchema, (schema.schema_id, schema.version)) is not None:
+        raise ValidationFailed(f"{schema.ref} already exists; versions are append-only")
+    session.add(
+        StoredSchema(
+            schema_id=schema.schema_id, version=schema.version, document=schema.document, created_by=actor
+        )
+    )
+    _put(session, f"schema:{schema.schema_id}", {"latest": schema.version}, actor)
+    audit(session, "schema.register", "schema", schema.ref, actor=actor, fields=len(schema.leaf_fields()))
+
+
+def stored_refs(session: Session) -> set[str]:
+    return {f"{r.schema_id}@{r.version}" for r in session.scalars(select(StoredSchema))}
+
+
+def resolve_target_schema(
+    session: Session, registry: SchemaRegistry, explicit: str | None, customer_default: str | None
+) -> str:
+    """Round target format: what the request names, else the customer's, else the global default."""
+    ref = explicit or customer_default or default_target_schema(session)
+    try:
+        registry.get_ref(ref)
+    except NotFound as e:
+        raise ValidationFailed(f"target format {ref!r} does not exist", details={"target_schema": ref}) from e
+    return ref

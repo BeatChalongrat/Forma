@@ -35,7 +35,7 @@ export function DataEditor() {
   const [copilot, setCopilot] = useState('')
 
   const columns: FieldSpec[] = useMemo(() => (page?.columns ?? []).filter((f) => !f.system && !f.in_collection && !f.is_collection && !f.json_type.includes('object')).concat((page?.columns ?? []).filter((f) => f.is_collection)), [page])
-  const identityOf = useCallback((row: Record<string, unknown>) => (page?.identity_keys ?? ['/sku']).map((k) => String(getPointer(row, k))).join('|'), [page])
+  const identityOf = useCallback((row: Record<string, unknown>) => (page?.identity_keys ?? []).map((k) => String(getPointer(row, k))).join('|'), [page])
 
   // overlay pending edits onto rows for display
   const rows = useMemo(() => {
@@ -179,7 +179,7 @@ export function DataEditor() {
                           onMouseDown={(e) => { e.stopPropagation(); if (editing && !isEd) commitEdit(); setSel({ r: vi.index, c }) }} onDoubleClick={() => (f.is_collection ? setDrawer({ kind: 'record', identity: id }) : startEdit(vi.index, c))}>
                           {isEd ? (
                             <input autoFocus className="absolute inset-0 w-full h-full px-2.5 bg-surface text-ink outline-none border-2 border-signal" value={editing.value} onChange={(e) => setEditing({ ...editing, value: e.target.value })} onKeyDown={(e) => { if (e.key === 'Enter') commitEdit(); if (e.key === 'Escape') setEditing(null) }} onMouseDown={(e) => e.stopPropagation()} />
-                          ) : f.is_collection ? <CollectionCell value={v} pointer={f.pointer} /> : (v === null || v === undefined ? <span className="text-muted/60">∅</span> : cellText(v))}
+                          ) : f.is_collection ? <CollectionCell value={v} fields={(page?.columns ?? []).filter((x) => x.in_collection === f.pointer)} /> : (v === null || v === undefined ? <span className="text-muted/60">∅</span> : cellText(v))}
                         </div>
                       )
                     })}
@@ -246,13 +246,19 @@ function setPointerLocal(obj: Record<string, unknown>, pointer: string, value: u
   else cur[last] = value
 }
 
-function CollectionCell({ value, pointer }: { value: unknown; pointer: string }) {
+// Field names come from the target schema, so a collection cell summarises each item by its fields'
+// meaning (amount, quantity, VAT flag, end date …) instead of by hard-coded names.
+const SUMMARY_SEMANTICS = ['price.list_name', 'stock.warehouse', 'promo.type', 'price.amount', 'stock.qty', 'discount.percent', 'discount.amount', 'promo.price', 'price.vat_included', 'promo.end_date']
+
+function CollectionCell({ value, fields }: { value: unknown; fields: FieldSpec[] }) {
   if (!Array.isArray(value) || !value.length) return <span className="text-muted/60">∅</span>
   const items = value as Record<string, unknown>[]
-  if (pointer === '/prices') return <span>{items.map((p) => `${fmtNum(p.amount as number)} ${p.vat_included ? 'inc' : 'ex'}${p.price_list && p.price_list !== 'standard' ? ` (${p.price_list})` : ''}`).join(' · ')}</span>
-  if (pointer === '/inventory') return <span>{items.map((p) => `${p.warehouse_code}: ${fmtNum(p.qty as number, 0)}`).join(' · ')}</span>
-  if (pointer === '/promotions') return <span>{items.map((p) => `${p.type}${p.discount_percent ? ` ${p.discount_percent}%` : ''}${p.end_date ? ` →${String(p.end_date).slice(5)}` : ''}`).join(' · ')}</span>
-  return <span className="text-muted">{items.length} items</span>
+  const name = (f: FieldSpec) => f.pointer.split('/').pop() ?? ''
+  const shown = SUMMARY_SEMANTICS.map((s) => fields.find((f) => f.semantic === s)).filter((f): f is FieldSpec => !!f)
+  const pick = shown.length ? shown : fields.slice(0, 3)
+  const part = (f: FieldSpec, v: unknown) =>
+    v === undefined || v === null || v === '' ? '' : f.semantic === 'price.vat_included' ? (v ? 'inc VAT' : 'ex VAT') : f.semantic === 'discount.percent' ? `${v}%` : f.semantic === 'promo.end_date' ? `→${String(v).slice(5)}` : typeof v === 'number' ? fmtNum(v) : String(v)
+  return <span>{items.map((it) => pick.map((f) => part(f, it[name(f)])).filter(Boolean).join(' ')).join(' · ')}</span>
 }
 
 function ImpactView({ impact, rowsAfter, errors }: { impact: Impact; rowsAfter: number; errors: { row: number; pointer: string; message: string }[] }) {

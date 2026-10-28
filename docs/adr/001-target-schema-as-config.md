@@ -13,3 +13,4 @@ field catalogue, quality rules and CSV flattening read from it. `SchemaRegistry.
 **Consequences** Replacing the draft with the real contract is a file drop + POST. Mappings reference
 fields by JSON pointer and are re-validated against the new version. The schema id is also the file name,
 so it must be 1–64 characters of `a-z 0-9 _ -` (a schema without one gets a slug of its title).
+Code finds fields by `x-forma.semantic` and formats are registered from the web app (ADR-017).

@@ -14,7 +14,7 @@ from typing import Any
 from rapidfuzz import fuzz
 
 from forma.core.hashing import stable_hash
-from forma.profiling.profile import WorkbookProfile
+from forma.profiling.profile import WorkbookProfile, noise_tables
 
 
 def norm_sheet(name: str) -> str:
@@ -79,9 +79,10 @@ def _band(n: int) -> str:
 
 def fingerprint_profile(profile: WorkbookProfile) -> Fingerprint:
     tables: list[TableShape] = []
-    for t in profile.tables:
-        if t.n_rows < 3 or len(t.columns) < 2:
-            continue  # noise blocks don't define the format
+    noise = noise_tables(profile.tables)
+    for i, t in enumerate(profile.tables):
+        if i in noise:
+            continue  # legends and footers don't define the format
         tables.append(
             TableShape(
                 sheet=norm_sheet(t.sheet),

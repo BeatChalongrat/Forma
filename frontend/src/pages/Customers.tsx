@@ -1,10 +1,10 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { Trash2, Upload } from 'lucide-react'
-import { api, type ImportRound, type MappingVersion } from '../lib/api'
+import { Pencil, Trash2, Upload } from 'lucide-react'
+import { api, type Customer, type ImportRound, type MappingVersion } from '../lib/api'
 import { fmtDate, fmtInt, timeAgo } from '../lib/utils'
-import { PageHeader, Section, StatusBadge, Badge, Confidence, Empty, KV } from '../components/ui'
+import { PageHeader, Section, StatusBadge, Badge, Confidence, Empty, KV, Modal } from '../components/ui'
 import { useToast } from '../lib/toast'
 
 export function Customers() {
@@ -40,13 +40,15 @@ export function CustomerPage() {
   const toast = useToast()
   const { data: c } = useQuery({ queryKey: ['customer', customerId], queryFn: () => api.customer(customerId) })
   const delOverride = useMutation({ mutationFn: (id: string) => api.deleteOverride(customerId, id), onSuccess: () => { qc.invalidateQueries({ queryKey: ['customer', customerId] }); toast.push({ kind: 'ok', title: 'Override removed' }) } })
+  const [editing, setEditing] = useState(false)
   if (!c) return null
   const rounds = (Array.isArray(c.rounds) ? c.rounds : []) as ImportRound[]
   const mappings = (c.mappings ?? []) as MappingVersion[]
   return (
     <>
       <PageHeader crumbs={<Link to="/customers" className="hover:text-ink">Customers</Link>} title={<span>{c.code} <span className="text-muted font-normal">{c.name}</span></span>} subtitle={c.erp_type ? `ERP: ${c.erp_type}` : undefined}
-        actions={<Link to="/imports/new" className="btn btn-primary"><Upload size={14} /> New import</Link>} />
+        actions={<><button className="btn" onClick={() => setEditing(true)}><Pencil size={14} /> Edit</button><Link to="/imports/new" className="btn btn-primary"><Upload size={14} /> New import</Link></>} />
+      {editing && <EditCustomer customer={c} onClose={() => setEditing(false)} />}
       <div className="grid lg:grid-cols-[1fr_360px] gap-4">
         <div className="flex flex-col gap-4">
           <Section title="Import history">
@@ -84,7 +86,7 @@ export function CustomerPage() {
         </div>
         <div className="flex flex-col gap-4">
           <Section title="Details">
-            <div className="px-4 py-2"><KV k="Code" v={c.code} /><KV k="ERP" v={c.erp_type ?? '–'} /><KV k="Created" v={fmtDate(c.created_at)} /><KV k="Notes" v={c.notes ?? '–'} /></div>
+            <div className="px-4 py-2"><KV k="Code" v={c.code} /><KV k="ERP" v={c.erp_type ?? '–'} /><KV k="Target format" v={c.default_target_schema ?? 'default'} /><KV k="Status" v={c.active ? 'active' : <Badge tone="warn">inactive</Badge>} /><KV k="Created" v={fmtDate(c.created_at)} /><KV k="Notes" v={c.notes ?? '–'} /></div>
           </Section>
           <Section title={`Persistent overrides (${c.overrides?.length ?? 0})`}>
             {c.overrides?.length ? (
@@ -104,5 +106,38 @@ export function CustomerPage() {
         </div>
       </div>
     </>
+  )
+}
+
+/** Correct customer master data here instead of in the database; every change is audited. */
+function EditCustomer({ customer, onClose }: { customer: Customer; onClose: () => void }) {
+  const qc = useQueryClient()
+  const toast = useToast()
+  const { data: schemas } = useQuery({ queryKey: ['schemas'], queryFn: api.schemas })
+  const [f, setF] = useState({ code: customer.code, name: customer.name, erp_type: customer.erp_type ?? '', notes: customer.notes ?? '', active: customer.active, default_target_schema: customer.default_target_schema ?? '' })
+  const save = useMutation({
+    mutationFn: () => api.updateCustomer(customer.id, { code: f.code, name: f.name, erp_type: f.erp_type || null, notes: f.notes || null, active: f.active, default_target_schema: f.default_target_schema || null }),
+    onSuccess: () => { qc.invalidateQueries(); toast.push({ kind: 'ok', title: 'Customer updated' }); onClose() },
+    onError: (e: Error) => toast.push({ kind: 'bad', title: 'Not saved', detail: e.message }),
+  })
+  const ids = [...new Set((schemas ?? []).map((s) => s.schema_id))]
+  const field = (label: string, el: React.ReactNode) => <label className="flex flex-col gap-1.5"><span className="text-muted">{label}</span>{el}</label>
+  return (
+    <Modal open onClose={onClose} title={`Edit ${customer.code}`} width="max-w-lg" footer={<><button className="btn" onClick={onClose}>Cancel</button><button className="btn btn-primary" disabled={save.isPending || !f.code.trim() || !f.name.trim()} onClick={() => save.mutate()}>Save</button></>}>
+      <div className="grid grid-cols-2 gap-3 text-[13px]">
+        {field('Code', <input className="input" value={f.code} onChange={(e) => setF({ ...f, code: e.target.value })} />)}
+        {field('ERP', <input className="input" value={f.erp_type} onChange={(e) => setF({ ...f, erp_type: e.target.value })} placeholder="SAP, Express, Odoo, …" />)}
+        <div className="col-span-2">{field('Name', <input className="input" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} />)}</div>
+        <div className="col-span-2">{field('Target format for new imports', (
+          <select className="input" value={f.default_target_schema} onChange={(e) => setF({ ...f, default_target_schema: e.target.value })}>
+            <option value="">Default format</option>
+            {ids.map((id) => <option key={id} value={id}>{id} (latest)</option>)}
+            {(schemas ?? []).map((s) => <option key={s.ref} value={s.ref}>{s.ref} (pinned)</option>)}
+          </select>
+        ))}</div>
+        <div className="col-span-2">{field('Notes', <textarea className="input h-20 py-2" value={f.notes} onChange={(e) => setF({ ...f, notes: e.target.value })} />)}</div>
+        <label className="flex items-center gap-2 col-span-2 cursor-pointer"><input type="checkbox" checked={f.active} onChange={(e) => setF({ ...f, active: e.target.checked })} /> Active customer</label>
+      </div>
+    </Modal>
   )
 }

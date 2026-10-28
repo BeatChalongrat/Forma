@@ -10,6 +10,7 @@
 | 5 Self-healing | drift detection, mapping memory, adaptation agent, feedback | **done** (adaptation needs an LLM key) | `fingerprint/`, `services/mapping.py` |
 | 6 Advanced | NL data editing (copilot), root-cause diagnosis, change intelligence, lineage | **done** | `agents.py`, `routes.py` |
 | 7 Production | scale, reliability, security, observability, deployment | **done** — see below | ADR-010 … ADR-016 |
+| 7+ Operability | any target format without code (semantic mapping, exact export shape), settings in the web app (AI key, policy, formats, customers) | **done** | ADR-017 |
 
 ## Phase 7 — production hardening (done)
 

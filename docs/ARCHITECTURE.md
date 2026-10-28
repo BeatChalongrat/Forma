@@ -78,6 +78,17 @@ new round ─▶ fingerprint ─▶ compare with approved ─▶ identical? ─�
 Approved mappings are keyed by `(customer, fingerprint)`; the memory also provides few-shot examples
 from other customers whose headers overlap (header Jaccard ≥ 0.3) to the mapping agent.
 
+## Target formats and runtime settings (ADR-017)
+
+The mapper, change report, copilot and editor find fields by `x-forma.semantic`, never by name, so a new
+contract maps without code changes. Records keep provenance (`source_meta`) and unmapped columns
+(`attributes`) inside FORMA; exports and validation use `TargetSchema.export_view`, which drops them unless
+the contract declares them. Formats registered in **Settings** live in the `target_schemas` table (files in
+`target_schema/` are the built-ins); the AI provider/key (encrypted), the approval policy and the default
+format live in `app_settings`. Each write is audited and bumps a revision; every API/worker process
+rebuilds its registry, policy and LLM client when it sees a new one (`FORMA_CONFIG_REFRESH_S`).
+A round's format: the request's, else the customer's (`default_target_schema`), else the default.
+
 ## Where the intelligence lives
 
 | Concern | Deterministic | LLM (optional) |

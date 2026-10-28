@@ -136,6 +136,22 @@ def merge_profiles(profiles: list[tuple[str, str, WorkbookProfile]]) -> Workbook
     return WorkbookProfile(meta, tables)
 
 
+def noise_tables(tables: list[TableProfile]) -> set[int]:
+    """Indexes of blocks that do not define a file's format: under two columns, no rows, or a small
+    secondary block (legend, footer) beside a sheet's main table. A sheet's main table counts even with
+    one or two rows — a promotions sheet holding two promotions this round is data, not noise."""
+    main: dict[int, int] = {}
+    for i, t in enumerate(tables):
+        j = main.get(t.sheet_index)
+        if j is None or t.n_rows > tables[j].n_rows:
+            main[t.sheet_index] = i
+    return {
+        i
+        for i, t in enumerate(tables)
+        if len(t.columns) < 2 or t.n_rows == 0 or (t.n_rows < 3 and main[t.sheet_index] != i)
+    }
+
+
 def _header_lang(name: str) -> str:
     th = bool(_THAI_RE.search(name))
     en = bool(re.search(r"[A-Za-z]", name))

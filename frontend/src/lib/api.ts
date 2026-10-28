@@ -34,12 +34,14 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 const get = <T>(p: string) => request<T>(p)
 const post = <T>(p: string, body?: unknown) => request<T>(p, { method: 'POST', body: body === undefined ? undefined : JSON.stringify(body) })
 const del = <T>(p: string) => request<T>(p, { method: 'DELETE' })
+const put = <T>(p: string, body: unknown) => request<T>(p, { method: 'PUT', body: JSON.stringify(body) })
+const patch = <T>(p: string, body: unknown) => request<T>(p, { method: 'PATCH', body: JSON.stringify(body) })
 
 // ---------------------------------------------------------------------------------------------
 // Types (mirror backend serializers)
 // ---------------------------------------------------------------------------------------------
 export type Customer = {
-  id: string; code: string; name: string; erp_type: string | null; notes: string | null; active: boolean; created_at: string
+  id: string; code: string; name: string; erp_type: string | null; notes: string | null; active: boolean; default_target_schema: string | null; created_at: string
   rounds?: number | ImportRound[]; last_round_at?: string | null; has_approved_mapping?: boolean
   mappings?: MappingVersion[]; overrides?: Override[]
 }
@@ -105,7 +107,22 @@ export type OpsSummary = {
   storage: string; database: string; auth: string; tracing: boolean; schema_revision: string | null
 }
 export type FieldSpec = { pointer: string; name: string; json_type: string[]; semantic: string | null; risk: 'critical' | 'high' | 'medium' | 'low'; required: boolean; nullable: boolean; enum: unknown[] | null; format: string | null; synonyms_en: string[]; synonyms_th: string[]; description: string | null; description_th: string | null; in_collection: string | null; is_collection: boolean; system: boolean; default: unknown }
-export type SchemaSummary = { schema_id: string; version: number; ref: string; entity: string; status: string; title: string; description: string; identity_keys: string[]; field_count: number; fields?: FieldSpec[]; document?: unknown }
+export type SchemaSummary = { schema_id: string; version: number; ref: string; entity: string; status: string; title: string; description: string; identity_keys: string[]; field_count: number; fields?: FieldSpec[]; document?: unknown; source?: 'ui' | 'file'; is_latest?: boolean; is_default?: boolean }
+export type SchemaPreview = SchemaSummary & { fields: FieldSpec[]; findings: { level: 'warning' | 'info'; pointer: string; message: string }[]; previous: string | null; diff: { added: string[]; removed: string[]; changed: { pointer: string; changes: Record<string, unknown> }[] } | null }
+export type AISettings = {
+  provider: string; model: string; base_url: string | null; timeout_s: number; max_retries: number
+  api_key_set: boolean; api_key_hint: string | null; api_key_source: 'ui' | 'env' | null; sources: Record<string, 'ui' | 'server'>
+  active_provider: string; offline: boolean; warning: string | null; providers: string[]; updated_by?: string; updated_at?: string
+}
+export type AISettingsPatch = Partial<{ provider: string | null; model: string | null; base_url: string | null; timeout_s: number | null; max_retries: number | null; api_key: string | null }>
+export type Policy = {
+  auto_approve: { min_mapping_confidence: number; min_field_confidence_critical: number; min_field_confidence_high: number; max_warning_findings: number; allow_errors: boolean; allowed_drift: string[]; require_previous_approval_for_auto: boolean; max_row_change_ratio: number }
+  review: { priority_weights: Record<string, number> }
+  block: Record<string, boolean>
+  risk_overrides: Record<string, string>
+  [k: string]: unknown
+}
+export type PolicyView = { effective: Policy; file: Policy; source: 'ui' | 'file'; updated_by?: string; updated_at?: string }
 export type Operation = { kind: 'set_cell' | 'set_field' | 'scale_field' | 'delete_rows' | 'delete_row' | 'set_item'; target?: string; identity?: string; value?: unknown; factor?: number; where?: Expr | null; explanation?: string }
 export type Impact = { rows_affected: number; cells_changed: number; rows_deleted: number; fields: string[]; sample: { row: number; identity: string; target: string | null; before: unknown; after: unknown }[] }
 export type RowsPage = { total: number; offset: number; limit: number; identity_keys: string[]; rows: Record<string, unknown>[]; columns: FieldSpec[]; findings: Finding[] }
@@ -124,6 +141,7 @@ export const api = {
   customers: () => get<Customer[]>('/api/customers'),
   customer: (id: string) => get<Customer>(`/api/customers/${id}`),
   createCustomer: (b: { code: string; name: string; erp_type?: string; notes?: string }) => post<Customer>('/api/customers', b),
+  updateCustomer: (id: string, b: Partial<Pick<Customer, 'code' | 'name' | 'erp_type' | 'notes' | 'active' | 'default_target_schema'>>) => patch<Customer>(`/api/customers/${id}`, b),
   deleteOverride: (cid: string, oid: string) => del<{ ok: boolean }>(`/api/customers/${cid}/overrides/${oid}`),
 
   rounds: (q?: { status?: string; customer_id?: string }) => get<ImportRound[]>('/api/rounds' + qs(q)),
@@ -176,6 +194,16 @@ export const api = {
   schemas: () => get<SchemaSummary[]>('/api/schemas'),
   schema: (ref: string) => get<SchemaSummary>(`/api/schemas/${ref}`),
   policy: () => get<Record<string, unknown>>('/api/policy'),
+  previewSchema: (document: unknown) => post<SchemaPreview>('/api/schemas/preview', { document }),
+  registerSchema: (document: unknown) => post<SchemaSummary>('/api/schemas', { document }),
+  semantics: () => get<Record<string, string>>('/api/settings/semantics'),
+  setDefaultFormat: (target_schema: string) => put<{ target_schema: string }>('/api/settings/default-format', { target_schema }),
+  aiSettings: () => get<AISettings>('/api/settings/ai'),
+  saveAiSettings: (b: AISettingsPatch) => put<AISettings>('/api/settings/ai', b),
+  testAi: () => post<{ ok: boolean; offline: boolean; message: string; model?: string; provider?: string; latency_ms?: number }>('/api/settings/ai/test'),
+  policySettings: () => get<PolicyView>('/api/settings/policy'),
+  savePolicy: (policy: Policy) => put<PolicyView>('/api/settings/policy', { policy }),
+  resetPolicy: () => del<PolicyView>('/api/settings/policy'),
   audit: (limit = 100) => get<{ id: string; actor: string; action: string; entity: string; entity_id: string; details: Record<string, unknown>; at: string }[]>(`/api/audit?limit=${limit}`),
 }
 

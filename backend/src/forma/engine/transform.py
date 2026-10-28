@@ -25,7 +25,7 @@ from forma.mapping_dsl.models import (
     SourceSpec,
 )
 from forma.profiling.tables import extract_table
-from forma.schema_registry import TargetSchema
+from forma.schema_registry import PASSTHROUGH_KEY, PROVENANCE_KEY, TargetSchema
 
 ROW_COL = "__row__"
 
@@ -699,9 +699,9 @@ class TransformEngine:
             if pass_plan:
                 attrs = {name: row[i] for i, name in pass_plan if row[i] is not None}
                 if attrs:
-                    rec["attributes"] = attrs
+                    rec[PASSTHROUGH_KEY] = attrs
             if provenance:
-                rec.setdefault("source_meta", {}).update(
+                rec.setdefault(PROVENANCE_KEY, {}).update(
                     meta_base | {"lineage": {"root_row": row[row_i], "source": root_id}}
                 )
             records.append(rec)
@@ -719,10 +719,13 @@ class TransformEngine:
         for i, rec in enumerate(records):
             errs: list[str] = []
             if validate is not None:
+                view = self.schema.export_view(rec)  # validate what will be exported
                 try:
-                    validate(rec)
+                    validate(view)
                 except Exception as e:
                     errs = [str(e)]
+                if view is not rec:
+                    rec.update(view)  # keep the defaults the validator filled in
             else:
                 errs = [f"{x['pointer']}: {x['message']}" for x in self.schema.validate_record(rec)]
             for m in errs:

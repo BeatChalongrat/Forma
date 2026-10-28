@@ -1,3 +1,27 @@
-from forma.schema_registry.registry import RISK_ORDER, FieldSpec, Risk, SchemaRegistry, TargetSchema
+from forma.schema_registry.registry import (
+    COLLECTION_KINDS,
+    INTERNAL_KEYS,
+    PASSTHROUGH_KEY,
+    PROVENANCE_KEY,
+    RISK_ORDER,
+    SEMANTICS,
+    FieldSpec,
+    Risk,
+    SchemaRegistry,
+    TargetSchema,
+    schema_findings,
+)
 
-__all__ = ["RISK_ORDER", "FieldSpec", "Risk", "SchemaRegistry", "TargetSchema"]
+__all__ = [
+    "COLLECTION_KINDS",
+    "INTERNAL_KEYS",
+    "PASSTHROUGH_KEY",
+    "PROVENANCE_KEY",
+    "RISK_ORDER",
+    "SEMANTICS",
+    "FieldSpec",
+    "Risk",
+    "SchemaRegistry",
+    "TargetSchema",
+    "schema_findings",
+]
