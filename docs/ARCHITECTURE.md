@@ -86,13 +86,45 @@ from other customers whose headers overlap (header Jaccard ≥ 0.3) to the mappi
 | Failures | ✓ rule-based causes | root-cause narrative + patched mapping |
 | Data edits | ✓ operations with impact preview | natural language → operations (never applied directly) |
 
+## Production shape (Phase 7)
+
+```
+ browser ──▶ nginx (web image: SPA + /api proxy) ──▶ API (FastAPI, N replicas)
+                                                       │ enqueue()            ▲ /ready /metrics /api/ops
+                                                       ▼                      │
+                                              Redis (arq queue) ──▶ workers (forma worker × N) ── OTLP ──▶ collector
+                                                       │                      │
+                                              PostgreSQL (JSONB, Alembic) ◀───┘──▶ S3 / MinIO (files, datasets, exports)
+```
+
+* **Workers** (ADR-010). `FORMA_JOB_BACKEND=thread|process|arq`. Jobs are rows claimed atomically; handlers
+  record finished stages and skip them on re-run; stale `running` jobs are re-queued on start; the queue is
+  bounded (429). `forma bench` measures a 300-file night (`docs/PERFORMANCE.md`).
+* **Storage** (ADR-012). `forma.storage.Storage` with `LocalStorage` (dev) and `S3Storage`; rows hold keys
+  (`files/…`, `datasets/…`, `exports/…`), readers get a local path (cache on S3), downloads are pre-signed.
+  Dataset versions are written object-first, row last — never a partial version (ADR-015).
+* **Database** (ADR-011). SQLite in dev (`create_all` + stamp), Postgres in production with mandatory
+  Alembic migrations; JSON → JSONB; every datetime is UTC-aware.
+* **Auth & tenancy** (ADR-013). `FORMA_AUTH=dev` (header) or `oidc` (JWT via JWKS, PKCE in the SPA).
+  Roles importer ⊂ reviewer ⊂ approver ⊂ admin enforced by one dependency; the authenticated actor is what
+  the audit log records; an optional `customers` claim scopes everything to a tenant's customers.
+* **Security** (ADR-013). Uploads are sniffed by content, names sanitised, sizes capped; LLM endpoints are
+  rate-limited and samples capped; agent output passes a guard (instruction-like text or pointers outside
+  the schema → rejected → heuristic draft → review).
+* **Observability** (ADR-014). `span()` tracing (OTLP when configured), Prometheus `/metrics` with
+  scrape-time gauges from the DB, JSON logs with request ids that follow a job into its worker, `/health`
+  and `/ready`, an admin Ops page (queue, workers, failed jobs + retry, spend, slowest rounds).
+* **Reliability** (ADR-015). Retries with backoff and a circuit breaker for the model (fallback never
+  auto-approves), retention policy with audited deletions, `forma backup|restore`, `docs/RUNBOOK.md`.
+* **Deployment** (ADR-016). One backend image (`forma serve` / `forma worker`), one web image,
+  `docker-compose.prod.yml`, `.env.production.example` generated from `Settings`, CI gates (lint, types,
+  tests on SQLite + Postgres + MinIO, migration/config drift, eval baseline, short bench, image builds).
+
 ## Scaling notes
 
-* Reads are streaming-friendly (fastexcel/calamine → Polars). 100K-row files profile in ~1 s and
-  transform in a few seconds; heavy per-row Python is limited to date/unit parsing and can be vectorised
-  further if profiling shows need. 30M rows per round across 300 files is a parallelism question (several
-  worker processes), not an engine redesign — the job runner interface is intentionally tiny so it can be
-  swapped for Celery/arq without touching services.
-* Datasets are JSONL on disk under `data/datasets/<customer>/<version>.jsonl`; swap `FileStore`/paths for
-  S3/MinIO when moving off a single node (compose file included).
-* Postgres is a one-line change (`FORMA_DATABASE_URL`); SQLite with WAL is fine for a single operator team.
+* Measured (docs/PERFORMANCE.md): 300 files × 100K rows = 30M rows in 17 min with 8 worker processes on a
+  12-core node; ~16K rows/s per core single-stream. Memory ≈ 1 GB per worker at 100K rows.
+* The thread backend is GIL-bound in record building and schema validation; use `process` on one node and
+  `arq` across nodes. Postgres is required for more than one worker node (SQLite locks under concurrent
+  writers).
+* S3 adds one download per cold read per node; keys are immutable so the per-node cache never invalidates.

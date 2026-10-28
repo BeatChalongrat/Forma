@@ -14,7 +14,11 @@ operator approval → transform (engine + schema validation + JSONL dataset vers
 | Backend | Workers | Wall-clock | Phase 1 profile+propose | Phase 2 transform | Rows/s (transform) | Rows/s (end to end) | Files/min | Peak RSS (api + workers) | Failed |
 |---|---|---|---|---|---|---|---|---|---|
 | `process` | 8 | **1 021 s (17.0 min)** | 380 s | 640 s | 46 865 | 29 382 | 17.6 | 7.1 GB | 0 |
-| `thread` | 4 | see `docs/bench/report_thread.md` | | | | | | | |
+| `thread` | 4 | 3 305 s (55.1 min) | 941 s | 2 363 s | 12 695 | 9 077 | 5.4 | 2.4 GB | 0 |
+
+The thread run overlapped with the test suite and the compose smoke test on the same machine, so its
+numbers are conservative; its first attempt (before ADR-015's object-first write order) had 3 of 300
+transforms fail with SQLite `database is locked` — the re-run on the committed code had none.
 
 Per-stage latency under load (process backend, 8 concurrent rounds, 100K rows each):
 
@@ -35,8 +39,10 @@ Reading the numbers:
 * Memory: ~900 MB per worker at 100K rows (profile + frame + records + validation). Size workers at
   roughly 1 GB RAM each; `FORMA_WORKERS` defaults to 4.
 * The `thread` backend shares one GIL: profiling and Polars expressions run in parallel (they release
-  the GIL) but record building and JSON-schema validation do not, so it scales to ~2 cores. Use it for
-  dev and single-user installs; use `process` or `arq` for throughput.
+  the GIL) but record building and JSON-schema validation do not, so it scales to ~2 cores: **3.2× slower
+  wall-clock than 8 processes** (55 min vs 17 min) at a third of the memory. Use it for dev and
+  single-user installs; use `process` or `arq` for throughput. Per-stage p50 under the thread backend:
+  profile 7.3 s, propose 4.5 s, transform 33.6 s (4 jobs contending for one interpreter).
 
 ## Engine: where the time goes (30 000-row files, single stream)
 
