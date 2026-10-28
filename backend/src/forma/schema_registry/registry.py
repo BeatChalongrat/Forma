@@ -10,6 +10,7 @@ goes through this module. Nothing else in the codebase may hard-code target fiel
 
 from __future__ import annotations
 
+import copy
 import json
 import re
 from collections.abc import Iterable, Iterator
@@ -24,6 +25,129 @@ from forma.core.errors import NotFound, ValidationFailed
 Risk = Literal["critical", "high", "medium", "low"]
 RISK_ORDER: dict[str, int] = {"critical": 3, "high": 2, "medium": 1, "low": 0}
 _SCHEMA_ID_RE = re.compile(r"[a-z0-9][a-z0-9_-]{0,63}")  # also the file name: <schema_id>.v<n>.json
+# Collections FORMA knows business rules for: kind → (collection semantic, item semantic prefixes).
+COLLECTION_KINDS: dict[str, tuple[str, tuple[str, ...]]] = {
+    "pricing": ("prices", ("price.",)),
+    "inventory": ("inventory", ("stock.",)),
+    "promotions": ("promotions", ("promo.", "discount.")),
+}
+# The x-forma.semantic vocabulary FORMA has rules for (Thai parsing, VAT, units, drift, change reports).
+# A schema tags its fields with these; any other semantic is still matched by synonyms and field name.
+SEMANTICS: dict[str, str] = {
+    "sku": "record identity / item code",
+    "product_name": "product name",
+    "description": "long description",
+    "barcode": "EAN / barcode",
+    "brand": "brand",
+    "category_path": "category (list or path)",
+    "unit.sell": "selling unit, normalised (PCS, PACK, CARTON …)",
+    "unit.pack_size": "pieces per pack, from 'ลัง(12)', '1x12' …",
+    "currency": "currency code (defaults to the schema default, else THB)",
+    "status": "active / inactive / discontinued (spelled as the schema enum spells them)",
+    "attributes": "unmapped columns, kept as key → value",
+    "price.amount": "price; at the root for one price, or inside a prices collection",
+    "price.list_name": "price list (standard, wholesale, member …)",
+    "price.vat_included": "true when the price includes VAT (guessed from the header)",
+    "price.vat_rate": "VAT rate",
+    "price.effective_from": "price valid from (date)",
+    "price.effective_to": "price valid to (date)",
+    "stock.warehouse": "warehouse / branch code",
+    "stock.qty": "quantity on hand",
+    "stock.reserved": "reserved quantity",
+    "promo.code": "promotion code",
+    "promo.name": "promotion name",
+    "promo.type": "percent_off, amount_off, fixed_price, buy_x_get_y, bundle, tiered",
+    "discount.percent": "discount in percent",
+    "discount.amount": "discount in baht",
+    "promo.price": "special price",
+    "promo.min_qty": "minimum quantity",
+    "promo.buy_qty": "buy X",
+    "promo.get_qty": "get Y",
+    "promo.bundle_skus": "items of a bundle",
+    "promo.channels": "sales channels",
+    "promo.start_date": "promotion start (date)",
+    "promo.end_date": "promotion end (date)",
+    "prices": "collection of prices",
+    "inventory": "collection of stock rows",
+    "promotions": "collection of promotions",
+}
+
+# Risk a field gets from its meaning when the schema does not say: money, identity and promotion terms are
+# critical, so the policy's confidence floors protect them in any contract without extra configuration.
+SEMANTIC_RISK: dict[str, Risk] = {
+    "sku": "critical",
+    "currency": "critical",
+    "price.amount": "critical",
+    "price.vat_included": "critical",
+    "promo.type": "critical",
+    "discount.percent": "critical",
+    "discount.amount": "critical",
+    "promo.price": "critical",
+    "promo.start_date": "critical",
+    "promo.end_date": "critical",
+    "product_name": "high",
+    "unit.sell": "high",
+    "unit.pack_size": "high",
+    "price.list_name": "high",
+    "price.vat_rate": "high",
+    "price.effective_from": "high",
+    "price.effective_to": "high",
+    "stock.warehouse": "high",
+    "stock.qty": "high",
+    "promo.code": "high",
+    "promo.min_qty": "high",
+    "promo.buy_qty": "high",
+    "promo.get_qty": "high",
+    "promo.bundle_skus": "high",
+}
+
+
+def schema_findings(schema: TargetSchema) -> list[dict[str, str]]:
+    """What the web app shows before a schema is registered: how well FORMA can map onto it."""
+    out: list[dict[str, str]] = []
+    for f in schema.leaf_fields():
+        if f.semantic is None and not (f.synonyms_en or f.synonyms_th):
+            level = "warning" if f.required else "info"
+            out.append(
+                {
+                    "level": level,
+                    "pointer": f.pointer,
+                    "message": "no semantic or synonyms: matched by field name only",
+                }
+            )
+        elif f.semantic and f.semantic not in SEMANTICS:
+            out.append(
+                {
+                    "level": "info",
+                    "pointer": f.pointer,
+                    "message": f"custom semantic '{f.semantic}': matched by synonyms and name",
+                }
+            )
+    for c in schema.collections():
+        if schema.collection_kind(c.pointer) is None:
+            out.append(
+                {
+                    "level": "info",
+                    "pointer": c.pointer,
+                    "message": "no pricing/stock/promotion semantics: items matched by synonyms only",
+                }
+            )
+    if schema.semantic_field("product_name") is None:
+        out.append(
+            {
+                "level": "info",
+                "pointer": "/",
+                "message": "no field tagged product_name: the main table is found by the identity key alone",
+            }
+        )
+    return out
+
+
+# Keys the engine adds to every record: provenance (lineage) and unmapped root columns. They reach an
+# export only when the target schema declares them as top-level properties.
+PROVENANCE_KEY = "source_meta"
+PASSTHROUGH_KEY = "attributes"
+INTERNAL_KEYS = (PROVENANCE_KEY, PASSTHROUGH_KEY)
 
 
 @dataclass(frozen=True)
@@ -143,13 +267,67 @@ class TargetSchema:
         except NotFound:
             return "medium"
 
+    # ---- semantics: how code finds a field by meaning, never by name (ADR-001) ---------------
+    def semantic_field(self, semantic: str, *, in_collection: str | None = None) -> FieldSpec | None:
+        """First leaf with this ``x-forma.semantic`` at the root (default) or inside ``in_collection``."""
+        return next(
+            (f for f in self.leaf_fields() if f.semantic == semantic and f.in_collection == in_collection),
+            None,
+        )
+
+    def semantic_pointers(self, semantic: str) -> set[str]:
+        """Every pointer carrying this semantic, at the root or in any collection."""
+        return {f.pointer for f in self.fields() if f.semantic == semantic}
+
+    def identity_field(self) -> FieldSpec | None:
+        keys = self.identity_keys
+        if keys and self.has_field(keys[0]):
+            return self.field(keys[0])
+        return self.semantic_field("sku")
+
+    def collection_kind(self, pointer: str) -> str | None:
+        """``pricing`` / ``inventory`` / ``promotions`` from the collection's semantic or, failing that,
+        from the semantics of its item fields; ``None`` for a collection FORMA has no special rules for."""
+        coll = next((f for f in self.collections() if f.pointer == pointer), None)
+        if coll is None:
+            return None
+        for kind, (sem, _) in COLLECTION_KINDS.items():
+            if coll.semantic == sem:
+                return kind
+        votes: dict[str, int] = {}
+        for f in self.leaf_fields():
+            if f.in_collection == pointer and f.semantic:
+                for kind, (_, prefixes) in COLLECTION_KINDS.items():
+                    if f.semantic.startswith(prefixes):
+                        votes[kind] = votes.get(kind, 0) + 1
+        return max(votes, key=lambda k: votes[k]) if votes else None
+
+    def collection_for(self, kind: str) -> str | None:
+        return next((c.pointer for c in self.collections() if self.collection_kind(c.pointer) == kind), None)
+
+    def declares(self, top_level_key: str) -> bool:
+        props = self.document.get("properties", {})
+        return isinstance(props, dict) and top_level_key in props
+
+    def export_view(self, record: dict[str, Any]) -> dict[str, Any]:
+        """The record as the contract sees it: engine-internal keys (provenance, unmapped columns) that
+        this schema does not declare are dropped, so a strict downstream schema gets exactly its shape."""
+        drop = [k for k in INTERNAL_KEYS if k in record and not self.declares(k)]
+        return {k: v for k, v in record.items() if k not in drop} if drop else record
+
+    @staticmethod
+    def wildcard(pointer: str) -> str:
+        """``/prices/0/amount`` → ``/prices/*/amount`` (data pointer → catalogue pointer)."""
+        return re.sub(r"/\d+(?=/|$)", "/*", pointer)
+
     # ---- validation -----------------------------------------------------------------------
     def validator(self) -> Draft202012Validator:
         return Draft202012Validator(self.document, format_checker=FormatChecker())
 
     def validate_record(self, record: dict[str, Any]) -> list[dict[str, Any]]:
+        """Errors of the record *as exported* (``export_view``), so 'valid' means the export is valid."""
         errs = []
-        for e in self.validator().iter_errors(record):
+        for e in self.validator().iter_errors(self.export_view(record)):
             errs.append(
                 {
                     "pointer": "/" + "/".join(str(p) for p in e.absolute_path),
@@ -218,7 +396,7 @@ def _walk(
             name=name,
             json_type=types,
             semantic=xf.get("semantic"),
-            risk=xf.get("risk", "medium"),
+            risk=xf.get("risk") or SEMANTIC_RISK.get(xf.get("semantic") or "", "medium"),
             required=name in required,
             nullable="null" in types,
             enum=tuple(sub["enum"]) if "enum" in sub else None,
@@ -300,8 +478,10 @@ class SchemaRegistry:
             return self.get(sid, int(v))
         return self.get(ref)
 
-    def register(self, document: dict[str, Any], *, persist: bool = True) -> TargetSchema:
-        """Validate and add a new schema (new version if the id already exists)."""
+    def prepare(self, document: dict[str, Any]) -> TargetSchema:
+        """Validate a new schema and give it its id and next version, without storing it anywhere
+        (the web app previews it first). The caller's document is never modified."""
+        document = copy.deepcopy(document)
         Draft202012Validator.check_schema(document)
         xf = document.setdefault("x-forma", {})
         # the id becomes a file name: an explicit one must already be safe, a title is slugified
@@ -321,13 +501,32 @@ class SchemaRegistry:
         if (sid, version) in self._cache:
             version = max(existing) + 1
         xf["schema_id"], xf["version"] = sid, version
-        path = None
+        schema = TargetSchema(sid, version, document, None)
+        identity = schema.identity_keys
+        if not identity or not all(schema.has_field(k) for k in identity):
+            raise ValidationFailed(
+                'x-forma.identity_keys must name the field(s) that identify a record, e.g. ["/sku"]',
+                details={"identity_keys": identity},
+            )
+        return schema
+
+    def register(self, document: dict[str, Any], *, persist: bool = True) -> TargetSchema:
+        """Validate and add a new schema (new version if the id already exists)."""
+        schema = self.prepare(document)
         if persist:
             self.directory.mkdir(parents=True, exist_ok=True)
-            path = self.directory / f"{sid}.v{version}.json"
-            path.write_text(json.dumps(document, ensure_ascii=False, indent=2), encoding="utf-8")
-        schema = TargetSchema(sid, version, document, path)
-        self._cache[(sid, version)] = schema
+            schema.path = self.directory / f"{schema.schema_id}.v{schema.version}.json"
+            schema.path.write_text(
+                json.dumps(schema.document, ensure_ascii=False, indent=2), encoding="utf-8"
+            )
+        self._cache[(schema.schema_id, schema.version)] = schema
+        return schema
+
+    def add(self, document: dict[str, Any]) -> TargetSchema:
+        """Load a schema stored outside the directory (registered in the web app) as id@version."""
+        xf = document.get("x-forma", {})
+        schema = TargetSchema(str(xf["schema_id"]), int(xf["version"]), document, None)
+        self._cache[(schema.schema_id, schema.version)] = schema
         return schema
 
     @staticmethod

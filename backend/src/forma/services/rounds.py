@@ -44,6 +44,39 @@ def create_customer(
     return c
 
 
+CUSTOMER_FIELDS = ("code", "name", "erp_type", "notes", "active", "default_target_schema")
+
+
+def update_customer(session: Session, customer_id: str, patch: dict[str, Any], actor: str) -> Customer:
+    """Correct customer master data from the web app (a typo, a new ERP, another target format) instead of
+    editing the database; the audit log keeps before and after. The caller checks a target format exists."""
+    c = get_customer(session, customer_id)
+    fields = [k for k in CUSTOMER_FIELDS if k in patch]
+    before = {k: getattr(c, k) for k in fields}
+    if "code" in patch:
+        code = str(patch["code"] or "").strip()
+        if not code:
+            raise ValidationFailed("customer code is required")
+        if session.scalar(select(Customer).where(Customer.code == code, Customer.id != c.id)):
+            raise ValidationFailed(f"customer code {code!r} already exists")
+        c.code = code
+    if "name" in patch:
+        name = str(patch["name"] or "").strip()
+        if not name:
+            raise ValidationFailed("customer name is required")
+        c.name = name
+    for k in ("erp_type", "notes", "default_target_schema"):
+        if k in patch:
+            v = patch[k]
+            setattr(c, k, (str(v).strip() or None) if v is not None else None)
+    if "active" in patch:
+        c.active = bool(patch["active"])
+    after = {k: getattr(c, k) for k in fields}
+    if before != after:
+        audit(session, "customer.update", "customer", c.id, actor=actor, before=before, after=after)
+    return c
+
+
 def get_customer(session: Session, customer_id: str) -> Customer:
     c = session.get(Customer, customer_id)
     if c is None:

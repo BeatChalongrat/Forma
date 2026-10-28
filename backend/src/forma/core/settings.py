@@ -7,7 +7,14 @@ from typing import Any
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-SECRET_FIELDS = {"llm_api_key", "database_url", "redis_url", "s3_secret_key", "auth_client_secret"}
+SECRET_FIELDS = {
+    "llm_api_key",
+    "database_url",
+    "redis_url",
+    "s3_secret_key",
+    "auth_client_secret",
+    "secret_key",
+}
 
 
 class Settings(BaseSettings):
@@ -113,6 +120,14 @@ class Settings(BaseSettings):
     auth_allow_dev_in_prod: bool = Field(
         default=False,
         description="Local smoke tests of the prod stack only: let FORMA_AUTH=dev run with FORMA_ENV=prod.",
+    )
+    secret_key: str | None = Field(
+        default=None,
+        description="Encrypts secrets saved in the web app (AI API key). Required in prod to save them; "
+        "changing it makes saved secrets unreadable until they are entered again.",
+    )
+    config_refresh_s: float = Field(
+        default=5.0, description="How often each process checks for settings changed in the web app."
     )
 
     # Observability

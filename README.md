@@ -65,7 +65,9 @@ and **New import** accepts your own files.
 ### Enable the AI agents (optional)
 
 Everything works offline with the deterministic mapper. To add LLM refinement, diagnosis, self-healing
-adaptation and the natural-language copilot, create `backend/.env`:
+adaptation and the natural-language copilot, open **Settings → AI**, pick the provider and paste the key
+(stored encrypted, applied without a restart, *Test connection* checks it). Or set it for the whole server
+in `backend/.env`:
 
 ```
 FORMA_LLM_PROVIDER=openai            # openai | openai_compatible | anthropic
@@ -75,6 +77,16 @@ FORMA_LLM_API_KEY=sk-...
 ```
 
 Token usage and cost per round are recorded in the `llm_calls` ledger and shown on the Overview.
+
+### Use the real downstream format
+
+**Settings → Target formats → New format**: paste (or load) the JSON Schema the downstream team gave you,
+tag each field with an `x-forma.semantic` from the list shown beside the editor (`sku`, `price.amount`,
+`stock.qty`, `promo.type` …) and Thai/English synonyms, *Check* it (validity, mapping findings, diff to the
+previous version), then *Register*. Make it the default, or assign it per customer (**Customers → Edit**).
+Mapping, validation, AI prompts and exports follow it; exports carry exactly its fields (ADR-017).
+The approval policy (**Settings → Approval policy**) and customer details are edited the same way —
+validated, audited, no database edits.
 
 ### Run it in production mode (Postgres · Redis workers · MinIO · nginx)
 

@@ -12,6 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
 
 from forma import __version__
+from forma.api.config_routes import router as config_router
 from forma.api.routes import api
 from forma.auth import ensure_auth_is_safe
 from forma.core import metrics, telemetry
@@ -114,6 +115,7 @@ def create_app() -> FastAPI:
         return JSONResponse(status_code=200 if body["status"] == "ok" else 503, content=body)
 
     app.include_router(api)
+    app.include_router(config_router)
     return app
 
 

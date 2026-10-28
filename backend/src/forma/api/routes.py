@@ -16,6 +16,7 @@ from forma.api.schemas import (
     ChangesIn,
     CopilotIn,
     CustomerIn,
+    CustomerPatch,
     Decision,
     MappingEditIn,
     MappingPreviewIn,
@@ -42,6 +43,8 @@ from forma.db.session import get_session
 from forma.export.exporter import MEDIA_TYPES
 from forma.jobs import runner
 from forma.mapping_dsl.models import MappingDocument, Op
+from forma.schema_registry import PROVENANCE_KEY, TargetSchema
+from forma.services import config as cfg
 from forma.services import datasets as ds
 from forma.services import mapping as ms
 from forma.services import rounds as rs
@@ -142,6 +145,21 @@ def create_customer(
     return ser.customer(rs.create_customer(session, body.code, body.name, body.erp_type, body.notes))
 
 
+@api.patch("/customers/{customer_id}")
+def update_customer(
+    customer_id: str,
+    body: CustomerPatch,
+    session: Session = Depends(get_session),
+    ctx: ServiceContext = Depends(ctx_dep),
+    p: Principal = Depends(require_role("admin")),
+) -> dict[str, Any]:
+    ensure_customer(p, customer_id)
+    patch = {k: getattr(body, k) for k in body.model_fields_set}
+    if patch.get("default_target_schema"):
+        cfg.resolve_target_schema(session, ctx.registry, patch["default_target_schema"], None)
+    return ser.customer(rs.update_customer(session, customer_id, patch, p.actor))
+
+
 @api.get("/customers/{customer_id}")
 def get_customer(
     customer_id: str, session: Session = Depends(get_session), p: Principal = Depends(current_principal)
@@ -222,10 +240,15 @@ def list_rounds(
 
 @api.post("/rounds", status_code=201)
 def create_round(
-    body: RoundIn, session: Session = Depends(get_session), p: Principal = Depends(require_role("importer"))
+    body: RoundIn,
+    session: Session = Depends(get_session),
+    ctx: ServiceContext = Depends(ctx_dep),
+    p: Principal = Depends(require_role("importer")),
 ) -> dict[str, Any]:
     ensure_customer(p, body.customer_id)
-    return ser.import_round(rs.create_round(session, body.customer_id, body.label, body.target_schema))
+    c = rs.get_customer(session, body.customer_id)
+    ref = cfg.resolve_target_schema(session, ctx.registry, body.target_schema, c.default_target_schema)
+    return ser.import_round(rs.create_round(session, body.customer_id, body.label, ref))
 
 
 @api.get("/rounds/{round_id}")
@@ -616,7 +639,7 @@ def dataset_rows(
     if q:
         ql = q.lower()
         records = [
-            r for r in records if ql in str({k: v for k, v in r.items() if k != "source_meta"}).lower()
+            r for r in records if ql in str({k: v for k, v in r.items() if k != PROVENANCE_KEY}).lower()
         ]
     if sort:
         from forma.engine.transform import _get_pointer
@@ -846,7 +869,7 @@ def copilot(
     schema = ctx.registry.get_ref(ms.get_mapping(session, d.mapping_version_id).target_schema)
     records = ds.records_of(ctx, d)
     if ctx.llm.is_mock:
-        plan = _rule_based_copilot(body.instruction)
+        plan = _rule_based_copilot(body.instruction, schema)
         if plan is None:
             return {
                 "ai": False,
@@ -859,12 +882,13 @@ def copilot(
         ms._record_llm(session, d.round_id, res)
         if res.data.get("needs_clarification"):
             return {"ai": True, "operations": [], "needs_clarification": res.data["needs_clarification"]}
-        ops = _copilot_to_ops(res.data.get("operations", []))
+        ops = _copilot_to_ops(res.data.get("operations", []), schema)
     _, impact = ds.apply_operations(records, ops, schema)
     return {"ai": not ctx.llm.is_mock, "operations": ops, "impact": impact, "needs_clarification": None}
 
 
-def _copilot_to_ops(ops: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def _copilot_to_ops(ops: list[dict[str, Any]], schema: TargetSchema) -> list[dict[str, Any]]:
+    status = schema.semantic_field("status")
     out = []
     for o in ops:
         k = o.get("kind")
@@ -878,11 +902,11 @@ def _copilot_to_ops(ops: list[dict[str, Any]]) -> list[dict[str, Any]]:
                     "explanation": o.get("explanation_th"),
                 }
             )
-        elif k in ("set_field", "set_status"):
+        elif k == "set_field" or (k == "set_status" and status is not None):
             out.append(
                 {
                     "kind": "set_field",
-                    "target": o["target"] if k == "set_field" else "/status",
+                    "target": o["target"] if k == "set_field" or status is None else status.pointer,
                     "value": o.get("value"),
                     "where": o.get("where"),
                     "explanation": o.get("explanation_th"),
@@ -895,24 +919,30 @@ def _copilot_to_ops(ops: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return out
 
 
-def _rule_based_copilot(text: str) -> list[dict[str, Any]] | None:
+def _rule_based_copilot(text: str, schema: TargetSchema) -> list[dict[str, Any]] | None:
     import re
 
+    # fields by meaning (ADR-001): the category path, the status, and the price amount wherever it lives
+    category = schema.semantic_field("category_path")
+    status = schema.semantic_field("status")
+    prices = sorted(schema.semantic_pointers("price.amount"))
+    if category is None:
+        return None
     t = text.strip()
     m = re.search(
         r"(?:ลดราคา|discount|reduce price|ลด)\s*(?:หมวด|category)?\s*(\S+)\s*(\d+(?:\.\d+)?)\s*%", t, re.I
     )
-    if m:
+    if m and prices:
         cat, pct = m.group(1), float(m.group(2))
         where = {
             "op": "contains",
-            "args": [{"op": "col", "name": "/category"}],
+            "args": [{"op": "col", "name": category.pointer}],
             "params": {"pattern": cat, "literal": True},
         }
         return [
             {
                 "kind": "scale_field",
-                "target": "/prices/*/amount",
+                "target": prices[0],
                 "factor": round(1 - pct / 100, 4),
                 "where": where,
                 "explanation": f"ลดราคาสินค้าหมวด {cat} ลง {pct}%",
@@ -923,16 +953,16 @@ def _rule_based_copilot(text: str) -> list[dict[str, Any]] | None:
         t,
         re.I,
     )
-    if m:
+    if m and status is not None:
         where = {
             "op": "contains",
-            "args": [{"op": "col", "name": "/category"}],
+            "args": [{"op": "col", "name": category.pointer}],
             "params": {"pattern": m.group(2), "literal": True},
         }
         return [
             {
                 "kind": "set_field",
-                "target": "/status",
+                "target": status.pointer,
                 "value": m.group(1).lower(),
                 "where": where,
                 "explanation": f"ตั้งสถานะ {m.group(1)} ให้หมวด {m.group(2)}",
@@ -946,9 +976,22 @@ def _rule_based_copilot(text: str) -> list[dict[str, Any]] | None:
 # ============================================================================================
 @api.get("/schemas")
 def list_schemas(
-    ctx: ServiceContext = Depends(ctx_dep), p: Principal = Depends(current_principal)
+    session: Session = Depends(get_session),
+    ctx: ServiceContext = Depends(ctx_dep),
+    p: Principal = Depends(current_principal),
 ) -> list[dict[str, Any]]:
-    return [s.to_summary() for s in ctx.registry.list()]
+    stored, default = cfg.stored_refs(session), cfg.default_target_schema(session)
+    latest = {s.schema_id: s.version for s in ctx.registry.list()}  # list() is sorted by (id, version)
+    return [
+        {
+            **s.to_summary(),
+            "source": "ui" if s.ref in stored else "file",
+            "is_latest": latest[s.schema_id] == s.version,
+            # "product" means the latest version, "product@1" pins one
+            "is_default": default == s.ref or (default == s.schema_id and latest[s.schema_id] == s.version),
+        }
+        for s in ctx.registry.list()
+    ]
 
 
 @api.get("/schemas/{ref}")
@@ -965,9 +1008,17 @@ def get_schema(
 
 @api.post("/schemas", status_code=201)
 def register_schema(
-    body: SchemaIn, ctx: ServiceContext = Depends(ctx_dep), p: Principal = Depends(require_role("approver"))
+    body: SchemaIn,
+    session: Session = Depends(get_session),
+    ctx: ServiceContext = Depends(ctx_dep),
+    p: Principal = Depends(require_role("approver")),
 ) -> dict[str, Any]:
-    s = ctx.registry.register(body.document)
+    """A new target format (or a new version of one) is stored in the database, never written into the
+    image: every API and worker process loads it on its next config check (ADR-017)."""
+    s = ctx.registry.prepare(body.document)
+    cfg.store_schema(session, s, p.actor)
+    session.commit()
+    ctx.refresh()
     return s.to_summary()
 
 

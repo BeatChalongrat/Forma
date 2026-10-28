@@ -1,4 +1,5 @@
 from forma.db.models import (
+    AppSetting,
     AuditLog,
     Base,
     ChangeSet,
@@ -12,10 +13,12 @@ from forma.db.models import (
     Override,
     ReviewTask,
     SourceFile,
+    StoredSchema,
 )
 from forma.db.session import get_engine, get_session, init_db, session_scope
 
 __all__ = [
+    "AppSetting",
     "AuditLog",
     "Base",
     "ChangeSet",
@@ -29,6 +32,7 @@ __all__ = [
     "Override",
     "ReviewTask",
     "SourceFile",
+    "StoredSchema",
     "get_engine",
     "get_session",
     "init_db",

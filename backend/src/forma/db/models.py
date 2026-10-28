@@ -53,6 +53,8 @@ class Customer(Base):
     erp_type: Mapped[str | None] = mapped_column(String(64))
     notes: Mapped[str | None] = mapped_column(Text)
     active: Mapped[bool] = mapped_column(Boolean, default=True)
+    # target format new rounds of this customer use ("catalog" = latest, "catalog@2" = pinned)
+    default_target_schema: Mapped[str | None] = mapped_column(String(80))
     created_at: Mapped[dt.datetime] = mapped_column(UTCDateTime, default=utcnow)
 
     rounds: Mapped[list[ImportRound]] = relationship(back_populates="customer")
@@ -276,4 +278,27 @@ class LLMCall(Base):
     cost_usd: Mapped[float] = mapped_column(Float, default=0.0)
     latency_ms: Mapped[float] = mapped_column(Float, default=0.0)
     attempts: Mapped[int] = mapped_column(Integer, default=1)
+    created_at: Mapped[dt.datetime] = mapped_column(UTCDateTime, default=utcnow)
+
+
+class AppSetting(Base):
+    """Runtime configuration edited in the web app (ADR-017): AI provider, approval policy, defaults.
+    Secrets are stored encrypted; the ``revision`` row tells every process when to reload."""
+
+    __tablename__ = "app_settings"
+    key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    value: Mapped[dict[str, Any]] = mapped_column(JSONType, default=dict)
+    updated_by: Mapped[str] = mapped_column(String(128), default="system")
+    updated_at: Mapped[dt.datetime] = mapped_column(UTCDateTime, default=utcnow, onupdate=utcnow)
+
+
+class StoredSchema(Base):
+    """A target schema registered from the web app. Versions are append-only; the files under
+    ``target_schema/`` stay the read-only built-ins."""
+
+    __tablename__ = "target_schemas"
+    schema_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    version: Mapped[int] = mapped_column(Integer, primary_key=True)
+    document: Mapped[dict[str, Any]] = mapped_column(JSONType)
+    created_by: Mapped[str] = mapped_column(String(128), default="system")
     created_at: Mapped[dt.datetime] = mapped_column(UTCDateTime, default=utcnow)

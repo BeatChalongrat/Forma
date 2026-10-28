@@ -21,7 +21,7 @@ from forma.engine.ops import CompileContext, compile_expr
 from forma.engine.transform import TransformEngine, _get_pointer, _set_pointer
 from forma.export.exporter import FORMATS, write_export
 from forma.mapping_dsl.models import CallExpr, ColExpr, ConstExpr, MappingDocument
-from forma.schema_registry import TargetSchema
+from forma.schema_registry import INTERNAL_KEYS, PROVENANCE_KEY, TargetSchema
 from forma.services.context import ServiceContext
 from forma.services.mapping import bind_sources, get_mapping
 from forma.services.rounds import audit, get_round, latest_approved_mapping
@@ -74,7 +74,7 @@ def _new_version(
     key = ctx.dataset_key(fields["customer_id"], dv_id)
     if stamp_meta:
         for d in records:
-            d.setdefault("source_meta", {})["dataset_version_id"] = dv_id
+            d.setdefault(PROVENANCE_KEY, {})["dataset_version_id"] = dv_id
     write_version_object(ctx, key, records)
     try:
         dv = DatasetVersion(id=dv_id, records_key=key, row_count=len(records), **fields)
@@ -491,6 +491,9 @@ def diff_datasets(
     changed: list[dict[str, Any]] = []
     price_changes: list[dict[str, Any]] = []
     promo_changes = 0
+    # which pointers are prices / promotions comes from the schema's semantics, not from field names
+    price_ptrs = schema.semantic_pointers("price.amount")
+    promo_coll = schema.collection_for("promotions")
     for k in set(o) & set(n):
         a, b = o[k], n[k]
         deltas = _record_delta(a, b)
@@ -498,8 +501,7 @@ def diff_datasets(
             changed.append({"identity": k, "changes": deltas[:20]})
             for d in deltas:
                 if (
-                    d["pointer"].startswith("/prices")
-                    and d["pointer"].endswith("/amount")
+                    schema.wildcard(d["pointer"]) in price_ptrs
                     and isinstance(d["before"], int | float)
                     and isinstance(d["after"], int | float)
                 ):
@@ -513,7 +515,7 @@ def diff_datasets(
                             else None,
                         }
                     )
-                if d["pointer"].startswith("/promotions"):
+                if promo_coll and (d["pointer"] + "/").startswith(promo_coll + "/"):
                     promo_changes += 1
     big = [p for p in price_changes if p["pct"] is not None and abs(p["pct"]) >= 20]
     return {
@@ -534,7 +536,7 @@ def diff_datasets(
 
 def _record_delta(a: dict[str, Any], b: dict[str, Any], prefix: str = "") -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
-    keys = (set(a) | set(b)) - {"source_meta", "attributes"}
+    keys = (set(a) | set(b)) - set(INTERNAL_KEYS)
     for k in sorted(keys):
         va, vb = a.get(k), b.get(k)
         ptr = f"{prefix}/{k}"
@@ -649,7 +651,7 @@ def lineage(ctx: ServiceContext, session: Session, dataset_id: str, identity: st
     ]
     return {
         "record": rec,
-        "source_meta": rec.get("source_meta"),
+        "source_meta": rec.get(PROVENANCE_KEY),
         "mapping_version": mv.id,
         "fields": fields,
         "collections": collections,

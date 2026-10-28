@@ -44,8 +44,9 @@ collections:                  # nested arrays
       - { target: /prices/*/vat_included, expr: { op: const, value: true } }
 quality:
   - { target: /sku, rule: unique, severity: warning }
-provenance: true              # attach source file / row lineage
-attributes_passthrough: true  # unmapped root columns land under /attributes (no data loss)
+provenance: true              # attach source file / row lineage (source_meta)
+attributes_passthrough: true  # unmapped root columns kept under attributes (no data loss)
+                              # both are exported only if the target schema declares them (ADR-017)
 ```
 
 ## Expressions

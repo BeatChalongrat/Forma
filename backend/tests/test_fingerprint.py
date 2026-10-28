@@ -82,10 +82,19 @@ def test_same_profile_twice_identical() -> None:
 
 
 def test_noise_tables_ignored() -> None:
+    # a sheet's own table counts even with two rows: two promotions this round are data, not noise …
     fp = fingerprint_profile(
-        _profile({"สินค้า": PRODUCTS, "legend": [("a", "string"), ("b", "string")]}, n_rows=2)
+        _profile({"สินค้า": PRODUCTS, "Promotions": [("a", "string"), ("b", "string")]}, n_rows=2)
     )
-    assert fp.tables == []
+    assert [t.sheet for t in fp.tables] == ["สินค้า", "promotions"]
+    # … a small block beside a sheet's main table (legend, footer) or a one-column block does not
+    prof = _profile({"สินค้า": PRODUCTS})
+    main = prof.tables[0]
+    prof.tables += [
+        TableProfile(main.sheet, main.sheet_index, main.table, [_col("a"), _col("b", i=1)], 2),
+        TableProfile("notes", 1, main.table, [_col("a")], 50),
+    ]
+    assert [t.headers for t in fingerprint_profile(prof).tables] == [[norm_header(c) for c, _ in PRODUCTS]]
 
 
 def test_renamed_column() -> None:

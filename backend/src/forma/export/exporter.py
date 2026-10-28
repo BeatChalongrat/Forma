@@ -16,7 +16,7 @@ from typing import Any
 
 import orjson
 
-from forma.schema_registry import TargetSchema
+from forma.schema_registry import PROVENANCE_KEY, TargetSchema
 
 FORMATS = ("json", "jsonl", "csv")
 MEDIA_TYPES = {"json": "application/json", "jsonl": "application/x-ndjson", "csv": "text/csv"}
@@ -28,9 +28,14 @@ def export_bytes(records: list[dict[str, Any]], fmt: str, schema: TargetSchema) 
 
 
 def iter_export(
-    records: Callable[[], Iterable[dict[str, Any]]], fmt: str, schema: TargetSchema
+    stored: Callable[[], Iterable[dict[str, Any]]], fmt: str, schema: TargetSchema
 ) -> Iterator[bytes]:
-    """Stream an export. ``records`` is called once (json/jsonl) or twice (csv: header pass + row pass)."""
+    """Stream an export. ``stored`` is called once (json/jsonl) or twice (csv: header pass + row pass).
+    Every record leaves in the contract's shape: keys the schema does not declare are not exported."""
+
+    def records() -> Iterator[dict[str, Any]]:
+        return (schema.export_view(r) for r in stored())
+
     if fmt == "json":
         yield b"[\n"
         first = True
@@ -78,9 +83,15 @@ def export_file(records: list[dict[str, Any]], fmt: str, schema: TargetSchema, d
 
 
 def flatten_record(
-    rec: dict[str, Any], *, explode: str | None, array_join: str = "|"
+    rec: dict[str, Any],
+    *,
+    explode: str | None,
+    array_join: str = "|",
+    skip: Iterable[str] = (PROVENANCE_KEY,),
 ) -> Iterable[dict[str, Any]]:
-    """Flatten nested objects with dotted keys; explode one collection into rows, join the rest."""
+    """Flatten nested objects with dotted keys; explode one collection into rows, join the rest.
+    Provenance never goes to a flat file."""
+    skipped = set(skip)
     base: dict[str, Any] = {}
     exploded: list[dict[str, Any]] | None = None
     explode_key = explode.lstrip("/") if explode else None
@@ -89,7 +100,7 @@ def flatten_record(
         nonlocal exploded
         if isinstance(obj, dict):
             for k, v in obj.items():
-                if k in ("source_meta",):
+                if k in skipped:
                     continue
                 walk(v, f"{prefix}.{k}" if prefix else k)
         elif isinstance(obj, list):
