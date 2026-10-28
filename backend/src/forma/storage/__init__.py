@@ -17,6 +17,7 @@ def make_storage(settings: Settings) -> Storage:
             prefix=settings.s3_prefix,
             cache_dir=settings.data_path / "cache",
             endpoint_url=settings.s3_endpoint_url,
+            public_endpoint_url=settings.s3_public_endpoint_url,
             region=settings.s3_region,
             access_key=settings.s3_access_key,
             secret_key=settings.s3_secret_key,
