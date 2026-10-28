@@ -165,7 +165,7 @@ class Settings(BaseSettings):
         for name, f in cls.model_fields.items():
             default = f.default
             if isinstance(default, Path):
-                default = str(default)
+                default = default.as_posix()  # OS-independent, so the generated example never drifts
             elif isinstance(default, list):
                 default = ",".join(default)
             elif default is None:

@@ -4,7 +4,7 @@ BACKEND := backend
 PY := $(BACKEND)/.venv/bin/python
 FORMA := $(BACKEND)/.venv/bin/forma
 
-.PHONY: install install-backend install-frontend dev api web worker check lint typecheck test synth seed eval bench bench-short reset clean
+.PHONY: install install-backend install-frontend dev api web worker check lint typecheck test synth seed eval eval-gate bench bench-short config-example prod-up prod-down reset clean
 
 install: install-backend install-frontend
 
@@ -45,6 +45,18 @@ synth:               ## regenerate the synthetic ERP corpus (30 variants, ground
 
 eval:                ## heuristic mapping + engine accuracy vs ground truth
 	cd $(BACKEND) && .venv/bin/forma eval --corpus ../data/synthetic --report ../data/eval_report.json
+
+eval-gate:           ## eval and fail if any metric drops below data/eval_baseline.json (CI)
+	cd $(BACKEND) && .venv/bin/forma eval --corpus ../data/synthetic --report ../data/eval_report.json --baseline ../data/eval_baseline.json
+
+config-example:      ## regenerate .env.production.example from Settings
+	cd $(BACKEND) && .venv/bin/forma config example --out ../.env.production.example
+
+prod-up:             ## production-like stack: postgres + redis + minio + api + workers + web (needs .env.production)
+	docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
+
+prod-down:
+	docker compose -f docker-compose.prod.yml --env-file .env.production down
 
 seed:                ## load the corpus into the DB as demo customers/rounds and run the pipeline
 	cd $(BACKEND) && .venv/bin/forma seed --corpus ../data/synthetic
