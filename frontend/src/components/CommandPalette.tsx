@@ -6,11 +6,13 @@ import { api } from '../lib/api'
 import { FEATURES, matches, STEPS, useOpenFeature } from '../lib/features'
 import { useToast } from '../lib/toast'
 import { cn } from '../lib/utils'
+import { useDialog } from '../lib/useDialog'
 
 type Item = { key: string; group: string; title: string; sub: string; icon: typeof Search; run: () => void }
 
 /** Ctrl+K: find any feature, page, customer or recent import by name — in English or Thai. */
 export function CommandPalette({ open, onClose, isAdmin }: { open: boolean; onClose: () => void; isAdmin: boolean }) {
+  const dialogRef = useDialog(open, onClose)
   const [q, setQ] = useState('')
   const [active, setActive] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -25,6 +27,10 @@ export function CommandPalette({ open, onClose, isAdmin }: { open: boolean; onCl
     const t = window.setTimeout(() => inputRef.current?.focus(), 0)
     return () => window.clearTimeout(t)
   }, [open])
+
+  useEffect(() => {
+    if (open) dialogRef.current?.querySelector('[data-command-active="true"]')?.scrollIntoView({ block: 'nearest' })
+  }, [active, open, dialogRef])
 
   const items = useMemo<Item[]>(() => {
     const s = q.trim().toLowerCase()
@@ -49,7 +55,7 @@ export function CommandPalette({ open, onClose, isAdmin }: { open: boolean; onCl
   if (!open) return null
 
   const onKey = (e: React.KeyboardEvent) => {
-    if (e.key === 'ArrowDown') { e.preventDefault(); setActive((a) => Math.min(items.length - 1, a + 1)) }
+    if (e.key === 'ArrowDown') { e.preventDefault(); setActive((a) => Math.max(0, Math.min(items.length - 1, a + 1))) }
     else if (e.key === 'ArrowUp') { e.preventDefault(); setActive((a) => Math.max(0, a - 1)) }
     else if (e.key === 'Enter') { e.preventDefault(); items[active]?.run() }
     else if (e.key === 'Escape') { e.preventDefault(); onClose() }
@@ -57,10 +63,10 @@ export function CommandPalette({ open, onClose, isAdmin }: { open: boolean; onCl
   let lastGroup = ''
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center pt-[12vh] px-4 bg-navy/25 dark:bg-black/60" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div role="dialog" aria-modal aria-label="Search features" className="card w-full max-w-[640px] overflow-hidden">
+      <div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Search features" className="card w-full max-w-[640px] overflow-hidden shadow-xl">
         <div className="flex items-center gap-2.5 px-4 h-14 border-b border-line">
           <Search size={17} className="text-signal" />
-          <input ref={inputRef} className="flex-1 bg-transparent outline-none text-[15px] placeholder:text-ink-3" placeholder="What do you want to do? — เช่น อัปโหลด, ย้อนดูที่มา, ราคา, backup key" value={q} onChange={(e) => { setQ(e.target.value); setActive(0) }} onKeyDown={onKey} />
+          <input ref={inputRef} aria-label="Search features" className="flex-1 min-w-0 bg-transparent outline-none text-[15px] placeholder:text-ink-3" placeholder="Search files, customers or tools…" value={q} onChange={(e) => { setQ(e.target.value); setActive(0) }} onKeyDown={onKey} />
           <span className="kbd">Esc</span>
         </div>
         <div className="max-h-[60vh] overflow-auto py-1.5">
@@ -71,7 +77,7 @@ export function CommandPalette({ open, onClose, isAdmin }: { open: boolean; onCl
             return (
               <div key={it.key}>
                 {head && <div className="px-4 pt-2.5 pb-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-3">{head}</div>}
-                <button onMouseEnter={() => setActive(i)} onClick={it.run} className={cn('w-full flex items-start gap-3 px-4 py-2 text-left', i === active && 'bg-signal-soft')}>
+                <button data-command-active={i === active} onMouseEnter={() => setActive(i)} onClick={it.run} className={cn('w-full flex items-start gap-3 px-4 py-2 text-left', i === active && 'bg-signal-soft')}>
                   <it.icon size={16} className="mt-0.5 shrink-0 text-signal" />
                   <span className="min-w-0 flex-1">
                     <span className="block font-semibold text-navy">{it.title}</span>

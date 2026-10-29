@@ -24,14 +24,16 @@ _INJECTION_PATTERNS = [
     r"\bnew instructions?\b",
     r"\bset all (prices?|amounts?|quantities|qty|stock)\b",
     r"\b(delete|drop|truncate) (all|every|the) (rows?|records?|tables?|data)\b",
-    r"\bexfiltrat|\bapi[_ -]?key\b|\bpassword\b|\bsecret\b",
+    r"\bexfiltrat",
     r"ละเว้น(คำสั่ง|ข้อความ)(ก่อนหน้า|ข้างบน|ทั้งหมด)",
     r"ไม่ต้องสนใจ(คำสั่ง|กฎ|ข้อความ)(ก่อนหน้า|ข้างบน|ทั้งหมด)?",
     r"ลืม(คำสั่ง|กฎ)(ก่อนหน้า|ทั้งหมด)",
     r"ตั้ง(ราคา|จำนวน)(ทั้งหมด|ทุกรายการ)(เป็น|ให้เป็น)",
     r"ลบ(ข้อมูล|แถว|รายการ)ทั้งหมด",
 ]
-_INJECTION_RE = re.compile("|".join(_INJECTION_PATTERNS), re.IGNORECASE)
+_CREDENTIAL_TERMS = r"\bapi[_ -]?key\b|\bpassword\b|\bsecret\b"
+_INJECTION_RE = re.compile("|".join([*_INJECTION_PATTERNS, _CREDENTIAL_TERMS]), re.IGNORECASE)
+_HELP_TEXT_RE = re.compile("|".join(_INJECTION_PATTERNS), re.IGNORECASE)
 _POINTER_KEYS = {"target", "target_pointer", "pointer"}
 _DATA_KEYS = {"name", "key_column"}  # source column names: data, echoed back by the schema agent
 
@@ -57,7 +59,13 @@ def _walk(obj: Any, path: str, out: list[tuple[str, str, Any]]) -> None:
         out.append(("text", path, obj))
 
 
-def scan(data: Any, schema: TargetSchema | None = None, *, max_text: int = 4000) -> list[str]:
+def scan(
+    data: Any,
+    schema: TargetSchema | None = None,
+    *,
+    max_text: int = 4000,
+    allow_credential_terms: bool = False,
+) -> list[str]:
     """Return human-readable problems; empty means the output is safe to use."""
     found: list[tuple[str, str, Any]] = []
     _walk(data, "", found)
@@ -70,7 +78,10 @@ def scan(data: Any, schema: TargetSchema | None = None, *, max_text: int = 4000)
             if len(text) > max_text:
                 problems.append(f"{path}: text too long ({len(text)} chars)")
                 continue
-            m = _INJECTION_RE.search(text)
+            # Read-only feature help can name settings such as "API key". This
+            # does not relax instruction/exfiltration detection for that text;
+            # transformation agents keep the stricter default.
+            m = (_HELP_TEXT_RE if allow_credential_terms else _INJECTION_RE).search(text)
             if m:
                 problems.append(f"{path}: instruction-like text {m.group(0)!r}")
         elif kind == "pointer" and known is not None:

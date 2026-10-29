@@ -1,3 +1,4 @@
+import { Localized } from '../lib/locale'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { RotateCcw } from 'lucide-react'
@@ -5,6 +6,7 @@ import { api, type OpsSummary } from '../lib/api'
 import { PageHeader, Stat, Section, Badge, Empty, Spinner } from '../components/ui'
 import { fmtInt, timeAgo } from '../lib/utils'
 import { useToast } from '../lib/toast'
+import { usePreferences } from '../lib/preferences'
 
 function ms(v: number | null | undefined): string {
   if (v === null || v === undefined) return '–'
@@ -12,6 +14,7 @@ function ms(v: number | null | undefined): string {
 }
 
 export function OpsPage() {
+  const { t } = usePreferences()
   const qc = useQueryClient()
   const toast = useToast()
   const { data: ops, isError, error } = useQuery({ queryKey: ['ops'], queryFn: api.ops, refetchInterval: 5000 })
@@ -29,15 +32,15 @@ export function OpsPage() {
   return (
     <>
       <PageHeader
-        title="Ops"
-        subtitle="Queue, workers, failures and spend — what an operator needs at 09:00 and at 02:00."
-        actions={ready && <Badge tone={ready.status === 'ok' ? 'ok' : 'warn'}>{ready.status === 'ok' ? 'all systems ready' : `degraded: ${Object.entries(ready.checks).filter(([, v]) => !v.ok).map(([k]) => k).join(', ')}`}</Badge>}
+        title={t('System health', 'สถานะระบบ')}
+        subtitle={t('Monitor processing, failed jobs and estimated AI costs. Connection checks do not confirm that every job is progressing.', 'ดูการประมวลผล งานที่ผิดพลาด และค่า AI โดยประมาณ สถานะการเชื่อมต่อไม่ได้ยืนยันว่าทุกงานกำลังเดินตามปกติ')}
+        actions={ready && <Badge tone={ready.status === 'ok' ? 'ok' : 'warn'}>{ready.status === 'ok' ? t('Connections ready', 'เชื่อมต่อบริการได้') : `${t('Connection issue', 'การเชื่อมต่อมีปัญหา')}: ${Object.entries(ready.checks).filter(([, v]) => !v.ok).map(([k]) => k).join(', ')}`}</Badge>}
       />
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-5">
         <Stat label="Queued" value={fmtInt(q?.queued)} tone={q && q.queued > (q.limit ?? 500) * 0.8 ? 'warn' : undefined} hint={q?.oldest_queued_age_s ? `oldest waiting ${Math.round(q.oldest_queued_age_s)} s` : `limit ${fmtInt(q?.limit)}`} />
         <Stat label="Running" value={fmtInt(q?.running)} hint={q ? `${q.backend} backend · ${fmtInt(q.workers)} workers${q.nodes ? ` · ${q.nodes} node` : ''}` : ''} />
         <Stat label="Failed jobs" value={fmtInt(q?.failed)} tone={q?.failed ? 'bad' : undefined} hint="retry re-queues the same job; finished stages are skipped" />
-        <Stat label="LLM spend (7 d)" value={ops ? `$${ops.llm_spend_by_day.reduce((a, d) => a + d.cost_usd, 0).toFixed(2)}` : '–'} hint={ops?.breaker?.open ? 'circuit breaker OPEN — heuristic fallback' : `${fmtInt(ops?.llm_spend_by_day.reduce((a, d) => a + d.calls, 0))} calls`} tone={ops?.breaker?.open ? 'warn' : undefined} />
+        <Stat label={t('Estimated AI cost (7 d)', 'ค่า AI โดยประมาณ (7 วัน)')} value={ops ? `$${ops.llm_spend_by_day.reduce((a, d) => a + d.cost_usd, 0).toFixed(2)}` : '–'} hint={ops?.breaker?.open ? 'circuit breaker OPEN — heuristic fallback' : `${fmtInt(ops?.llm_spend_by_day.reduce((a, d) => a + d.calls, 0))} ${t('usage records · not provider billing', 'รายการที่บันทึก · ไม่ใช่ยอดเรียกเก็บ')}`} tone={ops?.breaker?.open ? 'warn' : undefined} />
         <Stat label="Open reviews" value={fmtInt(ops?.review?.open)} hint={ops?.review?.oldest_age_s ? `oldest waiting ${Math.round(ops.review.oldest_age_s / 3600)} h` : 'queue is empty'} />
       </div>
 
@@ -63,10 +66,11 @@ export function OpsPage() {
         </Section>
 
         <div className="flex flex-col gap-4">
-          <Section title="LLM spend per day">
+          <Section title={t('Estimated AI cost per day', 'ค่า AI โดยประมาณต่อวัน')}>
+            <p className="px-4 pt-4 pb-2 text-[12px] text-muted">{t('Calculated from recorded tokens and rates in FORMA, not a provider invoice. Models without a configured rate use a default estimate. Dates are UTC.', 'คำนวณจาก token ที่บันทึกและอัตราราคาใน FORMA ไม่ได้ดึงยอดใบแจ้งหนี้ โมเดลที่ยังไม่มีราคาใช้ค่าเริ่มต้นในการประมาณ วันที่อิง UTC')}</p>
             {ops?.llm_spend_by_day.length ? (
               <table className="table">
-                <thead><tr><th>Day</th><th className="text-right">Calls</th><th className="text-right">Tokens</th><th className="text-right">USD</th></tr></thead>
+                <thead><tr><th>{t('Day (UTC)', 'วันที่ (UTC)')}</th><th className="text-right">{t('Records', 'รายการ')}</th><th className="text-right">Tokens</th><th className="text-right">{t('Est. USD', 'ประมาณ USD')}</th></tr></thead>
                 <tbody>{ops.llm_spend_by_day.map((d) => <tr key={d.day}><td>{d.day}</td><td className="text-right tnum">{fmtInt(d.calls)}</td><td className="text-right tnum">{fmtInt(d.tokens)}</td><td className="text-right tnum">${d.cost_usd.toFixed(3)}</td></tr>)}</tbody>
               </table>
             ) : <div className="p-6 text-center text-muted">No model calls in the last 7 days.</div>}
@@ -89,7 +93,7 @@ export function OpsPage() {
       <Section title="Slowest rounds (last 200 jobs)" className="mt-4">
         {ops?.slowest_rounds.length ? (
           <table className="table">
-            <thead><tr><th>Customer</th><th>Round</th><th>Job</th><th className="text-right">Profile</th><th className="text-right">Propose</th><th className="text-right">Transform</th><th className="text-right">Total</th></tr></thead>
+            <thead><tr><th><Localized>Customer</Localized></th><th>Round</th><th>Job</th><th className="text-right">Profile</th><th className="text-right">Propose</th><th className="text-right">Transform</th><th className="text-right">Total</th></tr></thead>
             <tbody>
               {ops.slowest_rounds.map((r) => (
                 <tr key={r.job_id} className="row-link" onClick={() => (window.location.href = `/rounds/${r.round_id}`)}>

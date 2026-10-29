@@ -21,6 +21,7 @@ customer (``needs_customer``). Once a file has a customer it is an ordinary roun
 from __future__ import annotations
 
 import datetime as dt
+import hashlib
 import io
 import re
 import zipfile
@@ -53,6 +54,8 @@ def create_batch(
     *,
     label: str | None = None,
     auto_publish: bool = True,
+    work_date: dt.date | None = None,
+    expected_files: int | None = None,
 ) -> Batch:
     if not files:
         raise ValidationFailed("add at least one file")
@@ -60,11 +63,36 @@ def create_batch(
         label=(label or "").strip() or f"Upload {dt.date.today().isoformat()}",
         auto_publish=auto_publish,
         created_by=actor,
+        work_date=work_date,
+        expected_files=expected_files,
     )
     session.add(b)
     session.flush()
+    add_files(ctx, session, b, files, actor)
+    rs.audit(session, "batch.create", "batch", b.id, actor=actor, files=len(files), auto_publish=auto_publish)
+    return b
+
+
+def add_files(
+    ctx: ServiceContext, session: Session, b: Batch, files: list[tuple[str, bytes]], actor: str
+) -> list[str]:
+    """Append immutable files; same filename/content retries within a round are idempotent.
+
+    The caller locks an existing batch before appending to serialize concurrent requests.
+    Different filenames may represent different customers even with identical contents.
+    """
+    if not files:
+        raise ValidationFailed("add at least one file")
+    existing = {(it.file_name, it.sha256) for it in b.items}
+    added: list[str] = []
+    skipped = 0
     for name, data in files:
         name = safe_name(name)
+        digest = hashlib.sha256(data).hexdigest()
+        if (name, digest) in existing:
+            skipped += 1
+            continue
+        existing.add((name, digest))
         try:
             kind = sniff_kind(data, name)  # bytes decide, not the extension (ADR-013)
         except (UnsupportedFile, ValidationFailed) as e:
@@ -72,7 +100,7 @@ def create_batch(
                 BatchItem(
                     batch_id=b.id,
                     file_name=name,
-                    sha256="",
+                    sha256=digest,
                     size=len(data),
                     kind="unknown",
                     storage_key="",
@@ -82,19 +110,21 @@ def create_batch(
             )
             continue
         stored = ctx.files.put_bytes(data, name)
-        session.add(
-            BatchItem(
-                batch_id=b.id,
-                file_name=name,
-                sha256=stored.sha256,
-                size=stored.size,
-                kind=kind,
-                storage_key=stored.key,
-            )
+        item = BatchItem(
+            batch_id=b.id,
+            file_name=name,
+            sha256=stored.sha256,
+            size=stored.size,
+            kind=kind,
+            storage_key=stored.key,
         )
+        session.add(item)
+        session.flush()
+        added.append(item.id)
     session.flush()
-    rs.audit(session, "batch.create", "batch", b.id, actor=actor, files=len(files), auto_publish=auto_publish)
-    return b
+    session.expire(b, ["items"])
+    rs.audit(session, "batch.append", "batch", b.id, actor=actor, files=len(files), skipped=skipped)
+    return added
 
 
 def get_batch(session: Session, batch_id: str) -> Batch:
@@ -395,6 +425,9 @@ def batch_view(session: Session, b: Batch) -> dict[str, Any]:
     return {
         "id": b.id,
         "label": b.label,
+        "work_date": b.work_date.isoformat() if b.work_date else None,
+        "expected_files": b.expected_files,
+        "complete": bool(items) and counts.get("ready", 0) == len(items),
         "auto_publish": b.auto_publish,
         "created_by": b.created_by,
         "created_at": b.created_at.isoformat() if b.created_at else None,
@@ -409,9 +442,27 @@ def batch_view(session: Session, b: Batch) -> dict[str, Any]:
     }
 
 
-def list_batches(session: Session, limit: int = 20) -> list[dict[str, Any]]:
+def list_batches(
+    session: Session,
+    limit: int = 20,
+    offset: int = 0,
+    search: str = "",
+    start: dt.date | None = None,
+    end: dt.date | None = None,
+) -> list[dict[str, Any]]:
     out = []
-    for b in session.scalars(select(Batch).order_by(Batch.created_at.desc()).limit(limit)):
+    if start and end and start > end:
+        raise ValidationFailed("Start date must not be after end date")
+    q = select(Batch)
+    if search.strip():
+        q = q.where(Batch.label.icontains(search.strip(), autoescape=True))
+    if start:
+        q = q.where(Batch.work_date >= start)
+    if end:
+        q = q.where(Batch.work_date <= end)
+    for b in session.scalars(
+        q.order_by(Batch.created_at.desc(), Batch.id.desc()).offset(offset).limit(limit)
+    ):
         v = batch_view(session, b)
         out.append(
             {
@@ -419,6 +470,9 @@ def list_batches(session: Session, limit: int = 20) -> list[dict[str, Any]]:
                 for k in (
                     "id",
                     "label",
+                    "work_date",
+                    "expected_files",
+                    "complete",
                     "auto_publish",
                     "created_by",
                     "created_at",

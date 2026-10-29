@@ -1,0 +1,182 @@
+"""Bounded, deterministic review evidence. No model-generated facts or business decisions."""
+
+from __future__ import annotations
+
+from typing import Any
+
+from sqlalchemy.orm import Session
+
+from forma.core.errors import ValidationFailed
+from forma.db.models import ImportRound, MappingVersion
+from forma.engine.transform import ROW_COL, _get_pointer, _source_columns, load_source_frame
+from forma.mapping_dsl.models import MappingDocument
+from forma.schema_registry import PROVENANCE_KEY
+from forma.services import mapping, sandbox
+from forma.services.context import ServiceContext
+from forma.services.lineage import _expr_columns, _Sources
+
+SAMPLE_LIMIT = 50
+
+
+def overview(ctx: ServiceContext, session: Session, m: MappingVersion) -> dict[str, Any]:
+    r = session.get(ImportRound, m.round_id) if m.round_id else None
+    schema = ctx.registry.get_ref(m.target_schema)
+    policy = m.policy or {}
+    review = policy.get("field_review") or {}
+    changes = []
+    for f in review.get("fields", []):
+        check = f.get("check") or {}
+        if f["status"] == "unchanged" and check.get("verdict") in (None, "same", "no_data"):
+            continue
+        try:
+            spec = schema.field(f["pointer"]).to_dict()
+        except Exception:
+            continue
+        changes.append({**f, "field": spec})
+    changes.sort(
+        key=lambda f: (
+            (f.get("check") or {}).get("verdict") in (None, "same", "no_data"),
+            f.get("risk") not in ("critical", "high"),
+            f["pointer"],
+        )
+    )
+    return {
+        "context": {
+            "customer": {"code": r.customer.code, "name": r.customer.name} if r else None,
+            "round_label": r.label if r else None,
+            "files": [{"id": f.id, "name": f.original_name} for f in r.files] if r else [],
+            "mapping_version": m.version,
+        },
+        "changes": changes,
+        "comparison_dataset_id": review.get("compared_with"),
+        "checks": policy.get("checks") or {},
+        "impact": policy.get("impact"),
+        "fields": [f.to_dict() for f in schema.leaf_fields()],
+    }
+
+
+def evidence(ctx: ServiceContext, session: Session, m: MappingVersion, pointer: str) -> dict[str, Any]:
+    """Read actual mapped outputs and the cells identified by engine provenance, on demand."""
+    doc = MappingDocument.model_validate(m.document)
+    schema = ctx.registry.get_ref(m.target_schema)
+    root = doc.record.root_source
+    options = [(f, root, None) for f in doc.fields] + [
+        (f, c.source, c.target) for c in doc.collections for f in c.fields
+    ]
+    hit = next((entry for entry in options if entry[0].target == pointer), None)
+    if hit is None:
+        raise ValidationFailed("This field is not mapped in this version")
+    fm, default, collection = hit
+    spec = schema.field(pointer)
+    r = session.get(ImportRound, m.round_id) if m.round_id else None
+    if r is None:
+        raise ValidationFailed("This mapping has no source delivery")
+    doc.provenance = True  # preview only; never modify the stored document
+    sim, _problems = mapping.simulate(ctx, doc, schema, r.files, limit=SAMPLE_LIMIT)
+    result: dict[str, Any] = {
+        "field": pointer,
+        "examples": [],
+        "sample_limit": SAMPLE_LIMIT,
+        "sample_records": len(sim.records) if sim else 0,
+        "constant": fm.expr.op == "const",
+        "unavailable": sim is None or not sim.records,
+        "context_only": False,
+    }
+    if sim is None or not sim.records:
+        return result
+    bindings, _ = mapping.bind_sources(doc, r.files, resolve=ctx.storage.local_path)
+    sources = _Sources(doc, bindings)
+    expr = fm.expr.model_dump(mode="json", exclude_none=True)
+    cols = _expr_columns(expr, default)
+    # A constant VAT flag has no source cell. Show price cells as context, never as VAT proof.
+    if not cols and spec.semantic == "price.vat_included":
+        amount = next(
+            (
+                f
+                for f, sid, c in options
+                if sid == default and c == collection and schema.field(f.target).semantic == "price.amount"
+            ),
+            None,
+        )
+        if amount:
+            cols = _expr_columns(amount.expr.model_dump(mode="json", exclude_none=True), default)
+            result["context_only"] = True
+    # Verify that the lineage extractor and engine used the same rows. Header relocation and
+    # filtered sources must not silently point users at unrelated cells.
+    frames = {}
+    for sid, _ in cols:
+        if sid not in frames and sid in bindings:
+            source = next(s for s in doc.sources if s.id == sid)
+            frames[sid] = load_source_frame(
+                source, bindings[sid], limit=SAMPLE_LIMIT, expected_columns=_source_columns(doc, sid)
+            )
+    for rec in sim.records:
+        lin = (rec.get(PROVENANCE_KEY) or {}).get("lineage") or {}
+        joined = lin.get("joined") or {}
+        locations = (
+            list(enumerate((lin.get("items") or {}).get(collection, [])))
+            if collection
+            else [(None, lin.get("root_row"))]
+        )
+        for index, row in locations:
+            rows = {root: lin.get("root_row"), **joined, default: row}
+            actual = pointer.replace("/*/", f"/{index}/", 1) if index is not None else pointer
+            cells = []
+            for sid, name in cols:
+                source_row = rows.get(sid)
+                frame = frames.get(sid)
+                if frame is None or source_row is None:
+                    continue
+                extracted = frame.filter(frame[ROW_COL] == source_row)
+                loc = sources.get(sid)
+                if loc is None or extracted.height != 1:
+                    continue
+                col = sources._column(loc, name)
+                cell = sources.cell(sid, source_row, name)
+                if cell is None or col not in extracted.columns or cell["raw"] != extracted[col][0]:
+                    continue
+                if cell.get("verified") is False:
+                    continue
+                cells.append(cell)
+            result["examples"].append(
+                {
+                    "identity": sandbox._identity(rec, schema),
+                    "item": index,
+                    "value": _get_pointer(rec, actual),
+                    "cells": cells,
+                    "source_complete": len(cells) == len(cols) and bool(cols),
+                }
+            )
+            if len(result["examples"]) >= 5:
+                return result
+    return result
+
+
+def answer_impact(
+    ctx: ServiceContext,
+    session: Session,
+    m: MappingVersion,
+    document: dict[str, Any],
+    answers: dict[str, Any],
+) -> dict[str, Any]:
+    """Compare both versions on the same bounded sample, joined by schema identity."""
+    if m.round_id is None:
+        raise ValidationFailed("This mapping has no source delivery")
+    before = mapping.preview_mapping(ctx, session, m.round_id, m.document, limit=SAMPLE_LIMIT)
+    after = mapping.preview_mapping(ctx, session, m.round_id, document, limit=SAMPLE_LIMIT)
+    counts, detail = sandbox.compare_records(
+        ctx.registry.get_ref(m.target_schema), before.get("records", []), after.get("records", []), cap=50
+    )
+    return {
+        "preview": after,
+        "before": before.get("records", [])[:3],
+        "comparison": {
+            "counts": counts,
+            "rows": detail["changed"],
+            "sample_limit": SAMPLE_LIMIT,
+            "before_records": len(before.get("records", [])),
+            "after_records": len(after.get("records", [])),
+            "reliable": bool(before.get("ok") and after.get("ok")),
+            "confirmed_fields": list(answers),
+        },
+    }

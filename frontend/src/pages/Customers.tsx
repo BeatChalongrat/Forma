@@ -1,9 +1,10 @@
+import { Localized } from '../lib/locale'
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Pencil, Trash2, Upload } from 'lucide-react'
 import { api, type Customer, type ImportRound, type MappingVersion } from '../lib/api'
-import { fmtDate, fmtInt, timeAgo } from '../lib/utils'
+import { formatLabel, fmtDate, fmtInt, timeAgo } from '../lib/utils'
 import { PageHeader, Section, StatusBadge, Badge, Confidence, Empty, KV, Modal } from '../components/ui'
 import { useToast } from '../lib/toast'
 
@@ -59,7 +60,7 @@ export function CustomerPage() {
                   {rounds.map((r) => (
                     <tr key={r.id} className="row-link" onClick={() => (window.location.href = `/rounds/${r.id}`)}>
                       <td>{r.label}</td><td><StatusBadge status={r.status} /></td>
-                      <td>{r.summary.drift ? <Badge tone={['identical', 'header_moved'].includes(r.summary.drift) ? 'ok' : r.summary.drift === 'unrelated_file' ? 'bad' : 'warn'}>{r.summary.drift.replace('_', ' ')}</Badge> : <span className="text-muted">first</span>}</td>
+                      <td>{r.summary.drift ? <Badge tone={['identical', 'header_moved'].includes(r.summary.drift) ? 'ok' : r.summary.drift === 'unrelated_file' ? 'bad' : 'warn'}>{formatLabel(r.summary.drift)}</Badge> : <span className="text-muted">first</span>}</td>
                       <td className="text-right tnum">{fmtInt(r.summary.rows)}</td><td className="text-right text-muted">{fmtDate(r.created_at)}</td>
                     </tr>
                   ))}
@@ -123,7 +124,7 @@ function EditCustomer({ customer, onClose }: { customer: Customer; onClose: () =
   const ids = [...new Set((schemas ?? []).map((s) => s.schema_id))]
   const field = (label: string, el: React.ReactNode) => <label className="flex flex-col gap-1.5"><span className="text-muted">{label}</span>{el}</label>
   return (
-    <Modal open onClose={onClose} title={`Edit ${customer.code}`} width="max-w-lg" footer={<><button className="btn" onClick={onClose}>Cancel</button><button className="btn btn-primary" disabled={save.isPending || !f.code.trim() || !f.name.trim()} onClick={() => save.mutate()}>Save</button></>}>
+    <Modal open onClose={onClose} title={`Edit ${customer.code}`} width="max-w-lg" footer={<><button className="btn" onClick={onClose}><Localized>Cancel</Localized></button><button className="btn btn-primary" disabled={save.isPending || !f.code.trim() || !f.name.trim()} onClick={() => save.mutate()}><Localized>Save</Localized></button></>}>
       <div className="grid grid-cols-2 gap-3 text-[13px]">
         {field('Code', <input className="input" value={f.code} onChange={(e) => setF({ ...f, code: e.target.value })} />)}
         {field('ERP', <input className="input" value={f.erp_type} onChange={(e) => setF({ ...f, erp_type: e.target.value })} placeholder="SAP, Express, Odoo, …" />)}

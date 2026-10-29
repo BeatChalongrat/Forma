@@ -17,6 +17,10 @@
 | 7+ AI resilience | backup AI keys tried in order (own provider, model, breaker), model picker, test every key | **done** | ADR-025 |
 | 7+ Bulk upload | many files at once, customer found by format (and file-name code), one JSON per file, policy-decided automatic publishing, zip of all JSON | **done** | ADR-027 |
 | 7+ Contract gate | records that break the target schema block approval and export; edits refused only for the errors they add | **done** | ADR-026 |
+| 7+ Focused workspace | responsive rail/drawer navigation, on-demand inspection panels, focus-trapped dialogs, aCommerce light + neutral dark theme, quiet header, honest estimated-cost labels | **done** | ADR-028, ADR-031, ADR-032 |
+| 7+ Guided review & assistant | deterministic review questions (answers = new mapping versions), evidence-first file review traced to source cells, personal preferences (language, theme, time zone), workspace assistant with 19 read-only tools + `POST /api/mcp`, provider endpoint + model discovery | **done** | ADR-029, ADR-035 |
+| 7+ Persistent conversations | chats stored in the database (owner + access scope), rename/pin/archive/delete, idempotent retries, cancellable SSE streaming of replies | **done** | ADR-030, ADR-031, ADR-034 |
+| 7+ Work rounds | a bulk upload is a named, dated work round that accepts more files later; receipt dashboard (received / expected / ready) on Home and the round | **done** | ADR-033, ADR-034 |
 
 ## Phase 7 — production hardening (done)
 

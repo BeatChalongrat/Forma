@@ -1,11 +1,13 @@
+import { Localized } from '../lib/locale'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useVirtualizer } from '@tanstack/react-virtual'
-import { Download, Search, Undo2, Sparkles, History, GitCompare, AlertCircle, CheckCircle2, Route, Trash2, ShieldAlert, X } from 'lucide-react'
+import { Download, Search, Undo2, MessageSquare, History, GitCompare, AlertCircle, CheckCircle2, Route, Trash2, ShieldAlert, X, PanelRight } from 'lucide-react'
 import { api, ApiError, type Answer, type AnomalyReport, type FieldSpec, type Operation, type Impact, type RowsPage, type Trace } from '../lib/api'
 import { cn, cellText, fmtInt, fmtNum, getPointer, timeAgo, describeExpr } from '../lib/utils'
 import { Badge, Drawer, HelpStrip, Modal, Spinner, StatusBadge, Tabs, FindingRow } from '../components/ui'
+import { WorkspacePanel } from '../components/WorkspacePanel'
 import { useToast } from '../lib/toast'
 
 const ROW_H = 32
@@ -56,7 +58,10 @@ export function DataEditor() {
   const [drawer, setDrawer] = useState<{ kind: 'record' | 'lineage'; identity: string; pointer?: string } | null>(null)
   const [saveOpen, setSaveOpen] = useState(false)
   const [params] = useSearchParams() // ?tab= opens a panel, ?tool=trace explains tracing (links from the round page, the guide, Ctrl+K)
-  const [rightTab, setRightTab] = useState<EditorTab>(() => (EDITOR_TABS as readonly string[]).includes(params.get('tab') ?? '') ? (params.get('tab') as EditorTab) : 'changes')
+  const [rightTab, setActiveTab] = useState<EditorTab>(() => (EDITOR_TABS as readonly string[]).includes(params.get('tab') ?? '') ? (params.get('tab') as EditorTab) : 'changes')
+  const [rightOpen, setRightOpen] = useState(() => !!params.get('tab'))
+  const [assistantOpen, setAssistantOpen] = useState(false)
+  const setRightTab = (tab: EditorTab) => { setActiveTab(tab); setRightOpen(true) }
   const [traceTip, setTraceTip] = useState(() => params.get('tool') === 'trace')
   const [copilot, setCopilot] = useState('')
   const [answer, setAnswer] = useState<Answer | null>(null)
@@ -90,8 +95,8 @@ export function DataEditor() {
   // keyboard navigation
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (editing || drawer || saveOpen) return
-      if ((e.target as HTMLElement)?.tagName === 'INPUT' || (e.target as HTMLElement)?.tagName === 'TEXTAREA') return
+      if (editing || drawer || saveOpen || document.querySelector('[role="dialog"]')) return
+      if ((e.target as HTMLElement)?.closest('input, textarea, select, button, a, [contenteditable=true]')) return
       if ((e.metaKey || e.ctrlKey) && e.key === 'z') { e.preventDefault(); undo(); return }
       if (!sel) return
       const move = (dr: number, dc: number) => {
@@ -118,8 +123,8 @@ export function DataEditor() {
   // paste a block from Excel / Sheets (tab-separated) starting at the selected cell
   useEffect(() => {
     const onPaste = (e: ClipboardEvent) => {
-      if (editing || drawer || saveOpen || !sel) return
-      if ((e.target as HTMLElement)?.tagName === 'INPUT' || (e.target as HTMLElement)?.tagName === 'TEXTAREA') return
+      if (editing || drawer || saveOpen || !sel || document.querySelector('[role="dialog"]')) return
+      if ((e.target as HTMLElement)?.closest('input, textarea, select, button, a, [contenteditable=true]')) return
       const text = e.clipboardData?.getData('text/plain')
       if (!text) return
       e.preventDefault()
@@ -239,19 +244,22 @@ export function DataEditor() {
   const widths = (f: FieldSpec) => (f.is_collection ? 220 : f.semantic === 'product_name' || f.semantic === 'description' ? 240 : f.json_type.includes('number') ? 110 : 140)
 
   return (
-    <div className="h-screen flex flex-col">
-      <div className="h-14 px-5 border-b border-line bg-surface flex items-center gap-3 shrink-0">
+    <div className="workspace">
+      <div className="workspace-toolbar">
         <Link to={`/rounds/${ds.round_id}`} className="text-muted hover:text-ink text-[12.5px]">← Round</Link>
         <span className="heading">Data Editor</span>
         <span className="tnum text-muted">v{ds.version}</span>
         <StatusBadge status={ds.status} />
         <span className="tnum text-muted text-[12.5px]">{fmtInt(ds.row_count)} rows</span>
         {invalid > 0
-          ? <button onClick={() => setRightTab('findings')} title="These records do not match the target format: approval and export wait until they are fixed or removed"><Badge tone="bad"><AlertCircle size={12} /> {fmtInt(invalid)} record{invalid > 1 ? 's' : ''} break the format</Badge></button>
-          : <Badge tone="ok"><CheckCircle2 size={12} /> schema valid</Badge>}
+          ? <button onClick={() => setRightTab('findings')} title="These records do not match the target format: approval and export wait until they are fixed or removed"><Badge tone="bad"><AlertCircle size={12} /> {fmtInt(invalid)} record{invalid > 1 ? 's' : ''} need correction</Badge></button>
+          : <Badge tone="ok"><CheckCircle2 size={12} /> Format checked</Badge>}
         {errors > 0 && <Badge tone="bad"><AlertCircle size={12} /> {errors} other error{errors > 1 ? 's' : ''}</Badge>}
-        <div className="relative ml-4"><Search size={13} className="absolute left-2.5 top-2.5 text-muted" /><input className="input pl-7 w-72" placeholder="Search any field…" value={q} onChange={(e) => setQ(e.target.value)} /></div>
-        <div className="ml-auto flex items-center gap-2">
+        <div className="relative min-w-0"><Search size={13} className="absolute left-2.5 top-2.5 text-muted" /><input className="input pl-7 w-52 max-w-full" placeholder="Search any field…" value={q} onChange={(e) => setQ(e.target.value)} /></div>
+        <div className="ml-auto flex items-center gap-2 flex-wrap">
+          <button className="btn btn-ghost btn-sm" aria-expanded={assistantOpen} onClick={() => setAssistantOpen(!assistantOpen)}><MessageSquare size={15} /> Assistant</button>
+          <button className="btn btn-ghost btn-sm" aria-expanded={rightOpen} onClick={() => setRightOpen(!rightOpen)}><PanelRight size={15} /> Review{pending.length > 0 ? ` (${pending.length})` : ''}</button>
+
           {pending.length > 0 && <><button className="btn btn-sm" onClick={() => setPending([])}><Undo2 size={13} /> Discard</button><button className="btn btn-sm btn-primary" onClick={() => { preview.mutate(); setSaveOpen(true) }}>Review {pending.length} change{pending.length > 1 ? 's' : ''}</button></>}
           {!pending.length && ds.status === 'draft' && <button className="btn btn-sm" disabled={approve.isPending || invalid > 0} title={invalid ? `Fix or remove the ${invalid} record${invalid > 1 ? 's' : ''} that do not match the target format first` : undefined} onClick={() => approve.mutate({})}><CheckCircle2 size={13} /> Approve data</button>}
           {!pending.length && ds.parent_id && <button className="btn btn-sm" onClick={() => rollback.mutate()} title="New version with the parent's content"><History size={13} /> Roll back</button>}
@@ -259,12 +267,12 @@ export function DataEditor() {
         </div>
       </div>
 
-      {/* copilot bar */}
-      <div className="px-5 py-2 border-b border-line bg-surface-2/60 flex items-center gap-2 shrink-0">
-        <Sparkles size={14} className="text-signal" />
-        <input className="input flex-1 bg-surface" placeholder='Tell the copilot what to change — "ลดราคาหมวด Electronics 5% เฉพาะที่ stock มากกว่า 100 ไม่รวมสินค้าในโปรโมชั่น" — or ask "ทำไม SKU บางรายการ join ไม่สำเร็จ?". Nothing is applied until you review and save.' value={copilot} onChange={(e) => setCopilot(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && submitCopilot()} />
-        <button className="btn btn-sm btn-primary" disabled={!copilot || ask.isPending || question.isPending} onClick={submitCopilot}>{ask.isPending || question.isPending ? <Spinner className="border-t-white" /> : isQuestion(copilot) ? 'Ask' : 'Plan'}</button>
-      </div>
+      {assistantOpen && <div className="px-5 py-3 border-b border-line bg-surface shrink-0">
+        <div className="flex items-center gap-2"><MessageSquare size={16} className="text-muted" />
+          <input aria-label="Ask the assistant" className="input flex-1" placeholder="Ask about this data, or describe a change…" value={copilot} onChange={(e) => setCopilot(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && submitCopilot()} />
+          <button className="btn btn-sm btn-primary" disabled={!copilot.trim() || ask.isPending || question.isPending} onClick={submitCopilot}>{ask.isPending || question.isPending ? <Spinner /> : isQuestion(copilot) ? 'Ask' : 'Preview'}</button>
+        </div><p className="text-[12.5px] text-muted mt-2 ml-6">Try “ลดราคา 5% เฉพาะสินค้าที่มีสต็อก” — you review the changes before saving.</p>
+      </div>}
 
       <div className="px-5 py-2 border-b border-line bg-surface shrink-0 flex flex-col gap-2">
         {traceTip && (
@@ -279,9 +287,9 @@ export function DataEditor() {
         </HelpStrip>
       </div>
 
-      <div className="flex-1 min-h-0 grid grid-cols-[1fr_360px]">
+      <div className="workspace-body">
         {/* grid */}
-        <div className="min-w-0 flex flex-col">
+        <div className="min-w-0 flex-1 flex flex-col">
           {picked.size > 0 && ds.status !== 'published' && (
             <BulkBar count={picked.size} fields={columns.filter((c) => !c.is_collection && !c.system)} pricePointer={pricePointer}
               onSet={(fld, text) => { const v = parseValue(fld, text); if (!v.ok) { toast.push({ kind: 'bad', title: v.error }); return } stageBulk({ kind: 'set_field', target: fld.pointer, value: v.value }, `set ${fld.name} = ${cellText(v.value) || '∅'} on ${picked.size} rows`) }}
@@ -289,7 +297,7 @@ export function DataEditor() {
               onDelete={() => { stageBulk({ kind: 'delete_rows' }, `delete ${picked.size} rows`); setPicked(new Set()) }}
               onClear={() => setPicked(new Set())} />
           )}
-          <div ref={scrollRef} className="flex-1 overflow-auto relative select-none" onMouseDown={() => editing && commitEdit()}>
+          <div ref={scrollRef} className="flex-1 min-h-0 overflow-auto relative select-none" tabIndex={0} aria-label="Data grid. Select a cell, then use arrow keys to navigate and Enter to edit." onMouseDown={() => editing && commitEdit()}>
             <div className="sticky top-0 z-10 flex bg-surface border-b border-line" style={{ width: 56 + 36 + columns.reduce((a, f) => a + widths(f), 0) }}>
               <label className="w-14 shrink-0 px-2 text-[11px] text-muted leading-8 tnum border-r border-line flex items-center gap-1.5" title="Select every row on this page"><input type="checkbox" className="accent-[var(--color-signal)]" checked={allPicked} onChange={() => setPicked((p) => { const n = new Set(p); pageIds.forEach((i) => (allPicked ? n.delete(i) : n.add(i))); return n })} />#</label>
               {columns.map((f) => (
@@ -310,7 +318,7 @@ export function DataEditor() {
                   <div key={vi.key} className={cn('absolute left-0 flex border-b border-line/70 hover:bg-surface-2/50', rowErr && 'bg-bad-soft/40')} style={{ top: vi.start, height: ROW_H, width: 56 + 36 + columns.reduce((a, f) => a + widths(f), 0) }}>
                     <div className={cn('w-14 shrink-0 px-2 text-[11px] text-muted leading-8 tnum border-r border-line/70 flex items-center gap-1.5', picked.has(id) && 'bg-signal-soft')}>
                       <input type="checkbox" className="accent-[var(--color-signal)]" checked={picked.has(id)} onChange={() => setPicked((p) => { const n = new Set(p); if (n.has(id)) n.delete(id); else n.add(id); return n })} />
-                      <span className="cursor-pointer hover:text-signal" onClick={() => setDrawer({ kind: 'record', identity: id })} title="Open record">{offset + vi.index + 1}</span>
+                      <button className="hover:text-signal" onClick={() => setDrawer({ kind: 'record', identity: id })} title="Open record" aria-label={`Open record ${id}`}>{offset + vi.index + 1}</button>
                     </div>
                     {columns.map((f, c) => {
                       const v = getPointer(row, f.pointer)
@@ -322,32 +330,32 @@ export function DataEditor() {
                           onMouseDown={(e) => { e.stopPropagation(); if (editing && !isEd) commitEdit(); if (e.shiftKey && sel) setAnchor((a) => a ?? sel); else setAnchor(null); setSel({ r: vi.index, c }) }} onDoubleClick={() => (f.is_collection ? setDrawer({ kind: 'record', identity: id }) : startEdit(vi.index, c))}>
                           {isEd ? (
                             <input autoFocus className="absolute inset-0 w-full h-full px-2.5 bg-surface text-ink outline-none border-2 border-signal" value={editing.value} onChange={(e) => setEditing({ ...editing, value: e.target.value })} onKeyDown={(e) => { if (e.key === 'Enter') commitEdit(); if (e.key === 'Escape') setEditing(null) }} onMouseDown={(e) => e.stopPropagation()} />
-                          ) : f.is_collection ? <CollectionCell value={v} fields={(page?.columns ?? []).filter((x) => x.in_collection === f.pointer)} /> : (v === null || v === undefined ? <span className="text-muted/60">∅</span> : cellText(v))}
+                          ) : f.is_collection ? <CollectionCell value={v} fields={(page?.columns ?? []).filter((x) => x.in_collection === f.pointer)} /> : (v === null || v === undefined ? <span className="text-muted">∅</span> : cellText(v))}
                         </div>
                       )
                     })}
-                    <button className="w-9 shrink-0 grid place-items-center text-muted hover:text-bad" title="Delete row" onClick={() => setPending((p) => [...p, { kind: 'delete_row', identity: id, label: `delete ${id}` }])}><Trash2 size={12} /></button>
+                    <button className="w-9 shrink-0 grid place-items-center text-muted hover:text-bad" title="Delete row" aria-label={`Delete record ${id}`} disabled={ds.status === 'published'} onClick={() => setPending((p) => [...p, { kind: 'delete_row', identity: id, label: `delete ${id}` }])}><Trash2 size={12} /></button>
                   </div>
                 )
               })}
             </div>
           </div>
-          <div className="h-9 border-t border-line bg-surface flex items-center gap-3 px-4 text-[12px] text-muted shrink-0">
+          <div className="editor-footer text-[12px] text-muted">
             <span className="tnum">{page ? `${fmtInt(offset + 1)}–${fmtInt(Math.min(offset + PAGE, page.total))} of ${fmtInt(page.total)}` : ''}</span>
             <button className="btn btn-ghost btn-sm" disabled={offset === 0} onClick={() => setOffset(Math.max(0, offset - PAGE))}>‹ prev</button>
             <button className="btn btn-ghost btn-sm" disabled={!page || offset + PAGE >= page.total} onClick={() => setOffset(offset + PAGE)}>next ›</button>
             <button className={cn('btn btn-sm', traceTip ? 'btn-outline' : 'btn-ghost')} disabled={!sel} onClick={traceSelected} title={sel ? 'ค่านี้มาจากเซลล์ไหนในไฟล์' : 'คลิกที่เซลล์ก่อน'}><Route size={12} /> Trace this value</button>
-            <span className="ml-auto flex items-center gap-3"><span><span className="kbd">↵</span> edit</span><span><span className="kbd">⇧</span>+click range</span><span><span className="kbd">⌘C</span>/<span className="kbd">⌘V</span> copy · paste</span><span><span className="kbd">Del</span> clear</span><span><span className="kbd">T</span> trace</span><span><span className="kbd">⌘Z</span> undo</span></span>
+            <span className="editor-shortcuts ml-auto flex items-center gap-3"><span><span className="kbd">↵</span> edit</span><span><span className="kbd">⇧</span>+click range</span><span><span className="kbd">Ctrl C</span>/<span className="kbd">Ctrl V</span> copy · paste</span><span><span className="kbd">Del</span> clear</span><span><span className="kbd">T</span> trace</span><span><span className="kbd">Ctrl Z</span> undo</span></span>
           </div>
         </div>
 
         {/* right rail */}
-        <aside className="border-l border-line bg-surface flex flex-col min-h-0">
-          <Tabs value={rightTab} onChange={setRightTab} items={[{ id: 'changes', label: 'Pending', count: pending.length, hint: 'การแก้ที่ยังไม่บันทึก' }, { id: 'diff', hint: 'เทียบกับรอบก่อน และของที่ดูผิดปกติ', label: <span className="flex items-center gap-1">Changes &amp; anomalies{ack && <ShieldAlert size={12} className="text-bad" />}</span> }, { id: 'copilot', label: 'Copilot', hint: 'คำตอบจาก Copilot' }, { id: 'findings', label: 'Problems', count: ds.findings.length, hint: 'record ที่ไม่ตรง format และปัญหาอื่น' }, { id: 'versions', label: 'Versions', count: ds.history?.length, hint: 'ทุกเวอร์ชัน ย้อนกลับได้' }]} />
+        <WorkspacePanel open={rightOpen} onClose={() => setRightOpen(false)} title="Review data">
+          <Tabs menu value={rightTab} onChange={setRightTab} items={[{ id: 'changes', label: 'Unsaved', count: pending.length, hint: 'การแก้ที่ยังไม่บันทึก' }, { id: 'diff', labelText: 'Changes & anomalies', hint: 'เทียบกับรอบก่อน และของที่ดูผิดปกติ', label: <span className="flex items-center gap-1">Changes &amp; anomalies{ack && <ShieldAlert size={12} className="text-bad" />}</span> }, { id: 'copilot', label: 'Assistant', hint: 'คำตอบจาก Copilot' }, { id: 'findings', label: 'Problems', count: ds.findings.length, hint: 'record ที่ไม่ตรง format และปัญหาอื่น' }, { id: 'versions', label: 'Versions', count: ds.history?.length, hint: 'ทุกเวอร์ชัน ย้อนกลับได้' }]} />
           <div className="flex-1 overflow-auto p-3 text-[12.5px]">
             {rightTab === 'changes' && (pending.length ? (
-              <ul className="flex flex-col gap-1">{pending.map((p, i) => <li key={i} className="flex items-start gap-2 py-1 border-b border-line/70"><Badge tone={p.kind.startsWith('delete') ? 'bad' : 'signal'} className="h-5 px-1.5 text-[11px] shrink-0">{p.kind.replace('_', ' ')}</Badge><span className="flex-1 break-words">{p.label}</span><button className="text-muted hover:text-bad" onClick={() => setPending((xs) => xs.filter((_, j) => j !== i))}>×</button></li>)}</ul>
-            ) : <div className="text-muted leading-relaxed">Edit cells directly (double-click or <span className="kbd">↵</span>), delete rows, or ask the copilot. Changes stay here until you review their impact and save them as a new version — nothing is overwritten.</div>)}
+              <ul className="flex flex-col gap-1">{pending.map((p, i) => <li key={i} className="flex items-start gap-2 py-1 border-b border-line/70"><Badge tone={p.kind.startsWith('delete') ? 'bad' : 'signal'} className="min-h-6 px-1.5 text-[12px] shrink-0">{p.kind.replace('_', ' ')}</Badge><span className="flex-1 break-words">{p.label}</span><button className="text-muted hover:text-bad" onClick={() => setPending((xs) => xs.filter((_, j) => j !== i))}>×</button></li>)}</ul>
+            ) : ds.status === 'published' ? <div className="text-muted leading-relaxed">This exported version is read-only. Use Versions to inspect its history, or open a record to trace where its values came from.</div> : <div className="text-muted leading-relaxed">Edit cells directly (double-click or <span className="kbd">↵</span>), delete rows, or ask the copilot. Changes stay here until you review their impact and save them as a new version — nothing is overwritten.</div>)}
             {rightTab === 'findings' && invalid > 0 && (
               <div className="card p-3 mb-2 border-bad/40 leading-relaxed">
                 <div className="font-medium text-bad">{fmtInt(invalid)} record{invalid > 1 ? 's do' : ' does'} not match the target format</div>
@@ -371,7 +379,7 @@ export function DataEditor() {
               </ul>
             )}
           </div>
-        </aside>
+        </WorkspacePanel>
       </div>
 
       <RecordDrawer open={drawer?.kind === 'record'} identity={drawer?.identity ?? ''} rows={rows} identityOf={identityOf} columns={page?.columns ?? []} onClose={() => setDrawer(null)} onLineage={() => setDrawer({ kind: 'lineage', identity: drawer!.identity })} onEdit={(target, value, label) => setPending((p) => [...p, { kind: 'set_item', identity: drawer!.identity, target, value, label }])} />
@@ -404,7 +412,7 @@ function setPointerLocal(obj: Record<string, unknown>, pointer: string, value: u
 const SUMMARY_SEMANTICS = ['price.list_name', 'stock.warehouse', 'promo.type', 'price.amount', 'stock.qty', 'discount.percent', 'discount.amount', 'promo.price', 'price.vat_included', 'promo.end_date']
 
 function CollectionCell({ value, fields }: { value: unknown; fields: FieldSpec[] }) {
-  if (!Array.isArray(value) || !value.length) return <span className="text-muted/60">∅</span>
+  if (!Array.isArray(value) || !value.length) return <span className="text-muted">∅</span>
   const items = value as Record<string, unknown>[]
   const name = (f: FieldSpec) => f.pointer.split('/').pop() ?? ''
   const shown = SUMMARY_SEMANTICS.map((s) => fields.find((f) => f.semantic === s)).filter((f): f is FieldSpec => !!f)
@@ -441,7 +449,7 @@ function SaveFooter({ pending, valid, onCancel, onSave }: { pending: boolean; va
         <option value="persistent">Persistent override (re-apply on every future import)</option>
       </select>
       <input className="input flex-1" placeholder="Note for the audit log (optional)" value={note} onChange={(e) => setNote(e.target.value)} />
-      <button className="btn" onClick={onCancel}>Cancel</button>
+      <button className="btn" onClick={onCancel}><Localized>Cancel</Localized></button>
       <button className="btn btn-primary" disabled={pending || !valid} onClick={() => onSave(kind, note)}>{pending ? <Spinner className="border-t-white" /> : 'Save as new version'}</button>
     </div>
   )
@@ -485,7 +493,7 @@ function AnomalyView({ an, onTrace }: { an: AnomalyReport; onTrace: (identity: s
         <div><div className="font-medium mb-1">Check first</div>
           <ul className="flex flex-col">{an.items.slice(0, 40).map((a, i) => (
             <li key={i} className="flex items-start gap-2 py-1 border-b border-line/60 cursor-pointer hover:bg-surface-2" onClick={() => a.identity && onTrace(a.identity, a.kind)} title="Trace this record">
-              <Badge tone={SEVERITY_TONE[a.severity]} className="h-5 px-1.5 text-[10.5px] shrink-0">{a.severity}</Badge><span className="mono shrink-0">{a.identity}</span><span className="text-ink-2">{a.message}</span>
+              <Badge tone={SEVERITY_TONE[a.severity]} className="min-h-6 px-1.5 text-[12px] shrink-0">{a.severity}</Badge><span className="mono shrink-0">{a.identity}</span><span className="text-ink-2">{a.message}</span>
             </li>))}</ul>
           {an.items.length > 40 && <div className="text-muted text-[12px] mt-1">+{an.items.length - 40} more</div>}
         </div>
@@ -566,7 +574,7 @@ function RecordDrawer({ open, identity, rows, identityOf, columns, onClose, onLi
 
 function EditableCell({ value, field, onCommit }: { value: unknown; field: FieldSpec; onCommit: (v: unknown) => void }) {
   const [ed, setEd] = useState<string | null>(null)
-  if (ed === null) return <span className="cursor-text hover:bg-signal-soft rounded px-1 -mx-1" onDoubleClick={() => setEd(value === null || value === undefined ? '' : typeof value === 'object' ? JSON.stringify(value) : String(value))}>{cellText(value) || <span className="text-muted/60">∅</span>}</span>
+  if (ed === null) return <span className="cursor-text hover:bg-signal-soft rounded px-1 -mx-1" onDoubleClick={() => setEd(value === null || value === undefined ? '' : typeof value === 'object' ? JSON.stringify(value) : String(value))}>{cellText(value) || <span className="text-muted">∅</span>}</span>
   const commit = () => {
     let v: unknown = ed.trim()
     if (v === '') v = null
@@ -633,7 +641,7 @@ function FocusView({ f, mappingVersion }: { f: NonNullable<Trace['focus']>; mapp
     <div className="card p-3">
       <div className="font-medium mono mb-1">{f.pointer}</div>
       <Step title="Source">{f.cells.length ? f.cells.map((c, i) => (
-        <div key={i}><span className="mono">{c.file} · {c.sheet ?? c.source} · row {c.row ?? '?'} · column {c.column ?? '?'}</span> <span className="text-muted">({c.header})</span> = <span className="mono">"{cellText(c.raw)}"</span> {c.verified === true && <Badge tone="ok" className="h-5 text-[10.5px]">read back from the file</Badge>}{c.verified === false && <Badge tone="warn" className="h-5 text-[10.5px]">position approximate</Badge>}</div>
+        <div key={i}><span className="mono">{c.file} · {c.sheet ?? c.source} · row {c.row ?? '?'} · column {c.column ?? '?'}</span> <span className="text-muted">({c.header})</span> = <span className="mono">"{cellText(c.raw)}"</span> {c.verified === true && <Badge tone="ok" className="min-h-6 text-[12px]">read back from the file</Badge>}{c.verified === false && <Badge tone="warn" className="min-h-6 text-[12px]">position approximate</Badge>}</div>
       )) : <span className="text-muted">no source cell — a constant or a default</span>}</Step>
       <Step title={`Mapping v${mappingVersion}`}><span className="mono">{f.expr ? describeExpr(f.expr) : '–'}</span> → <b>{cellText(f.mapped) || '∅'}</b></Step>
       {(f.edits.length > 0 || f.overrides.length > 0) && <Step title="Manual changes">

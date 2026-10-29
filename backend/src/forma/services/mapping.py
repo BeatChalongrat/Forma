@@ -588,6 +588,7 @@ def save_mapping_edit(
     actor: str,
     *,
     simulate_rows: int | None = 3000,
+    remaining_questions: list[Any] | None = None,
 ) -> MappingVersion:
     """A human edited the DSL in the Mapping Studio → new proposed version (never mutate in place)."""
     parent = get_mapping(session, mapping_id)
@@ -648,7 +649,7 @@ def save_mapping_edit(
             "sandbox": sandbox_report,
         },
         agent_log=[{"agent": "human", "actor": actor, "parent": parent.id}],
-        open_questions=[],
+        open_questions=remaining_questions or [],
         validation=rep.to_dict(),
         parent_id=parent.id,
     )
@@ -669,7 +670,12 @@ def save_mapping_edit(
             kind="mapping",
             priority=decision.priority,
             reasons=["edited by " + actor, *decision.reasons],
-            details={"decision": decision.decision, **_risk(decision), "findings": findings[:50]},
+            details={
+                "decision": decision.decision,
+                **_risk(decision),
+                "findings": findings[:50],
+                "open_questions": remaining_questions or [],
+            },
         )
     )
     audit(session, "mapping.edit", "mapping", mv.id, actor=actor, parent=parent.id)

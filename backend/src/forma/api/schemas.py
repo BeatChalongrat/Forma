@@ -120,6 +120,14 @@ class DefaultFormatIn(BaseModel):
 class ConnectAIIn(BaseModel):
     api_key: str
     provider: str | None = None  # only when the key's prefix does not tell (gateways)
+    model: str | None = Field(default=None, max_length=200)
+    base_url: str | None = Field(default=None, max_length=2000)
+
+
+class DiscoverModelsIn(BaseModel):
+    provider: str
+    api_key: str | None = Field(default=None, max_length=4096)
+    base_url: str | None = Field(default=None, max_length=2000)
 
 
 class BackupKeyIn(BaseModel):

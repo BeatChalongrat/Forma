@@ -7,7 +7,21 @@ from __future__ import annotations
 import datetime as dt
 from typing import Any
 
-from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, Index, Integer, String, Text, TypeDecorator
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    Date,
+    DateTime,
+    Float,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+    TypeDecorator,
+    UniqueConstraint,
+    false,
+)
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.engine.interfaces import Dialect
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
@@ -107,6 +121,8 @@ class Batch(Base):
     __tablename__ = "batches"
     id: Mapped[str] = mapped_column(String(40), primary_key=True, default=lambda: new_id("bch"))
     label: Mapped[str | None] = mapped_column(String(255))
+    work_date: Mapped[dt.date | None] = mapped_column(Date, index=True)
+    expected_files: Mapped[int | None] = mapped_column(Integer)
     auto_publish: Mapped[bool] = mapped_column(Boolean, default=True)
     created_by: Mapped[str] = mapped_column(String(128))
     created_at: Mapped[dt.datetime] = mapped_column(UTCDateTime, default=utcnow)
@@ -342,3 +358,42 @@ class StoredSchema(Base):
     document: Mapped[dict[str, Any]] = mapped_column(JSONType)
     created_by: Mapped[str] = mapped_column(String(128), default="system")
     created_at: Mapped[dt.datetime] = mapped_column(UTCDateTime, default=utcnow)
+
+
+class AssistantConversation(Base):
+    __tablename__ = "assistant_conversations"
+    id: Mapped[str] = mapped_column(String(40), primary_key=True, default=lambda: new_id("chat"))
+    owner_key: Mapped[str] = mapped_column(String(64))
+    access_key: Mapped[str] = mapped_column(String(64))
+    title: Mapped[str] = mapped_column(String(160))
+    round_id: Mapped[str | None] = mapped_column(String(40))
+    dataset_id: Mapped[str | None] = mapped_column(String(40))
+    archived: Mapped[bool] = mapped_column(Boolean, default=False)
+    pinned: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
+    legacy_key: Mapped[str | None] = mapped_column(String(64))
+    active_run: Mapped[str | None] = mapped_column(String(40))
+    busy_until: Mapped[dt.datetime | None] = mapped_column(UTCDateTime)
+    created_at: Mapped[dt.datetime] = mapped_column(UTCDateTime, default=utcnow)
+    updated_at: Mapped[dt.datetime] = mapped_column(UTCDateTime, default=utcnow)
+    __table_args__ = (
+        Index("ix_assistant_owner_access_updated", "owner_key", "access_key", "updated_at"),
+        UniqueConstraint("owner_key", "access_key", "legacy_key", name="uq_assistant_legacy"),
+    )
+
+
+class AssistantTurn(Base):
+    __tablename__ = "assistant_turns"
+    id: Mapped[str] = mapped_column(String(40), primary_key=True, default=lambda: new_id("turn"))
+    conversation_id: Mapped[str] = mapped_column(ForeignKey("assistant_conversations.id"), index=True)
+    request_id: Mapped[str] = mapped_column(String(64))
+    sequence: Mapped[int] = mapped_column(Integer)
+    question: Mapped[str] = mapped_column(Text)
+    answer: Mapped[str] = mapped_column(Text, default="")
+    reply: Mapped[dict[str, Any] | None] = mapped_column(JSONType)
+    status: Mapped[str] = mapped_column(String(20), default="pending")
+    created_at: Mapped[dt.datetime] = mapped_column(UTCDateTime, default=utcnow)
+    completed_at: Mapped[dt.datetime | None] = mapped_column(UTCDateTime)
+    __table_args__ = (
+        UniqueConstraint("conversation_id", "request_id", name="uq_assistant_request"),
+        UniqueConstraint("conversation_id", "sequence", name="uq_assistant_sequence"),
+    )

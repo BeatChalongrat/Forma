@@ -15,6 +15,7 @@ from forma import __version__
 from forma.api.batch_routes import router as batch_router
 from forma.api.config_routes import router as config_router
 from forma.api.routes import api
+from forma.api.workspace_routes import router as workspace_router
 from forma.auth import ensure_auth_is_safe
 from forma.core import metrics, telemetry
 from forma.core.errors import FormaError
@@ -118,6 +119,7 @@ def create_app() -> FastAPI:
     app.include_router(api)
     app.include_router(config_router)
     app.include_router(batch_router)
+    app.include_router(workspace_router)
     return app
 
 
