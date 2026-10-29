@@ -106,6 +106,13 @@ new round ─▶ fingerprint ─▶ compare with approved ─▶ identical? ─�
 Approved mappings are keyed by `(customer, fingerprint)`; the memory also provides few-shot examples
 from other customers whose headers overlap (header Jaccard ≥ 0.3) to the mapping agent.
 
+**Learning from corrections (ADR-038).** Every approval is diffed against the version FORMA proposed: a field
+re-pointed to another column becomes a column alias for that customer, a confirmed constant becomes a
+convention, an approval as proposed is recorded too (`corrections` table). The heuristic draft reads them
+before it guesses (a taught header wins, with evidence saying so), the agents get them as data, and an alias
+three customers taught independently is suggested as a synonym for everyone — promoted by an admin, never
+automatically. Settings › *What FORMA learned* shows corrections per approval by month.
+
 ## Target formats and runtime settings (ADR-017)
 
 The mapper, change report, copilot and editor find fields by `x-forma.semantic`, never by name, so a new

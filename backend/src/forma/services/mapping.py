@@ -258,6 +258,7 @@ def propose_for_round(
     agent_log: list[dict[str, Any]] = []
     open_questions: list[str] = []
     llm_fallback = False
+    learning_note: dict[str, Any] | None = None
     file_fps = {f.id: f.fingerprint for f in r.files if f.fingerprint}
 
     # 1) Mapping memory: identical structure → reuse the approved mapping verbatim
@@ -272,8 +273,13 @@ def propose_for_round(
         agent_log.append({"agent": "memory", "result": "reuse", "previous": previous.id, "drift": drift})
         source_kind = "memory"
     else:
-        # 2) deterministic draft
-        draft: HeuristicProposal = propose_mapping(profile, schema, customer_id=r.customer_id)
+        # 2) deterministic draft, reading what this customer's operators taught FORMA before (ADR-038)
+        from forma.services import learning
+
+        learned = learning.learned_for(session, r.customer_id, schema)
+        draft: HeuristicProposal = propose_mapping(
+            profile, schema, customer_id=r.customer_id, learned=None if learned.empty else learned
+        )
         open_questions.extend(draft.open_questions)
         agent_log.append(
             {
@@ -283,6 +289,11 @@ def propose_for_round(
                 "unmatched": draft.unmatched_columns,
             }
         )
+        if not learned.empty:
+            used = _learned_pointers(draft.mapping)
+            learning.count_uses(session, learned, used)
+            learning_note = {**learned.summary(), "used": sorted(used)}
+            agent_log.append({"agent": "learning", **learning_note})
         doc = draft.mapping
         source_kind = "heuristic"
         # 3) AI refinement
@@ -291,7 +302,15 @@ def propose_for_round(
                 if previous is not None and drift not in (None, "unrelated_file"):
                     prev_doc = MappingDocument.model_validate(previous.document)
                     drift_detail = next((f.drift for f in r.files if f.drift), {"classification": drift})
-                    doc, res = adaptation_agent(ctx.llm, prev_doc, schema, profile, drift_detail or {}, draft)
+                    doc, res = adaptation_agent(
+                        ctx.llm,
+                        prev_doc,
+                        schema,
+                        profile,
+                        drift_detail or {},
+                        draft,
+                        learned=None if learned.empty else learned.for_prompt(),
+                    )
                     source_kind = "ai_adaptation"
                 else:
                     sa = schema_agent(ctx.llm, profile, schema)
@@ -299,7 +318,13 @@ def propose_for_round(
                     agent_log.append(sa.to_dict())
                     examples = _examples(session, r.customer_id, profile)
                     doc, res = mapping_agent(
-                        ctx.llm, profile, schema, draft, schema_analysis=sa.data, examples=examples
+                        ctx.llm,
+                        profile,
+                        schema,
+                        draft,
+                        schema_analysis=sa.data,
+                        examples=examples,
+                        learned=None if learned.empty else learned.for_prompt(),
                     )
                     source_kind = "ai"
                 _record_llm(session, r.id, res)
@@ -394,6 +419,7 @@ def propose_for_round(
             "sample": (sim.records[:5] if sim else []),
             "sandbox": sandbox_report,
             "field_review": review,
+            "learning": learning_note,
         },
         agent_log=agent_log,
         open_questions=open_questions,
@@ -452,6 +478,15 @@ def propose_for_round(
         source=source_kind,
     )
     return mv
+
+
+def _learned_pointers(doc: MappingDocument) -> set[str]:
+    """Targets whose field mapping carries learned evidence (ADR-038)."""
+    return {
+        f.target
+        for f in [*doc.fields, *(x for c in doc.collections for x in c.fields)]
+        if any("learned:" in e for e in f.evidence)
+    }
 
 
 def _bound_file_id(s: SourceSpec, files: list[SourceFile]) -> str:
@@ -558,7 +593,22 @@ def approve_mapping(
         r = session.get(ImportRound, m.round_id)
         if r:
             r.status = "approved"
-    audit(session, "mapping.approve", "mapping", m.id, actor=actor, comment=comment, override_block=blocked)
+    from forma.services import learning
+
+    taught = learning.record_from_approval(session, m, actor)  # what this approval teaches FORMA (ADR-038)
+    audit(
+        session,
+        "mapping.approve",
+        "mapping",
+        m.id,
+        actor=actor,
+        comment=comment,
+        override_block=blocked,
+        learned={
+            "corrections": sum(1 for t in taught if t.kind != "accepted"),
+            "accepted": any(t.kind == "accepted" for t in taught),
+        },
+    )
     return m
 
 

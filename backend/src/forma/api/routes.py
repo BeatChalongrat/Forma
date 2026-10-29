@@ -1113,6 +1113,20 @@ def get_policy(
     return ctx.policy.policy
 
 
+def _learning_brief(session: Session) -> dict[str, Any]:
+    """Home's 'learned from you' figures (ADR-038)."""
+    from forma.services import learning
+
+    s = learning.stats(session, months=2)
+    latest = s["series"][-1] if s["series"] else None
+    return {
+        "aliases": s["aliases"] + s["promoted"],
+        "constants": s["constants"],
+        "uses": s["uses"],
+        "corrections_per_approval": latest["corrections_per_approval"] if latest else None,
+    }
+
+
 @api.get("/dashboard")
 def dashboard(
     session: Session = Depends(get_session),
@@ -1198,6 +1212,7 @@ def dashboard(
             ser.import_round(r, files=False, customer_obj=cmap.get(r.customer_id)) for r in recent
         ],
         "automation_rate": round(auto / total_mv, 3) if total_mv else None,
+        "learning": _learning_brief(session),
     }
 
 

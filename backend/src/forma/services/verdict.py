@@ -317,6 +317,16 @@ def for_mapping(
         )
     if llm_fallback:
         ev("ai", "AI was unavailable; the deterministic draft is in use", "AI ใช้งานไม่ได้ ใช้ร่างจากกฎแทน", None)
+    learned = policy.get("learning") or {}
+    if learned.get("used"):
+        n = len(learned["used"])
+        ev(
+            "learned",
+            f"{n} fields mapped from what you taught FORMA before",
+            f"{n} ฟิลด์จับคู่จากสิ่งที่คุณเคยสอน FORMA ไว้",
+            f"{studio}?tab=fields",
+            used=learned["used"],
+        )
     if questions:
         ev(
             "questions",

@@ -241,6 +241,7 @@ def mapping_agent(
     *,
     schema_analysis: dict[str, Any] | None = None,
     examples: list[dict[str, Any]] | None = None,
+    learned: dict[str, Any] | None = None,
 ) -> tuple[MappingDocument, AgentResult]:
     system = (
         SYSTEM_BASE.format(ops=_ops_list())
@@ -259,6 +260,9 @@ def mapping_agent(
         payload["schema_analysis"] = schema_analysis
     if examples:
         payload["approved_examples_from_similar_files"] = examples[:3]
+    if learned:
+        # decisions this customer's operators made before (ADR-038): keep them unless the file contradicts them
+        payload["what_the_operator_taught_before"] = learned
     user = json.dumps(payload, ensure_ascii=False)
 
     def _validate(d: dict[str, Any]) -> list[str]:
@@ -381,6 +385,8 @@ def adaptation_agent(
     profile: WorkbookProfile,
     drift: dict[str, Any],
     draft: HeuristicProposal,
+    *,
+    learned: dict[str, Any] | None = None,
 ) -> tuple[MappingDocument, AgentResult]:
     system = (
         SYSTEM_BASE.format(ops=_ops_list())
@@ -395,6 +401,8 @@ def adaptation_agent(
         "fresh_heuristic_draft": draft.mapping.model_dump(mode="json", exclude_none=True),
         "target_fields": _field_catalogue(schema),
     }
+    if learned:
+        payload["what_the_operator_taught_before"] = learned
     user = json.dumps(payload, ensure_ascii=False)
 
     def _validate(d: dict[str, Any]) -> list[str]:
