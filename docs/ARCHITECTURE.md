@@ -95,6 +95,10 @@ ImportRound: uploaded ─▶ profiled ─▶ ┬─ auto_approved ─▶ transfo
    customer code in the file name confirms or names it; disagreement waits for a person), becomes a one-file
    round, and — when the policy's publish checks all pass — is approved and exported as JSON without a
    person; one JSON per file, all of them in one zip (ADR-027).
+10b. **Foresight** (ADR-039) — from each customer's round history: the expected next delivery (median
+   cadence, due / overdue with a grace of a quarter cycle), a watchlist (layout drifted or a person needed in
+   two of the last three rounds, or the last file blocked), and per-customer price-move baselines proposed
+   through calibration from acknowledged rounds. Read-only, recomputed on each call, on Home and Customers.
 11. **Export** — JSON (nested), JSONL, or CSV flattened per the schema's `output_variants`; atomic write;
    artifact recorded with sha256. Exporting publishes, so only an approved (or already published) dataset
    can be exported; a draft is refused with 409.

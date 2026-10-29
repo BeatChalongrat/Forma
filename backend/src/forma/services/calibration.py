@@ -308,6 +308,73 @@ def proposals(session: Session, policy: dict[str, Any], *, months: int = 6) -> l
                 evidence=[r["mapping_id"] for r in fine][:10],
             )
         )
+    out.extend(anomaly_proposals(session, policy))
+    return out
+
+
+def anomaly_proposals(session: Session, policy: dict[str, Any]) -> list[dict[str, Any]]:
+    """Customers whose price jumps were acknowledged and approved in two or more rounds: raise their own
+    threshold to the observed 90th percentile plus five points (ADR-039), never the global one."""
+    acknowledged = {
+        a.entity_id
+        for a in session.scalars(select(AuditLog).where(AuditLog.action == "dataset.approve"))
+        if (a.details or {}).get("acknowledged_anomalies")
+    }
+    if not acknowledged:
+        return []
+    rounds_of = {
+        dv.id: dv.round_id
+        for dv in session.scalars(select(DatasetVersion).where(DatasetVersion.id.in_(sorted(acknowledged))))
+    }
+    rounds = {
+        r.id: r
+        for r in session.scalars(select(ImportRound).where(ImportRound.id.in_(set(rounds_of.values()))))
+    }
+    per_customer: dict[str, list[tuple[str, list[float]]]] = defaultdict(list)
+    for dv_id, rid in rounds_of.items():
+        r = rounds.get(rid)
+        summ = (r.summary or {}).get("anomaly_summary") if r else None
+        if not r or not summ or summ.get("dataset_id") != dv_id or not summ.get("price_jump_pcts"):
+            continue
+        per_customer[r.customer_id].append((r.id, [float(x) for x in summ["price_jump_pcts"]]))
+    out: list[dict[str, Any]] = []
+    global_thr = float(policy.get("anomaly", {}).get("max_price_change_pct", 30))
+    customers = {
+        c.id: c for c in session.scalars(select(Customer).where(Customer.id.in_(list(per_customer))))
+    }
+    for cid, rows in per_customer.items():
+        c = customers.get(cid)
+        if c is None or len(rows) < 2:
+            continue
+        pcts = sorted(x for _, xs in rows for x in xs)
+        p90 = pcts[min(len(pcts) - 1, int(len(pcts) * 0.9))]
+        current = float(
+            ((c.policy_overrides or {}).get("anomaly") or {}).get("max_price_change_pct") or global_thr
+        )
+        value = float(min(80, int(p90) + 5))
+        if value <= current:
+            continue
+        out.append(
+            _proposal(
+                f"price_move:{cid}",
+                scope="customer",
+                customer_id=cid,
+                customer_code=c.code,
+                path="anomaly.max_price_change_pct",
+                value=value,
+                current=current,
+                title=(
+                    f"Treat price moves up to {value:.0f}% as normal for {c.code}",
+                    f"ถือว่าราคาของ {c.code} ขยับได้ถึง {value:.0f}% เป็นเรื่องปกติ",
+                ),
+                why=(
+                    f"in {len(rows)} rounds a person acknowledged price jumps (90th percentile {p90:.0f}%) and approved the data",
+                    f"ใน {len(rows)} รอบ คนรับทราบราคาที่กระโดด (เปอร์เซ็นไทล์ที่ 90 = {p90:.0f}%) แล้วอนุมัติข้อมูล",
+                ),
+                saves=len(rows),
+                evidence=[rid for rid, _ in rows][:10],
+            )
+        )
     return out
 
 
