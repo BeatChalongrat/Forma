@@ -14,8 +14,8 @@ from forma.db.models import Customer, DatasetVersion, ImportRound, MappingVersio
 
 def navigation_choices(
     session: Session, p: Principal, name: str, args: dict[str, Any], data: dict[str, Any], language: str
-) -> list[dict[str, str]]:
-    choices: dict[str, dict[str, str]] = {}
+) -> list[dict[str, Any]]:
+    choices: dict[str, dict[str, Any]] = {}
 
     def add(url: str, en: str, th: str, detail: str = "") -> None:
         choices[url] = {
@@ -23,6 +23,48 @@ def navigation_choices(
             "url": url,
             "label": th if language == "th" else en,
             "detail": detail[:160],
+        }
+
+    def add_act(r: ImportRound) -> None:
+        """A one-click acceptance of the round's verdict (ADR-036) the person confirms in the UI (ADR-040).
+        Only when the verdict needs no decision; the digest ties the action to exactly this evidence."""
+        v = (r.summary or {}).get("verdict") or {}
+        if v.get("outcome") != "accept" or v.get("must_decide") or not v.get("digest"):
+            return
+        if not p.has_role("reviewer"):
+            return
+        key = f"act:verdict.accept:{r.id}:{v['digest']}"
+        stage = v.get("stage")
+        preview = [
+            {
+                "en": f"Approve the {'field matching' if stage == 'mapping' else 'data'} of this file as FORMA proposed",
+                "th": f"อนุมัติ{'การจับคู่คอลัมน์' if stage == 'mapping' else 'ข้อมูล'}ของไฟล์นี้ตามที่ FORMA เสนอ",
+            },
+            {
+                "en": "Recorded in the audit log with the rules that fired: "
+                + ", ".join(v.get("rules_fired") or []),
+                "th": "บันทึกใน audit log พร้อมกฎที่ใช้ตัดสิน: " + ", ".join(v.get("rules_fired") or []),
+            },
+            {
+                "en": "The policy still decides; a changed file makes this action stale",
+                "th": "นโยบายยังเป็นผู้ตัดสิน ถ้าไฟล์เปลี่ยนไปแล้ว คำสั่งนี้จะใช้ไม่ได้",
+            },
+        ]
+        if stage == "data":
+            preview.append(
+                {
+                    "en": "Exported as JSON when the round publishes automatically",
+                    "th": "ออก JSON ให้เองถ้ารอบนี้ตั้งค่าให้ publish อัตโนมัติ",
+                }
+            )
+        conclusion = (v.get("conclusion") or {}).get("th" if language == "th" else "en", "")
+        choices[key] = {
+            "id": sha256(key.encode()).hexdigest()[:16],
+            "url": "",
+            "kind": "act",
+            "label": "ยอมรับคำตัดสินของ FORMA" if language == "th" else "Accept FORMA's verdict",
+            "detail": str(conclusion)[:160],
+            "act": {"type": "verdict.accept", "round_id": r.id, "digest": v["digest"], "preview": preview},
         }
 
     def round_choices(rid: str | None, *, review: bool = False, status: str = "open") -> None:
@@ -40,6 +82,7 @@ def navigation_choices(
                 detail,
             )
         add("/rounds/" + quote(r.id, safe=""), "Open this file", "เปิดไฟล์นี้", detail)
+        add_act(r)
 
     def dataset_choices(did: str | None, *, findings: bool = False) -> None:
         d = session.get(DatasetVersion, did) if did else None

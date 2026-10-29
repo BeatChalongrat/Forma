@@ -71,6 +71,8 @@ ImportRound: uploaded ─▶ profiled ─▶ ┬─ auto_approved ─▶ transfo
    (a field whose rule is unchanged but whose values differ is a data change, not a mapping change). The
    policy decision is unchanged; `POST /rounds/{id}/verdict/accept` acts through the ordinary approval
    paths and records the rules that fired. Stored on the round's summary; recomputed when the rules move on.
+   The round page carries the full card (ADR-040); the assistant may propose the same acceptance as a
+   server-built action a person confirms in the UI — the model picks an id, never a URL or a payload.
 6c. **Calibration** (ADR-037) — each decided mapping version gets an outcome from what a person did next
    (accepted unchanged, corrected, rejected; auto then edited or rolled back). Precision per verdict rule and
    per decision kind is reported, and consistent outcomes become proposals an admin applies through the

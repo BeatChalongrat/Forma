@@ -384,7 +384,10 @@ def ask(
         "Each evidence item has server-generated navigation actions. When recommending a next step, return "
         "1 to 3 relevant action IDs in actions, ordered by usefulness, and cite their evidence IDs. "
         "Prefer an action for the specific file over a generic page. Never invent action IDs or URLs. "
-        "Buttons only navigate; they never save or approve. Use actions: [] if no next step is relevant. "
+        "Navigation buttons only navigate. An action whose kind is 'act' performs FORMA's verdict for a file "
+        "(approve as proposed) only after the user reads a preview and confirms in the UI; propose it when the "
+        "user asks to approve, accept or finish a file whose verdict says accept, and say that confirmation is needed. "
+        "Use actions: [] if no next step is relevant. "
         'Return JSON, e.g. {"answer":"","citations":[],"calls":[{"name":"review_queue","arguments":{}}]} '
         'to retrieve data, or {"answer":"Your evidence-based answer","citations":[1],"calls":[]} to finish. '
         f"Current local date/time: {datetime.now(ZoneInfo(timezone)).isoformat()} ({timezone}). "

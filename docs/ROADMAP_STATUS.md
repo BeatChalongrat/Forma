@@ -24,6 +24,7 @@
 | 8 Learning from corrections | every approval is diffed against FORMA's proposal: column aliases and confirmed constants per customer, accepted-as-proposed records; the mapper and the AI agents read them first with evidence; aliases three customers taught are suggested for everyone (admin promotes); corrections per approval shown by month | **phase 1 done** | ADR-038 |
 | 8 Policy calibration | every decision gets an outcome (accepted unchanged / corrected / rejected / auto then edited); precision per verdict rule and per decision kind; proposals with evidence (trust the data check, lower a confidence bar, a customer's row-count tolerance) applied by an admin through the settings service; per-customer policy overrides | **phase 1 done** | ADR-037 |
 | 8 Proactive intelligence | expected deliveries from each customer's cadence (due / overdue with the reason), a watchlist of customers likely to need a check, per-customer price-move baselines proposed from acknowledged rounds | **phase 1 done** | ADR-039 |
+| 8 Case page & assistant actions | the round page carries the full verdict card with its one-click accept for both stages; the assistant proposes a server-built `verdict.accept` action (round + digest) that a person confirms in the UI through the ordinary endpoint | **phase 1 done** | ADR-040 |
 | 7+ Work rounds | a bulk upload is a named, dated work round that accepts more files later; receipt dashboard (received / expected / ready) on Home and the round | **done** | ADR-033, ADR-034 |
 
 ## Phase 7 — production hardening (done)
