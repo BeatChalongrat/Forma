@@ -130,7 +130,7 @@ rollout, backup/restore), the admin **Ops** page, `/metrics` for Prometheus.
 | `forma profile <file>` | sheets, tables, columns, types, fingerprint of one file |
 | `forma propose <file> [--llm]` | propose a mapping YAML for a file |
 | `forma transform <file> <mapping.yaml> --fmt csv` | run a mapping, write output |
-| `forma eval [--baseline data/eval_baseline.json]` | accuracy of mapper + engine vs corpus ground truth (CI gate) |
+| `forma eval [--baseline data/eval_baseline.json]` | accuracy of mapper + engine vs corpus ground truth (CI gate); `--llm` scores the AI-refined mapping, `--replay` replays corrections, `--index` indexes `data/real/` (ADR-041) |
 | `forma bench --files 300 --rows 100000` | end-to-end throughput benchmark (`docs/PERFORMANCE.md`) |
 | `forma worker` | run a job worker (`FORMA_JOB_BACKEND=arq` needs Redis) |
 | `forma db upgrade / revision -m "…" / current` | Alembic migrations |

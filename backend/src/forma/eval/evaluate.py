@@ -16,11 +16,13 @@ from pathlib import Path
 from typing import Any
 
 from forma.ai.heuristics import propose_mapping
+from forma.ai.llm import LLMClient
 from forma.engine.transform import BoundSource, TransformEngine, _get_pointer
 from forma.fingerprint.fingerprint import compare, fingerprint_profile
 from forma.mapping_dsl.validate import validate_mapping
 from forma.profiling.profile import WorkbookProfile, merge_profiles, profile_workbook
 from forma.schema_registry import SchemaRegistry, TargetSchema
+from forma.services.learning import Learned
 
 COMPARE_POINTERS = [
     "/sku",
@@ -76,7 +78,15 @@ def _eq(a: Any, b: Any) -> bool:
     return bool(a == b)
 
 
-def evaluate_variant(vdir: Path, schema: TargetSchema) -> dict[str, Any]:
+def evaluate_variant(
+    vdir: Path,
+    schema: TargetSchema,
+    *,
+    llm: LLMClient | None = None,
+    learned: Learned | None = None,
+) -> dict[str, Any]:
+    """Score one variant. ``llm`` scores the AI-refined mapping instead of the heuristic draft (the draft is
+    still the fallback when the model fails); ``learned`` replays corrections (ADR-038) into the draft."""
     manifest = json.loads((vdir / "manifest.json").read_text(encoding="utf-8"))
     expected = [
         json.loads(line)
@@ -96,7 +106,7 @@ def evaluate_variant(vdir: Path, schema: TargetSchema) -> dict[str, Any]:
         "tables": len(profile.tables),
     }
     try:
-        prop = propose_mapping(profile, schema, customer_id=manifest["customer_code"])
+        prop = propose_mapping(profile, schema, customer_id=manifest["customer_code"], learned=learned)
     except Exception as e:
         result.update(
             {
@@ -107,7 +117,20 @@ def evaluate_variant(vdir: Path, schema: TargetSchema) -> dict[str, Any]:
             }
         )
         return result
-    rep = validate_mapping(prop.mapping, schema)
+    mapping = prop.mapping
+    result["mode"] = "heuristic"
+    if llm is not None:
+        from forma.ai.agents import mapping_agent
+
+        mapping, agent = mapping_agent(llm, profile, schema, prop)
+        result["mode"] = "heuristic" if any(n.startswith("llm_failed") for n in agent.notes) else "llm"
+        result["llm"] = {"usage": agent.usage.to_dict(), "attempts": agent.attempts, "notes": agent.notes}
+    if learned is not None:
+        every = [*mapping.fields, *(f for c in mapping.collections for f in c.fields)]
+        result["learned_used"] = {
+            f.target: any("learned:" in e for e in f.evidence) for f in every if f.target in learned.aliases
+        }
+    rep = validate_mapping(mapping, schema)
     result["mapping_valid"] = rep.ok
     result["mapping_confidence"] = prop.confidence
     result["open_questions"] = prop.open_questions
@@ -125,12 +148,12 @@ def evaluate_variant(vdir: Path, schema: TargetSchema) -> dict[str, Any]:
     by_name = {f.name: f for f in files}
     import re
 
-    for s in prop.mapping.sources:
+    for s in mapping.sources:
         target = None
         if s.file.name_pattern:
             target = next((f for n, f in by_name.items() if re.search(s.file.name_pattern, n)), None)
         bindings[s.id] = BoundSource(target or files[0])
-    res = TransformEngine(schema).run(prop.mapping, bindings)
+    res = TransformEngine(schema).run(mapping, bindings)
     result["engine"] = res.summary()
     result["errors"] = [f.message for f in res.findings if f.severity == "error"][:10]
 
@@ -220,11 +243,11 @@ def compare_to_baseline(
     return drops
 
 
-def evaluate_corpus(corpus: Path) -> dict[str, Any]:
+def evaluate_corpus(corpus: Path, *, llm: LLMClient | None = None) -> dict[str, Any]:
     reg = SchemaRegistry(_schema_dir(corpus))
     schema = reg.get("product")
     index = json.loads((corpus / "index.json").read_text(encoding="utf-8"))
-    results = [evaluate_variant(corpus / m["variant_id"], schema) for m in index["variants"]]
+    results = [evaluate_variant(corpus / m["variant_id"], schema, llm=llm) for m in index["variants"]]
 
     # drift classification on sequences
     drift_results = []
@@ -268,6 +291,8 @@ def evaluate_corpus(corpus: Path) -> dict[str, Any]:
         "drift_checks": len(drift_results),
         "drift_correct": sum(1 for d in drift_results if d["ok"]),
         "by_archetype": _by_arch(results),
+        "mode": "llm" if llm is not None else "heuristic",
+        "llm_fallbacks": sum(1 for r in results if llm is not None and r.get("mode") == "heuristic"),
     }
     return {"summary": summary, "variants": results, "drift": drift_results}
 
@@ -287,3 +312,36 @@ def _schema_dir(corpus: Path) -> Path:
 
     s = get_settings()
     return s.resolve(s.target_schema_dir)
+
+
+def build_index(corpus: Path, *, seed: int | None = None) -> dict[str, Any]:
+    """Write ``index.json`` for a folder of hand-made variants (real customer files, ADR-041).
+
+    Each sub-folder holds ``files/`` and ``expected_output.jsonl``; a ``manifest.json`` is written when
+    missing (variant_id = folder name, customer_code = the part before the first ``_`` or the folder name,
+    archetype ``real``). Folders without expected output are skipped and listed."""
+    variants: list[dict[str, Any]] = []
+    skipped: list[str] = []
+    for d in sorted(p for p in corpus.iterdir() if p.is_dir() and not p.name.startswith(".")):
+        files_dir = d / "files"
+        if not (d / "expected_output.jsonl").exists() or not files_dir.is_dir():
+            skipped.append(d.name)
+            continue
+        mpath = d / "manifest.json"
+        manifest = json.loads(mpath.read_text(encoding="utf-8")) if mpath.exists() else {}
+        manifest = {
+            "variant_id": d.name,
+            "customer_code": d.name.split("_", 1)[0],
+            "archetype": "real",
+            "perturbations": [],
+            "round_no": 0,
+            "sequence": None,
+            "expected_relation": None,
+            **manifest,
+            "files": sorted(f.name for f in files_dir.iterdir() if f.is_file()),
+        }
+        mpath.write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
+        variants.append(manifest)
+    index = {"seed": seed, "scale": "real", "variants": variants, "skipped": skipped}
+    (corpus / "index.json").write_text(json.dumps(index, ensure_ascii=False, indent=2), encoding="utf-8")
+    return index
