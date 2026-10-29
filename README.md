@@ -63,7 +63,8 @@ shows the demo rounds (including the returning-customer sequences C900–C902 th
 and **Upload files** takes any number of files at once: each is matched to its customer by format and comes
 out as its own JSON, published automatically when every check passes (ADR-027). Every round page shows its five steps
 (files → mapping → create data → check & approve → export) with the next action; **Feature guide** and
-**Ctrl K** find any feature by name, in English or Thai. **Review** turns each uncertain field into a question answered from evidence traced to the source cell (ADR-035),
+**Ctrl K** find any feature by name, in English or Thai. **Review** opens with FORMA's verdict — one sentence, a confidence, the decisions only a person can make, and a
+one-click accept when the evidence is clear (ADR-036) — and turns each uncertain field into a question answered from evidence traced to the source cell (ADR-035),
 and the **Assistant** answers questions about files, customers and features from live, read-only tools — also exposed to
 external clients at `POST /api/mcp` (ADR-029); conversations are kept in the database (ADR-030). The UI follows the aCommerce brand (Montserrat,
 navy/blue/lime), bundled so it works offline.

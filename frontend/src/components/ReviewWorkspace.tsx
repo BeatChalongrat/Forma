@@ -5,6 +5,7 @@ import { ArrowLeft, ArrowRight, Check, CircleHelp, FileText, MessageCircleMore, 
 import { api, type AnswerPreview, type Expr, type FieldSpec, type ReviewQuestions } from '../lib/api'
 import { usePreferences } from '../lib/preferences'
 import { Badge, Spinner } from './ui'
+import { VerdictCard } from './VerdictCard'
 
 type T = (en: string, th: string) => string
 type Question = ReviewQuestions['questions'][number]
@@ -36,6 +37,11 @@ function rule(expr: Expr, t: T): string {
 export function ReviewWorkspace({ id, onSaved, onDone }: { id: string; onSaved: (id: string) => void; onDone: () => void }) {
   const { prefs, t } = usePreferences(), th = prefs.language === 'th', qc = useQueryClient()
   const query = useQuery({ queryKey: ['questions', id], queryFn: () => api.reviewQuestions(id) })
+  const verdictQuery = useQuery({ queryKey: ['verdict', query.data?.round_id], queryFn: () => api.verdict(query.data!.round_id), enabled: !!query.data?.round_id })
+  const accepting = useMutation({
+    mutationFn: (decisions: Record<string, boolean | number | string | null>) => api.acceptVerdict(query.data!.round_id, { digest: verdictQuery.data!.verdict!.digest, decisions }),
+    onSuccess: (res) => { void qc.invalidateQueries(); if (res.did === 'apply_answers' && res.mapping_id) onSaved(res.mapping_id); else onDone() },
+  })
   const { data: me } = useQuery({ queryKey: ['me'], queryFn: api.me })
   const [selected, setSelectedState] = useState<string | null>(null)
   const content = useRef<HTMLElement>(null)
@@ -47,7 +53,7 @@ export function ReviewWorkspace({ id, onSaved, onDone }: { id: string; onSaved: 
   const previewing = useMutation({ mutationFn: () => api.previewAnswers(id, answers), onSuccess: p => { setPreview(p); setSelected('finish') } })
   const saving = useMutation({ mutationFn: () => api.applyAnswers(id, answers, preview!.digest), onSuccess: m => { void qc.invalidateQueries(); onSaved(m.id) } })
   const approve = useMutation({ mutationFn: () => api.approveMapping(id, { actor: 'operator', comment }), onSuccess: () => { void qc.invalidateQueries(); onDone() } })
-  const q = query.data, busy = saving.isPending || previewing.isPending || approve.isPending
+  const q = query.data, busy = saving.isPending || previewing.isPending || approve.isPending || accepting.isPending
   if (query.isPending) return <div className="p-8 flex gap-3"><Spinner />{t('Loading file evidence…', 'กำลังโหลดข้อมูลสำหรับตรวจไฟล์…')}</div>
   if (!q) return <div role="alert" className="p-6 space-y-3"><p>{t('Could not load this review.', 'โหลดข้อมูลการตรวจไม่ได้')}</p><button className="btn" onClick={() => void query.refetch()}>{t('Retry', 'ลองใหม่')}</button><button className="btn" onClick={onDone}>{t('Back', 'กลับ')}</button></div>
   const editable = !!me?.effective_roles.includes('reviewer') && q.status === 'proposed'
@@ -64,6 +70,9 @@ export function ReviewWorkspace({ id, onSaved, onDone }: { id: string; onSaved: 
       <Link className="btn btn-sm" to={`/assistant?round=${q.round_id}`}><MessageCircleMore size={16} />{t('Explain this file', 'ให้ผู้ช่วยอธิบายไฟล์นี้')}</Link>
     </header>
     <div className="flex flex-wrap gap-2">{q.context.files.map(f => <Link key={f.id} className="btn btn-sm max-w-full text-left" to={`/rounds/${q.round_id}`}><FileText size={14} className="shrink-0" /><span className="break-all">{f.name}</span></Link>)}</div>
+    {verdictQuery.data?.verdict && verdictQuery.data.verdict.stage === 'mapping' && verdictQuery.data.verdict.subject.id === q.mapping_id
+      ? <VerdictCard v={verdictQuery.data.verdict} editable={editable} busy={busy} onAccept={(d) => accepting.mutate(d)} onOpenDecision={(fid) => { if (q.questions.some(x => x.id === fid)) setSelected(fid) }} error={accepting.error?.message} />
+      : verdictQuery.isPending && <div className="card p-4 flex gap-2 items-center text-sm text-muted"><Spinner />{t('Weighing the evidence…', 'กำลังชั่งน้ำหนักหลักฐาน…')}</div>}
     {!editable && <p className="bg-surface-2 border border-line rounded-xl p-3 text-sm">{t('Read-only: this version is already reviewed, or your role cannot change it.', 'ดูข้อมูลได้อย่างเดียว: เวอร์ชันนี้ตรวจไปแล้ว หรือสิทธิ์ของคุณไม่สามารถแก้ไขได้')}</p>}
     <div className="grid lg:grid-cols-[250px_minmax(0,1fr)] gap-5 items-start">
       <nav aria-label={t('Review sections', 'หัวข้อที่ต้องตรวจ')} className="card p-2 space-y-1 lg:sticky lg:top-20 min-w-0">
@@ -76,8 +85,8 @@ export function ReviewWorkspace({ id, onSaved, onDone }: { id: string; onSaved: 
       </nav>
       <main ref={content} className="min-w-0 space-y-4 scroll-mt-20">
         {current === 'issues' && <>
-          <ImportantIssues q={q} t={t} th={th} />
-          <div className="flex justify-end"><button className="btn btn-primary" onClick={() => setSelected(q.questions[0]?.id || 'finish')}>{t('Go to questions', 'ไปตอบคำถาม')}<ArrowRight size={15} /></button></div>
+          <details className="card" open={!verdictQuery.data?.verdict}><summary className="px-4 py-3 text-sm font-medium cursor-pointer">{t(`All fields and checks (${q.changes.length})`, `ทุกฟิลด์และผลตรวจ (${q.changes.length})`)}</summary><div className="border-t border-line"><ImportantIssues q={q} t={t} th={th} /></div></details>
+          <div className="flex justify-end"><button className="btn" onClick={() => setSelected(q.questions[0]?.id || 'finish')}>{t('Go to questions', 'ไปตอบคำถาม')}<ArrowRight size={15} /></button></div>
         </>}
         {item && <section className="card p-4 sm:p-6 space-y-5">
           <div><p className="text-xs text-muted mb-2">{t('Question', 'คำถาม')} {q.questions.indexOf(item) + 1}/{q.questions.length}</p><h2 className="text-xl font-semibold text-navy">{title(item, t, th)}</h2></div>

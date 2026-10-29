@@ -89,6 +89,14 @@ DEFAULT_POLICY: dict[str, Any] = {
         "max_high_anomalies": 0,  # more high-severity anomalies than this → a person checks the data
         "max_error_findings": 0,  # engine errors (duplicate identities, broken joins) → a person checks
     },
+    # The verdict layer (ADR-036): one conclusion per file, from the stored reports.
+    "verdict": {
+        "min_pairs": 3,  # identity-matched SKUs before data checks may carry a conclusion
+        "different_share": 0.8,  # share of checked important fields that no longer match → wrong file
+        "min_group": 5,  # anomalies of one kind before they become one conclusion
+        "max_must_decide": 3,  # decisions shown on the card; the rest are counted
+        "narrative": "on_open",  # on_open | never — when a model may narrate a verdict
+    },
 }
 
 
@@ -164,6 +172,16 @@ def validate_policy(policy: dict[str, Any]) -> list[str]:
     for sem, risk in p["risk_overrides"].items():
         if risk not in RISK_ORDER:
             problems.append(f"risk_overrides.{sem} must be one of {list(RISK_ORDER)}")
+    for k, v in p["verdict"].items():
+        if k not in DEFAULT_POLICY["verdict"]:
+            problems.append(f"verdict.{k} is not a known setting")
+        elif k == "narrative":
+            if v not in ("on_open", "never"):
+                problems.append("verdict.narrative must be on_open or never")
+        elif k == "different_share":
+            number("verdict.different_share", v, 0, 1)
+        elif isinstance(v, bool) or not isinstance(v, int) or v < 1:
+            problems.append(f"verdict.{k} must be a whole number ≥ 1")
     return problems
 
 

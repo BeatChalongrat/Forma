@@ -74,6 +74,9 @@ def auto_publish(ctx: ServiceContext, session: Session, round_id: str) -> dict[s
         art = ds.export_dataset(ctx, session, dv.id, FORMAT, ACTOR)
         result["export_id"] = art.id
     r.summary = {**(r.summary or {}), "publish": result}
+    from forma.services import verdict_flow
+
+    verdict_flow.attach_to_dataset(ctx, session, dv, r, anomalies=anomalies, publish=result)  # ADR-036
     audit(
         session,
         "round.publish_decision",

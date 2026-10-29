@@ -10,6 +10,7 @@ import { nextStep } from '../lib/steps'
 import { usePreferences } from '../lib/preferences'
 import { Workflow, workflowStep } from '../components/Workflow'
 import { PageHeader, Stat, Section, Empty, Badge, Spinner } from '../components/ui'
+import { VerdictLine } from '../components/VerdictCard'
 
 export function Overview() {
   const { t } = usePreferences()
@@ -38,7 +39,7 @@ export function Overview() {
       {waiting.slice(0, 6).map((r) => {
         const step = nextStep(r)
         return <Link key={r.id} to={target(r)} className="flex flex-wrap items-center gap-3 px-5 py-4 border-b border-line last:border-0 hover:bg-surface-2">
-          <span className="flex-1 min-w-[180px]"><span className="block font-medium break-words">{r.customer?.name ?? r.customer?.code} <span className="font-normal text-muted">· {r.label}</span></span><span className="block text-[13px] text-muted mt-1">{t(step.action || 'Processing', step.th)}</span></span>
+          <span className="flex-1 min-w-[180px]"><span className="block font-medium break-words">{r.customer?.name ?? r.customer?.code} <span className="font-normal text-muted">· {r.label}</span></span><span className="block text-[13px] text-muted mt-1">{r.summary.verdict ? <VerdictLine v={r.summary.verdict} /> : t(step.action || 'Processing', step.th)}</span></span>
           <Badge tone={step.tone === 'problem' ? 'bad' : 'warn'}>{step.tone === 'problem' ? t('Action required', 'ต้องตรวจสอบ') : t('Ready for review', 'รอคุณตรวจ')}</Badge>
           <span className="btn btn-sm">{t(step.action || "Open", "ตรวจรายการนี้")} <ArrowRight size={14} /></span>
         </Link>
@@ -72,7 +73,7 @@ export function NextStepCell({ r }: { r: ImportRound }): ReactNode {
   return (
     <span className="flex items-center gap-2 min-w-[160px]">
       <Badge tone={tone} className="whitespace-nowrap shrink-0">{r.status === 'published' ? t('Done', 'เสร็จแล้ว') : `${workflowStep(r.status)}/3`}</Badge>
-      <span className="leading-tight"><span className="block text-[12.5px] font-semibold text-ink">{t(s.action ?? (s.tone === 'done' ? 'Downloaded' : 'Working…'), s.th || 'กำลังดำเนินการ')}</span></span>
+      <span className="leading-tight min-w-0"><span className="block text-[12.5px] font-semibold text-ink">{t(s.action ?? (s.tone === 'done' ? 'Downloaded' : 'Working…'), s.th || 'กำลังดำเนินการ')}</span>{r.summary.verdict && s.tone !== 'done' && <span className="block text-[12px] text-muted max-w-[360px]"><VerdictLine v={r.summary.verdict} /></span>}</span>
     </span>
   )
 }

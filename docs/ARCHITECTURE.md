@@ -64,6 +64,13 @@ ImportRound: uploaded ─▶ profiled ─▶ ┬─ auto_approved ─▶ transfo
    the factors and the records changed vs the approved mapping — ADR-019). A sandbox comparison that loses records or adds errors/invalid prices blocks; changed prices go to review. A `block` is not an ordinary review:
    approving it is an explicit override (`override_block`, approver role, mandatory reason, audited), and a
    Studio edit keeps the round's drift, so it cannot clear a wrong-file block.
+6b. **Verdict** (ADR-036) — from the stored reports of a mapping version (and later of a dataset version) a
+   deterministic rule set states one conclusion per file (`wrong_customer`, `rename_only`, `vat_shift`,
+   `first_time`, `contract_broken`, `price_move`, …) with an outcome from a closed set, a confidence word,
+   the one to three decisions only a person can make, the evidence behind it and what was folded away
+   (a field whose rule is unchanged but whose values differ is a data change, not a mapping change). The
+   policy decision is unchanged; `POST /rounds/{id}/verdict/accept` acts through the ordinary approval
+   paths and records the rules that fired. Stored on the round's summary; recomputed when the rules move on.
 7. **Transform** — full run with the approved mapping; persistent overrides for the customer are
    re-applied; records are validated against the schema (the count of records that break it is kept on the
    version, ADR-026); a `DatasetVersion` (JSONL on disk) is created.
