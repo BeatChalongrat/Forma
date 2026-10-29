@@ -75,7 +75,8 @@ out as its own JSON, published automatically when every check passes (ADR-027). 
 **Ctrl K** find any feature by name, in English or Thai. **Review** opens with FORMA's verdict — one sentence, a confidence, the decisions only a person can make, and a
 one-click accept when the evidence is clear (ADR-036) — and turns each uncertain field into a question answered from evidence traced to the source cell (ADR-035),
 and the **Assistant** answers questions about files, customers and features from live, read-only tools — also exposed to
-external clients at `POST /api/mcp` (ADR-029); conversations are kept in the database (ADR-030). The UI follows the aCommerce brand (Montserrat,
+external clients at `POST /api/mcp` (ADR-029); conversations are kept in the database (ADR-030). Ask it to accept a
+file's verdict and it proposes the action; you confirm, the policy decides, the audit log records it (ADR-040). The UI follows the aCommerce brand (Montserrat,
 navy/blue/lime), bundled so it works offline.
 
 ### Enable the AI agents (optional)

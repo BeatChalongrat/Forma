@@ -106,3 +106,48 @@ def test_model_cannot_invent_destination(client: TestClient, action_id: str) -> 
     reply = client.post("/api/assistant/ask", json={"question": "help"}).json()
     assert not reply["ai"]
     assert not reply.get("actions")
+
+
+def test_a_verdict_that_needs_no_decision_becomes_a_confirmable_action(
+    client: TestClient, isolated_env: Path
+) -> None:
+    """ADR-040: the assistant proposes a server-built act (round + digest); a person confirms it in the UI."""
+    from forma.db.models import ImportRound
+
+    r = delivery(client, isolated_env)
+    reviewer = Principal("rev", frozenset({"reviewer"}))
+    with session_scope() as s:
+        row = s.get(ImportRound, r["id"])
+        assert row
+        v = dict((row.summary or {}).get("verdict") or {})
+        # the demo delivery asks questions: no act
+        assert v.get("must_decide")
+        assert not any(
+            a.get("kind") == "act"
+            for a in navigation_choices(s, reviewer, "inspect_import", {}, {"id": r["id"]}, "en")
+        )
+        row.summary = {
+            **row.summary,
+            "verdict": {**v, "outcome": "accept", "must_decide": [], "digest": "abc12345"},
+        }
+    with session_scope() as s:
+        acts = [
+            a
+            for a in navigation_choices(s, reviewer, "inspect_import", {}, {"id": r["id"]}, "th")
+            if a.get("kind") == "act"
+        ]
+        assert len(acts) == 1
+        act = acts[0]
+        assert act["url"] == "" and act["label"] == "ยอมรับคำตัดสินของ FORMA"
+        assert act["act"] == {
+            "type": "verdict.accept",
+            "round_id": r["id"],
+            "digest": "abc12345",
+            "preview": act["act"]["preview"],
+        }
+        assert len(act["act"]["preview"]) >= 3
+        importer = Principal("imp", frozenset({"importer"}))
+        assert not any(
+            a.get("kind") == "act"
+            for a in navigation_choices(s, importer, "inspect_import", {}, {"id": r["id"]}, "th")
+        )

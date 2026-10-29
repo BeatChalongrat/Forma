@@ -3,12 +3,19 @@ import { Download, ArrowRight } from 'lucide-react'
 import type { ImportRound } from '../lib/api'
 import { usePreferences } from '../lib/preferences'
 import { Workflow } from './Workflow'
-import { VerdictLine } from './VerdictCard'
+import { VerdictCard } from './VerdictCard'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { api } from '../lib/api'
 
 type Props = { r: ImportRound; busy: boolean; onRun: (kind: 'run' | 'propose' | 'transform') => void; onExport: (datasetId: string, fmt: string) => void }
 
 export function RoundSteps({ r, busy, onRun, onExport }: Props) {
-  const { t } = usePreferences()
+  const { t } = usePreferences(), qc = useQueryClient()
+  const { data: me } = useQuery({ queryKey: ['me'], queryFn: api.me })
+  const verdictQuery = useQuery({ queryKey: ['verdict', r.id], queryFn: () => api.verdict(r.id), refetchInterval: ['uploaded', 'profiled', 'approved', 'auto_approved', 'approved_data'].includes(r.status) ? 5000 : false })
+  const accepting = useMutation({ mutationFn: (decisions: Record<string, boolean | number | string | null>) => api.acceptVerdict(r.id, { digest: verdictQuery.data!.verdict!.digest, decisions }), onSuccess: () => { void qc.invalidateQueries() } })
+  const verdict = verdictQuery.data?.verdict ?? null
+  const canAct = !!me?.effective_roles.includes('reviewer') && !['published', 'approved_data'].includes(r.status)
   const mapping = r.mappings?.[0]
   const dataset = r.datasets?.[0]
   const ready = ['approved_data', 'published'].includes(r.status) && dataset && ['approved', 'published'].includes(dataset.status)
@@ -22,8 +29,9 @@ export function RoundSteps({ r, busy, onRun, onExport }: Props) {
             : t('Some fields need your confirmation. Answer the questions, preview the result, then approve when correct.', 'มีข้อมูลบางจุดที่ต้องให้คุณยืนยัน ตอบคำถาม ดูตัวอย่างผลลัพธ์ แล้วจึงอนุมัติเมื่อถูกต้อง')
   return <div className="mb-6">
     <Workflow status={r.status} />
+    {verdict && !ready && <div className="mb-4"><VerdictCard v={verdict} editable={canAct} busy={busy || accepting.isPending} onAccept={(d) => accepting.mutate(d)} error={accepting.error?.message} /></div>}
     <div className="card p-5">
-      <div className="flex flex-wrap items-center gap-4"><div className="flex-1 min-w-[200px]"><h2 className="font-semibold text-navy">{t('What happens next', 'ขั้นตอนต่อไป')}</h2>{r.summary.verdict && !ready && <p className="text-sm font-medium text-navy mt-2 leading-6"><VerdictLine v={r.summary.verdict} /></p>}<p className="text-sm text-ink-2 mt-2 leading-6">{explanation}</p></div>
+      <div className="flex flex-wrap items-center gap-4"><div className="flex-1 min-w-[200px]"><h2 className="font-semibold text-navy">{t('What happens next', 'ขั้นตอนต่อไป')}</h2><p className="text-sm text-ink-2 mt-2 leading-6">{explanation}</p></div>
         <div className="flex flex-wrap gap-2">
           {ready && dataset ? <>{['json', 'jsonl', 'csv'].map(fmt => <button key={fmt} className={fmt === 'json' ? 'btn btn-primary' : 'btn'} disabled={busy} onClick={() => onExport(dataset.id, fmt)}><Download size={15} />{fmt === 'json' ? t('Download JSON', 'ดาวน์โหลด JSON') : fmt.toUpperCase()}</button>)}</>
             : matched ? <button className="btn btn-primary" disabled={busy} onClick={() => onRun('transform')}>{t('Create & check results', 'สร้างและตรวจผลลัพธ์')} <ArrowRight size={15} /></button>
