@@ -242,17 +242,14 @@ def test_process_backend_runs_in_child_process(isolated_env: Path, monkeypatch: 
         assert runner.get_backend().name == "process"
         rids = [_round_with_file(c, isolated_env, code=f"P{i}") for i in range(2)]
         b = c.post("/api/rounds/batch-run", json={"round_ids": rids}).json()
-        st = _wait(
-            lambda: (
-                {**c.get(f"/api/jobs/batch/{b['batch_id']}").json(), "status": "x"}
-                | {
-                    "status": "done"
-                    if c.get(f"/api/jobs/batch/{b['batch_id']}").json()["done"]
-                    else "running"
-                }
-            ),
-            timeout=300,
-        )
+
+        def batch_status() -> dict[str, Any]:
+            # A worker may finish between requests. The completion flag and
+            # counts must come from the same snapshot.
+            snapshot = c.get(f"/api/jobs/batch/{b['batch_id']}").json()
+            return {**snapshot, "status": "done" if snapshot["done"] else "running"}
+
+        st = _wait(batch_status, timeout=300)
         assert st["by_status"].get("done") == 2, st
         workers = {c.get(f"/api/jobs/{jid}").json()["worker"] for jid in b["job_ids"]}
         import os

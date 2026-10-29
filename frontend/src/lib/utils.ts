@@ -64,8 +64,8 @@ export function describeExpr(e: { op: string; name?: string; value?: unknown; ar
   return `${e.op}(${args})${p}`
 }
 export const STATUS_LABEL: Record<string, string> = {
-  uploaded: 'Uploaded', profiled: 'Profiled', review: 'Needs review', auto_approved: 'Auto-approved', approved: 'Mapping approved', transformed: 'Transformed',
-  approved_data: 'Data approved', published: 'Published', blocked: 'Blocked', rejected: 'Rejected', failed: 'Failed', proposed: 'Proposed', superseded: 'Superseded', draft: 'Draft', open: 'Open',
+  uploaded: 'Uploaded', profiled: 'File read', review: 'Needs review', auto_approved: 'Auto-approved', approved: 'Fields approved', transformed: 'Data ready for review',
+  approved_data: 'Data approved', published: 'Exported', blocked: 'Blocked', rejected: 'Rejected', failed: 'Failed', proposed: 'Proposed', superseded: 'Superseded', draft: 'Draft', open: 'Open',
 }
 export const STATUS_TONE: Record<string, 'ok' | 'warn' | 'bad' | 'info' | 'neutral'> = {
   uploaded: 'neutral', profiled: 'neutral', review: 'warn', auto_approved: 'ok', approved: 'ok', transformed: 'info', approved_data: 'ok', published: 'ok', blocked: 'bad', rejected: 'bad', failed: 'bad',
@@ -81,3 +81,10 @@ export function pyRegex(pattern: string | null | undefined): RegExp | null {
   if (m) { src = src.slice(m[0].length); if (m[1].includes('i')) flags += 'i' }
   try { return new RegExp(src, flags) } catch { return null }
 }
+
+export const FORMAT_LABEL: Record<string, string> = {
+  identical: 'Same format', header_moved: 'Header moved', columns_added: 'Columns added',
+  columns_renamed: 'Columns renamed', columns_removed: 'Missing columns', types_changed: 'Data types changed',
+  sheets_added: 'Sheets added', sheets_removed: 'Missing sheets', unrelated_file: 'Check customer',
+}
+export const formatLabel = (value: string) => FORMAT_LABEL[value] ?? value.replace(/_/g, ' ')

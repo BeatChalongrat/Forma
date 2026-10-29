@@ -37,6 +37,31 @@ const del = <T>(p: string) => request<T>(p, { method: 'DELETE' })
 const put = <T>(p: string, body: unknown) => request<T>(p, { method: 'PUT', body: JSON.stringify(body) })
 const patch = <T>(p: string, body: unknown) => request<T>(p, { method: 'PATCH', body: JSON.stringify(body) })
 
+export type ChatStreamEvent = { type: 'started'; request_id: string } | { type: 'phase'; phase: 'research' | 'writing' } | { type: 'delta'; text: string } | { type: 'reset' } | { type: 'done'; turn: ChatTurn } | { type: 'error'; message: string }
+async function chatStream(id: string, body: { question: string; request_id: string; language: 'th' | 'en'; timezone: string }, onEvent: (event: ChatStreamEvent) => void, signal: AbortSignal): Promise<ChatTurn> {
+  const response = await fetch(`/api/assistant/conversations/${encodeURIComponent(id)}/messages/stream`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() }, body: JSON.stringify(body), signal })
+  if (response.status === 401) void login()
+  if (!response.ok || !response.body) throw new ApiError(response.status, 'stream_failed', 'Could not start reply')
+  const reader = response.body.getReader(), decoder = new TextDecoder()
+  let buffer = ''
+  try {
+    while (true) {
+      const { done, value } = await reader.read()
+      buffer += decoder.decode(value, { stream: !done })
+      let end: number
+      while ((end = buffer.indexOf('\n')) >= 0) {
+        const line = buffer.slice(0, end).trimEnd(); buffer = buffer.slice(end + 1)
+        if (!line.startsWith('data:')) continue
+        const event = JSON.parse(line.slice(5)) as ChatStreamEvent
+        if (event.type === 'error') throw new Error(event.message)
+        onEvent(event)
+        if (event.type === 'done') return event.turn
+      }
+      if (done) throw new Error('Reply stream interrupted')
+    }
+  } finally { await reader.cancel().catch(() => undefined); reader.releaseLock() }
+}
+
 // ---------------------------------------------------------------------------------------------
 // Types (mirror backend serializers)
 // ---------------------------------------------------------------------------------------------
@@ -56,6 +81,7 @@ export type TableProfile = { sheet: string; sheet_index: number; file_id?: strin
 export type WorkbookProfile = { meta: { file_name: string; kind: string; sheets: { name: string; index: number; hidden: boolean; n_rows: number; n_cols: number; merged_ranges: string[]; formula_cells: number }[] }; tables: TableProfile[] }
 export type RoundStatus = 'uploaded' | 'profiled' | 'review' | 'auto_approved' | 'approved' | 'transformed' | 'approved_data' | 'published' | 'blocked' | 'rejected' | 'failed'
 export type ImportRound = {
+  uploaded_at?: string
   id: string; customer_id: string; label: string | null; status: RoundStatus; target_schema: string; notes: string | null
   summary: { drift?: string | null; drift_report?: DriftReport | null; decision?: string; mapping_version_id?: string; dataset_version_id?: string; rows?: number; errors?: number; error?: string; simulation?: SimSummary | null; has_previous_approval?: boolean; batch_id?: string; auto_publish?: boolean; publish?: PublishDecision }
   created_at: string; updated_at: string; files?: SourceFile[]; customer?: { id: string; code: string; name: string }
@@ -71,7 +97,7 @@ export type BatchItem = {
   publish: PublishDecision | null; export_id: string | null; json_name: string; rows: number | null
   state: BatchItemState; step: number; message: string; reasons?: string[]
 }
-export type BatchSummary = { id: string; label: string | null; auto_publish: boolean; created_by: string; created_at: string; total: number; counts: Partial<Record<BatchItemState, number>>; done: boolean; stuck: number }
+export type BatchSummary = { id: string; label: string | null; work_date: string | null; expected_files: number | null; complete: boolean; auto_publish: boolean; created_by: string; created_at: string; total: number; counts: Partial<Record<BatchItemState, number>>; done: boolean; stuck: number }
 export type Batch = BatchSummary & { items: BatchItem[] }
 export type SimSummary = { rows_in: number; rows_out: number; findings: { error: number; warning: number; info: number }; duration_ms?: number }
 export type Finding = { kind: string; severity: 'error' | 'warning' | 'info'; message: string; target: string | null; row: number | null; identity: string | null; details: Record<string, unknown> }
@@ -202,7 +228,37 @@ export type Trace = {
 export type Answer = { intent: string; ai: boolean; answer: string; evidence: unknown[]; suggestions: string[]; trace?: { identity: string; pointer: string | null } }
 
 // ---------------------------------------------------------------------------------------------
+export type Preferences = { display_name: string; avatar?: string; language: 'th' | 'en'; theme: 'light' | 'dark' | 'system'; timezone: string; date_format: 'day-first' | 'iso' }
+export type HistoryFilters = { status?: string; customer_id?: string; search?: string; start?: string; end?: string; timezone?: string; offset?: number; limit?: number }
+export type ReviewQuestions = { mapping_id: string; round_id: string; status: string; blocked: boolean; questions: { id: string; field: FieldSpec; kind: 'boolean' | 'number' | 'confirm'; current: Expr; evidence: string[]; note?: string }[]; open_questions: string[]; reasons: string[]; sample: Record<string, unknown>[]; context: { customer: { code: string; name: string } | null; round_label: string | null; files: { id: string; name: string }[]; mapping_version: number }; changes: (FieldChange & { field: FieldSpec })[]; comparison_dataset_id: string | null; checks: Record<string, unknown>; impact: PolicyDecision['impact'] | null; fields: FieldSpec[] }
+export type ReviewEvidence = { field: string; sample_limit: number; sample_records: number; constant: boolean; context_only: boolean; unavailable: boolean; examples: { identity: string; item: number | null; value: unknown; source_complete: boolean; cells: { file: string | null; sheet: string | null; row: number | null; column: string | null; header: string; raw: unknown; verified: boolean | null }[] }[] }
+export type AnswerPreview = { digest: string; remaining_questions: string[]; before: Record<string, unknown>[]; comparison: { counts: { changed_records: number; lost: number; gained: number }; rows: SandboxItem[]; sample_limit: number; before_records: number; after_records: number; reliable: boolean; confirmed_fields: string[] }; preview: { ok: boolean; records: Record<string, unknown>[]; findings: Finding[]; validation?: { ok: boolean }; stats?: Record<string, unknown>; errors?: string[] } }
+export type WorkspaceAnswer = { answer: string; ai: boolean; reason?: string; tools_used?: string[]; actions?: { id: string; label: string; detail: string; url: string }[]; evidence: { id: number; tool: string; data: unknown; links: { label: string; url: string }[] }[] }
+
+export type ChatSummary = { id: string; title: string; round_id: string | null; dataset_id: string | null; archived: boolean; pinned: boolean; created_at: string; updated_at: string; busy: boolean }
+export type ChatTurn = { id: string; request_id: string; sequence: number; question: string; reply: WorkspaceAnswer | null; status: 'pending' | 'complete' | 'failed' | 'stopped'; created_at: string }
+export type ChatDetail = { conversation: ChatSummary; turns: ChatTurn[]; total: number; older_before: number | null }
+export type ChatList = { items: ChatSummary[]; total: number; next_offset: number | null }
+
 export const api = {
+  chats: (search = '', offset = 0, archived = false) => get<ChatList>(`/api/assistant/conversations?search=${encodeURIComponent(search)}&offset=${offset}&archived=${archived}`),
+  createChat: (b: { round_id?: string; dataset_id?: string }) => post<ChatSummary>('/api/assistant/conversations', b),
+  importChat: (b: { round_id?: string; dataset_id?: string; messages: { question: string; answer: string }[] }) => post<ChatSummary>('/api/assistant/conversations/import', b),
+  chat: (id: string, before?: number) => get<ChatDetail>(`/api/assistant/conversations/${encodeURIComponent(id)}${before ? '?before=' + before : ''}`),
+  editChat: (id: string, b: { title?: string; archived?: boolean; pinned?: boolean }) => patch<ChatSummary>(`/api/assistant/conversations/${encodeURIComponent(id)}`, b),
+  deleteChat: (id: string) => del<void>(`/api/assistant/conversations/${encodeURIComponent(id)}`),
+  chatSend: (id: string, b: { question: string; request_id: string; language: 'th' | 'en'; timezone: string }) => post<ChatTurn>(`/api/assistant/conversations/${encodeURIComponent(id)}/messages`, b),
+  chatStream,
+  chatStop: (id: string, request_id: string) => post<ChatTurn>(`/api/assistant/conversations/${encodeURIComponent(id)}/stop`, { request_id }),
+  preferences: () => request<Preferences>('/api/me/preferences', { cache: 'no-store' }),
+  savePreferences: (b: Preferences) => put<Preferences>('/api/me/preferences', b),
+  history: (q: HistoryFilters) => get<{ items: ImportRound[]; total: number; offset: number; limit: number; timezone: string }>('/api/history' + qs(q)),
+  reviewQuestions: (id: string) => get<ReviewQuestions>(`/api/mappings/${id}/questions`),
+  reviewEvidence: (id: string, field: string) => get<ReviewEvidence>(`/api/mappings/${id}/questions/evidence?field=${encodeURIComponent(field)}`),
+  previewAnswers: (id: string, answers: Record<string, boolean | number | string>) => post<AnswerPreview>(`/api/mappings/${id}/answers/preview`, { answers }),
+  applyAnswers: (id: string, answers: Record<string, boolean | number | string>, digest: string) => post<MappingVersion>(`/api/mappings/${id}/answers/apply`, { answers, digest }),
+  assistantStatus: () => get<{ enabled: boolean; provider: string; model: string; tools: string[] }>('/api/assistant/status'),
+  workspaceAsk: (b: { question: string; language: 'th' | 'en'; timezone: string; round_id?: string; dataset_id?: string; conversation: { role: 'user' | 'assistant'; content: string }[] }) => post<WorkspaceAnswer>('/api/assistant/ask', b),
   dashboard: () => get<Dashboard>('/api/dashboard'),
   customers: () => get<Customer[]>('/api/customers'),
   customer: (id: string) => get<Customer>(`/api/customers/${id}`),
@@ -218,15 +274,23 @@ export const api = {
     files.forEach((f) => fd.append('files', f))
     return request<SourceFile[]>(`/api/rounds/${roundId}/files`, { method: 'POST', body: fd })
   },
-  createUpload: (files: File[], o: { label?: string; auto_publish: boolean }) => {
+  createUpload: (files: File[], o: { label?: string; work_date?: string; expected_files?: number; auto_publish: boolean }) => {
     const fd = new FormData()
     files.forEach((f) => fd.append('files', f))
     if (o.label) fd.append('label', o.label)
+    if (o.work_date) fd.append('work_date', o.work_date)
+    if (o.expected_files !== undefined) fd.append('expected_files', String(o.expected_files))
     fd.append('auto_publish', String(o.auto_publish))
     return request<Batch>('/api/batches', { method: 'POST', body: fd })
   },
-  uploads: () => get<BatchSummary[]>('/api/batches'),
+  uploads: (q?: { limit?: number; offset?: number; search?: string; start?: string; end?: string }) => get<BatchSummary[]>('/api/batches' + qs(q)),
+  appendUpload: (id: string, files: File[]) => {
+    const fd = new FormData()
+    files.forEach(f => fd.append('files', f))
+    return request<Batch & { added: number; skipped: number }>(`/api/batches/${id}/files`, { method: 'POST', body: fd })
+  },
   upload: (id: string) => get<Batch>(`/api/batches/${id}`),
+  editUpload: (id: string, body: { label?: string; work_date?: string; expected_files?: number | null }) => patch<Batch>(`/api/batches/${id}`, body),
   assignUpload: (id: string, b: { item_ids: string[]; customer_id?: string; new_customer?: { code: string; name: string; erp_type?: string } }) => post<Batch>(`/api/batches/${id}/assign`, b),
   resumeUpload: (id: string) => post<Batch>(`/api/batches/${id}/resume`, {}),
   uploadDownloadUrl: (id: string) => `/api/batches/${id}/download`,
@@ -258,7 +322,7 @@ export const api = {
   sandboxList: (id: string, list: string, offset = 0, limit = 100) => get<{ report: SandboxReport | null; list: string; total: number; items: SandboxItem[] }>(`/api/mappings/${id}/sandbox?list=${list}&offset=${offset}&limit=${limit}`),
   dsl: () => get<{ ops: string[]; json_schema: unknown }>('/api/dsl'),
 
-  review: (status = 'open') => get<ReviewTask[]>(`/api/review?status=${status}`),
+  review: (status = 'open', round_id = '', offset = 0) => get<ReviewTask[]>('/api/review' + qs({ status, round_id: round_id || undefined, offset, limit: 50 })),
 
   dataset: (id: string) => get<DatasetVersion>(`/api/datasets/${id}`),
   rows: (id: string, q: { offset?: number; limit?: number; q?: string; sort?: string; desc?: boolean }) => get<RowsPage>(`/api/datasets/${id}/rows` + qs(q)),
@@ -285,7 +349,8 @@ export const api = {
   setDefaultFormat: (target_schema: string) => put<{ target_schema: string }>('/api/settings/default-format', { target_schema }),
   aiSettings: () => get<AISettings>('/api/settings/ai'),
   saveAiSettings: (b: AISettingsPatch) => put<AISettings>('/api/settings/ai', b),
-  connectAi: (api_key: string, provider?: string) => post<{ test: { ok: boolean; message: string; model?: string; provider?: string; latency_ms?: number }; ai: AISettings }>('/api/settings/ai/connect', { api_key, ...(provider ? { provider } : {}) }),
+  connectAi: (api_key: string, provider?: string, model?: string, base_url?: string) => post<{ test: { ok: boolean; message: string; model?: string; provider?: string; latency_ms?: number }; ai: AISettings }>('/api/settings/ai/connect', { api_key, provider, model, base_url }),
+  discoverModels: (b: { provider: string; api_key?: string; base_url?: string }) => post<{ models: string[]; source: string; message: string; truncated: boolean }>('/api/settings/ai/models', b),
   testAi: () => post<AiProbe & { route?: string; backups?: (AiProbe & { id: string })[] }>('/api/settings/ai/test'),
   addBackupKey: (b: { api_key: string; provider?: string; model?: string; base_url?: string }) => post<{ test: AiProbe & { id: string }; ai: AISettings }>('/api/settings/ai/backups', b),
   updateBackupKey: (id: string, b: { model?: string; base_url?: string | null }) => patch<AISettings>(`/api/settings/ai/backups/${id}`, b),

@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+from datetime import date
 from typing import Any
 
 from fastapi import APIRouter, Depends, File, Form, Query, UploadFile
 from fastapi.responses import Response
+from pydantic import BaseModel, ConfigDict, Field
+from sqlalchemy import update
 from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 
@@ -13,6 +16,7 @@ from forma.api.routes import ctx_dep, read_upload
 from forma.api.schemas import BatchAssignIn
 from forma.auth import Principal, current_principal, llm_rate_limited, require_role
 from forma.core.errors import Conflict, Forbidden, ValidationFailed
+from forma.db.models import Batch
 from forma.db.session import get_session
 from forma.jobs import runner
 from forma.services import batches as bs
@@ -20,6 +24,13 @@ from forma.services import rounds as rs
 from forma.services.context import ServiceContext
 
 router = APIRouter(prefix="/api")
+
+
+class BatchLabelIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    label: str | None = Field(default=None, min_length=1, max_length=255)
+    work_date: date | None = None
+    expected_files: int | None = Field(default=None, ge=1, le=1000000)
 
 
 def _all_customers(p: Principal) -> None:
@@ -42,7 +53,9 @@ def _process(items: list[str], p: Principal, *, sync: bool, use_llm: bool | None
 @router.post("/batches", status_code=201)
 async def create_batch(
     files: list[UploadFile] = File(...),
-    label: str | None = Form(None),
+    label: str | None = Form(None, max_length=255),
+    work_date: date | None = Form(None),
+    expected_files: int | None = Form(None, ge=1, le=1000000),
     auto_publish: bool = Form(True),
     use_llm: bool | None = Form(None),
     sync: bool = Query(False),
@@ -56,7 +69,16 @@ async def create_batch(
     if use_llm:
         llm_rate_limited(p)
     data = [(up.filename or "upload.xlsx", await read_upload(up, ctx.settings.max_upload_mb)) for up in files]
-    b = bs.create_batch(ctx, session, data, p.actor, label=label, auto_publish=auto_publish)
+    b = bs.create_batch(
+        ctx,
+        session,
+        data,
+        p.actor,
+        label=label,
+        auto_publish=auto_publish,
+        work_date=work_date,
+        expected_files=expected_files,
+    )
     todo = [i.id for i in b.items if i.status == "received"]
     session.commit()
     # off the event loop: the arq backend submits with asyncio.run, which cannot nest in this async handler
@@ -65,13 +87,49 @@ async def create_batch(
     return bs.batch_view(session, bs.get_batch(session, b.id))
 
 
+@router.post("/batches/{batch_id}/files")
+async def append_files(
+    batch_id: str,
+    files: list[UploadFile] = File(...),
+    use_llm: bool | None = Form(None),
+    sync: bool = Query(False),
+    session: Session = Depends(get_session),
+    ctx: ServiceContext = Depends(ctx_dep),
+    p: Principal = Depends(require_role("importer")),
+) -> dict[str, Any]:
+    _all_customers(p)
+    if use_llm:
+        llm_rate_limited(p)
+    bs.get_batch(session, batch_id)
+    data = [(up.filename or "upload.xlsx", await read_upload(up, ctx.settings.max_upload_mb)) for up in files]
+    # Acquire a write lock on both PostgreSQL and SQLite before deduplication.
+    session.execute(update(Batch).where(Batch.id == batch_id).values(label=Batch.label))
+    session.expire_all()
+    b = bs.get_batch(session, batch_id)
+    before = len(b.items)
+    todo = bs.add_files(ctx, session, b, data, p.actor)
+    added = len(b.items) - before
+    session.commit()
+    await run_in_threadpool(_process, todo, p, sync=sync, use_llm=use_llm)
+    session.expire_all()
+    return {
+        **bs.batch_view(session, bs.get_batch(session, batch_id)),
+        "added": added,
+        "skipped": len(files) - added,
+    }
+
+
 @router.get("/batches")
 def list_batches(
     limit: int = Query(20, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    search: str = Query("", max_length=200),
+    start: date | None = None,
+    end: date | None = None,
     session: Session = Depends(get_session),
     p: Principal = Depends(current_principal),
 ) -> list[dict[str, Any]]:
-    return [] if p.customers is not None else bs.list_batches(session, limit)
+    return [] if p.customers is not None else bs.list_batches(session, limit, offset, search, start, end)
 
 
 @router.get("/batches/{batch_id}")
@@ -80,6 +138,38 @@ def get_batch(
 ) -> dict[str, Any]:
     _all_customers(p)
     return bs.batch_view(session, bs.get_batch(session, batch_id))
+
+
+@router.patch("/batches/{batch_id}")
+def edit_label(
+    batch_id: str,
+    body: BatchLabelIn,
+    session: Session = Depends(get_session),
+    p: Principal = Depends(require_role("importer")),
+) -> dict[str, Any]:
+    _all_customers(p)
+    b = bs.get_batch(session, batch_id)
+    if not body.model_fields_set:
+        raise ValidationFailed("No changes supplied")
+    if "label" in body.model_fields_set:
+        if body.label is None or not body.label.strip():
+            raise ValidationFailed("Round name cannot be blank")
+        b.label = body.label.strip()
+    if "work_date" in body.model_fields_set:
+        b.work_date = body.work_date
+    if "expected_files" in body.model_fields_set:
+        b.expected_files = body.expected_files
+    rs.audit(
+        session,
+        "batch.label",
+        "batch",
+        b.id,
+        actor=p.actor,
+        work_date=b.work_date.isoformat() if b.work_date else None,
+        expected_files=b.expected_files,
+    )
+    session.flush()
+    return bs.batch_view(session, b)
 
 
 @router.post("/batches/{batch_id}/assign")

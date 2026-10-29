@@ -1,18 +1,20 @@
-import { type ReactNode, useEffect, useRef, useState } from 'react'
-import { Lightbulb, X } from 'lucide-react'
+import { Localized } from '../lib/locale'
+import { type ReactNode, useId, useState } from 'react'
+import { CircleHelp, X } from 'lucide-react'
+import { useDialog } from '../lib/useDialog'
 import { cn, STATUS_LABEL, STATUS_TONE } from '../lib/utils'
 
 /** Page title in the aCommerce style: navy heading, one line of English, and a short Thai hint. */
 export function PageHeader({ title, subtitle, hint, actions, crumbs }: { title: ReactNode; subtitle?: ReactNode; hint?: ReactNode; actions?: ReactNode; crumbs?: ReactNode }) {
   return (
-    <div className="flex items-end justify-between gap-4 mb-6">
+    <div className="page-header flex items-end justify-between gap-4 mb-6 flex-wrap">
       <div className="min-w-0">
         {crumbs && <div className="text-muted text-[12.5px] mb-1.5 flex items-center gap-1.5">{crumbs}</div>}
-        <h1 className="heading text-[26px] leading-tight truncate">{title}</h1>
-        {subtitle && <div className="text-ink-2 mt-1.5">{subtitle}</div>}
-        {hint && <div className="hint-th mt-1">{hint}</div>}
+        <h1 className="heading text-[26px] leading-tight break-words"><Localized>{title}</Localized></h1>
+        {subtitle && <div className="text-ink-2 mt-1.5"><Localized>{subtitle}</Localized></div>}
+        {hint && <details className="mt-2 text-[13px] text-muted"><summary className="hover:text-signal"><Localized>Usage tips</Localized></summary><div className="hint-th mt-2">{hint}</div></details>}
       </div>
-      {actions && <div className="flex items-center gap-2 shrink-0">{actions}</div>}
+      {actions && <div className="flex items-center gap-2 flex-wrap max-w-full">{actions}</div>}
     </div>
   )
 }
@@ -28,7 +30,7 @@ const toneCls = {
 export type Tone = keyof typeof toneCls
 
 export function Badge({ tone = 'neutral', children, className }: { tone?: Tone; children: ReactNode; className?: string }) {
-  return <span className={cn('chip', toneCls[tone], className)}>{children}</span>
+  return <span className={cn('chip', typeof children === 'string' && children.length < 32 && 'whitespace-nowrap shrink-0', toneCls[tone], className)}><Localized>{children}</Localized></span>
 }
 
 export function StatusBadge({ status }: { status: string }) {
@@ -85,41 +87,32 @@ export function Spinner({ className }: { className?: string }) {
 }
 
 export function Modal({ open, onClose, title, children, footer, width = 'max-w-2xl' }: { open: boolean; onClose: () => void; title: ReactNode; children: ReactNode; footer?: ReactNode; width?: string }) {
-  const ref = useRef<HTMLDivElement>(null)
-  useEffect(() => {
-    if (!open) return
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [open, onClose])
+  const ref = useDialog(open, onClose)
+  const titleId = useId()
   if (!open) return null
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-center p-4 bg-ink/30 dark:bg-black/60" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div ref={ref} role="dialog" aria-modal className={cn('card w-full max-h-[88vh] flex flex-col', width)}>
+      <div ref={ref} role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1} className={cn('card w-full max-h-[88dvh] flex flex-col min-w-0 shadow-xl', width)}>
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-line">
-          <div className="heading text-[15px]">{title}</div>
+          <div id={titleId} className="heading text-[15px] min-w-0 break-words">{title}</div>
           <button className="btn btn-ghost btn-sm" onClick={onClose} aria-label="Close"><X size={15} /></button>
         </div>
-        <div className="px-5 py-4 overflow-auto">{children}</div>
-        {footer && <div className="px-5 py-3 border-t border-line flex items-center justify-end gap-2">{footer}</div>}
+        <div className="px-5 py-4 overflow-auto min-h-0">{children}</div>
+        {footer && <div className="px-5 py-3 border-t border-line flex items-center justify-end gap-2 flex-wrap shrink-0">{footer}</div>}
       </div>
     </div>
   )
 }
 
 export function Drawer({ open, onClose, title, children, width = 'w-[520px]' }: { open: boolean; onClose: () => void; title: ReactNode; children: ReactNode; width?: string }) {
-  useEffect(() => {
-    if (!open) return
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [open, onClose])
+  const ref = useDialog(open, onClose)
+  const titleId = useId()
   if (!open) return null
   return (
     <div className="fixed inset-0 z-40 flex justify-end bg-ink/20 dark:bg-black/50" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div className={cn('h-full bg-surface border-l border-line shadow-xl flex flex-col max-w-full', width)}>
+      <div ref={ref} role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1} className={cn('h-full bg-surface border-l border-line shadow-xl flex flex-col max-w-full min-w-0', width)}>
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-line">
-          <div className="heading text-[15px] truncate">{title}</div>
+          <div id={titleId} className="heading text-[15px] min-w-0 break-words">{title}</div>
           <button className="btn btn-ghost btn-sm" onClick={onClose} aria-label="Close"><X size={15} /></button>
         </div>
         <div className="p-5 overflow-auto flex-1">{children}</div>
@@ -131,14 +124,14 @@ export function Drawer({ open, onClose, title, children, width = 'w-[520px]' }: 
 export function Section({ title, hint, children, actions, className }: { title: ReactNode; hint?: ReactNode; children: ReactNode; actions?: ReactNode; className?: string }) {
   return (
     <section className={cn('card', className)}>
-      <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-line">
+      <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-line flex-wrap">
         <div className="min-w-0">
-          <h2 className="heading text-[14.5px]">{title}</h2>
+          <h2 className="heading text-[14.5px]"><Localized>{title}</Localized></h2>
           {hint && <div className="hint-th mt-0.5">{hint}</div>}
         </div>
         {actions}
       </div>
-      <div>{children}</div>
+      <div className="section-body">{children}</div>
     </section>
   )
 }
@@ -156,12 +149,13 @@ export function Json({ value, className }: { value: unknown; className?: string 
   return <pre className={cn('mono text-[12px] leading-relaxed whitespace-pre-wrap break-words bg-surface-2 rounded-[var(--radius-md)] p-3 overflow-auto', className)}>{JSON.stringify(value, null, 2)}</pre>
 }
 
-export function Tabs<T extends string>({ value, onChange, items }: { value: T; onChange: (v: T) => void; items: { id: T; label: ReactNode; count?: number; hint?: string }[] }) {
+export function Tabs<T extends string>({ value, onChange, items, menu = false }: { value: T; onChange: (v: T) => void; menu?: boolean; items: { id: T; label: ReactNode; labelText?: string; count?: number; hint?: string }[] }) {
+  if (menu) return <div className="px-3 py-2 border-b border-line shrink-0"><label className="block"><span className="sr-only">Inspection view</span><select className="input" value={value} onChange={(e) => onChange(e.target.value as T)}>{items.map((it) => <option key={it.id} value={it.id}>{it.labelText ?? (typeof it.label === 'string' ? it.label : it.id)}{it.count !== undefined ? ` (${it.count})` : ''}</option>)}</select></label></div>
   return (
-    <div className="flex items-center gap-1 border-b border-line overflow-x-auto">
+    <div className="flex items-center gap-1 border-b border-line overflow-x-auto overflow-y-hidden shrink-0" role="group" aria-label="Views">
       {items.map((it) => (
-        <button key={it.id} onClick={() => onChange(it.id)} title={it.hint} className={cn('relative px-3 py-2 text-[13px] font-semibold text-muted hover:text-navy -mb-px border-b-2 border-transparent whitespace-nowrap', value === it.id && 'text-navy border-brand-blue')}>
-          {it.label}
+        <button key={it.id} onClick={() => onChange(it.id)} title={it.hint} aria-pressed={value === it.id} className={cn('relative px-3 py-2 text-[13px] font-medium text-muted hover:text-navy -mb-px border-b-2 border-transparent whitespace-nowrap shrink-0', value === it.id && 'text-navy border-brand-blue')}>
+          <Localized>{it.label}</Localized>
           {it.count !== undefined && <span className="ml-1.5 text-[11.5px] tnum text-muted">{it.count}</span>}
         </button>
       ))}
@@ -173,7 +167,7 @@ export function FindingRow({ f }: { f: { severity: string; kind: string; message
   const tone = f.severity === 'error' ? 'bad' : f.severity === 'warning' ? 'warn' : 'info'
   return (
     <div className="flex items-start gap-2 py-1.5 text-[12.5px]">
-      <Badge tone={tone} className="h-5 px-1.5 text-[11px] shrink-0">{f.kind}</Badge>
+      <Badge tone={tone} className="px-1.5 shrink-0">{f.severity === 'error' ? 'Error' : f.severity === 'warning' ? 'Check' : 'Info'}</Badge>
       <div className="min-w-0"><span>{f.message}</span>{f.target && <span className="text-muted mono ml-1.5">{f.target}</span>}</div>
     </div>
   )
@@ -182,12 +176,12 @@ export function FindingRow({ f }: { f: { severity: string; kind: string; message
 /** "How this page works" — a short guide at the top of a complex page; hidden once dismissed (per browser). */
 export function HelpStrip({ id, title = 'How this page works', children }: { id: string; title?: string; children: ReactNode }) {
   const key = `forma.help.${id}`
-  const [hidden, setHidden] = useState(() => { try { return localStorage.getItem(key) === 'hidden' } catch { return false } })
+  const [hidden, setHidden] = useState(() => { try { return localStorage.getItem(key) !== 'shown' } catch { return true } })
   const set = (v: boolean) => { setHidden(v); try { localStorage.setItem(key, v ? 'hidden' : 'shown') } catch { /* private mode */ } }
-  if (hidden) return <button className="text-[11.5px] font-semibold text-signal hover:underline flex items-center gap-1" onClick={() => set(false)}><Lightbulb size={12} /> {title}</button>
+  if (hidden) return <button className="text-[12.5px] text-muted hover:text-signal flex items-center gap-1.5 py-1" onClick={() => set(false)} aria-expanded={false}><CircleHelp size={14} /> {title}</button>
   return (
     <div className="flex items-start gap-3 rounded-[10px] bg-signal-soft/70 border border-signal/15 px-3.5 py-2.5 text-[12.5px]">
-      <Lightbulb size={15} className="text-signal mt-0.5 shrink-0" />
+      <CircleHelp size={15} className="text-muted mt-0.5 shrink-0" />
       <div className="flex-1 min-w-0"><div className="font-semibold text-navy">{title}</div><div className="text-ink-2 mt-0.5">{children}</div></div>
       <button className="btn btn-ghost btn-sm" onClick={() => set(true)} aria-label="Hide this guide"><X size={13} /></button>
     </div>

@@ -1,75 +1,45 @@
-import { useState } from 'react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Link } from 'react-router-dom'
-import { Check, X, ArrowRight } from 'lucide-react'
-import { api } from '../lib/api'
-import { cn, fmtInt, timeAgo } from '../lib/utils'
-import { PageHeader, Badge, Section, Confidence, Tabs, Empty, RiskLevel } from '../components/ui'
-import { useToast } from '../lib/toast'
+import { useQuery } from '@tanstack/react-query'
+import { Link, useSearchParams } from 'react-router-dom'
+import { ArrowRight, MessageCircleMore } from 'lucide-react'
+import { api, type ReviewTask } from '../lib/api'
+import { usePreferences } from '../lib/preferences'
+import { Badge, Empty, PageHeader, Spinner } from '../components/ui'
+import { Workflow } from '../components/Workflow'
+import { ReviewWorkspace } from '../components/ReviewWorkspace'
+
 
 export function ReviewCenter() {
-  const [tab, setTab] = useState<'open' | 'approved' | 'rejected' | 'dismissed'>('open')
-  const { data } = useQuery({ queryKey: ['review', tab], queryFn: () => api.review(tab), refetchInterval: tab === 'open' ? 8000 : false })
-  const qc = useQueryClient()
-  const toast = useToast()
-  const [selected, setSelected] = useState<Set<string>>(new Set())
-  const act = useMutation({
-    mutationFn: async ({ ids, approve }: { ids: string[]; approve: boolean }) => {
-      for (const id of ids) {
-        if (approve) await api.approveMapping(id, { actor: 'operator', comment: 'bulk approve' })
-        else await api.rejectMapping(id, { actor: 'operator', comment: 'bulk reject' })
-      }
-    },
-    onSuccess: (_, v) => { qc.invalidateQueries(); setSelected(new Set()); toast.push({ kind: 'ok', title: `${v.ids.length} mapping${v.ids.length > 1 ? 's' : ''} ${v.approve ? 'approved' : 'rejected'}` }) },
-    onError: (e: Error) => toast.push({ kind: 'bad', title: 'Action failed', detail: e.message }),
-  })
-  const mappings = (data ?? []).filter((t) => t.mapping_version_id)
-  const toggle = (id: string) => setSelected((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n })
-  const bulkable = mappings.filter((t) => t.kind !== 'blocked' && t.details.decision !== 'block')
-  return (
-    <>
-      <PageHeader title="Review" subtitle="Ordered by business risk: wrong files and low-confidence prices first, cosmetic drift last."
-        actions={selected.size > 0 && <><span className="text-muted text-[12.5px]">{selected.size} selected</span><button className="btn btn-danger" onClick={() => act.mutate({ ids: [...selected], approve: false })}><X size={14} /> Reject</button><button className="btn btn-primary" onClick={() => act.mutate({ ids: [...selected], approve: true })}><Check size={14} /> Approve selected</button></>} />
-      <Tabs value={tab} onChange={setTab} items={[{ id: 'open', label: 'Open', count: tab === 'open' ? data?.length : undefined }, { id: 'approved', label: 'Approved' }, { id: 'rejected', label: 'Rejected' }, { id: 'dismissed', label: 'Superseded' }]} />
-      <div className="mt-4">
-        {data?.length ? (
-          <Section title={`${data.length} item${data.length > 1 ? 's' : ''}`} actions={tab === 'open' && bulkable.length > 0 ? <button className="btn btn-ghost btn-sm" onClick={() => setSelected(selected.size === bulkable.length ? new Set() : new Set(bulkable.map((t) => t.mapping_version_id!)))}>{selected.size === bulkable.length ? 'Clear' : 'Select all non-blocked'}</button> : undefined}>
-            <ul>
-              {data.map((t) => {
-                const blocked = t.kind === 'blocked' || t.details.decision === 'block'
-                return (
-                  <li key={t.id} className={cn('px-4 py-3 border-b border-line last:border-0 flex gap-3 items-start', blocked && 'bg-bad-soft/30')}>
-                    {tab === 'open' && t.mapping_version_id && <input type="checkbox" className="mt-1 accent-[var(--color-signal)]" disabled={blocked} checked={selected.has(t.mapping_version_id)} onChange={() => toggle(t.mapping_version_id!)} />}
-                    <div className="w-12 shrink-0 text-center"><div className="tnum text-[18px] font-semibold leading-none">{t.priority}</div><div className="text-[10.5px] text-muted mt-0.5">priority</div></div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-medium">{t.customer?.code}</span><span className="text-muted">{t.customer?.name}</span>
-                        <Badge tone={blocked ? 'bad' : t.kind === 'drift' ? 'warn' : 'signal'}>{blocked ? 'blocked' : t.kind}</Badge>
-                        <RiskLevel level={t.details.risk_level} factors={t.details.risk_factors} />
-                        <span className="text-muted text-[12px]">{t.round?.label} · {timeAgo(t.created_at)}</span>
-                        {t.resolver && <span className="text-muted text-[12px]">· {t.status} by {t.resolver}</span>}
-                      </div>
-                      <ul className="text-[12.5px] text-ink-2 mt-1 flex flex-col gap-0.5">{t.reasons.map((r, i) => <li key={i}>• {r}</li>)}</ul>
-                      {t.details.risk_level === 'high' && t.details.risk_factors?.length ? <div className="text-[12px] text-bad mt-1">High risk: {t.details.risk_factors.join(' · ')}</div> : null}
-                      {t.details.impact?.affected_records !== undefined && !t.details.impact.high ? <div className="text-[12px] text-muted mt-0.5 tnum">{fmtInt(t.details.impact.affected_records)} of {fmtInt(t.details.impact.of_records)} records change vs the approved mapping</div> : null}
-                      {t.details.open_questions?.length ? <div className="text-[12px] text-warn mt-1">{t.details.open_questions.length} question{t.details.open_questions.length > 1 ? 's' : ''} from the mapper: {t.details.open_questions[0]}</div> : null}
-                    </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      {t.mapping_version_id && <MappingConf id={t.mapping_version_id} />}
-                      <Link className="btn btn-sm" to={t.mapping_version_id ? `/rounds/${t.round_id}/mapping/${t.mapping_version_id}` : `/rounds/${t.round_id}`}>Open <ArrowRight size={13} /></Link>
-                    </div>
-                  </li>
-                )
-              })}
-            </ul>
-          </Section>
-        ) : <Empty title={tab === 'open' ? 'Queue is empty' : 'Nothing here'} body={tab === 'open' ? 'Every recent import was handled by policy or already reviewed.' : undefined} />}
-      </div>
-    </>
-  )
+  const { t, date } = usePreferences()
+  const [params, setParams] = useSearchParams()
+  const tab = params.get('status') || 'open'
+  const round = params.get('round') || ''
+  const offset = Math.max(0, Number(params.get('offset')) || 0)
+
+  const query = useQuery({ queryKey: ['review', tab, round, offset], queryFn: () => api.review(tab, round, offset), refetchInterval: tab === 'open' ? 10000 : false })
+  const items = query.data ?? []
+  const choose = (values: Record<string, string>) => setParams(old => { const next = new URLSearchParams(old); next.delete('offset'); Object.entries(values).forEach(([k, v]) => v ? next.set(k, v) : next.delete(k)); return next })
+  const active = params.get('mapping') || (round ? items.find(i => i.mapping_version_id)?.mapping_version_id ?? null : null)
+  if (active) return <ReviewWorkspace key={active} id={active} onSaved={id => { choose({ mapping: id }) }} onDone={() => { choose({ mapping: '', round: '' }) }} />
+  return <>
+    <PageHeader title={t('Questions & issues', 'คำถามและปัญหา')} subtitle={t('Start with one file. Answer what you know, inspect the evidence, and preview before saving.', 'เริ่มทีละไฟล์ ตอบสิ่งที่ทราบ ตรวจหลักฐาน แล้วดูตัวอย่างก่อนบันทึก')} actions={<Link className="btn" to={round ? `/assistant?round=${round}` : '/assistant'}><MessageCircleMore size={16} />{t('Ask the assistant', 'ถามผู้ช่วย')}</Link>} />
+    <Workflow status="review" />
+    <div className="flex flex-wrap gap-2 mb-4">{[['open', t('Needs your attention', 'รอคุณตรวจ')], ['approved', t('Approved', 'อนุมัติแล้ว')], ['rejected', t('Rejected', 'ไม่อนุมัติ')], ['dismissed', t('Replaced by a newer version', 'มีเวอร์ชันใหม่แล้ว')]].map(([id, label]) => <button key={id} className={`btn btn-sm ${tab === id ? 'bg-signal-soft text-navy border-signal/30' : 'btn-ghost'}`} onClick={() => { choose({ status: id, round: '' }) }}>{label}</button>)}{round && <button className="btn btn-sm" onClick={() => { choose({ round: '' }) }}>{t('Show all files', 'ดูทุกไฟล์')}</button>}</div>
+    {query.isPending && <div className="p-6 flex gap-2 text-muted"><Spinner />{t('Loading questions…', 'กำลังโหลดคำถาม…')}</div>}
+    {query.error && <p role="alert" className="text-bad">{t('Could not load the queue.', 'โหลดรายการไม่ได้')} <button className="btn btn-sm" onClick={() => void query.refetch()}>{t('Try again', 'ลองใหม่')}</button></p>}
+    {!query.isPending && !query.error && !items.length && <Empty title={t('No items here', 'ไม่มีรายการในหมวดนี้')} />}
+    <ul className="space-y-3">{items.map(task => <li key={task.id} className="card p-5">
+      <div className="flex flex-wrap gap-3 items-start"><div className="flex-1 min-w-[180px]"><div className="font-semibold text-navy break-words">{task.customer?.name?.startsWith(task.customer.code) ? task.customer.name : `${task.customer?.code ?? ''} · ${task.customer?.name ?? ''}`}</div><div className="text-xs text-muted mt-1 break-words">{task.round?.label} · {date(task.created_at)}</div></div><Badge tone={task.details.decision === 'block' ? 'bad' : 'warn'}>{task.details.decision === 'block' ? t('Check the source file', 'ต้องตรวจไฟล์ต้นทาง') : t('Needs confirmation', 'ต้องยืนยันข้อมูล')}</Badge></div>
+      <p className="text-sm text-ink-2 mt-3 leading-6">{issueSummary(task, t)}</p>
+      <div className="flex flex-wrap items-center justify-between gap-3 mt-4"><details className="text-xs text-muted flex-1 min-w-0"><summary>{t('Why this needs review', 'เหตุผลและรายละเอียด')}</summary><ul className="mt-2 space-y-1 break-words">{task.reasons.map((r, i) => <li key={i}>{r}</li>)}</ul></details>{task.mapping_version_id ? <button className="btn btn-sm" onClick={() => { choose({ mapping: task.mapping_version_id!, round: task.round_id }) }}>{t('Open questions', 'เปิดคำถาม')} <ArrowRight size={14} /></button> : <Link className="btn btn-sm" to={task.dataset_version_id ? `/datasets/${task.dataset_version_id}?tab=findings` : `/rounds/${task.round_id}`}>{t('Check results', 'ตรวจผลลัพธ์')} →</Link>}</div>
+    </li>)}</ul>
+    <div className="flex justify-between mt-4"><button className="btn btn-sm" disabled={!offset} onClick={() => choose({ offset: String(Math.max(0, offset - 50)) })}>{t('Previous', 'ก่อนหน้า')}</button><button className="btn btn-sm" disabled={items.length < 50} onClick={() => choose({ offset: String(offset + 50) })}>{t('Next', 'ถัดไป')}</button></div>
+
+  </>
 }
 
-function MappingConf({ id }: { id: string }) {
-  const { data } = useQuery({ queryKey: ['mapping-lite', id], queryFn: () => api.mapping(id), staleTime: 60000 })
-  return <Confidence value={data?.confidence} />
+function issueSummary(task: ReviewTask, t: (en: string, th: string) => string) {
+  if (task.details.decision === 'block' || task.kind === 'blocked') return t('The file may not belong to this customer, or its data could not pass the checks. Confirm the source file first.', 'ไฟล์อาจไม่ตรงกับลูกค้ารายนี้ หรือข้อมูลยังไม่ผ่านการตรวจ เริ่มจากตรวจว่าเลือกไฟล์ถูกต้องหรือไม่')
+  if (task.details.open_questions?.length) return t('The source file leaves some details unclear. Please confirm them before we use the results.', 'ไฟล์ต้นทางยังบอกข้อมูลบางอย่างไม่ชัดเจน ต้องให้คุณยืนยันก่อนนำผลลัพธ์ไปใช้')
+  if (task.kind === 'drift') return t('This file differs from the previous format. Check that the new column matching still means the same thing.', 'รูปแบบไฟล์เปลี่ยนจากครั้งก่อน ตรวจว่าคอลัมน์ที่จับคู่ใหม่ยังหมายถึงข้อมูลเดิม')
+  return t('Check the suggested column matching and a sample of the result before approving.', 'ตรวจการจับคู่คอลัมน์ที่ระบบเสนอและตัวอย่างผลลัพธ์ก่อนอนุมัติ')
 }

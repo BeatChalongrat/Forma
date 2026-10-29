@@ -1,139 +1,78 @@
+import { WorkRoundDashboard } from '../components/WorkRoundDashboard'
+import { Localized } from '../lib/locale'
 import type { ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Link, useNavigate } from 'react-router-dom'
-import { ArrowRight, ArrowUpRight, BookOpen, CircleCheck, Download, FileWarning, ShieldCheck, Table2, Upload } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { ArrowRight, Upload, Download, CircleCheck } from 'lucide-react'
 import { api, type ImportRound } from '../lib/api'
-import { fmtInt, fmtPct, timeAgo, cn } from '../lib/utils'
-import { nextStep, ROUND_STEPS } from '../lib/steps'
-import { PageHeader, Stat, Section, Empty, Badge } from '../components/ui'
+import { fmtInt, fmtPct, timeAgo } from '../lib/utils'
+import { nextStep } from '../lib/steps'
+import { usePreferences } from '../lib/preferences'
+import { Workflow, workflowStep } from '../components/Workflow'
+import { PageHeader, Stat, Section, Empty, Badge, Spinner } from '../components/ui'
 
-type Todo = { key: string; title: string; th: string; icon: typeof Upload; tone: 'warn' | 'bad' | 'signal' | 'ok'; rounds: ImportRound[]; href: (r: ImportRound) => string; all: string; cta: string }
-
-/** Home: what needs a person now, grouped by the step it is waiting at, then how the system is doing. */
 export function Overview() {
-  const nav = useNavigate()
-  const { data: d } = useQuery({ queryKey: ['dashboard'], queryFn: api.dashboard, refetchInterval: 10000 })
-  const { data: rounds } = useQuery({ queryKey: ['rounds', ''], queryFn: () => api.rounds(), refetchInterval: 10000 })
-  const { data: uploads } = useQuery({ queryKey: ['uploads'], queryFn: api.uploads, refetchInterval: 10000 })
-  const unknown = (uploads ?? []).filter((u) => u.counts.needs_customer)
-  const by = (s: string[]) => (rounds ?? []).filter((r) => s.includes(r.status))
-  const studio = (r: ImportRound) => (r.summary.mapping_version_id ? `/rounds/${r.id}/mapping/${r.summary.mapping_version_id}` : `/rounds/${r.id}`)
-  const todos: Todo[] = [
-    { key: 'mapping', title: 'Check mappings', th: 'ไฟล์ใหม่หรือ format เปลี่ยน ระบบไม่กล้า approve เอง', icon: ShieldCheck, tone: 'warn', rounds: by(['review', 'rejected']), href: studio, all: '/review', cta: 'Open review' },
-    { key: 'problem', title: 'Files with a problem', th: 'ไฟล์ผิดราย ไฟล์เสีย หรือขั้นตอนล้มเหลว', icon: FileWarning, tone: 'bad', rounds: by(['blocked', 'failed']), href: (r) => `/rounds/${r.id}`, all: '/imports', cta: 'See imports' },
-    { key: 'data', title: 'Data to check & approve', th: 'สร้างข้อมูล ตรวจ แล้วกด Approve', icon: Table2, tone: 'signal', rounds: by(['transformed', 'approved', 'auto_approved']), href: (r) => (r.summary.dataset_version_id ? `/datasets/${r.summary.dataset_version_id}` : `/rounds/${r.id}`), all: '/imports', cta: 'See imports' },
-    { key: 'export', title: 'Ready to export', th: 'อนุมัติแล้ว ดาวน์โหลด JSON ส่งต่อได้', icon: Download, tone: 'ok', rounds: by(['approved_data']), href: (r) => `/rounds/${r.id}`, all: '/imports', cta: 'See imports' },
-  ]
-  const waiting = todos.reduce((a, t) => a + t.rounds.length, 0)
-
-  return (
-    <>
-      <PageHeader
-        title="What needs you today"
-        subtitle="Every delivery waiting for a person, grouped by what to do next."
-        hint="งานที่รอคุณ เรียงตามขั้นตอน — กดที่รายการเพื่อไปทำต่อได้เลย"
-        actions={<Link to="/imports/new" className="btn btn-primary btn-lg"><Upload size={15} /> Upload files</Link>}
-      />
-
-      {unknown.map((u) => (
-        <Link key={u.id} to={`/uploads/${u.id}`} className="card p-4 mb-4 flex items-center gap-3 border-l-4 border-l-warn hover:bg-surface-2/60">
-          <FileWarning className="text-warn shrink-0" />
-          <span className="flex-1"><span className="heading block">{u.counts.needs_customer} file{u.counts.needs_customer === 1 ? '' : 's'} in “{u.label}” have an unknown format</span><span className="hint-th">ไม่ตรงกับ format ของลูกค้ารายไหน — เลือกลูกค้าแล้วระบบทำต่อเอง</span></span>
-          <span className="btn btn-sm">Choose customer <ArrowRight size={13} /></span>
+  const { t } = usePreferences()
+  const dashboard = useQuery({ queryKey: ['dashboard'], queryFn: api.dashboard, refetchInterval: 10000 })
+  const roundsQuery = useQuery({ queryKey: ['rounds', ''], queryFn: () => api.rounds(), refetchInterval: 10000 })
+  const uploadsQuery = useQuery({ queryKey: ['uploads'], queryFn: () => api.uploads(), refetchInterval: 10000 })
+  const d = dashboard.data
+  const unknown = (uploadsQuery.data ?? []).filter((u) => u.counts.needs_customer || u.stuck)
+  const priority = ['blocked', 'failed', 'rejected', 'review', 'transformed', 'approved', 'auto_approved', 'approved_data']
+  const waiting = (roundsQuery.data ?? []).filter((r) => priority.includes(r.status)).sort((a, b) => priority.indexOf(a.status) - priority.indexOf(b.status))
+  const target = (r: ImportRound) => ['review', 'rejected', 'blocked'].includes(r.status) ? `/review?round=${r.id}` : r.status === 'transformed' && r.summary.dataset_version_id ? `/datasets/${r.summary.dataset_version_id}?tab=diff` : `/rounds/${r.id}`
+  const loading = roundsQuery.isPending || uploadsQuery.isPending
+  const error = roundsQuery.isError || uploadsQuery.isError || dashboard.isError
+  return <>
+    <PageHeader title={t("Your workspace", "งานของคุณ")} subtitle={t("Upload files. Answer questions. Download the results.", "อัปโหลดไฟล์ ตอบคำถามที่จำเป็น แล้วดาวน์โหลดผลลัพธ์")}
+      actions={<Link to="/imports/new" className="btn btn-primary btn-lg"><Upload size={16} /> {t("Upload files", "อัปโหลดไฟล์")}</Link>} />
+    {error && <div role="alert" className="card p-4 mb-5 text-bad">Some tasks could not be loaded. <button className="btn btn-sm ml-2" onClick={() => { void roundsQuery.refetch(); void uploadsQuery.refetch(); void dashboard.refetch() }}>Try again</button></div>}
+    <Workflow />
+    <WorkRoundDashboard />
+    <Section title={t("Needs your attention", "งานที่รอคุณตรวจ")} className="mb-7" actions={<Link to="/review" className="btn btn-ghost btn-sm">{t("Questions & issues", "คำถามและปัญหา")} <ArrowRight size={14} /></Link>}>
+      {loading && <div className="p-5 flex gap-2 items-center text-muted"><Spinner /> Loading tasks…</div>}
+      {unknown.map((u) => <Link key={u.id} to={`/uploads/${u.id}`} className="flex flex-wrap items-center gap-3 px-5 py-4 border-b border-line hover:bg-surface-2">
+        <span className="flex-1 min-w-[180px]"><span className="block font-medium break-words">{u.label}</span><span className="block text-muted text-[13px] mt-1">{u.stuck ? `${u.stuck} files paused. Resume processing to continue.` : `${u.counts.needs_customer} files need a customer before processing can continue.`}</span></span>
+        <span className="btn btn-sm">{u.stuck ? 'Resume upload' : 'Choose customer'} <ArrowRight size={14} /></span>
+      </Link>)}
+      {waiting.slice(0, 6).map((r) => {
+        const step = nextStep(r)
+        return <Link key={r.id} to={target(r)} className="flex flex-wrap items-center gap-3 px-5 py-4 border-b border-line last:border-0 hover:bg-surface-2">
+          <span className="flex-1 min-w-[180px]"><span className="block font-medium break-words">{r.customer?.name ?? r.customer?.code} <span className="font-normal text-muted">· {r.label}</span></span><span className="block text-[13px] text-muted mt-1">{t(step.action || 'Processing', step.th)}</span></span>
+          <Badge tone={step.tone === 'problem' ? 'bad' : 'warn'}>{step.tone === 'problem' ? t('Action required', 'ต้องตรวจสอบ') : t('Ready for review', 'รอคุณตรวจ')}</Badge>
+          <span className="btn btn-sm">{t(step.action || "Open", "ตรวจรายการนี้")} <ArrowRight size={14} /></span>
         </Link>
-      ))}
-
-      <div className="grid sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
-        {todos.map((t) => <TodoCard key={t.key} t={t} onOpen={(r) => nav(t.href(r))} />)}
-      </div>
-      {rounds && waiting === 0 && (
-        <div className="card p-5 mb-6 flex items-center gap-3"><CircleCheck className="text-ok" /><div><div className="heading">All clear</div><div className="hint-th">ไม่มีงานค้าง ทุกรอบผ่านอัตโนมัติหรือส่งออกแล้ว</div></div></div>
-      )}
-
-      {/* how a delivery flows, once, for people new to the tool */}
-      <div className="card p-5 mb-6">
-        <div className="flex items-center justify-between gap-4 flex-wrap">
-          <div>
-            <div className="heading">How every delivery flows</div>
-            <div className="hint-th">ทุกไฟล์ที่ลูกค้าส่งมาผ่าน 5 ขั้นนี้ หน้า Import แต่ละรอบจะบอกว่าอยู่ขั้นไหนและต้องกดอะไรต่อ</div>
-          </div>
-          <Link to="/guide" className="btn btn-outline btn-sm"><BookOpen size={13} /> Where is each feature?</Link>
-        </div>
-        <ol className="grid grid-cols-1 md:grid-cols-5 gap-2 mt-4">
-          {ROUND_STEPS.map((s) => (
-            <li key={s.n} className="flex items-start gap-2.5 rounded-[10px] bg-surface-2 px-3 py-2.5">
-              <span className="w-6 h-6 rounded-full text-white text-[12px] font-bold grid place-items-center shrink-0" style={{ backgroundImage: 'var(--gradient-brand)' }}>{s.n}</span>
-              <span className="leading-tight"><span className="block font-semibold text-navy text-[12.5px]">{s.title}</span><span className="block text-[11.5px] text-muted mt-0.5">{s.th}</span></span>
-            </li>
-          ))}
-        </ol>
-      </div>
-
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
-        <Stat label="Handled automatically" value={d?.automation_rate !== null && d?.automation_rate !== undefined ? fmtPct(d.automation_rate) : '–'} hint={`${fmtInt(d?.auto_approved_mappings)} of ${fmtInt(d?.mapping_versions)} mappings approved by policy`} />
-        <Stat label="Rows published" value={fmtInt(d?.published_rows)} hint={`${fmtInt(d?.approved_mappings)} customers with an approved mapping`} />
-        <Stat label="Customers" value={fmtInt(d?.customers)} hint={`${fmtInt(rounds?.length)} deliveries in total`} />
-        <Stat label="AI spend" value={d ? `$${d.llm.cost_usd.toFixed(2)}` : '–'} hint={d ? (d.llm.provider === 'mock' ? 'AI off — rule-based mapping only' : `${fmtInt(d.llm.calls)} calls · ${d.llm.model}`) : ''} />
-      </div>
-
-      <Section title="Recent imports" hint="ไฟล์ล่าสุดที่ลูกค้าส่งมา และขั้นที่ต้องทำต่อ" actions={<Link to="/imports" className="btn btn-ghost btn-sm">All imports <ArrowUpRight size={13} /></Link>}>
-        {d?.recent_rounds?.length ? (
-          <table className="table">
-            <thead><tr><th>Customer</th><th>Round</th><th>Next step</th><th className="text-right">Rows</th><th className="text-right">Updated</th></tr></thead>
-            <tbody>
-              {d.recent_rounds.map((r) => <tr key={r.id} className="row-link" onClick={() => nav(`/rounds/${r.id}`)}>
-                <td><span className="font-semibold text-navy">{r.customer?.code}</span> <span className="text-muted">{r.customer?.name}</span></td>
-                <td className="text-ink-2">{r.label}</td>
-                <td><NextStepCell r={r} /></td>
-                <td className="text-right tnum">{fmtInt(r.summary.rows)}</td>
-                <td className="text-right text-muted">{timeAgo(r.updated_at)}</td>
-              </tr>)}
-            </tbody>
-          </table>
-        ) : (
-          <div className="p-4"><Empty title="No imports yet" body="Upload a customer's ERP export to get started." action={<Link to="/imports/new" className="btn btn-primary">New import</Link>} /></div>
-        )}
-      </Section>
-    </>
-  )
-}
-
-const TONE: Record<Todo['tone'], string> = { warn: 'text-warn bg-warn-soft', bad: 'text-bad bg-bad-soft', signal: 'text-signal bg-signal-soft', ok: 'text-ok bg-ok-soft' }
-
-function TodoCard({ t, onOpen }: { t: Todo; onOpen: (r: ImportRound) => void }) {
-  const n = t.rounds.length
-  return (
-    <div className={cn('card p-4 flex flex-col', n > 0 && 'ring-1 ring-inset ring-brand-blue/20')}>
-      <div className="flex items-start justify-between gap-2">
-        <span className={cn('w-9 h-9 rounded-[10px] grid place-items-center', TONE[t.tone])}><t.icon size={18} /></span>
-        <span className={cn('text-[30px] font-bold tnum leading-none', n ? 'text-navy' : 'text-ink-3')}>{n}</span>
-      </div>
-      <div className="heading mt-3">{t.title}</div>
-      <div className="hint-th mt-0.5 min-h-[32px]">{t.th}</div>
-      <ul className="mt-2 flex-1">
-        {t.rounds.slice(0, 3).map((r) => (
-          <li key={r.id}>
-            <button onClick={() => onOpen(r)} className="w-full flex items-center gap-2 py-1.5 border-t border-line text-left text-[12.5px] hover:text-signal">
-              <span className="font-semibold text-navy shrink-0">{r.customer?.code}</span>
-              <span className="text-muted truncate flex-1">{r.label}</span>
-              <ArrowRight size={13} className="shrink-0 text-ink-3" />
-            </button>
-          </li>
-        ))}
-        {n === 0 && <li className="py-1.5 border-t border-line text-[12.5px] text-ink-3">Nothing waiting</li>}
-      </ul>
-      {n > 3 && <Link to={t.all} className="text-[12.5px] font-semibold text-signal mt-2 hover:underline">+{n - 3} more · {t.cta}</Link>}
-    </div>
-  )
+      })}
+      {!loading && !error && !waiting.length && !unknown.length && <div className="p-6 flex items-center gap-3 text-ink-2"><CircleCheck size={20} className="text-ok" /><div className="min-w-0"><div className="font-medium"><Localized>Nothing needs your attention</Localized></div><div className="text-[13px] text-muted"><Localized>You can upload another batch or open a recent file below.</Localized></div></div></div>}
+      {waiting.length > 6 && <Link to="/imports?view=files" className="block px-5 py-3 text-signal text-[13px] hover:underline">View all {waiting.length} tasks →</Link>}
+    </Section>
+    <Section title={t("Recent files", "ไฟล์ล่าสุด")} actions={<Link to="/imports?view=files" className="btn btn-ghost btn-sm">{t("Upload history", "ประวัติไฟล์")} <ArrowRight size={14} /></Link>}>
+      {d?.recent_rounds?.length ? <table className="table"><thead><tr><th><Localized>Customer / delivery</Localized></th><th><Localized>Next action</Localized></th><th className="text-right"><Localized>Records</Localized></th><th><Localized>Updated</Localized></th><th aria-label={t('Open', 'เปิด')}></th></tr></thead><tbody>
+        {d.recent_rounds.map((r) => <tr key={r.id}>
+          <td><Link to={`/rounds/${r.id}`} className="font-medium text-navy hover:underline">{r.customer?.name ?? r.customer?.code}</Link><div className="text-muted text-[12.5px] mt-0.5">{r.label}</div></td>
+          <td><NextStepCell r={r} /></td><td className="text-right tnum">{fmtInt(r.summary.rows)}</td><td className="text-muted whitespace-nowrap">{timeAgo(r.updated_at)}</td>
+          <td><Link to={`/rounds/${r.id}`} className="btn btn-ghost btn-sm" aria-label={`Open ${r.label}`}>{r.status === 'published' ? <Download size={15} /> : <ArrowRight size={15} />}</Link></td>
+        </tr>)}
+      </tbody></table> : <div className="p-4"><Empty title={dashboard.isPending ? 'Loading files…' : 'Your first file starts here'} body="Upload an Excel or CSV file to create your first delivery." /></div>}
+    </Section>
+    <details className="mt-6 group"><summary className="text-[13px] text-muted py-2 hover:text-ink"><Localized>Workspace statistics</Localized></summary><div className="grid sm:grid-cols-2 xl:grid-cols-4 gap-3 mt-3">
+      <Stat label="Handled automatically" value={d?.automation_rate != null ? fmtPct(d.automation_rate) : '–'} hint="Mappings approved by policy" />
+      <Stat label="Records exported" value={fmtInt(d?.published_rows)} />
+      <Stat label="Customers" value={fmtInt(d?.customers)} />
+      <Stat label={t('Estimated AI cost', 'ค่า AI โดยประมาณ')} value={d ? `$${d.llm.cost_usd.toFixed(2)}` : '–'} hint={d ? `${fmtInt(d.llm.calls)} ${t('usage records · not provider billing', 'รายการที่บันทึก · ไม่ใช่ยอดเรียกเก็บ')}` : ''} />
+    </div></details>
+    <div className="mt-5 flex items-center gap-2 text-[13px] text-muted"><span>New to FORMA?</span><Link to="/guide" className="text-signal hover:underline">See how importing works →</Link></div>
+  </>
 }
 
 export function NextStepCell({ r }: { r: ImportRound }): ReactNode {
+  const { t } = usePreferences()
   const s = nextStep(r)
   const tone = s.tone === 'problem' ? 'bad' : s.tone === 'todo' ? 'warn' : s.tone === 'done' ? 'ok' : 'neutral'
   return (
-    <span className="flex items-center gap-2">
-      <Badge tone={tone} className="whitespace-nowrap shrink-0">{s.step <= 5 ? `Step ${s.step}/5` : 'Done'}</Badge>
-      <span className="leading-tight"><span className="block text-[12.5px] font-semibold text-ink">{s.action ?? (s.tone === 'done' ? 'Exported' : 'Working…')}</span><span className="block text-[11.5px] text-muted">{s.th}</span></span>
+    <span className="flex items-center gap-2 min-w-[160px]">
+      <Badge tone={tone} className="whitespace-nowrap shrink-0">{r.status === 'published' ? t('Done', 'เสร็จแล้ว') : `${workflowStep(r.status)}/3`}</Badge>
+      <span className="leading-tight"><span className="block text-[12.5px] font-semibold text-ink">{t(s.action ?? (s.tone === 'done' ? 'Downloaded' : 'Working…'), s.th || 'กำลังดำเนินการ')}</span></span>
     </span>
   )
 }

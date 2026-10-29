@@ -1,11 +1,14 @@
+import { Localized } from '../lib/locale'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { Check, X, Save, Stethoscope, ChevronDown, ChevronRight, Braces, Plus, Trash2, Wand2, ShieldAlert, Network } from 'lucide-react'
+import { Check, X, Save, SearchCheck, ChevronDown, ChevronRight, Braces, Plus, Trash2, PencilLine, ShieldAlert, Network, PanelLeft, PanelRight } from 'lucide-react'
 import { api, type SandboxItem, type SandboxReport, type Expr, type FieldChange, type FieldMapping, type FieldSpec, type MappingDocument, type TableProfile } from '../lib/api'
 import { cn, describeExpr, fmtInt, pyRegex } from '../lib/utils'
 import { Badge, Confidence, HelpStrip, RiskDot, RiskLevel, Spinner, StatusBadge, Tabs, FindingRow, Modal } from '../components/ui'
 import { useToast } from '../lib/toast'
+import { useMediaQuery } from '../lib/useMediaQuery'
+import { WorkspacePanel } from '../components/WorkspacePanel'
 import { RelationshipMap } from './RelationshipMap'
 
 type Group = { title: string; pointer: string | null; source: string; fields: FieldSpec[] }
@@ -63,7 +66,12 @@ export function MappingStudio() {
   const [selected, setSelected] = useState<string | null>(null) // target pointer being edited
   const [selectedSource, setSelectedSource] = useState<string | null>(null)
   const [params] = useSearchParams() // ?tab= and ?view= open a tool directly (links from the round page, the guide, Ctrl+K)
-  const [rightTab, setRightTab] = useState<StudioTab>(() => (STUDIO_TABS as readonly string[]).includes(params.get('tab') ?? '') ? (params.get('tab') as StudioTab) : 'json')
+  const [rightTab, setActiveTab] = useState<StudioTab>(() => (STUDIO_TABS as readonly string[]).includes(params.get('tab') ?? '') ? (params.get('tab') as StudioTab) : 'json')
+  const dockPanels = useMediaQuery('(min-width: 1440px)')
+  const [rightOpen, setRightOpen] = useState(() => !!params.get('tab'))
+  const [sourcesOpen, setSourcesOpen] = useState(() => window.matchMedia('(min-width: 1440px)').matches)
+  const setRightTab = (tab: StudioTab) => { setActiveTab(tab); setRightOpen(true); if (!window.matchMedia('(min-width: 1440px)').matches) setSourcesOpen(false) }
+  const [toolsOpen, setToolsOpen] = useState(false)
   const [showRaw, setShowRaw] = useState(false)
   const [rawText, setRawText] = useState('')
   const [comment, setComment] = useState('')
@@ -75,10 +83,21 @@ export function MappingStudio() {
   useEffect(() => {
     if (mv?.document && !doc) {
       setDoc(mv.document)
-      setSelectedSource(mv.document.record.root_source)
-      if (mv.policy.field_review?.needs_decision?.length && !params.get('tab')) setRightTab('changes') // a drifted format: show what needs a decision first
+      const focus = params.get('field')
+      const collection = mv.document.collections.find(c => c.fields.some(f => f.target === focus))
+      if (focus) setSelected(focus)
+      setSelectedSource(collection?.source || mv.document.record.root_source)
+      if (mv.policy.field_review?.needs_decision?.length && !params.get('tab') && !focus) setRightTab('changes') // a drifted format: show what needs a decision first
     }
   }, [mv, doc, params])
+
+  const focusField = params.get('field')
+  const focusReady = !!doc && !!schema?.fields
+  useEffect(() => {
+    if (!focusField || !focusReady) return
+    const frame = requestAnimationFrame(() => document.getElementById(`mapping-field-${focusField}`)?.scrollIntoView({ block: 'center' }))
+    return () => cancelAnimationFrame(frame)
+  }, [focusField, focusReady])
 
   // ---- profiles of this round (columns per source) --------------------------------------------
   const tables: TableProfile[] = useMemo(() => {
@@ -189,21 +208,24 @@ export function MappingStudio() {
   const locked = mv.status !== 'proposed'
 
   return (
-    <div className="h-screen flex flex-col">
+    <div className="workspace">
       {/* top bar */}
-      <div className="h-14 px-5 border-b border-line bg-surface flex items-center gap-4 shrink-0">
-        <div className="min-w-0 flex items-center gap-3">
+      <div className="workspace-toolbar">
+        <div className="min-w-0 flex items-center gap-3 flex-wrap">
           <Link to={`/rounds/${roundId}`} className="text-muted hover:text-ink text-[12.5px]">← {round?.customer?.code} · {round?.label}</Link>
-          <span className="heading">Mapping Studio</span>
+          <span className="heading">Match fields</span>
           <span className="text-muted tnum">v{mv.version}</span>
           <StatusBadge status={mv.status} />
           <Confidence value={mv.confidence} />
           {dirty && <Badge tone="warn">unsaved edits</Badge>}
         </div>
-        <div className="ml-auto flex items-center gap-2">
-          <button className={cn('btn btn-sm', view === 'relationships' && 'bg-signal-soft text-signal border-signal/30')} title="แผนภาพว่าชีต/ตารางเชื่อมกันยังไง" onClick={() => setView(view === 'relationships' ? 'fields' : 'relationships')}><Network size={13} /> {view === 'relationships' ? 'Back to fields' : 'How sheets connect'}</button>
-          <button className={cn('btn btn-sm', showRaw && 'bg-signal-soft text-signal border-signal/30')} onClick={() => { setRawText(JSON.stringify(doc, null, 2)); setShowRaw(true) }}><Braces size={13} /> JSON</button>
-          <button className="btn btn-sm" title="ให้ระบบหาสาเหตุของปัญหาที่พบ" onClick={() => { setRightTab('diagnosis'); diagnose.mutate() }}><Stethoscope size={13} /> Diagnose</button>
+        <div className="ml-auto flex items-center gap-2 flex-wrap">
+          {view === 'fields' && <><button className="btn btn-sm btn-ghost" aria-expanded={sourcesOpen && (dockPanels || !rightOpen)} onClick={() => { setSourcesOpen(!sourcesOpen); if (!window.matchMedia('(min-width: 1440px)').matches) setRightOpen(false) }}><PanelLeft size={15} /> Sources</button><button className="btn btn-sm btn-ghost" aria-expanded={rightOpen} onClick={() => { setRightOpen(!rightOpen); if (!window.matchMedia('(min-width: 1440px)').matches) setSourcesOpen(false) }}><PanelRight size={15} /> Inspect results</button></>}
+
+          <button className={cn('btn btn-sm', view === 'relationships' && 'bg-signal-soft text-signal border-signal/30')} title="แผนภาพว่าชีต/ตารางเชื่อมกันยังไง" onClick={() => setView(view === 'relationships' ? 'fields' : 'relationships')}><Network size={13} /> {view === 'relationships' ? 'Back to fields' : 'Relationships'}</button>
+          <button className="btn btn-sm btn-ghost" aria-expanded={toolsOpen} onClick={() => setToolsOpen(!toolsOpen)}>More tools <ChevronDown size={14} /></button>
+          {toolsOpen && <><button className={cn('btn btn-sm', showRaw && 'bg-signal-soft text-signal border-signal/30')} onClick={() => { setRawText(JSON.stringify(doc, null, 2)); setShowRaw(true) }}><Braces size={13} /> JSON</button>
+          <button className="btn btn-sm" title="ให้ระบบหาสาเหตุของปัญหาที่พบ" onClick={() => { setRightTab('diagnosis'); diagnose.mutate() }}><SearchCheck size={13} /> Explain issues</button></>}
           {dirty && <button className="btn btn-sm btn-primary" disabled={save.isPending} onClick={() => save.mutate()}><Save size={13} /> Save as new version</button>}
           {!dirty && !locked && (
             <>
@@ -217,15 +239,15 @@ export function MappingStudio() {
         </div>
       </div>
 
-      {/* policy strip */}
-      <div className="px-5 py-2 border-b border-line bg-surface-2/60 text-[12.5px] flex items-center gap-4 shrink-0 overflow-x-auto">
-        <RiskLevel level={mv.policy.risk_level} factors={mv.policy.risk_factors} />
-        <span className={cn('font-medium', mv.policy.decision === 'auto_approve' ? 'text-ok' : mv.policy.decision === 'block' ? 'text-bad' : 'text-warn')}>{mv.policy.decision?.replace('_', ' ')}</span>
-        {mv.policy.risk_level === 'high' && mv.policy.risk_factors?.map((r) => <span key={r} className="text-bad whitespace-nowrap">• {r}</span>)}
-        {mv.policy.impact?.affected_records !== undefined && !mv.policy.impact.high && <span className="text-ink-2 whitespace-nowrap tnum">• {fmtInt(mv.policy.impact.affected_records)} of {fmtInt(mv.policy.impact.of_records)} records change vs the approved mapping</span>}
-        {mv.policy.reasons.map((r, i) => <span key={i} className="text-ink-2 whitespace-nowrap">• {r}</span>)}
-        {mv.open_questions.length > 0 && <span className="text-warn whitespace-nowrap">• {mv.open_questions.length} open question{mv.open_questions.length > 1 ? 's' : ''}</span>}
-      </div>
+      <details className="px-5 py-3 border-b border-line bg-surface shrink-0 max-h-[30dvh] overflow-auto">
+        <summary className="text-[13px] text-ink-2"><span className="inline-flex items-center gap-2 flex-wrap ml-2"><RiskLevel level={mv.policy.risk_level} factors={mv.policy.risk_factors} /><span>{mv.policy.decision === 'block' ? 'Approval is blocked. Review the reasons before continuing.' : mv.policy.decision === 'review' ? 'Review the suggested fields before approving.' : 'Fields checked. Inspect the output before continuing.'}</span><span className="text-muted">Details</span></span></summary>
+        <div className="mt-3 space-y-2 text-[13px]">
+          {mv.policy.impact?.affected_records !== undefined && !mv.policy.impact.high && <p className="font-medium">{fmtInt(mv.policy.impact.affected_records)} of {fmtInt(mv.policy.impact.of_records)} records change compared with the approved version.</p>}
+          {mv.policy.reasons.map((reason, i) => <p key={i}>{reason}</p>)}
+          {mv.policy.risk_factors?.map((reason, i) => <p key={i} className="text-warn">{reason}</p>)}
+          {!!mv.open_questions.length && <p className="text-warn">{mv.open_questions.length} questions need review in the field list.</p>}
+        </div>
+      </details>
 
       <div className="px-5 py-2 border-b border-line bg-surface shrink-0">
         <HelpStrip id="studio">
@@ -236,9 +258,9 @@ export function MappingStudio() {
       </div>
 
       {view === 'relationships' ? <RelationshipMap roundId={roundId} doc={doc} schemaFields={schema.fields ?? []} locked={locked} onChange={update} /> : (
-      <div className="flex-1 min-h-0 grid grid-cols-[240px_minmax(0,1fr)_380px]">
+      <div className="workspace-body">
         {/* LEFT: sources */}
-        <aside className="border-r border-line overflow-auto bg-surface">
+        <WorkspacePanel open={sourcesOpen && (dockPanels || !rightOpen)} onClose={() => setSourcesOpen(false)} title="Source columns" side="left">
           <div className="px-4 pt-4 pb-2 text-[12px] text-muted">Sources — {doc.sources.length} table{doc.sources.length > 1 ? 's' : ''} from {round?.files?.length} file{(round?.files?.length ?? 0) > 1 ? 's' : ''}</div>
           {doc.sources.map((s) => {
             const cols = columnsFor(s.id)
@@ -251,7 +273,7 @@ export function MappingStudio() {
                 <button className="w-full flex items-center gap-2 px-4 py-2.5 hover:bg-surface-2 text-left" onClick={() => { setSelectedSource(open ? null : s.id); if (!open) setRightTab('source') }}>
                   {open ? <ChevronDown size={14} className="text-muted" /> : <ChevronRight size={14} className="text-muted" />}
                   <span className="font-medium truncate">{s.id}</span>
-                  <Badge tone={s.id === doc.record.root_source ? 'signal' : 'neutral'} className="ml-auto h-5 text-[11px]">{s.id === doc.record.root_source ? 'root' : s.role}</Badge>
+                  <Badge tone={s.id === doc.record.root_source ? 'signal' : 'neutral'} className="ml-auto min-h-6 text-[12px]">{s.id === doc.record.root_source ? 'root' : s.role}</Badge>
                 </button>
                 <div className="px-4 pb-2 -mt-1 text-[11.5px] text-muted truncate">{s.sheet?.name ? `sheet “${s.sheet.name}”` : 'CSV'}{' · '}header row {String((s.table as { header_row?: number | string }).header_row ?? 'auto')}</div>
                 {open && (
@@ -271,15 +293,15 @@ export function MappingStudio() {
             )
           })}
           <div className="p-4 text-[11.5px] text-muted leading-relaxed">Drag a column onto a target field — or select a field, then click <span className="text-signal">use</span> on a column. <span className="text-signal">Relationships</span> shows how the tables connect.</div>
-        </aside>
+        </WorkspacePanel>
 
         {/* CENTER: target fields */}
-        <section className="overflow-auto min-w-0">
+        <section className="overflow-auto min-w-0 flex-1" aria-label="Target fields">
           {groups.map((g) => {
             const coll = g.pointer ? doc.collections.find((c) => c.target === g.pointer) : null
             return (
               <div key={g.title} className="border-b border-line">
-                <div className="sticky top-0 z-10 bg-paper/95 backdrop-blur px-5 py-2.5 flex items-center gap-3 border-b border-line">
+                <div className="sticky top-0 z-10 bg-paper px-5 py-3 flex flex-wrap items-center gap-3 border-b border-line">
                   <span className="font-semibold">{g.title}</span>
                   {g.pointer ? (
                     coll ? (
@@ -300,11 +322,11 @@ export function MappingStudio() {
                       const { fm, coll: c } = getMapping(f.pointer)
                       const isSel = selected === f.pointer
                       return (
-                        <li key={f.pointer} className={cn('px-5 border-b border-line/70 last:border-0', dropOn === f.pointer ? 'bg-signal-soft ring-2 ring-inset ring-signal' : isSel ? 'bg-signal-soft/50' : 'hover:bg-surface-2/50')}
+                        <li key={f.pointer} id={`mapping-field-${f.pointer}`} className={cn('px-5 border-b border-line/70 last:border-0', dropOn === f.pointer ? 'bg-signal-soft ring-2 ring-inset ring-signal' : isSel ? 'bg-signal-soft/50' : 'hover:bg-surface-2/50')}
                           onDragOver={(e) => { if (locked || !e.dataTransfer.types.includes(DRAG_TYPE)) return; e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; if (dropOn !== f.pointer) setDropOn(f.pointer) }}
                           onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDropOn((p) => (p === f.pointer ? null : p)) }}
                           onDrop={(e) => { e.preventDefault(); setDropOn(null); const raw = e.dataTransfer.getData(DRAG_TYPE); if (!raw) return; const v = JSON.parse(raw) as { source: string; column: string }; pointAt(f.pointer, v.source, v.column); setSelected(f.pointer) }}>
-                          <button className="w-full grid grid-cols-[minmax(140px,180px)_minmax(0,1fr)_104px_56px] items-center gap-3 py-2 text-left" onClick={() => setSelected(isSel ? null : f.pointer)}>
+                          <button className="mapping-field" onClick={() => setSelected(isSel ? null : f.pointer)}>
                             <span className="flex items-center gap-2 min-w-0"><RiskDot risk={f.risk} /><span className={cn('mono truncate', !fm && 'text-muted')}>{f.pointer.replace(/^\/[^/]+\/\*\//, '').replace(/^\//, '')}</span>{f.required && <span className="text-[10px] text-muted">req</span>}</span>
                             <span className={cn('truncate text-[12.5px]', fm ? 'text-ink' : 'text-muted italic')}>{fm ? describeExpr(fm.expr) : 'not mapped'}</span>
                             <span>{fm && <Confidence value={fm.confidence} />}</span>
@@ -327,8 +349,8 @@ export function MappingStudio() {
         </section>
 
         {/* RIGHT: preview */}
-        <aside className="border-l border-line bg-surface flex flex-col min-h-0">
-          <Tabs value={rightTab} onChange={setRightTab} items={[{ id: 'json', label: 'Output preview', count: pv?.records.length, hint: 'ตัวอย่าง JSON ที่จะได้จากไฟล์นี้' }, { id: 'source', label: 'Source rows', hint: 'แถวต้นทางจากไฟล์' }, { id: 'findings', label: 'Problems', count: pv?.findings.length, hint: 'ปัญหาที่พบตอนลองรัน mapping' }, { id: 'changes', hint: 'field ไหนเปลี่ยนจาก mapping ที่ approve แล้ว ตรวจกับข้อมูลจริง', label: <span className="flex items-center gap-1">What changed{(mv.policy.field_review?.needs_decision?.length ?? 0) > 0 && <span className="w-1.5 h-1.5 rounded-full bg-warn" />}</span> }, { id: 'diagnosis', label: 'Diagnosis', hint: 'สาเหตุของปัญหาและวิธีแก้' }, { id: 'compare', hint: 'รันคู่กับ mapping เดิม ดูว่า record/ราคาไหนเปลี่ยน', label: <span className="flex items-center gap-1">Compare outputs{mv.policy.sandbox?.verdict === 'fail' && <span className="w-1.5 h-1.5 rounded-full bg-bad" />}</span> }]} />
+        <WorkspacePanel open={rightOpen} onClose={() => { setRightOpen(false); if (!dockPanels) setSourcesOpen(false) }} title="Inspect results">
+          <Tabs menu value={rightTab} onChange={setRightTab} items={[{ id: 'json', label: 'Output preview', count: pv?.records.length, hint: 'ตัวอย่าง JSON ที่จะได้จากไฟล์นี้' }, { id: 'source', label: 'Source rows', hint: 'แถวต้นทางจากไฟล์' }, { id: 'findings', label: 'Problems', count: pv?.findings.length, hint: 'ปัญหาที่พบตอนลองรัน mapping' }, { id: 'changes', labelText: 'What changed', hint: 'field ไหนเปลี่ยนจาก mapping ที่ approve แล้ว ตรวจกับข้อมูลจริง', label: <span className="flex items-center gap-1">What changed{(mv.policy.field_review?.needs_decision?.length ?? 0) > 0 && <span className="w-1.5 h-1.5 rounded-full bg-warn" />}</span> }, { id: 'diagnosis', label: 'Diagnosis', hint: 'สาเหตุของปัญหาและวิธีแก้' }, { id: 'compare', labelText: 'Compare outputs', hint: 'รันคู่กับ mapping เดิม ดูว่า record/ราคาไหนเปลี่ยน', label: <span className="flex items-center gap-1">Compare outputs{mv.policy.sandbox?.verdict === 'fail' && <span className="w-1.5 h-1.5 rounded-full bg-bad" />}</span> }]} />
           <div className="flex-1 overflow-auto p-3">
             {rightTab === 'json' && (
               <>
@@ -356,7 +378,7 @@ export function MappingStudio() {
               diagnose.isPending ? <div className="text-muted text-[12.5px] flex items-center gap-2"><Spinner /> analysing…</div> : diagnose.data ? (
                 <div className="flex flex-col gap-3 text-[12.5px]">
                   {diagnose.data.summary_th && <div className="card p-3">{diagnose.data.summary_th}</div>}
-                  {!diagnose.data.ai && <Badge tone="neutral">rule-based — configure an LLM for AI root-cause analysis</Badge>}
+                  {!diagnose.data.ai && <p className="text-muted">Analysis uses the validation rules. Connect a model in Settings for additional explanations.</p>}
                   {diagnose.data.root_causes.map((rc, i) => (
                     <div key={i} className="card p-3">
                       <div className="font-medium">{rc.finding}</div>
@@ -365,22 +387,22 @@ export function MappingStudio() {
                     </div>
                   ))}
                   {diagnose.data.root_causes.length === 0 && <div className="text-muted">Nothing to diagnose — the mapping runs clean on the sample.</div>}
-                  {diagnose.data.patched_mapping && !locked && <button className="btn btn-primary btn-sm self-start" onClick={() => { setDoc(diagnose.data!.patched_mapping!); setDirty(true); toast.push({ kind: 'info', title: 'Patched mapping loaded', detail: 'Review the changes, then save as a new version.' }) }}><Wand2 size={13} /> Apply suggested patch</button>}
+                  {diagnose.data.patched_mapping && !locked && <button className="btn btn-primary btn-sm self-start" onClick={() => { setDoc(diagnose.data!.patched_mapping!); setDirty(true); toast.push({ kind: 'info', title: 'Patched mapping loaded', detail: 'Review the changes, then save as a new version.' }) }}><PencilLine size={13} /> Review suggested fix</button>}
                 </div>
-              ) : <div className="text-muted text-[12.5px]">Click Diagnose to explain findings and get suggested fixes.</div>
+              ) : <div className="text-muted text-[12.5px]">Choose Explain issues to see the cause and suggested fixes.</div>
             )}
           </div>
-        </aside>
+        </WorkspacePanel>
       </div>
       )}
 
-      <Modal open={showRaw} onClose={() => setShowRaw(false)} title="Mapping document (JSON)" width="max-w-4xl" footer={<><button className="btn" onClick={() => setShowRaw(false)}>Close</button>{!locked && <button className="btn btn-primary" onClick={() => { try { const d = JSON.parse(rawText) as MappingDocument; setDoc(d); setDirty(true); setShowRaw(false) } catch (e) { toast.push({ kind: 'bad', title: 'Invalid JSON', detail: (e as Error).message }) } }}>Apply</button>}</>}>
+      <Modal open={showRaw} onClose={() => setShowRaw(false)} title="Mapping document (JSON)" width="max-w-4xl" footer={<><button className="btn" onClick={() => setShowRaw(false)}><Localized>Close</Localized></button>{!locked && <button className="btn btn-primary" onClick={() => { try { const d = JSON.parse(rawText) as MappingDocument; setDoc(d); setDirty(true); setShowRaw(false) } catch (e) { toast.push({ kind: 'bad', title: 'Invalid JSON', detail: (e as Error).message }) } }}>Apply</button>}</>}>
         <textarea className="input mono h-[60vh] py-2 resize-none" value={rawText} onChange={(e) => setRawText(e.target.value)} spellCheck={false} />
       </Modal>
-      <Modal open={reject} onClose={() => setReject(false)} title="Reject this mapping" width="max-w-md" footer={<><button className="btn" onClick={() => setReject(false)}>Cancel</button><button className="btn btn-danger" onClick={() => rejectM.mutate()}>Reject</button></>}>
+      <Modal open={reject} onClose={() => setReject(false)} title="Reject this mapping" width="max-w-md" footer={<><button className="btn" onClick={() => setReject(false)}><Localized>Cancel</Localized></button><button className="btn btn-danger" onClick={() => rejectM.mutate()}>Reject</button></>}>
         <textarea className="input h-24 py-2" placeholder="Why? (kept in the audit log and shown to the AI on the next proposal)" value={comment} onChange={(e) => setComment(e.target.value)} />
       </Modal>
-      <Modal open={overrideOpen} onClose={() => setOverrideOpen(false)} title="Override the policy block" width="max-w-md" footer={<><button className="btn" onClick={() => setOverrideOpen(false)}>Cancel</button><button className="btn btn-danger" disabled={!comment.trim() || approve.isPending} onClick={() => approve.mutate(true)}><ShieldAlert size={13} /> Approve anyway</button></>}>
+      <Modal open={overrideOpen} onClose={() => setOverrideOpen(false)} title="Override the policy block" width="max-w-md" footer={<><button className="btn" onClick={() => setOverrideOpen(false)}><Localized>Cancel</Localized></button><button className="btn btn-danger" disabled={!comment.trim() || approve.isPending} onClick={() => approve.mutate(true)}><ShieldAlert size={13} /> Approve anyway</button></>}>
         <div className="space-y-3 text-[13px]">
           <ul className="text-ink-2 space-y-1">{mv.policy.reasons.map((r, i) => <li key={i}>• {r}</li>)}</ul>
           <textarea className="input h-24 py-2" placeholder="Why is this safe to approve? (required, kept in the audit log)" value={comment} onChange={(e) => setComment(e.target.value)} />
@@ -445,7 +467,7 @@ function FieldEditor({ field, fm, columns, locked, onChange, onRemove }: { field
             <input className="input h-7 w-56 text-[12.5px] mono" disabled={locked} value={constVal} placeholder='"THB" · true · 7' onChange={(e) => setConstVal(e.target.value)} onBlur={() => apply({})} />
           )}
           {!['col', 'const', 'trim', 'upper', 'normalize_whitespace', 'parse_bool', 'pack_size', 'to_list', 'strip_leading_zeros'].includes(presetOp) && (
-            <input className={cn('input h-7 flex-1 min-w-[200px] text-[12px] mono', paramErr && 'border-bad')} disabled={locked} value={params} onChange={(e) => setParams(e.target.value)} onBlur={() => apply({})} title={paramErr ?? 'params (JSON)'} />
+            <input className={cn('input h-7 flex-1 min-w-0 text-[12px] mono', paramErr && 'border-bad')} disabled={locked} value={params} onChange={(e) => setParams(e.target.value)} onBlur={() => apply({})} title={paramErr ?? 'params (JSON)'} />
           )}
           {onRemove && !locked && <button className="btn btn-ghost btn-sm text-bad" onClick={onRemove}><Trash2 size={12} /> unmap</button>}
         </div>
@@ -489,16 +511,19 @@ function ChangeCard({ c, onRevert }: { c: FieldChange; onRevert: ((c: FieldChang
   const side = (x: FieldChange['before']) => (x ? (x.reads.length ? x.reads.join(', ') : describeExpr(x.expr)) : '—')
   return (
     <div className="card p-2.5">
-      <div className="flex items-center gap-2">
-        <RiskDot risk={c.risk ?? 'low'} /><span className="mono truncate">{c.pointer}</span><Badge tone={c.status === 'removed' ? 'bad' : c.status === 'added' ? 'info' : 'warn'} className="h-5 px-1.5 text-[10.5px]">{c.status}</Badge>
+      <div className="flex items-center gap-2 flex-wrap">
+        <RiskDot risk={c.risk ?? 'low'} /><span className="mono truncate">{c.pointer}</span><Badge tone={c.status === 'removed' ? 'bad' : c.status === 'added' ? 'info' : 'warn'} className="min-h-6 px-1.5 text-[12px]">{c.status}</Badge>
         {onRevert && <button className="btn btn-ghost btn-sm ml-auto text-signal" onClick={() => onRevert(c)}>{c.status === 'added' ? 'Remove' : 'Use approved'}</button>}
       </div>
-      <div className="mt-1 mono text-[11.5px]"><span className="text-muted">{side(c.before)}</span> → <span>{c.status === 'removed' ? 'not mapped' : side(c.after)}</span></div>
-      {c.before && c.after && describeExpr(c.before.expr) !== describeExpr(c.after.expr) && <div className="text-muted text-[11.5px] mono">{describeExpr(c.before.expr)} → {describeExpr(c.after.expr)}</div>}
+      <div className="grid grid-cols-2 gap-2 mt-3 text-[12.5px]">
+        <div className="rounded-lg bg-surface-2 p-3 min-w-0"><div className="text-muted mb-1">Previously approved</div><div className="break-words">{side(c.before)}</div></div>
+        <div className="rounded-lg border border-line p-3 min-w-0"><div className="text-muted mb-1">Proposed</div><div className="break-words">{c.status === 'removed' ? 'Not mapped' : side(c.after)}</div></div>
+      </div>
+      {c.before && c.after && describeExpr(c.before.expr) !== describeExpr(c.after.expr) && <details className="text-muted text-[12px] mt-2"><summary>Transformation details</summary><div className="mono break-words mt-1">{describeExpr(c.before.expr)} → {describeExpr(c.after.expr)}</div></details>}
       {c.check && (
         <div className={cn('mt-1.5 rounded-[var(--radius-sm)] px-2 py-1', CHECK_TONE[c.check.verdict] ?? 'bg-surface-2')}>
           {c.check.summary}
-          {c.check.examples?.length ? <div className="mono text-[11px] opacity-90">{c.check.examples.slice(0, 3).map((e) => `${e.identity}: ${fmt(e.before)} → ${fmt(e.after)}`).join(' · ')}</div> : null}
+          {c.check.examples?.length ? <div className="overflow-auto mt-2"><table className="w-full text-[12px]"><thead><tr className="text-left"><th>Record</th><th>Before</th><th>After</th></tr></thead><tbody>{c.check.examples.slice(0, 3).map((e, i) => <tr key={i}><td className="pr-2 py-1">{e.identity}</td><td className="pr-2">{fmt(e.before)}</td><td>{fmt(e.after)}</td></tr>)}</tbody></table></div> : null}
         </div>
       )}
     </div>
@@ -557,7 +582,7 @@ function SandboxView({ mappingId, report, live }: { mappingId: string; report: S
       {report.override_conflicts && report.override_conflicts.length > 0 && (
         <div className="card p-3 border-warn/40">
           <div className="font-medium text-warn mb-1">{report.override_conflicts.length} persistent override{report.override_conflicts.length > 1 ? 's' : ''} collide with this mapping</div>
-          <ul className="flex flex-col gap-1 text-[12px]">{report.override_conflicts.slice(0, 20).map((c, i) => <li key={i}><Badge tone="warn" className="h-5 px-1.5 text-[10.5px] mr-1.5">{c.kind.replace('_', ' ')}</Badge>{c.message}</li>)}</ul>
+          <ul className="flex flex-col gap-1 text-[12px]">{report.override_conflicts.slice(0, 20).map((c, i) => <li key={i}><Badge tone="warn" className="min-h-6 px-1.5 text-[12px] mr-1.5">{c.kind.replace('_', ' ')}</Badge>{c.message}</li>)}</ul>
           <div className="text-muted text-[11.5px] mt-1.5">Overrides are re-applied on every import of this customer. Keep or remove them on the customer page before approving.</div>
         </div>
       )}

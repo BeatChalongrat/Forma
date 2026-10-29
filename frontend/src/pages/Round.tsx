@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { FileSpreadsheet, Table2 } from 'lucide-react'
 import { api, waitForJob, type SourceFile, type TableProfile } from '../lib/api'
-import { fmtBytes, fmtDate, fmtInt, cn } from '../lib/utils'
+import { formatLabel, fmtBytes, fmtDate, fmtInt, cn } from '../lib/utils'
 import { PageHeader, StatusBadge, Section, Badge, Confidence, Drawer, KV, Spinner, FindingRow, Empty } from '../components/ui'
 import { RoundSteps } from '../components/RoundSteps'
 import { useToast } from '../lib/toast'
@@ -43,27 +43,27 @@ export function RoundPage() {
       <PageHeader
         crumbs={<><Link to="/imports" className="hover:text-ink">Imports</Link><span>/</span><Link to={`/customers/${r.customer_id}`} className="hover:text-ink">{r.customer?.code}</Link></>}
         title={<span>{r.customer?.name} <span className="text-muted font-normal">· {r.label}</span></span>}
-        subtitle={<span className="flex items-center gap-2 flex-wrap"><StatusBadge status={r.status} />{drift && <Badge tone={driftTone(drift)}>format: {drift.replace('_', ' ')}</Badge>}<span className="text-muted">{fmtDate(r.created_at)}</span></span>}
+        subtitle={<span className="flex items-center gap-2 flex-wrap"><StatusBadge status={r.status} />{drift && <Badge tone={driftTone(drift)}>format: {formatLabel(drift)}</Badge>}<span className="text-muted">{fmtDate(r.created_at)}</span></span>}
         hint="รอบนี้อยู่ขั้นไหน และต้องทำอะไรต่อ ดูที่แถบด้านล่าง"
       />
 
       <RoundSteps r={r} busy={runJob.isPending || doExport.isPending} onRun={(k) => runJob.mutate(k)} onExport={(id, fmt) => doExport.mutate({ id, fmt })} />
 
-      <div className="flex items-baseline gap-3 mb-3"><h2 className="heading text-[16px]">Details</h2><span className="hint-th">ไฟล์ mapping ทุกเวอร์ชัน dataset และงานเบื้องหลังของรอบนี้</span></div>
+      <details className="mt-6" open={r.status === 'blocked' || r.status === 'failed'}><summary className="text-[14px] font-medium text-ink-2 mb-4">Files, issues &amp; version history</summary>
       <div className="grid lg:grid-cols-[1fr_380px] gap-4">
         <div className="flex flex-col gap-4">
           <Section title="Files">
             <table className="table">
-              <thead><tr><th>File</th><th>Sheets</th><th>Tables</th><th>Fingerprint</th><th>vs approved format</th><th></th></tr></thead>
+              <thead><tr><th>File</th><th>Sheets</th><th>Tables</th><th>vs approved format</th><th></th></tr></thead>
               <tbody>
                 {r.files?.map((f) => (
-                  <tr key={f.id} className="row-link" onClick={() => setFileOpen(f)}>
-                    <td><div className="flex items-center gap-2"><FileSpreadsheet size={15} className="text-muted" /><span className="font-medium">{f.name}</span><span className="text-muted tnum text-[12px]">{fmtBytes(f.size)}</span>{f.duplicate_of && <Badge tone="info">seen before</Badge>}{f.error && <Badge tone="bad">error</Badge>}</div></td>
+                  <tr key={f.id} >
+                    <td><div className="flex items-center gap-2 flex-wrap"><FileSpreadsheet size={15} className="text-muted" /><span className="font-medium break-all">{f.name}</span><span className="text-muted tnum text-[12px]">{fmtBytes(f.size)}</span>{f.duplicate_of && <Badge tone="info">seen before</Badge>}{f.error && <Badge tone="bad">error</Badge>}</div></td>
                     <td className="text-muted">{f.sheets.join(', ')}</td>
                     <td className="tnum">{f.tables}</td>
-                    <td className="mono text-muted">{f.fingerprint?.slice(0, 10)}</td>
-                    <td>{f.drift ? <Badge tone={driftTone(f.drift.classification)}>{f.drift.classification.replace('_', ' ')} · {Math.round(f.drift.similarity * 100)}%</Badge> : <span className="text-muted">first time</span>}{f.drift?.matches_other_customer && <Badge tone="bad" className="ml-1">matches {f.drift.matches_other_customer.customer_code}</Badge>}</td>
-                    <td className="text-right"><button className="btn btn-ghost btn-sm">Inspect</button></td>
+
+                    <td>{f.drift ? <Badge tone={driftTone(f.drift.classification)}>{formatLabel(f.drift.classification)} · {Math.round(f.drift.similarity * 100)}%</Badge> : <span className="text-muted">first time</span>}{f.drift?.matches_other_customer && <Badge tone="bad" className="ml-1">matches {f.drift.matches_other_customer.customer_code}</Badge>}</td>
+                    <td className="text-right"><button className="btn btn-ghost btn-sm" onClick={() => setFileOpen(f)} aria-label={`Inspect ${f.name}`}>Inspect</button></td>
                   </tr>
                 ))}
               </tbody>
@@ -115,7 +115,7 @@ export function RoundPage() {
 
         <div className="flex flex-col gap-4">
           {latestMapping?.open_questions?.length ? (
-            <Section title="Open questions from the mapper">
+            <Section title="Questions to review">
               <ul className="p-4 flex flex-col gap-2 text-[13px]">{latestMapping.open_questions.map((q, i) => <li key={i} className="flex gap-2"><span className="text-warn">?</span><span>{q}</span></li>)}</ul>
             </Section>
           ) : null}
@@ -123,17 +123,17 @@ export function RoundPage() {
             <Section title="What changed in the format">
               <ul className="p-4 flex flex-col gap-1.5 text-[12.5px]">
                 {r.summary.drift_report.changes.slice(0, 12).map((c, i) => (
-                  <li key={i} className="flex gap-2"><Badge tone={String(c.kind).includes('removed') ? 'bad' : String(c.kind).includes('renamed') ? 'warn' : 'info'} className="h-5 px-1.5 text-[11px]">{String(c.kind).replace('_', ' ')}</Badge><span className="mono truncate">{c.from !== undefined ? `${c.from} → ${c.to}` : (c.header as string) ?? (c.sheet as string) ?? ''}</span></li>
+                  <li key={i} className="flex gap-2"><Badge tone={String(c.kind).includes('removed') ? 'bad' : String(c.kind).includes('renamed') ? 'warn' : 'info'} className="min-h-6 px-1.5 text-[12px]">{String(c.kind).replace('_', ' ')}</Badge><span className="mono truncate">{c.from !== undefined ? `${c.from} → ${c.to}` : (c.header as string) ?? (c.sheet as string) ?? ''}</span></li>
                 ))}
               </ul>
             </Section>
           )}
           {latestDataset && (
-            <Section title="Latest dataset findings">
+            <Section title="Data issues">
               <div className="p-3">{latestDataset.findings.length ? latestDataset.findings.slice(0, 10).map((f, i) => <FindingRow key={i} f={f} />) : <div className="text-muted text-center py-3">No findings.</div>}</div>
             </Section>
           )}
-          <Section title="Jobs">
+          <Section title="Processing history">
             <ul className="p-3 text-[12.5px] flex flex-col gap-1">
               {r.jobs?.map((j) => (
                 <li key={j.id} className="flex items-center justify-between gap-2">
@@ -147,6 +147,7 @@ export function RoundPage() {
         </div>
       </div>
 
+      </details>
       <FileDrawer roundId={roundId} file={fileOpen} onClose={() => setFileOpen(null)} />
     </>
   )

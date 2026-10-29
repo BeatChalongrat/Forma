@@ -1,71 +1,71 @@
-import { useCallback, useMemo, useRef, useState } from 'react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Link, useNavigate } from 'react-router-dom'
+import { Localized } from '../lib/locale'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { FileSpreadsheet, UploadCloud, X, Plus } from 'lucide-react'
 import { api, waitForJob, type Job } from '../lib/api'
-import { fmtBytes, fmtInt, timeAgo, cn } from '../lib/utils'
-import { PageHeader, Section, Badge, Spinner, Modal } from '../components/ui'
+import { fmtBytes, cn } from '../lib/utils'
+import { PageHeader, Section, Spinner, Modal } from '../components/ui'
 import { NextStepCell } from './Overview'
 import { useToast } from '../lib/toast'
+import { dateInZone, usePreferences } from '../lib/preferences'
+import { Workflow } from '../components/Workflow'
+import { WorkRounds } from '../components/WorkRounds'
 
 export function Imports() {
-  const [status, setStatus] = useState('')
-  const { data } = useQuery({ queryKey: ['rounds', status], queryFn: () => api.rounds({ status: status || undefined }), refetchInterval: 8000 })
-  const { data: uploads } = useQuery({ queryKey: ['uploads'], queryFn: api.uploads, refetchInterval: 5000 })
-  const nav = useNavigate()
-  const statuses: [string, string][] = [['', 'All'], ['review', 'Check mapping'], ['blocked', 'Blocked'], ['approved', 'Create data'], ['transformed', 'Check data'], ['approved_data', 'Ready to export'], ['published', 'Exported'], ['failed', 'Failed']]
-  return (
-    <>
-      <PageHeader title="Imports" subtitle="Every delivery from every customer, newest first." hint="ทุกไฟล์ที่ลูกค้าส่งมา คอลัมน์ Next step บอกว่าต้องทำอะไรต่อ — กดที่แถวเพื่อเปิดรอบนั้น" actions={<Link to="/imports/new" className="btn btn-primary btn-lg"><UploadCloud size={15} /> Upload files</Link>} />
-      {!!uploads?.length && (
-        <Section className="mb-5" title="Recent uploads" hint="การอัปโหลดหลายไฟล์ล่าสุด — กดเพื่อดูแต่ละไฟล์และดาวน์โหลด JSON">
-          <ul>
-            {uploads.slice(0, 5).map((u) => {
-              const ready = u.counts.ready ?? 0
-              const need = (u.counts.needs_customer ?? 0) + (u.counts.needs_review ?? 0) + (u.counts.needs_data_check ?? 0)
-              return (
-                <li key={u.id} className="border-b border-line last:border-0">
-                  <Link to={`/uploads/${u.id}`} className="flex items-center gap-4 px-4 py-2.5 hover:bg-surface-2/60">
-                    <span className="min-w-0 flex-1"><span className="block font-semibold text-navy truncate">{u.label}</span><span className="block text-[11.5px] text-muted">{u.total} files · {timeAgo(u.created_at)}</span></span>
-                    <span className="w-40 h-1.5 rounded-full bg-line overflow-hidden"><span className="block h-full" style={{ width: `${(ready / Math.max(1, u.total)) * 100}%`, backgroundImage: 'var(--gradient-brand)' }} /></span>
-                    <span className="text-[12px] tnum w-24 text-right"><b className="text-ok">{ready}</b> JSON ready</span>
-                    {u.stuck > 0 ? <Badge tone="bad">stuck — resume</Badge> : need > 0 ? <Badge tone="warn">{need} need you</Badge> : !u.done ? <Badge>working…</Badge> : <Badge tone="ok">done</Badge>}
-                  </Link>
-                </li>
-              )
-            })}
-          </ul>
-        </Section>
-      )}
-      <div className="flex items-center gap-1.5 mb-4 flex-wrap">
-        {statuses.map(([s, label]) => (
-          <button key={s} onClick={() => setStatus(s)} className={cn('btn btn-sm rounded-full', status === s ? 'bg-signal-soft border-signal/40 text-navy' : 'btn-ghost text-ink-2')}>{label}</button>
-        ))}
+  const { prefs, t, date } = usePreferences()
+  const [params, setParams] = useSearchParams()
+  const timezone = params.get('timezone') || prefs.timezone
+  const filters = Object.fromEntries(['status', 'customer_id', 'search', 'start', 'end'].map(k => [k, params.get(k) || undefined]))
+  const offset = Math.max(0, Number(params.get('offset')) || 0)
+  const invalid = !!(filters.start && filters.end && filters.start > filters.end)
+  const filesView = params.get('view') === 'files' || ['search', 'status', 'customer_id', 'start', 'end', 'offset'].some(k => params.has(k))
+  const query = useQuery({ queryKey: ['history', filters, offset, timezone], queryFn: () => api.history({ ...filters, offset, timezone }), enabled: !invalid && filesView, refetchInterval: filesView ? 10000 : false, placeholderData: keepPreviousData })
+  const { data: customers } = useQuery({ queryKey: ['customers'], queryFn: api.customers })
+  const [searchText, setSearchText] = useState(filters.search ?? '')
+  useEffect(() => { setSearchText(filters.search ?? '') }, [filters.search])
+  useEffect(() => {
+    if (searchText === (params.get('search') || '')) return
+    const timer = setTimeout(() => setParams(current => { const next = new URLSearchParams(current); next.delete('offset'); searchText ? next.set('search', searchText) : next.delete('search'); return next }, { replace: true }), 300)
+    return () => clearTimeout(timer)
+  }, [searchText, params, setParams])
+  const change = (values: Record<string, string>) => setParams(current => {
+    const next = new URLSearchParams(current)
+    next.delete('offset')
+    Object.entries(values).forEach(([k, v]) => v ? next.set(k, v) : next.delete(k))
+    return next
+  }, { replace: true })
+  const statuses = [['', t('All statuses', 'ทุกสถานะ')], ['review', t('Needs answers', 'รอตอบคำถาม')], ['blocked', t('Check file', 'ต้องตรวจไฟล์')], ['transformed', t('Check results', 'ตรวจผลลัพธ์')], ['approved_data', t('Ready to download', 'พร้อมดาวน์โหลด')], ['published', t('Downloaded', 'ส่งออกแล้ว')], ['failed', t('Processing failed', 'ประมวลผลไม่สำเร็จ')], ['uploaded', t('Reading files', 'กำลังอ่านไฟล์')], ['profiled', t('Matching fields', 'กำลังจับคู่ข้อมูล')], ['approved', t('Ready to create results', 'พร้อมสร้างผลลัพธ์')], ['auto_approved', t('Matched automatically', 'จับคู่ผ่านอัตโนมัติ')], ['rejected', t('Needs correction', 'ต้องแก้ไข')]]
+  if (!filesView) return <WorkRounds />
+  return <>
+    <PageHeader title={t('Upload history', 'ประวัติไฟล์')} subtitle={t('Find past deliveries by the date the files were received.', 'ค้นหาไฟล์ย้อนหลังตามวันที่รับไฟล์เข้าระบบ')} actions={<Link to="/imports/new" className="btn btn-primary"><UploadCloud size={16} />{t('Upload files', 'อัปโหลดไฟล์')}</Link>} />
+    <div className="flex gap-2 mb-4"><Link className="btn btn-ghost" to="/imports">{t('Work rounds', 'ตามรอบงาน')}</Link><span className="btn bg-signal-soft" aria-current="page">{t('All files', 'ไฟล์ทั้งหมด')}</span></div>
+    <div className="card p-4 mb-5 space-y-4">
+      <div className="flex flex-wrap gap-2">{[[0, t('Today', 'วันนี้')], [6, t('Last 7 days', '7 วันล่าสุด')], [29, t('Last 30 days', '30 วันล่าสุด')]].map(([days, label]) => <button key={days} className="btn btn-sm" onClick={() => change({ start: dateInZone(timezone, Number(days)), end: dateInZone(timezone) })}>{label}</button>)}<button className="btn btn-ghost btn-sm" onClick={() => { setSearchText(''); setParams({ view: 'files' }) }}>{t('Clear filters', 'ล้างตัวกรอง')}</button></div>
+      <div className="grid sm:grid-cols-2 xl:grid-cols-5 gap-3">
+        <label className="grid gap-1 text-sm">{t('Uploaded from', 'อัปโหลดตั้งแต่')}<input className="input min-w-0" type="date" value={filters.start ?? ''} onChange={e => change({ start: e.target.value })} /></label>
+        <label className="grid gap-1 text-sm">{t('Through', 'จนถึงวันที่')}<input className="input min-w-0" type="date" value={filters.end ?? ''} onChange={e => change({ end: e.target.value })} /></label>
+        <label className="grid gap-1 text-sm">{t('Customer', 'ลูกค้า')}<select className="input min-w-0" value={filters.customer_id ?? ''} onChange={e => change({ customer_id: e.target.value })}><option value="">{t('All customers', 'ลูกค้าทั้งหมด')}</option>{customers?.map(c => <option key={c.id} value={c.id}>{c.code} · {c.name}</option>)}</select></label>
+        <label className="grid gap-1 text-sm">{t('Status', 'สถานะ')}<select className="input min-w-0" value={filters.status ?? ''} onChange={e => change({ status: e.target.value })}>{statuses.map(([v, label]) => <option key={v} value={v}>{label}</option>)}</select></label>
+        <label className="grid gap-1 text-sm">{t('File, delivery or customer', 'ไฟล์ ชุดอัปโหลด หรือลูกค้า')}<input className="input min-w-0" maxLength={200} value={searchText} placeholder={t('Search…', 'ค้นหา…')} onChange={e => setSearchText(e.target.value)} /></label>
       </div>
-      <Section title={`${fmtInt(data?.length)} rounds`}>
-        <table className="table">
-          <thead><tr><th>Customer</th><th>Round</th><th>Files</th><th>Next step</th><th>Format</th><th className="text-right">Rows</th><th className="text-right">Updated</th></tr></thead>
-          <tbody>
-            {data?.map((r) => (
-              <tr key={r.id} className="row-link" onClick={() => nav(`/rounds/${r.id}`)}>
-                <td><span className="font-semibold text-navy">{r.customer?.code}</span> <span className="text-muted">{r.customer?.name}</span></td>
-                <td>{r.label}</td>
-                <td className="text-muted max-w-[260px] truncate" title={r.files?.map((f) => f.name).join(', ')}>{r.files?.map((f) => f.name).join(', ')}</td>
-                <td><NextStepCell r={r} /></td>
-                <td>{r.summary.drift ? <Badge tone={r.summary.drift === 'identical' ? 'ok' : r.summary.drift === 'unrelated_file' ? 'bad' : 'warn'}>{r.summary.drift.replace('_', ' ')}</Badge> : <span className="text-muted">{r.summary.has_previous_approval === false ? 'first time' : '–'}</span>}</td>
-                <td className="text-right tnum">{fmtInt(r.summary.rows)}</td>
-                <td className="text-right text-muted">{timeAgo(r.updated_at)}</td>
-              </tr>
-            ))}
-            {data && data.length === 0 && <tr><td colSpan={7} className="text-center text-muted py-8">No rounds match this filter.</td></tr>}
-          </tbody>
-        </table>
-      </Section>
-    </>
-  )
+      <p className="text-xs text-muted">{t('Upload dates use', 'วันที่อัปโหลดใช้เขตเวลา')} {timezone} · {t('End date includes the whole day.', 'รวมทั้งวันของวันที่สิ้นสุด')}</p>
+      {invalid && <p role="alert" className="text-bad">{t('End date must be on or after the start date.', 'วันที่สิ้นสุดต้องไม่ก่อนวันที่เริ่มต้น')}</p>}
+    </div>
+    <Section title={t(`${query.data?.total ?? 0} deliveries`, `${query.data?.total ?? 0} รอบนำเข้า`)} actions={<span className="h-5 min-w-40 text-xs text-muted flex items-center justify-end gap-2" role="status">{!invalid && query.isFetching && <><Spinner />{t('Updating results…', 'กำลังอัปเดตผล…')}</>}</span>}>
+      {query.error && <p role="alert" className="p-4 text-bad">{t('Could not load history.', 'โหลดประวัติไม่ได้')} <button className="btn btn-sm" onClick={() => void query.refetch()}>{t('Try again', 'ลองใหม่')}</button></p>}
+      {!invalid && <table className="table"><thead><tr><th>{t('Customer / file', 'ลูกค้า / ไฟล์')}</th><th>{t('Next step', 'ขั้นตอนถัดไป')}</th><th>{t('Uploaded', 'วันที่อัปโหลด')}</th></tr></thead><tbody>
+        {query.isPending && <tr><td colSpan={3} className="p-8 text-center text-muted">{t('Loading files…', 'กำลังโหลดไฟล์…')}</td></tr>}
+        {query.data?.items.map(r => <tr key={r.id}><td className="max-w-[480px]"><Link to={`/rounds/${r.id}`} className="font-medium text-navy hover:underline break-words">{r.customer?.code} · {r.label || r.customer?.name}</Link><div className="text-xs text-muted mt-1 break-words">{r.files?.map(f => f.name).join(', ')}</div></td><td><NextStepCell r={r} /></td><td className="whitespace-nowrap text-muted">{date(r.uploaded_at)}</td></tr>)}
+        {query.data?.total === 0 && <tr><td colSpan={3} className="text-center p-8 text-muted">{t('No files match these filters.', 'ไม่พบไฟล์ที่ตรงกับตัวกรองนี้')}</td></tr>}
+      </tbody></table>}
+      <div className="p-4 flex items-center justify-between gap-3 border-t border-line"><button className="btn btn-sm" disabled={offset === 0} onClick={() => change({ offset: String(Math.max(0, offset - 50)) })}>{t('Previous', 'ก่อนหน้า')}</button><span className="text-sm text-muted">{t('Page', 'หน้า')} {Math.floor(offset / 50) + 1}</span><button className="btn btn-sm" disabled={!query.data || offset + 50 >= query.data.total} onClick={() => change({ offset: String(offset + 50) })}>{t('Next', 'ถัดไป')}</button></div>
+    </Section>
+  </>
 }
 
 export function NewImport() {
+  const { t } = usePreferences()
   const { data: customers } = useQuery({ queryKey: ['customers'], queryFn: api.customers })
   const [customerId, setCustomerId] = useState('')
   const [label, setLabel] = useState('')
@@ -112,15 +112,17 @@ export function NewImport() {
   return (
     <>
       <PageHeader title="New import" subtitle="Drop the files a customer sent. FORMA profiles them, finds or proposes a mapping, and tells you whether anything needs a decision." hint="1) ลากไฟล์มาวาง  2) เลือกลูกค้า  3) กด Upload and run — ระบบจะพาไปหน้ารอบนั้นและบอกขั้นต่อไป" />
+      <Workflow />
+      <p className="text-muted mb-4">{t("Files → field matching → checks. Only questions that need your decision will stop the process.", "รับไฟล์ → จับคู่คอลัมน์ → ตรวจข้อมูล ระบบจะหยุดถามเฉพาะจุดที่ต้องให้คุณตัดสินใจ")}</p>
       <div className="grid lg:grid-cols-[1fr_360px] gap-4">
         <div className="flex flex-col gap-4">
           <div
-            onDragOver={(e) => e.preventDefault()} onDrop={onDrop} onClick={() => inputRef.current?.click()}
+            onDragOver={(e) => e.preventDefault()} onDrop={onDrop} onClick={() => inputRef.current?.click()} role="button" tabIndex={0} aria-label="Choose files" onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); inputRef.current?.click() } }}
             className={cn('card border-dashed p-10 text-center cursor-pointer hover:border-signal/50 transition-colors', files.length && 'py-6')}
           >
             <input ref={inputRef} type="file" multiple accept=".xlsx,.xlsm,.csv,.txt,.tsv" className="hidden" onChange={(e) => setFiles((xs) => [...xs, ...Array.from(e.target.files ?? [])])} />
             <UploadCloud className="mx-auto text-muted" size={28} />
-            <div className="mt-2 font-medium">Drop Excel or CSV files here</div>
+            <div className="mt-2 font-medium"><Localized>Drop Excel or CSV files here</Localized></div>
             <div className="text-muted text-[12.5px]">.xlsx · .xlsm · .csv — several files per round are fine (products, prices, stock, promotions)</div>
           </div>
           {files.length > 0 && (
@@ -129,7 +131,7 @@ export function NewImport() {
                 {files.map((f, i) => (
                   <li key={i} className="flex items-center gap-3 px-4 py-2 border-b border-line last:border-0">
                     <FileSpreadsheet size={16} className="text-muted" />
-                    <span className="flex-1 truncate">{f.name}</span>
+                    <span className="flex-1 min-w-0 truncate" title={f.name}>{f.name}</span>
                     <span className="text-muted tnum text-[12px]">{fmtBytes(f.size)}</span>
                     <button className="btn btn-ghost btn-sm" onClick={() => setFiles((xs) => xs.filter((_, j) => j !== i))} aria-label="Remove"><X size={13} /></button>
                   </li>
@@ -174,7 +176,7 @@ export function NewImport() {
         </div>
       </div>
 
-      <Modal open={newCust} onClose={() => setNewCust(false)} title="New customer" footer={<><button className="btn" onClick={() => setNewCust(false)}>Cancel</button><button className="btn btn-primary" disabled={!form.code || createCustomer.isPending} onClick={() => createCustomer.mutate()}>Create</button></>} width="max-w-md">
+      <Modal open={newCust} onClose={() => setNewCust(false)} title="New customer" footer={<><button className="btn" onClick={() => setNewCust(false)}><Localized>Cancel</Localized></button><button className="btn btn-primary" disabled={!form.code || createCustomer.isPending} onClick={() => createCustomer.mutate()}>Create</button></>} width="max-w-md">
         <div className="flex flex-col gap-3">
           <label className="text-[12.5px] text-muted">Code<input className="input mt-1" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} placeholder="e.g. C123" /></label>
           <label className="text-[12.5px] text-muted">Name<input className="input mt-1" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Company name" /></label>

@@ -4,7 +4,7 @@
 
 ```
                         ┌────────────────────────── Web app (React) ───────────────────────────┐
-                        │ Home · Imports · Round (5 steps) · Studio · Review · Editor · Guide   │
+                        │ Home · Work rounds · Round · Studio · Review · Editor · Assistant · Guide │
                         └───────────────────────────────┬──────────────────────────────────────┘
                                                         │ REST (/api)
                         ┌───────────────────────────────┴──────────────────────────────────────┐

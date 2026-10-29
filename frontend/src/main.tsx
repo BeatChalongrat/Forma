@@ -21,6 +21,8 @@ import { GuidePage } from './pages/Guide'
 import { BulkUpload, UploadPage } from './pages/Upload'
 import { AuthCallback } from './pages/AuthCallback'
 import { ensureAuthenticated } from './lib/auth'
+import { PreferencesProvider } from './lib/preferences'
+import { AssistantPage } from './components/Assistant'
 
 const qc = new QueryClient({ defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false, staleTime: 5000 } } })
 
@@ -37,6 +39,7 @@ const router = createBrowserRouter([
       { path: 'rounds/:roundId', element: <RoundPage /> },
       { path: 'rounds/:roundId/mapping/:mappingId', element: <MappingStudio /> },
       { path: 'review', element: <ReviewCenter /> },
+      { path: 'assistant', element: <AssistantPage /> },
       { path: 'customers', element: <Customers /> },
       { path: 'customers/:customerId', element: <CustomerPage /> },
       { path: 'datasets/:datasetId', element: <DataEditor /> },
@@ -53,7 +56,7 @@ void ensureAuthenticated().finally(() => {
     <StrictMode>
       <QueryClientProvider client={qc}>
         <ToastProvider>
-          <RouterProvider router={router} />
+          <PreferencesProvider><RouterProvider router={router} /></PreferencesProvider>
         </ToastProvider>
       </QueryClientProvider>
     </StrictMode>,

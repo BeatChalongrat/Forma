@@ -1,7 +1,10 @@
+import { Localized } from '../lib/locale'
+import { usePreferences } from '../lib/preferences'
+import { providerName } from '../lib/providerName'
 import { useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowDown, ArrowUp, Bot, Check, FileJson, KeyRound, Plus, RotateCcw, Save, Star, Trash2, Upload, Wifi } from 'lucide-react'
+import { ArrowDown, ArrowUp, MessageSquare, Check, FileJson, KeyRound, Plus, RotateCcw, Save, Star, Trash2, Upload, Wifi } from 'lucide-react'
 import { api, ApiError, type AISettings, type AiProbe, type BackupKey, type Policy, type SchemaPreview } from '../lib/api'
 import { PageHeader, Section, Badge, RiskDot, Tabs, Json, KV, Modal, Spinner } from '../components/ui'
 import { cn, fmtDate } from '../lib/utils'
@@ -43,6 +46,7 @@ type AIForm = { provider: string; model: string; base_url: string; timeout_s: st
 const formOf = (ai: AISettings): AIForm => ({ provider: ai.provider, model: ai.model, base_url: ai.base_url ?? '', timeout_s: String(ai.timeout_s), max_retries: String(ai.max_retries) })
 
 function AITab() {
+  const { t } = usePreferences()
   const qc = useQueryClient()
   const toast = useToast()
   const { data: ai } = useQuery({ queryKey: ['ai-settings'], queryFn: api.aiSettings })
@@ -62,12 +66,12 @@ function AITab() {
   const dirty = draft !== null || key.trim() !== ''
   return (
     <div className="flex flex-col gap-4">
-      <ConnectCard ai={ai} />
+      <ConnectCard key={`${ai.provider}:${ai.base_url}:${ai.model}:${ai.updated_at}`} ai={ai} />
       <BackupKeysCard ai={ai} />
-      <div><button className="btn btn-ghost btn-sm" onClick={() => setAdvanced(!advanced)}>{advanced ? 'Hide' : 'Show'} advanced settings — provider, model, gateway URL, timeout</button></div>
+      <div><button className="btn btn-ghost btn-sm whitespace-normal text-left h-auto max-w-full" onClick={() => setAdvanced(!advanced)}>{advanced ? t('Hide advanced settings', 'ซ่อนการตั้งค่าขั้นสูง') : t('Show advanced settings — provider, model, gateway URL, timeout', 'การตั้งค่าขั้นสูง — ผู้ให้บริการ โมเดล Gateway และเวลารอ')}</button></div>
       {advanced && (
     <div className="grid lg:grid-cols-[1fr_340px] gap-4">
-      <Section title="Advanced settings" actions={ai.offline ? <Badge tone="warn">offline · deterministic mapper only</Badge> : <Badge tone="ok"><Bot size={12} /> {ai.active_provider} · {ai.model}</Badge>}>
+      <Section title="Advanced settings" actions={ai.offline ? <Badge tone="warn">offline · deterministic mapper only</Badge> : <Badge tone="ok"><MessageSquare size={12} /> {ai.active_provider} · {ai.model}</Badge>}>
         <div className="p-4 grid sm:grid-cols-2 gap-4 text-[13px]">
           <label className="flex flex-col gap-1.5"><span className="text-muted">Provider</span>
             <select className="input" value={f.provider} onChange={(e) => { const p = e.target.value; const known = ai.models[p] ?? []; setDraft({ ...f, provider: p, model: !known.length || known.includes(f.model) ? f.model : known[0] }) }}>{ai.providers.map((p) => <option key={p} value={p}>{p === 'mock' ? 'off (mock)' : p}</option>)}</select>
@@ -83,7 +87,7 @@ function AITab() {
         {ai.warning && <div className="mx-4 mb-3 rounded-[var(--radius-md)] bg-warn-soft text-warn px-3 py-2 text-[12.5px]">{ai.warning}</div>}
         <div className="px-4 pb-4 flex flex-wrap items-center gap-2">
           <button className="btn btn-primary" disabled={!dirty || save.isPending} onClick={() => save.mutate()}><Save size={14} /> Save</button>
-          {dirty && <button className="btn" onClick={() => { setDraft(null); setKey('') }}>Discard</button>}
+          {dirty && <button className="btn" onClick={() => { setDraft(null); setKey('') }}><Localized>Discard</Localized></button>}
           <button className="btn" disabled={test.isPending || dirty} onClick={() => test.mutate()}><Wifi size={14} /> {test.isPending ? 'Testing…' : 'Test connection'}</button>
           {ai.api_key_source === 'ui' && <button className="btn btn-ghost" onClick={() => removeKey.mutate()}><KeyRound size={14} /> Remove saved key</button>}
           {test.data && <Badge tone={test.data.ok ? 'ok' : 'bad'}>{test.data.ok ? `connected · ${test.data.latency_ms} ms` : test.data.message}</Badge>}
@@ -104,58 +108,35 @@ function AITab() {
 
 /** Paste a key, press Connect: the provider is recognised, a model chosen, the key tried and saved encrypted. */
 function ConnectCard({ ai }: { ai: AISettings }) {
+  const { t } = usePreferences()
   const qc = useQueryClient()
-  const toast = useToast()
+  const [editing, setEditing] = useState(ai.offline)
   const [key, setKey] = useState('')
-  const [provider, setProvider] = useState('')
-  const [replacing, setReplacing] = useState(false)
-  const k = key.trim()
-  const detected = k.startsWith('sk-ant-') ? 'anthropic' : k.startsWith('sk-') ? 'openai' : null
-  const connect = useMutation({
-    mutationFn: () => api.connectAi(key, detected ? undefined : provider || undefined),
-    onSuccess: (r) => { setKey(''); setReplacing(false); qc.invalidateQueries(); toast.push({ kind: 'ok', title: 'AI connected', detail: `${r.ai.active_provider} · ${r.ai.model} · answered in ${r.test.latency_ms} ms` }) },
-  })
-  const disconnect = useMutation({
-    mutationFn: () => api.saveAiSettings({ api_key: '', provider: null, model: null }),
-    onSuccess: () => { qc.invalidateQueries(); toast.push({ kind: 'ok', title: 'Main key removed', detail: ai.backups.length ? 'Backup keys answer from now on.' : 'FORMA keeps mapping with its deterministic mapper.' }) },
-  })
-  const model = useMutation({
-    mutationFn: (m: string) => api.saveAiSettings({ model: m || null }),
-    onSuccess: (r) => { qc.invalidateQueries(); toast.push({ kind: 'ok', title: 'Model changed', detail: `${r.active_provider} · ${r.model}` }) },
-    onError: (e: Error) => toast.push({ kind: 'bad', title: 'Not changed', detail: e.message }),
-  })
-  const primary = ai.active_route === 'primary'
-  if (!ai.offline && primary && !replacing) {
-    return (
-      <Section title="AI" actions={ai.circuit_open ? <Badge tone="warn">main key resting after failures — backups answer</Badge> : undefined}>
-        <div className="p-4 flex flex-wrap items-center gap-3 text-[13px]">
-          <Badge tone="ok"><Check size={12} /> Connected</Badge>
-          <span className="text-ink-2">{ai.active_provider}{ai.api_key_hint && <> · key {ai.api_key_hint}</>}</span>
-          <span className="flex items-center gap-2"><span className="text-muted">Model</span><span className="w-56"><ModelPicker provider={ai.provider} models={ai.models} value={ai.model} disabled={model.isPending} saveOnBlur onChange={(m) => m && m !== ai.model && model.mutate(m)} /></span></span>
-          <div className="ml-auto flex gap-2">
-            <button className="btn btn-sm" onClick={() => setReplacing(true)}><KeyRound size={13} /> Replace key</button>
-            {ai.api_key_source === 'ui' && <button className="btn btn-sm btn-ghost" disabled={disconnect.isPending} onClick={() => disconnect.mutate()}>Disconnect</button>}
-          </div>
-        </div>
-      </Section>
-    )
-  }
-  return (
-    <Section title="Connect AI" actions={replacing ? undefined : ai.offline ? <Badge tone="warn">offline · deterministic mapper only</Badge> : <Badge tone="warn">no main key · a backup key answers</Badge>}>
-      <div className="p-4 flex flex-col gap-3 text-[13px]">
-        <p className="text-ink-2">Paste your API key and press Connect. OpenAI (<span className="mono">sk-…</span>) and Anthropic (<span className="mono">sk-ant-…</span>) keys are recognised automatically; FORMA picks the model, tries the key with one tiny call and saves it encrypted — nothing else to fill in.</p>
-        <div className="flex flex-wrap items-center gap-2">
-          <input className="input mono flex-1 min-w-[280px]" type="password" autoComplete="off" autoFocus value={key} onChange={(e) => setKey(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && k && (detected || provider)) connect.mutate() }} placeholder="Paste API key here" />
-          {k && (detected
-            ? <Badge tone="signal">{detected === 'anthropic' ? 'Anthropic' : 'OpenAI'} key</Badge>
-            : <select className="input w-52" value={provider} onChange={(e) => setProvider(e.target.value)}><option value="">Which provider is this?</option><option value="openai">OpenAI</option><option value="anthropic">Anthropic</option><option value="openai_compatible">Gateway (set its URL under advanced)</option></select>)}
-          <button className="btn btn-primary" disabled={!k || connect.isPending || (!detected && !provider)} onClick={() => connect.mutate()}><Wifi size={14} /> {connect.isPending ? 'Checking the key…' : 'Connect'}</button>
-          {replacing && <button className="btn" onClick={() => { setReplacing(false); setKey('') }}>Cancel</button>}
-        </div>
-        {connect.error && <div className="rounded-[var(--radius-md)] bg-bad-soft text-bad px-3 py-2 text-[12.5px]">{connect.error.message}</div>}
-      </div>
-    </Section>
-  )
+  const [provider, setProvider] = useState(ai.provider === 'mock' ? 'openai' : ai.provider)
+  const [url, setUrl] = useState(ai.base_url ?? (ai.provider === 'anthropic' ? 'https://api.anthropic.com' : 'https://api.openai.com/v1'))
+  const [model, setModel] = useState(ai.provider === 'mock' ? '' : ai.model)
+  const discovery = useMutation({ mutationFn: () => api.discoverModels({ provider, api_key: key.trim() || undefined, base_url: url.trim() || undefined }) })
+  const connect = useMutation({ mutationFn: () => api.connectAi(key.trim(), provider, model.trim(), url.trim()), onSuccess: () => { setKey(''); setEditing(false); qc.invalidateQueries() } })
+  const test = useMutation({ mutationFn: api.testAi })
+  const busy = discovery.isPending || connect.isPending
+  const providerChanged = (value: string) => { setProvider(value); setUrl(value === 'anthropic' ? 'https://api.anthropic.com' : value === 'openai' ? 'https://api.openai.com/v1' : ''); setModel(''); discovery.reset(); connect.reset() }
+  return <Section title={t('AI connection', 'การเชื่อมต่อ AI')} actions={<Badge tone={ai.offline ? 'warn' : 'ok'}>{ai.offline ? t('AI is off', 'ยังไม่เปิด AI') : t('Connection configured', 'ตั้งค่าการเชื่อมต่อแล้ว')}</Badge>}>
+    {!editing ? <div className="p-5 space-y-4"><div className="flex items-start justify-between flex-wrap gap-4"><div><div className="font-semibold text-navy text-lg">{providerName(ai.provider, ai.base_url)}</div><div className="text-sm mt-1">{ai.active_model ?? ai.model}</div><div className="text-xs text-muted mt-2 break-all">{ai.base_url || (ai.provider === 'anthropic' ? 'https://api.anthropic.com' : 'https://api.openai.com/v1')}</div></div><div className="flex gap-2 flex-wrap"><button className="btn" onClick={() => setEditing(true)}>{t('Edit connection', 'แก้ไขการเชื่อมต่อ')}</button><button className="btn" disabled={test.isPending} onClick={() => test.mutate()}>{test.isPending ? t('Testing…', 'กำลังทดสอบ…') : t('Test connection', 'ทดสอบการเชื่อมต่อ')}</button></div></div><p className="text-xs text-muted">{t('Your key is saved securely. The assistant and file mapping use this connection.', 'บันทึกคีย์ไว้แล้ว ผู้ช่วยและการจับคู่ข้อมูลใช้การเชื่อมต่อนี้')}</p>{ai.warning && <p className="text-warn text-sm">{ai.warning}</p>}{test.data && <p role="status" className={test.data.ok ? 'text-ok text-sm' : 'text-bad text-sm'}>{test.data.ok ? t('Connection test passed', 'ทดสอบการเชื่อมต่อผ่านแล้ว') : t('Connection test failed. Edit the connection to check its settings.', 'ทดสอบไม่ผ่าน เปิดแก้ไขการเชื่อมต่อเพื่อตรวจการตั้งค่า')}</p>}{test.error && <p role="alert" className="text-bad text-sm">{t('Could not test the connection.', 'ยังทดสอบการเชื่อมต่อไม่ได้')}</p>}</div> : <>
+    <form className="p-5 space-y-4" onSubmit={e => { e.preventDefault(); connect.mutate() }}>
+      <p className="text-sm text-ink-2 leading-6">{t('Choose your provider, endpoint and model. Direct OpenAI and Anthropic connections use the standard endpoint below. For another gateway, use its OpenAI-compatible base URL.', 'เลือกผู้ให้บริการ Endpoint และโมเดล ถ้าใช้ OpenAI หรือ Anthropic โดยตรงใช้ URL มาตรฐานด้านล่างได้เลย ถ้าใช้ gateway อื่นให้ใส่ Base URL ที่รองรับ OpenAI')}</p>
+      <fieldset disabled={busy} className="grid sm:grid-cols-2 gap-4 min-w-0">
+        <label className="grid gap-1.5 text-sm">{t('Provider', 'ผู้ให้บริการ')}<select className="input" value={provider} onChange={e => providerChanged(e.target.value)}><option value="openai">OpenAI</option><option value="anthropic">Anthropic</option><option value="openai_compatible">OpenAI-compatible / Gateway</option></select></label>
+        <label className="grid gap-1.5 text-sm">{t('Base endpoint URL', 'Base endpoint URL')}<input className="input mono min-w-0" type="url" value={url} required onChange={e => { setUrl(e.target.value); discovery.reset() }} placeholder="https://your-gateway/v1" /></label>
+        <label className="grid gap-1.5 text-sm sm:col-span-2">{t('API key', 'API key')}<input className="input mono" type="password" autoComplete="off" value={key} onChange={e => { setKey(e.target.value); discovery.reset() }} placeholder={ai.api_key_set ? t('Leave blank to reuse the saved key for the same endpoint', 'เว้นว่างเพื่อใช้คีย์ที่บันทึกไว้กับ endpoint เดิม') : t('Paste API key', 'วาง API key')} /></label>
+        <div className="sm:col-span-2 flex items-center gap-3 flex-wrap"><button type="button" className="btn" onClick={() => discovery.mutate()} disabled={!url.trim() || (!key.trim() && !ai.api_key_set)}>{discovery.isPending ? t('Loading models…', 'กำลังดึงโมเดล…') : t('Load models from API', 'ดึงรายชื่อโมเดลจาก API')}</button><span className="text-xs text-muted">{t('This reads the catalogue without saving your settings.', 'อ่านรายชื่อโมเดล ยังไม่บันทึกการตั้งค่า')}</span></div>
+        {!!discovery.data?.models.length && <label className="grid gap-1.5 text-sm sm:col-span-2">{t('Models reported by this API', 'โมเดลที่ API นี้แจ้งว่ามีให้ใช้')}<select className="input mono" value={discovery.data.models.includes(model) ? model : ''} onChange={e => setModel(e.target.value)}><option value="">{t('Choose a model…', 'เลือกโมเดล…')}</option>{discovery.data.models.map(m => <option key={m} value={m}>{m}</option>)}</select></label>}
+        <label className="grid gap-1.5 text-sm sm:col-span-2">{t('Model ID (you can also type it)', 'Model ID (พิมพ์เองได้)')}<input className="input mono" value={model} required maxLength={200} onChange={e => setModel(e.target.value)} placeholder={t('Choose above or enter the exact model ID', 'เลือกด้านบนหรือใส่ชื่อโมเดลให้ตรงกับผู้ให้บริการ')} /></label>
+      </fieldset>
+      {discovery.data && <p role="status" className="text-sm text-muted">{discovery.data.source === 'provider' ? t(`${discovery.data.models.length} models loaded. Availability does not guarantee JSON/chat support; Connect checks the selected model.`, `ดึงได้ ${discovery.data.models.length} โมเดล รายชื่อยังไม่ยืนยันว่ารองรับงาน JSON/แชต ปุ่มเชื่อมต่อจะทดสอบโมเดลที่เลือกอีกครั้ง`) : t('This API could not return a model list. Enter a model ID manually and connect.', 'API นี้ยังดึงรายชื่อโมเดลไม่ได้ ใส่ Model ID เองแล้วทดสอบเชื่อมต่อได้')}{discovery.data.truncated && t(' More models may exist; enter an exact ID if missing.', ' อาจมีโมเดลเพิ่มเติม หากไม่พบให้พิมพ์ ID เอง')}</p>}
+      {(discovery.error || connect.error) && <p role="alert" className="text-bad text-sm">{(discovery.error || connect.error)?.message}</p>}
+      <div className="flex gap-3 items-center flex-wrap"><button className="btn btn-primary" disabled={busy || !model.trim() || !url.trim() || (!key.trim() && !ai.api_key_set)}><Wifi size={15} />{connect.isPending ? t('Testing connection…', 'กำลังทดสอบ…') : t('Test & save connection', 'ทดสอบและบันทึกการเชื่อมต่อ')}</button>{!ai.offline && <button type="button" className="btn" disabled={busy} onClick={() => { setKey(''); setProvider(ai.provider); setUrl(ai.base_url || (ai.provider === 'anthropic' ? 'https://api.anthropic.com' : 'https://api.openai.com/v1')); setModel(ai.model); discovery.reset(); connect.reset(); setEditing(false) }}>{t('Cancel', 'ยกเลิก')}</button>}<span className="text-xs text-muted">{t('Makes one small model request. Saved only when successful.', 'เรียกโมเดลทดสอบสั้น ๆ หนึ่งครั้ง บันทึกเมื่อทดสอบผ่านเท่านั้น')}</span></div>
+    </form></>}
+  </Section>
 }
 
 /** Known models of the provider in a list, "Other model…" for any name (gateways, new models).
@@ -265,7 +246,7 @@ function BackupKeysCard({ ai }: { ai: AISettings }) {
           )}
           <div className="flex items-center gap-2">
             <button className="btn btn-primary" disabled={!ready || add.isPending} onClick={() => add.mutate()}><Wifi size={14} /> {add.isPending ? 'Checking the key…' : 'Test & add'}</button>
-            <button className="btn" onClick={() => { setAdding(false); setKey(''); add.reset() }}>Cancel</button>
+            <button className="btn" onClick={() => { setAdding(false); setKey(''); add.reset() }}><Localized>Cancel</Localized></button>
             <span className="text-[12px] text-muted">The key is tried with one tiny call and saved encrypted only if it answers.</span>
           </div>
           {add.error && <div className="rounded-[var(--radius-md)] bg-bad-soft text-bad px-3 py-2 text-[12.5px]">{add.error.message}</div>}
@@ -320,7 +301,7 @@ function FieldTable({ fields }: { fields: NonNullable<SchemaPreview['fields']> }
       <thead><tr><th>Field</th><th>Type</th><th>Risk</th><th>Required</th><th>Semantic</th><th>Synonyms (TH / EN)</th></tr></thead>
       <tbody>{fields.map((f) => (
         <tr key={f.pointer}>
-          <td className="mono">{f.pointer}{f.is_collection && <Badge tone="neutral" className="ml-2 h-5 text-[11px]">collection</Badge>}</td>
+          <td className="mono">{f.pointer}{f.is_collection && <Badge tone="neutral" className="ml-2 min-h-6 text-[12px]">collection</Badge>}</td>
           <td className="text-muted">{f.json_type.join('/')}{f.format ? ` · ${f.format}` : ''}{f.enum ? ` · ${f.enum.length} values` : ''}</td>
           <td><span className="flex items-center gap-1.5"><RiskDot risk={f.risk} />{f.risk}</span></td>
           <td>{f.required ? 'yes' : ''}</td>
@@ -354,7 +335,7 @@ function NewFormatModal({ open, onClose, onRegistered }: { open: boolean; onClos
   const onFile = async (file: File | undefined) => { if (file) { setText(await file.text()); setChecked(null); setError(null) } }
   return (
     <Modal open={open} onClose={onClose} title="New target format" width="max-w-5xl" footer={<>
-      <button className="btn" onClick={onClose}>Cancel</button>
+      <button className="btn" onClick={onClose}><Localized>Cancel</Localized></button>
       <button className="btn" disabled={!text.trim() || check.isPending} onClick={() => { const d = parse(); if (d !== undefined) check.mutate(d) }}><Check size={14} /> Check</button>
       <button className="btn btn-primary" disabled={!preview || register.isPending} onClick={() => { const d = parse(); if (d !== undefined) register.mutate(d) }}><FileJson size={14} /> Register {preview?.ref}</button>
     </>}>
@@ -413,7 +394,7 @@ function PolicyTab() {
         <Badge tone={view.source === 'ui' ? 'signal' : 'neutral'}>{view.source === 'ui' ? 'edited here' : 'from policies/approval.yaml'}</Badge>
         {view.updated_at && <span className="text-muted">last changed by {view.updated_by} · {fmtDate(view.updated_at)}</span>}
         <div className="ml-auto flex gap-2">
-          {draft && <button className="btn" onClick={() => setDraft(null)}>Discard</button>}
+          {draft && <button className="btn" onClick={() => setDraft(null)}><Localized>Discard</Localized></button>}
           {view.source === 'ui' && <button className="btn" disabled={reset.isPending} onClick={() => reset.mutate()}><RotateCcw size={14} /> Reset to file</button>}
           <button className="btn btn-primary" disabled={!draft || save.isPending} onClick={() => save.mutate()}><Save size={14} /> Save policy</button>
         </div>

@@ -641,14 +641,17 @@ def dsl_reference(p: Principal = Depends(current_principal)) -> dict[str, Any]:
 @api.get("/review")
 def review_queue(
     status: str = "open",
+    round_id: str | None = None,
     limit: int = Query(200, le=1000),
     offset: int = Query(0, ge=0),
     session: Session = Depends(get_session),
     p: Principal = Depends(current_principal),
 ) -> list[dict[str, Any]]:
+    q = _scoped(p, select(ReviewTask), ReviewTask.customer_id)
+    if round_id:
+        q = q.where(ReviewTask.round_id == round_id)
     tasks = session.scalars(
-        _scoped(p, select(ReviewTask), ReviewTask.customer_id)
-        .where(ReviewTask.status == status)
+        q.where(ReviewTask.status == status)
         .order_by(ReviewTask.priority.desc(), ReviewTask.created_at.asc())
         .limit(limit)
         .offset(offset)

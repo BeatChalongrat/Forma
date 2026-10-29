@@ -20,6 +20,7 @@ from forma.api.schemas import (
     BackupOrderIn,
     ConnectAIIn,
     DefaultFormatIn,
+    DiscoverModelsIn,
     PolicyIn,
     SchemaIn,
 )
@@ -69,10 +70,25 @@ def connect_ai(
 ) -> dict[str, Any]:
     """Paste a key and go: the provider is recognised from the key, a model is chosen, the key is tried
     with one tiny call, and it is saved (encrypted) only when that call works."""
-    result = cfg.connect_ai(session, ctx.settings, body.api_key, p.actor, body.provider)
+    result = cfg.connect_ai(
+        session, ctx.settings, body.api_key, p.actor, body.provider, model=body.model, base_url=body.base_url
+    )
     session.commit()
     ctx.refresh()
     return {"test": result, "ai": cfg.ai_view(session, ctx.settings)}
+
+
+@router.post("/settings/ai/models")
+def discover_models(
+    body: DiscoverModelsIn,
+    session: Session = Depends(get_session),
+    ctx: ServiceContext = Depends(ctx_dep),
+    p: Principal = Depends(require_role("admin")),
+    _rl: Principal = Depends(llm_rate_limited),
+) -> dict[str, Any]:
+    from forma.services.model_discovery import discover
+
+    return discover(session, ctx.settings, body.provider, body.base_url, body.api_key)
 
 
 @router.post("/settings/ai/test")

@@ -53,6 +53,118 @@ def _by_name(view: dict[str, Any]) -> dict[str, dict[str, Any]]:
     return {i["file_name"]: i for i in view["items"]}
 
 
+def test_work_round_date_append_and_retry(client: TestClient) -> None:
+    first = _batch(
+        client,
+        [("one.csv", _unrelated_csv())],
+        label="Monthly delivery",
+        work_date="2026-09-15",
+        auto_publish=False,
+    )
+    assert first["work_date"] == "2026-09-15"
+    assert first["done"] is True and first["complete"] is False  # waiting for a person is not complete
+    url = f"/api/batches/{first['id']}/files?sync=true"
+    files = [("files", ("one.csv", _unrelated_csv())), ("files", ("two.csv", _product_csv()))]
+    appended = client.post(url, files=files)
+    assert appended.status_code == 200, appended.text
+    result = appended.json()
+    assert result["total"] == 2 and result["added"] == 1 and result["skipped"] == 1
+    assert result["auto_publish"] is False and result["work_date"] == "2026-09-15"
+    assert result["items"][0]["id"] == first["items"][0]["id"]
+    retry = client.post(url, files=files).json()
+    assert retry["total"] == 2 and retry["added"] == 0 and retry["skipped"] == 2
+    changed = client.post(
+        url, files=[("files", ("one.csv", _unrelated_csv().replace(b"4.5", b"5.5")))]
+    ).json()
+    assert changed["total"] == 3  # changed content is a new immutable file, not an overwrite
+    assert (
+        client.get("/api/batches", params={"start": "2026-09-15", "end": "2026-09-15"}).json()[0]["id"]
+        == first["id"]
+    )
+    assert client.get("/api/batches", params={"start": "2026-10-01"}).json() == []
+    assert client.get("/api/batches", params={"search": "Monthly"}).json()[0]["id"] == first["id"]
+    assert client.get("/api/batches", params={"offset": 1}).json() == []
+    edited = client.patch(
+        f"/api/batches/{first['id']}", json={"label": "Revised label", "work_date": "2026-09-16"}
+    )
+    assert edited.status_code == 200 and edited.json()["work_date"] == "2026-09-16"
+    assert edited.json()["created_at"] == first["created_at"]
+    assert edited.json()["items"][0]["id"] == first["items"][0]["id"]
+
+
+def test_append_scope_validation_and_audit(client: TestClient) -> None:
+    from sqlalchemy import select
+
+    from forma.db.models import AuditLog
+    from forma.db.session import session_scope
+
+    b = _batch(client, [("one.csv", _unrelated_csv())])
+    headers = {"X-Forma-User": "scoped", "X-Forma-Roles": "importer", "X-Forma-Customers": "cus_x"}
+    assert (
+        client.post(
+            f"/api/batches/{b['id']}/files", headers=headers, files=[("files", ("two.csv", _product_csv()))]
+        ).status_code
+        == 403
+    )
+    assert (
+        client.post("/api/batches/missing/files", files=[("files", ("two.csv", _product_csv()))]).status_code
+        == 404
+    )
+    assert (
+        client.post(
+            "/api/batches", data={"work_date": "bad-date"}, files=[("files", ("two.csv", _product_csv()))]
+        ).status_code
+        == 422
+    )
+    assert client.get("/api/batches", params={"start": "2026-10-02", "end": "2026-10-01"}).status_code == 422
+    with session_scope() as s:
+        events = list(s.scalars(select(AuditLog).where(AuditLog.action == "batch.append")))
+        assert events and events[-1].actor == "operator"
+
+
+def test_three_hundred_files_across_uploads(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    from forma.api import batch_routes
+
+    submitted: list[str] = []
+    monkeypatch.setattr(batch_routes, "_process", lambda items, p, **kwargs: submitted.extend(items))
+
+    def files(start: int) -> list[tuple[str, tuple[str, bytes]]]:
+        return [("files", (f"file-{i:03}.csv", _unrelated_csv())) for i in range(start, start + 100)]
+
+    first = client.post(
+        "/api/batches", data={"label": "300 files", "work_date": "2026-10-01"}, files=files(0)
+    )
+    assert first.status_code == 201, first.text
+    bid = first.json()["id"]
+    for start in (100, 200):
+        response = client.post(f"/api/batches/{bid}/files", files=files(start))
+        assert response.status_code == 200, response.text
+    result = client.get(f"/api/batches/{bid}").json()
+    assert result["total"] == 300 and len(set(submitted)) == len(submitted) == 300
+    retry = client.post(f"/api/batches/{bid}/files", files=files(100)).json()
+    assert retry["total"] == 300 and retry["skipped"] == 100 and retry["added"] == 0
+    assert len(submitted) == 300  # no duplicate jobs on resend
+
+
+def test_expected_files_target_is_separate_from_received_and_ready(client: TestClient) -> None:
+    b = _batch(client, [("one.csv", _unrelated_csv())], label="Target", expected_files=300)
+    assert b["expected_files"] == 300 and b["total"] == 1 and not b["complete"]
+    url = f"/api/batches/{b['id']}"
+    edited = client.patch(url, json={"expected_files": 180}).json()
+    assert edited["expected_files"] == 180 and edited["total"] == 1
+    assert edited["label"] == b["label"] and edited["work_date"] is None
+    assert edited["created_at"] == b["created_at"]
+    assert client.get("/api/batches").json()[0]["expected_files"] == 180
+    assert client.patch(url, json={"expected_files": None}).json()["expected_files"] is None
+    for value in (-1, 0, 1.5, 1000001):
+        assert client.patch(url, json={"expected_files": value}).status_code == 422
+    assert (
+        client.patch(url, json={"expected_files": 5}, headers={"X-Forma-Customers": "cus_x"}).status_code
+        == 403
+    )
+    assert client.patch(url, json={}).status_code == 422
+
+
 def _unrelated_csv() -> bytes:
     return b"warehouse_id,bin,temperature_c,checked_on\nW1,A-01,4.5,2026-10-01\nW1,A-02,4.7,2026-10-01\n"
 

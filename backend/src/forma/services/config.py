@@ -39,6 +39,27 @@ FALLBACK_TARGET_SCHEMA = "product"
 MAX_BACKUP_KEYS = 4
 
 
+def personal_preferences(session: Session, subject: str, mode: str) -> dict[str, Any]:
+    from forma.core.hashing import stable_hash
+    from forma.services.workspace import Preferences
+
+    row = session.get(AppSetting, "user:" + stable_hash([mode, subject], 56))
+    return Preferences.model_validate(row.value if row else {}).model_dump()
+
+
+def save_preferences(
+    session: Session, subject: str, mode: str, value: dict[str, Any], actor: str
+) -> dict[str, Any]:
+    from forma.core.hashing import stable_hash
+    from forma.services.workspace import Preferences
+
+    clean = Preferences.model_validate(value).model_dump()
+    key = "user:" + stable_hash([mode, subject], 56)
+    _put(session, key, clean, actor)
+    audit(session, "preferences.update", "user", subject, actor=actor, fields=list(clean))
+    return clean
+
+
 @dataclass
 class ConfigSnapshot:
     revision: int = 0
@@ -407,14 +428,19 @@ def _probe(provider: Any, model: str, temperature: float = 0.0) -> dict[str, Any
 
 
 def connect_ai(
-    session: Session, base: Settings, api_key: str, actor: str, provider: str | None = None
+    session: Session,
+    base: Settings,
+    api_key: str,
+    actor: str,
+    provider: str | None = None,
+    *,
+    model: str | None = None,
+    base_url: str | None = None,
 ) -> dict[str, Any]:
     """Paste-a-key flow: detect the provider, pick a model, try the key, save it only if it works."""
     from forma.ai.llm import LLMClient
 
     key = api_key.strip()
-    if not key:
-        raise ValidationFailed("paste an API key")
     chosen = provider or detect_provider(key)
     if chosen is None or chosen == "mock" or chosen not in PROVIDERS:
         raise ValidationFailed(
@@ -423,18 +449,44 @@ def connect_ai(
         )
     row = _row(session, AI_KEY)
     ai = dict(row.value or {}) if row else {}
-    model = _model_for(chosen, ai.get("model") or (base.llm_model if base.llm_provider == chosen else None))
+    from forma.services.model_discovery import endpoint
+
+    model = (model or "").strip() or _model_for(
+        chosen, ai.get("model") or (base.llm_model if base.llm_provider == chosen else None)
+    )
+    url = endpoint(
+        chosen,
+        base_url if base_url is not None else ai.get("base_url") if ai.get("provider") == chosen else None,
+    )
+    if not key:
+        saved = llm_settings(base, ai)
+        if chosen != saved.llm_provider or url != endpoint(saved.llm_provider, saved.llm_base_url):
+            raise ValidationFailed("Enter the API key again when changing provider or endpoint")
+        key = saved.llm_api_key or ""
+        if not key:
+            raise ValidationFailed("paste an API key")
     candidate = llm_settings(
-        base, {**{k: v for k, v in ai.items() if k != "api_key_enc"}, "provider": chosen, "model": model}
+        base,
+        {
+            **{k: v for k, v in ai.items() if k != "api_key_enc"},
+            "provider": chosen,
+            "model": model,
+            "base_url": url,
+        },
     )
     candidate = candidate.model_copy(update={"llm_api_key": key})
     result = probe(LLMClient.from_settings(candidate))
     if not result["ok"]:
+        import re
+
+        status = re.search(r"HTTP\s+(\d{3})", str(result.get("message", "")))
+        detail = f" (HTTP {status.group(1)})" if status else ""
         raise ValidationFailed(
-            f"the key did not work: {result['message']}", details={"provider": chosen, "model": model}
+            f"the key did not work{detail}. Check the endpoint, key and model access.",
+            details={"provider": chosen, "model": model},
         )
     _ledger(session, "settings.connect", model, result)
-    update_ai(session, base, {"provider": chosen, "model": model, "api_key": key}, actor)
+    update_ai(session, base, {"provider": chosen, "model": model, "api_key": key, "base_url": url}, actor)
     return result
 
 
