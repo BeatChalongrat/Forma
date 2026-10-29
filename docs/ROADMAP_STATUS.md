@@ -20,6 +20,7 @@
 | 7+ Focused workspace | responsive rail/drawer navigation, on-demand inspection panels, focus-trapped dialogs, aCommerce light + neutral dark theme, quiet header, honest estimated-cost labels | **done** | ADR-028, ADR-031, ADR-032 |
 | 7+ Guided review & assistant | deterministic review questions (answers = new mapping versions), evidence-first file review traced to source cells, personal preferences (language, theme, time zone), workspace assistant with 19 read-only tools + `POST /api/mcp`, provider endpoint + model discovery | **done** | ADR-029, ADR-035 |
 | 7+ Persistent conversations | chats stored in the database (owner + access scope), rename/pin/archive/delete, idempotent retries, cancellable SSE streaming of replies | **done** | ADR-030, ADR-031, ADR-034 |
+| 8 Verdict layer | one conclusion per file (mapping and data stage) from the stored reports: outcome, confidence, what only a person decides, evidence, what was folded away; one-click accept through the policy; every acceptance audited with the rules that fired | **phase 1 done** (narrative, assign-customer click, eval metric pending) | ADR-036 |
 | 7+ Work rounds | a bulk upload is a named, dated work round that accepts more files later; receipt dashboard (received / expected / ready) on Home and the round | **done** | ADR-033, ADR-034 |
 
 ## Phase 7 — production hardening (done)

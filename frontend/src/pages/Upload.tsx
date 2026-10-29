@@ -2,6 +2,7 @@ import { WorkRoundProgress } from '../components/WorkRoundDashboard'
 import { Localized } from '../lib/locale'
 import { dateInZone, usePreferences } from '../lib/preferences'
 import { Workflow } from '../components/Workflow'
+import { VerdictLine } from '../components/VerdictCard'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
@@ -270,7 +271,7 @@ function ItemRow({ i }: { i: BatchItem }) {
       </td>
       <td>
         <Badge tone={st.tone}>{i.state === 'processing' ? <Loader2 size={11} className="animate-spin" /> : i.state === 'ready' ? <CircleCheck size={11} /> : null}{st.label}</Badge>
-        <div className="text-[11.5px] text-muted mt-1 max-w-[280px]">{i.state === 'needs_data_check' && i.reasons?.length ? i.reasons.join(' · ') : i.message}</div>
+        <div className="text-[11.5px] text-muted mt-1 max-w-[280px]">{i.verdict && i.state !== 'ready' && i.state !== 'processing' ? <VerdictLine v={i.verdict} /> : i.state === 'needs_data_check' && i.reasons?.length ? i.reasons.join(' · ') : i.message}</div>
       </td>
       <td className="text-right tnum">{fmtInt(i.rows)}</td>
       <td className="text-right">{action}</td>

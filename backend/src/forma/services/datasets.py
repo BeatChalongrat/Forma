@@ -159,6 +159,9 @@ def transform_round(
         "rows": len(records),
         "errors": sum(1 for f in findings if f["severity"] == "error"),
     }
+    from forma.services import verdict_flow
+
+    verdict_flow.attach_to_dataset(ctx, session, dv, r)  # the conclusion of the data stage (ADR-036)
     audit(session, "dataset.transform", "dataset", dv.id, actor=actor, round_id=r.id, rows=len(records))
     return dv
 

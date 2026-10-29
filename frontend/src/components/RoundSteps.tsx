@@ -3,6 +3,7 @@ import { Download, ArrowRight } from 'lucide-react'
 import type { ImportRound } from '../lib/api'
 import { usePreferences } from '../lib/preferences'
 import { Workflow } from './Workflow'
+import { VerdictLine } from './VerdictCard'
 
 type Props = { r: ImportRound; busy: boolean; onRun: (kind: 'run' | 'propose' | 'transform') => void; onExport: (datasetId: string, fmt: string) => void }
 
@@ -22,7 +23,7 @@ export function RoundSteps({ r, busy, onRun, onExport }: Props) {
   return <div className="mb-6">
     <Workflow status={r.status} />
     <div className="card p-5">
-      <div className="flex flex-wrap items-center gap-4"><div className="flex-1 min-w-[200px]"><h2 className="font-semibold text-navy">{t('What happens next', 'ขั้นตอนต่อไป')}</h2><p className="text-sm text-ink-2 mt-2 leading-6">{explanation}</p></div>
+      <div className="flex flex-wrap items-center gap-4"><div className="flex-1 min-w-[200px]"><h2 className="font-semibold text-navy">{t('What happens next', 'ขั้นตอนต่อไป')}</h2>{r.summary.verdict && !ready && <p className="text-sm font-medium text-navy mt-2 leading-6"><VerdictLine v={r.summary.verdict} /></p>}<p className="text-sm text-ink-2 mt-2 leading-6">{explanation}</p></div>
         <div className="flex flex-wrap gap-2">
           {ready && dataset ? <>{['json', 'jsonl', 'csv'].map(fmt => <button key={fmt} className={fmt === 'json' ? 'btn btn-primary' : 'btn'} disabled={busy} onClick={() => onExport(dataset.id, fmt)}><Download size={15} />{fmt === 'json' ? t('Download JSON', 'ดาวน์โหลด JSON') : fmt.toUpperCase()}</button>)}</>
             : matched ? <button className="btn btn-primary" disabled={busy} onClick={() => onRun('transform')}>{t('Create & check results', 'สร้างและตรวจผลลัพธ์')} <ArrowRight size={15} /></button>

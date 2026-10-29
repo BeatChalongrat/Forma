@@ -404,6 +404,7 @@ def propose_for_round(
     )
     session.add(mv)
     session.flush()
+    task: ReviewTask | None = None
     if decision.decision == "auto_approve":
         _supersede_others(session, r.customer_id, mv.id)
         r.status = "auto_approved"
@@ -415,22 +416,21 @@ def propose_for_round(
             if (drift and drift != "identical")
             else "mapping"
         )
-        session.add(
-            ReviewTask(
-                round_id=r.id,
-                customer_id=r.customer_id,
-                mapping_version_id=mv.id,
-                kind=kind,
-                priority=decision.priority,
-                reasons=decision.reasons,
-                details={
-                    "decision": decision.decision,
-                    **_risk(decision),
-                    "open_questions": open_questions,
-                    "findings": findings[:50],
-                },
-            )
+        task = ReviewTask(
+            round_id=r.id,
+            customer_id=r.customer_id,
+            mapping_version_id=mv.id,
+            kind=kind,
+            priority=decision.priority,
+            reasons=decision.reasons,
+            details={
+                "decision": decision.decision,
+                **_risk(decision),
+                "open_questions": open_questions,
+                "findings": findings[:50],
+            },
         )
+        session.add(task)
         r.status = "blocked" if decision.decision == "block" else "review"
     r.summary = {
         **(r.summary or {}),
@@ -438,6 +438,9 @@ def propose_for_round(
         "decision": decision.decision,
         "simulation": sim.summary() if sim else None,
     }
+    from forma.services import verdict_flow
+
+    verdict_flow.attach_to_mapping(ctx, session, mv, r, task)  # the conclusion (ADR-036)
     audit(
         session,
         "mapping.propose",
@@ -662,22 +665,26 @@ def save_mapping_edit(
             t.status = "dismissed"
     session.add(mv)
     session.flush()
-    session.add(
-        ReviewTask(
-            round_id=parent.round_id or "",
-            customer_id=parent.customer_id,
-            mapping_version_id=mv.id,
-            kind="mapping",
-            priority=decision.priority,
-            reasons=["edited by " + actor, *decision.reasons],
-            details={
-                "decision": decision.decision,
-                **_risk(decision),
-                "findings": findings[:50],
-                "open_questions": remaining_questions or [],
-            },
-        )
+    task = ReviewTask(
+        round_id=parent.round_id or "",
+        customer_id=parent.customer_id,
+        mapping_version_id=mv.id,
+        kind="mapping",
+        priority=decision.priority,
+        reasons=["edited by " + actor, *decision.reasons],
+        details={
+            "decision": decision.decision,
+            **_risk(decision),
+            "findings": findings[:50],
+            "open_questions": remaining_questions or [],
+        },
     )
+    session.add(task)
+    if r is not None:
+        from forma.services import verdict_flow
+
+        r.summary = {**(r.summary or {}), "mapping_version_id": mv.id, "decision": decision.decision}
+        verdict_flow.attach_to_mapping(ctx, session, mv, r, task)  # the conclusion (ADR-036)
     audit(session, "mapping.edit", "mapping", mv.id, actor=actor, parent=parent.id)
     return mv
 

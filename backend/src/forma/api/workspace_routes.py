@@ -16,11 +16,13 @@ from starlette.concurrency import run_in_threadpool
 
 from forma.ai.text_stream import AnswerStream
 from forma.api import serialize as ser
-from forma.api.routes import _mapping_scoped, ctx_dep
+from forma.api.routes import _mapping_scoped, _round_scoped, ctx_dep
 from forma.auth import Principal, llm_rate_limited, require_role
 from forma.core.errors import FormaError, ValidationFailed
 from forma.db.session import get_session, session_scope
-from forma.services import config, conversations, review_evidence, review_questions, workspace
+from forma.jobs import runner
+from forma.services import config, conversations, review_evidence, review_questions, verdict_flow, workspace
+from forma.services import publishing as pub
 from forma.services import workspace_assistant as assistant
 from forma.services.context import ServiceContext
 from forma.services.rounds import audit
@@ -92,6 +94,49 @@ def question_evidence(
     p: Principal = Depends(require_role("importer")),
 ) -> dict[str, Any]:
     return review_evidence.evidence(ctx, session, _mapping_scoped(session, p, mapping_id), field)
+
+
+@router.get("/rounds/{round_id}/verdict")
+def round_verdict(
+    round_id: str,
+    session: Session = Depends(get_session),
+    ctx: ServiceContext = Depends(ctx_dep),
+    p: Principal = Depends(require_role("importer")),
+) -> dict[str, Any]:
+    """The conclusion of the round's current stage (ADR-036); ``verdict`` is null while processing."""
+    r = _round_scoped(session, p, round_id)
+    return {"round_id": r.id, "status": r.status, "verdict": verdict_flow.current(ctx, session, r)}
+
+
+class VerdictAcceptIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    digest: str = Field(min_length=8, max_length=64)
+    decisions: dict[str, bool | float | str | None] = Field(default_factory=dict, max_length=20)
+    comment: str | None = Field(default=None, max_length=2000)
+
+
+@router.post("/rounds/{round_id}/verdict/accept")
+def accept_verdict(
+    round_id: str,
+    body: VerdictAcceptIn,
+    session: Session = Depends(get_session),
+    ctx: ServiceContext = Depends(ctx_dep),
+    p: Principal = Depends(require_role("reviewer")),
+) -> dict[str, Any]:
+    """Act on the verdict through the ordinary approval paths; the policy still decides (rule 6)."""
+    r = _round_scoped(session, p, round_id)
+    result = verdict_flow.accept(ctx, session, p, r, body.digest, dict(body.decisions), body.comment)
+    if result["did"] == "approve_dataset":
+        pub.after_manual_approval(ctx, session, r)  # a bulk-upload round: its JSON is written at once
+    if result["did"] == "approve_mapping" and result.get("auto_publish"):
+        session.commit()
+        runner.enqueue(
+            "run_pipeline",
+            {"round_id": r.id, "actor": p.actor, "auto_publish": True},
+            round_id=r.id,
+            request_id=p.request_id,
+        )
+    return result
 
 
 class AnswersIn(BaseModel):

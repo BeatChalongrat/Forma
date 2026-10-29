@@ -382,6 +382,15 @@ def stuck_items(session: Session, b: Batch) -> list[str]:
     return sorted(waiting - active)
 
 
+def _brief_verdict(v: dict[str, Any] | None) -> dict[str, Any] | None:
+    """The conclusion a file row shows (ADR-036), without evidence payloads."""
+    if not v:
+        return None
+    return {
+        k: v.get(k) for k in ("conclusion", "outcome", "confidence", "word", "rules_fired", "digest", "stage")
+    }
+
+
 def batch_view(session: Session, b: Batch) -> dict[str, Any]:
     items = list(b.items)
     rounds = {
@@ -419,6 +428,7 @@ def batch_view(session: Session, b: Batch) -> dict[str, Any]:
                 "export_id": art.id if art else None,
                 "json_name": json_name(it.file_name),
                 "rows": (r.summary or {}).get("rows") if r else None,
+                "verdict": _brief_verdict((r.summary or {}).get("verdict")) if r else None,
                 **st,
             }
         )

@@ -83,19 +83,33 @@ export type RoundStatus = 'uploaded' | 'profiled' | 'review' | 'auto_approved' |
 export type ImportRound = {
   uploaded_at?: string
   id: string; customer_id: string; label: string | null; status: RoundStatus; target_schema: string; notes: string | null
-  summary: { drift?: string | null; drift_report?: DriftReport | null; decision?: string; mapping_version_id?: string; dataset_version_id?: string; rows?: number; errors?: number; error?: string; simulation?: SimSummary | null; has_previous_approval?: boolean; batch_id?: string; auto_publish?: boolean; publish?: PublishDecision }
+  summary: { drift?: string | null; drift_report?: DriftReport | null; decision?: string; mapping_version_id?: string; dataset_version_id?: string; rows?: number; errors?: number; error?: string; simulation?: SimSummary | null; has_previous_approval?: boolean; batch_id?: string; auto_publish?: boolean; publish?: PublishDecision; verdict?: Verdict | null }
   created_at: string; updated_at: string; files?: SourceFile[]; customer?: { id: string; code: string; name: string }
   mappings?: MappingVersion[]; datasets?: DatasetVersion[]; review_tasks?: ReviewTask[]; jobs?: Job[]
 }
 /** what the policy decided after the data was created, for rounds that publish automatically (ADR-027) */
 export type PublishDecision = { decision: 'publish' | 'review'; reasons: string[]; export_id?: string }
+/** the verdict layer (ADR-036): one conclusion per file, from the stored reports */
+export type Bilingual = { en: string; th: string }
+export type VerdictOutcome = 'accept' | 'assign_customer' | 'answer' | 'fix_mapping' | 'check_data' | 'fix_data' | 'reject_file' | 'wait'
+export type VerdictBrief = { conclusion: Bilingual; outcome: VerdictOutcome; confidence: number; word: 'sure' | 'likely' | 'unsure'; rules_fired: string[]; digest: string; stage: 'mapping' | 'data' }
+export type VerdictDecision = { id: string; kind: 'boolean' | 'number' | 'confirm'; question: Bilingual; why: Bilingual; options: unknown[]; default: unknown; default_reason?: Bilingual; evidence_ids: number[] }
+export type Verdict = VerdictBrief & {
+  subject: { kind: 'mapping' | 'dataset'; id: string; round_id: string }
+  must_decide: VerdictDecision[]
+  evidence: { id: number; kind: string; text: Bilingual; numbers: Record<string, unknown>; link: string | null }[]
+  suppressed: { count: number; groups: { reason: string; text: Bilingual; pointers: string[] }[] }
+  policy_decision: string | null; rules_version: string; narrative: { text: string; model: string } | null
+  round_status?: string; mapping_status?: string; dataset_status?: string
+}
+export type VerdictAccepted = { did: 'approve_mapping' | 'apply_answers' | 'approve_dataset'; mapping_id?: string; dataset_id?: string; auto_publish?: boolean; verdict: Verdict }
 export type BatchMatch = { kind: 'known' | 'unknown'; how?: 'exact' | 'same_columns' | 'similar' | 'file_name'; named?: boolean; customer_id?: string; customer_code?: string | null; similarity?: number | null; classification?: string; reason?: string; candidates?: { customer_id: string; customer_code: string | null; similarity: number | null }[] }
 export type BatchItemState = 'processing' | 'needs_customer' | 'needs_review' | 'needs_data_check' | 'ready' | 'failed'
 export type BatchItem = {
   id: string; file_name: string; size: number; match: BatchMatch | null; customer: { id: string; code: string | null; name: string | null } | null
   round_id: string | null; round_status: string | null; mapping_version_id: string | null; dataset_version_id: string | null
   publish: PublishDecision | null; export_id: string | null; json_name: string; rows: number | null
-  state: BatchItemState; step: number; message: string; reasons?: string[]
+  state: BatchItemState; step: number; message: string; reasons?: string[]; verdict?: VerdictBrief | null
 }
 export type BatchSummary = { id: string; label: string | null; work_date: string | null; expected_files: number | null; complete: boolean; auto_publish: boolean; created_by: string; created_at: string; total: number; counts: Partial<Record<BatchItemState, number>>; done: boolean; stuck: number }
 export type Batch = BatchSummary & { items: BatchItem[] }
@@ -143,7 +157,7 @@ export type MappingVersion = {
 }
 export type ReviewTask = {
   id: string; round_id: string; customer_id: string; mapping_version_id: string | null; dataset_version_id: string | null; kind: string; priority: number; status: string
-  reasons: string[]; details: { decision?: string; risk_level?: RiskLevel; risk_factors?: string[]; impact?: PolicyDecision['impact']; open_questions?: string[]; findings?: Finding[] }; resolver: string | null; comment: string | null; created_at: string; resolved_at: string | null
+  reasons: string[]; details: { decision?: string; risk_level?: RiskLevel; risk_factors?: string[]; impact?: PolicyDecision['impact']; open_questions?: string[]; findings?: Finding[]; verdict?: VerdictBrief }; resolver: string | null; comment: string | null; created_at: string; resolved_at: string | null
   customer?: { id: string; code: string; name: string } | null; round?: { id: string; label: string | null; status: string } | null
 }
 export type DatasetVersion = {
@@ -253,6 +267,8 @@ export const api = {
   preferences: () => request<Preferences>('/api/me/preferences', { cache: 'no-store' }),
   savePreferences: (b: Preferences) => put<Preferences>('/api/me/preferences', b),
   history: (q: HistoryFilters) => get<{ items: ImportRound[]; total: number; offset: number; limit: number; timezone: string }>('/api/history' + qs(q)),
+  verdict: (roundId: string) => get<{ round_id: string; status: string; verdict: Verdict | null }>(`/api/rounds/${roundId}/verdict`),
+  acceptVerdict: (roundId: string, b: { digest: string; decisions?: Record<string, boolean | number | string | null>; comment?: string }) => post<VerdictAccepted>(`/api/rounds/${roundId}/verdict/accept`, b),
   reviewQuestions: (id: string) => get<ReviewQuestions>(`/api/mappings/${id}/questions`),
   reviewEvidence: (id: string, field: string) => get<ReviewEvidence>(`/api/mappings/${id}/questions/evidence?field=${encodeURIComponent(field)}`),
   previewAnswers: (id: string, answers: Record<string, boolean | number | string>) => post<AnswerPreview>(`/api/mappings/${id}/answers/preview`, { answers }),
