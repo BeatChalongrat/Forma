@@ -245,14 +245,45 @@ def bench(
 
 @app.command()
 def eval(
-    corpus: Path = Path("../data/synthetic"), report: Path | None = None, baseline: Path | None = None
+    corpus: Path = Path("../data/synthetic"),
+    report: Path | None = None,
+    baseline: Path | None = None,
+    llm: bool = False,
+    replay: bool = False,
+    index: bool = False,
 ) -> None:
-    """Evaluate heuristic mapping + engine against the synthetic corpus ground truth.
+    """Evaluate mapping + engine against a corpus's ground truth.
 
-    --baseline FILE: exit 1 when any summary metric drops below the stored baseline (CI gate)."""
-    from forma.eval.evaluate import compare_to_baseline, evaluate_corpus
+    --baseline FILE: exit 1 when any summary metric drops below the stored baseline (CI gate).
+    --llm: score the AI-refined mapping with the configured provider (ADR-041); needs a real key.
+    --replay: correction replay — round 0's mistakes become learned aliases, later rounds are scored
+    without and with them (ADR-041).
+    --index: (re)build index.json for a folder of real customer files first (data/real)."""
+    from forma.eval.evaluate import build_index, compare_to_baseline, evaluate_corpus
 
-    rep = evaluate_corpus(corpus)
+    if index:
+        built = build_index(corpus)
+        typer.echo(f"indexed {len(built['variants'])} variants; skipped {built['skipped']}")
+    if replay:
+        from forma.eval.replay import replay_corpus
+
+        rep = replay_corpus(corpus)
+        typer.echo(json.dumps(rep["summary"], ensure_ascii=False, indent=2))
+        if report:
+            report.write_text(json.dumps(rep, ensure_ascii=False, indent=2), encoding="utf-8")
+            typer.echo(f"wrote {report}")
+        return
+    client = None
+    if llm:
+        from forma.services.context import get_context
+
+        client = get_context().llm
+        if client.is_mock:
+            typer.echo(
+                "no AI provider is configured (FORMA_LLM_PROVIDER / Settings > AI); --llm needs one", err=True
+            )
+            raise typer.Exit(code=2)
+    rep = evaluate_corpus(corpus, llm=client)
     typer.echo(json.dumps(rep["summary"], ensure_ascii=False, indent=2))
     if report:
         report.write_text(json.dumps(rep, ensure_ascii=False, indent=2), encoding="utf-8")

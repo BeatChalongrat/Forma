@@ -25,6 +25,7 @@
 | 8 Policy calibration | every decision gets an outcome (accepted unchanged / corrected / rejected / auto then edited); precision per verdict rule and per decision kind; proposals with evidence (trust the data check, lower a confidence bar, a customer's row-count tolerance) applied by an admin through the settings service; per-customer policy overrides | **phase 1 done** | ADR-037 |
 | 8 Proactive intelligence | expected deliveries from each customer's cadence (due / overdue with the reason), a watchlist of customers likely to need a check, per-customer price-move baselines proposed from acknowledged rounds | **phase 1 done** | ADR-039 |
 | 8 Case page & assistant actions | the round page carries the full verdict card with its one-click accept for both stages; the assistant proposes a server-built `verdict.accept` action (round + digest) that a person confirms in the UI through the ordinary endpoint | **phase 1 done** | ADR-040 |
+| 8 Evaluation modes | `forma eval --llm` (AI-refined mapping scored, draft as fallback), `--replay` (round-0 corrections become learned aliases; later rounds scored without / with), `--index` + `data/real/` for real customer files (git-ignored) | **harness done**; real files and their baseline pending | ADR-041 |
 | 7+ Work rounds | a bulk upload is a named, dated work round that accepts more files later; receipt dashboard (received / expected / ready) on Home and the round | **done** | ADR-033, ADR-034 |
 
 ## Phase 7 — production hardening (done)
@@ -51,8 +52,9 @@
 
 ## What remains (next phases)
 
-* **Eval on real customer files** — the corpus is synthetic; add the first real ERP exports (anonymised) to
-  `data/eval/` and extend `forma eval` to them before tuning synonyms further (`docs/EVALUATION.md`).
+* **Eval on real customer files** — the harness is ready (`data/real/`, `forma eval --index|--llm|--replay`,
+  ADR-041); what is missing are the first 20–30 real ERP exports with reviewed expected output and a
+  baseline for them (`docs/EVALUATION.md`).
 * **Real target contract** — `target_schema/product.v1.json` is still the draft; swap in the downstream
   schema and run the schema diff + a full re-eval.
 * **OIDC against a real IdP** — the token path is unit-tested with RSA keys and the SPA has the PKCE flow;
