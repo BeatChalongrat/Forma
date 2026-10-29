@@ -337,6 +337,31 @@ class LLMCall(Base):
     created_at: Mapped[dt.datetime] = mapped_column(UTCDateTime, default=utcnow)
 
 
+class Correction(Base):
+    """What a human decision taught FORMA (ADR-038): a column alias or a confirmed constant for a
+    customer, an approval accepted as proposed, or an alias promoted to everyone. The mapper reads it
+    before it guesses."""
+
+    __tablename__ = "corrections"
+    id: Mapped[str] = mapped_column(String(40), primary_key=True, default=lambda: new_id("cor"))
+    customer_id: Mapped[str | None] = mapped_column(String(40), index=True)  # None = promoted, for everyone
+    kind: Mapped[str] = mapped_column(String(16))  # alias | constant | accepted | promoted
+    target: Mapped[str | None] = mapped_column(String(255))  # target pointer
+    header: Mapped[str | None] = mapped_column(String(255))  # normalized source header (alias, promoted)
+    before: Mapped[Any | None] = mapped_column(JSONType)
+    after: Mapped[Any | None] = mapped_column(JSONType)
+    actor: Mapped[str] = mapped_column(String(128))
+    mapping_version_id: Mapped[str | None] = mapped_column(String(40))
+    round_id: Mapped[str | None] = mapped_column(String(40))
+    status: Mapped[str] = mapped_column(String(16), default="confirmed", server_default="confirmed")
+    uses: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    created_at: Mapped[dt.datetime] = mapped_column(UTCDateTime, default=utcnow)
+    __table_args__ = (
+        Index("ix_corrections_kind_status", "kind", "status"),
+        Index("ix_corrections_header_target", "header", "target"),
+    )
+
+
 class AppSetting(Base):
     """Runtime configuration edited in the web app (ADR-017): AI provider, approval policy, defaults.
     Secrets are stored encrypted; the ``revision`` row tells every process when to reload."""

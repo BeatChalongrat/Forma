@@ -27,6 +27,10 @@ without writing code.
   No generated code runs. The same inputs always produce the same output.
 * **Thai business reality is first-class.** Buddhist-era dates, Thai month names, Thai digits, ฿/comma
   numbers, VAT 7% inclusive vs exclusive, ชิ้น/แพ็ค/ลัง with pack sizes, TIS-620/cp874 CSVs.
+* **It learns from every correction.** Approve a mapping you corrected and FORMA keeps the lesson — the
+  column alias or the confirmed constant — for that customer's next file, with evidence saying where it came
+  from; an alias several customers taught becomes everyone's once an admin promotes it. Corrections per
+  approval, by month, are on the Settings page (ADR-038).
 * **Memory + drift detection from day one.** Every file is fingerprinted. A returning customer with an
   unchanged format is approved automatically; a renamed column goes to review with the diff; a file that
   matches another customer's format is blocked as a probable wrong file.

@@ -60,6 +60,7 @@ export function Overview() {
       <Stat label="Handled automatically" value={d?.automation_rate != null ? fmtPct(d.automation_rate) : '–'} hint="Mappings approved by policy" />
       <Stat label="Records exported" value={fmtInt(d?.published_rows)} />
       <Stat label="Customers" value={fmtInt(d?.customers)} />
+      <Stat label={t('Learned from you', 'เรียนจากคุณ')} value={d?.learning ? fmtInt(d.learning.aliases + d.learning.constants) : '–'} hint={d?.learning ? t(`${fmtInt(d.learning.uses)} uses · corrections per approval ${d.learning.corrections_per_approval ?? '–'}`, `ใช้แล้ว ${fmtInt(d.learning.uses)} ครั้ง · การแก้ต่อการอนุมัติ ${d.learning.corrections_per_approval ?? '–'}`) : ''} />
       <Stat label={t('Estimated AI cost', 'ค่า AI โดยประมาณ')} value={d ? `$${d.llm.cost_usd.toFixed(2)}` : '–'} hint={d ? `${fmtInt(d.llm.calls)} ${t('usage records · not provider billing', 'รายการที่บันทึก · ไม่ใช่ยอดเรียกเก็บ')}` : ''} />
     </div></details>
     <div className="mt-5 flex items-center gap-2 text-[13px] text-muted"><span>New to FORMA?</span><Link to="/guide" className="text-signal hover:underline">See how importing works →</Link></div>

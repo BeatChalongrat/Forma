@@ -6,6 +6,7 @@ import { usePreferences } from '../lib/preferences'
 import { Badge, Empty, PageHeader, Spinner } from '../components/ui'
 import { Workflow } from '../components/Workflow'
 import { ReviewWorkspace } from '../components/ReviewWorkspace'
+import { VerdictLine } from '../components/VerdictCard'
 
 
 export function ReviewCenter() {
@@ -29,7 +30,7 @@ export function ReviewCenter() {
     {!query.isPending && !query.error && !items.length && <Empty title={t('No items here', 'ไม่มีรายการในหมวดนี้')} />}
     <ul className="space-y-3">{items.map(task => <li key={task.id} className="card p-5">
       <div className="flex flex-wrap gap-3 items-start"><div className="flex-1 min-w-[180px]"><div className="font-semibold text-navy break-words">{task.customer?.name?.startsWith(task.customer.code) ? task.customer.name : `${task.customer?.code ?? ''} · ${task.customer?.name ?? ''}`}</div><div className="text-xs text-muted mt-1 break-words">{task.round?.label} · {date(task.created_at)}</div></div><Badge tone={task.details.decision === 'block' ? 'bad' : 'warn'}>{task.details.decision === 'block' ? t('Check the source file', 'ต้องตรวจไฟล์ต้นทาง') : t('Needs confirmation', 'ต้องยืนยันข้อมูล')}</Badge></div>
-      <p className="text-sm text-ink-2 mt-3 leading-6">{issueSummary(task, t)}</p>
+      <p className="text-sm text-ink-2 mt-3 leading-6">{task.details.verdict ? <span className="font-medium text-navy"><VerdictLine v={task.details.verdict} /></span> : issueSummary(task, t)}</p>
       <div className="flex flex-wrap items-center justify-between gap-3 mt-4"><details className="text-xs text-muted flex-1 min-w-0"><summary>{t('Why this needs review', 'เหตุผลและรายละเอียด')}</summary><ul className="mt-2 space-y-1 break-words">{task.reasons.map((r, i) => <li key={i}>{r}</li>)}</ul></details>{task.mapping_version_id ? <button className="btn btn-sm" onClick={() => { choose({ mapping: task.mapping_version_id!, round: task.round_id }) }}>{t('Open questions', 'เปิดคำถาม')} <ArrowRight size={14} /></button> : <Link className="btn btn-sm" to={task.dataset_version_id ? `/datasets/${task.dataset_version_id}?tab=findings` : `/rounds/${task.round_id}`}>{t('Check results', 'ตรวจผลลัพธ์')} →</Link>}</div>
     </li>)}</ul>
     <div className="flex justify-between mt-4"><button className="btn btn-sm" disabled={!offset} onClick={() => choose({ offset: String(Math.max(0, offset - 50)) })}>{t('Previous', 'ก่อนหน้า')}</button><button className="btn btn-sm" disabled={items.length < 50} onClick={() => choose({ offset: String(offset + 50) })}>{t('Next', 'ถัดไป')}</button></div>

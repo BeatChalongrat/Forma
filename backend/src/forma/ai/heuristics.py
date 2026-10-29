@@ -10,7 +10,7 @@ from __future__ import annotations
 import dataclasses
 import re
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from rapidfuzz import fuzz
 
@@ -33,6 +33,9 @@ from forma.mapping_dsl.models import (
 )
 from forma.profiling.profile import ColumnProfile, TableProfile, WorkbookProfile, noise_tables
 from forma.schema_registry import COLLECTION_KINDS, FieldSpec, TargetSchema
+
+if TYPE_CHECKING:
+    from forma.services.learning import Learned
 
 ROLE_SIGNALS: dict[str, list[str]] = {
     "pricing": ["price", "ราคา", "amount", "vat", "price list", "ประเภทราคา"],
@@ -151,11 +154,18 @@ def score_header(header: str, f: FieldSpec) -> tuple[float, str | None]:
     return best, why
 
 
-def match_columns(table: TableProfile, fields: list[FieldSpec]) -> list[Match]:
-    """Greedy best-first assignment of columns to target fields (one column → one field)."""
+def match_columns(
+    table: TableProfile, fields: list[FieldSpec], learned: Learned | None = None
+) -> list[Match]:
+    """Greedy best-first assignment of columns to target fields (one column → one field). A header the
+    customer (or everyone) taught FORMA to map to a field (ADR-038) wins outright, with evidence that says so."""
     pairs: list[Match] = []
     for c in table.columns:
         for f in fields:
+            taught = learned.alias_for(f.pointer, c.name) if learned else None
+            if taught:
+                pairs.append(Match(c, f, 1.1, [f"header '{c.name}' → {f.pointer}: {taught}"]))
+                continue
             s, why = score_header(c.name, f)
             if s < 0.55:
                 continue
@@ -186,6 +196,7 @@ def match_columns(table: TableProfile, fields: list[FieldSpec]) -> list[Match]:
             continue
         used_cols.add(m.column.name)
         used_fields.add(m.field.pointer)
+        m.score = min(1.0, m.score)
         out.append(m)
     return out
 
@@ -412,7 +423,11 @@ def _vat_included_guess(headers: list[str]) -> tuple[bool, str]:
 
 
 def propose_mapping(
-    profile: WorkbookProfile, schema: TargetSchema, *, customer_id: str | None = None
+    profile: WorkbookProfile,
+    schema: TargetSchema,
+    *,
+    customer_id: str | None = None,
+    learned: Learned | None = None,
 ) -> HeuristicProposal:
     """Every target field is found by its ``x-forma.semantic`` (ADR-001), so a new target schema that
     tags its fields with the documented semantics is mapped without code changes."""
@@ -442,7 +457,7 @@ def propose_mapping(
     def root_score(i: int) -> tuple[float, int]:
         if roles[i][0] == "other":
             return (-1.0, 0)
-        ms = match_columns(profile.tables[i], root_fields_all)
+        ms = match_columns(profile.tables[i], root_fields_all, learned)
         keyed = any(is_key(m.field) for m in ms)
         named = any(m.field.semantic == "product_name" for m in ms)
         score = sum(m.score for m in ms) + (2.0 if keyed and named else 0.0)
@@ -458,7 +473,7 @@ def propose_mapping(
     )
 
     root_fields = [f for f in schema.leaf_fields() if f.in_collection is None]
-    root_matches = match_columns(root, root_fields)
+    root_matches = match_columns(root, root_fields, learned)
     sku_match = next((m for m in root_matches if m.field.pointer == identity.pointer), None) or next(
         (m for m in root_matches if m.field.semantic == "sku"), None
     )
@@ -592,7 +607,7 @@ def propose_mapping(
     price_ptr = colls.get("pricing")
     if price_ptr is not None:
         price_fields = [f for f in schema.leaf_fields() if f.in_collection == price_ptr]
-        root_price = match_columns(_subset(root, exclude=used_root_cols), price_fields)
+        root_price = match_columns(_subset(root, exclude=used_root_cols), price_fields, learned)
         amount = next((m for m in root_price if m.field.semantic == "price.amount"), None)
         if amount is not None:
             vat_inc, why = _vat_included_guess([amount.column.name])
@@ -730,7 +745,7 @@ def propose_mapping(
             evidence.append(f"table '{t.sheet}' → {target} via unpivot of {len(value_cols)} period columns")
             field_scores.append(0.8)
             continue
-        matches = match_columns(_subset(t, exclude={link_col.name}), item_fields)
+        matches = match_columns(_subset(t, exclude={link_col.name}), item_fields, learned)
         items = []
         for m in matches:
             items.append(
@@ -865,6 +880,22 @@ def propose_mapping(
     elif root_amount is not None and root_amount.pointer in mapped_targets:
         quality.append(QualityRule(target=root_amount.pointer, rule="positive", severity="warning"))
 
+    if learned and learned.constants:
+        # a constant a person confirmed for this customer (ADR-038) replaces the guess and its question
+        every: list[FieldMapping] = list(fields)
+        for coll in collections:
+            every.extend(coll.fields)
+        for taught in every:
+            hit = learned.constants.get(taught.target)
+            if hit is None or taught.expr.op != "const":
+                continue
+            value, why = hit
+            taught.expr = const(value)
+            taught.confidence = 1.0
+            taught.evidence = [*taught.evidence, why]
+            if "vat" in taught.target.lower():
+                questions[:] = [q for q in questions if "VAT" not in q]
+            evidence.append(f"{taught.target}: {why}")
     conf = round(sum(field_scores) / len(field_scores), 3) if field_scores else 0.0
     conf = max(0.0, min(1.0, conf - 0.05 * len(questions)))
     doc = MappingDocument(

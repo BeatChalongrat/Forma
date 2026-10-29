@@ -102,6 +102,12 @@ export type Verdict = VerdictBrief & {
   policy_decision: string | null; rules_version: string; narrative: { text: string; model: string } | null
   round_status?: string; mapping_status?: string; dataset_status?: string
 }
+/** what human decisions taught FORMA (ADR-038) */
+export type LearnedItem = { id: string; customer_id: string | null; kind: 'alias' | 'constant' | 'promoted'; target: string | null; header: string | null; column: string | null; value: unknown; actor: string; round_id: string | null; uses: number; created_at: string | null }
+export type LearningMonth = { month: string; mappings_approved: number; accepted_as_proposed: number; corrections: number; corrections_per_approval: number | null; learned_fields_used: number }
+export type LearningStats = { series: LearningMonth[]; aliases: number; constants: number; promoted: number; customers_taught: number; uses: number }
+export type LearningSuggestion = { header: string; target: string; field: FieldSpec; customers: number }
+export type LearningView = { stats: LearningStats; learned: { total: number; items: LearnedItem[] }; suggestions: LearningSuggestion[] }
 export type VerdictAccepted = { did: 'approve_mapping' | 'apply_answers' | 'approve_dataset'; mapping_id?: string; dataset_id?: string; auto_publish?: boolean; verdict: Verdict }
 export type BatchMatch = { kind: 'known' | 'unknown'; how?: 'exact' | 'same_columns' | 'similar' | 'file_name'; named?: boolean; customer_id?: string; customer_code?: string | null; similarity?: number | null; classification?: string; reason?: string; candidates?: { customer_id: string; customer_code: string | null; similarity: number | null }[] }
 export type BatchItemState = 'processing' | 'needs_customer' | 'needs_review' | 'needs_data_check' | 'ready' | 'failed'
@@ -219,7 +225,7 @@ export type Impact = { rows_affected: number; cells_changed: number; rows_delete
 export type RowsPage = { total: number; offset: number; limit: number; identity_keys: string[]; rows: Record<string, unknown>[]; columns: FieldSpec[]; findings: Finding[] }
 export type Dashboard = {
   customers: number; rounds_by_status: Record<string, number>; open_reviews: number; approved_mappings: number; auto_approved_mappings: number; mapping_versions: number; reused_mappings: number
-  published_rows: number; failed_jobs: number; llm: { calls: number; cost_usd: number; tokens: number; provider: string; model: string }; recent_rounds: ImportRound[]; automation_rate: number | null
+  published_rows: number; failed_jobs: number; llm: { calls: number; cost_usd: number; tokens: number; provider: string; model: string }; recent_rounds: ImportRound[]; automation_rate: number | null; learning?: { aliases: number; constants: number; uses: number; corrections_per_approval: number | null }
 }
 export type ChangeReport = {
   has_previous: boolean; current_rows: number; previous_rows?: number; previous_dataset_id?: string; added?: string[]; removed?: string[]; added_count?: number; removed_count?: number; changed_count?: number
@@ -267,6 +273,9 @@ export const api = {
   preferences: () => request<Preferences>('/api/me/preferences', { cache: 'no-store' }),
   savePreferences: (b: Preferences) => put<Preferences>('/api/me/preferences', b),
   history: (q: HistoryFilters) => get<{ items: ImportRound[]; total: number; offset: number; limit: number; timezone: string }>('/api/history' + qs(q)),
+  learning: (customer_id = '', offset = 0) => get<LearningView>('/api/learning' + qs({ customer_id: customer_id || undefined, offset })),
+  promoteAlias: (b: { header: string; target: string }) => post<{ id: string }>('/api/learning/promote', b),
+  forgetLearned: (id: string) => del<void>(`/api/learning/${encodeURIComponent(id)}`),
   verdict: (roundId: string) => get<{ round_id: string; status: string; verdict: Verdict | null }>(`/api/rounds/${roundId}/verdict`),
   acceptVerdict: (roundId: string, b: { digest: string; decisions?: Record<string, boolean | number | string | null>; comment?: string }) => post<VerdictAccepted>(`/api/rounds/${roundId}/verdict/accept`, b),
   reviewQuestions: (id: string) => get<ReviewQuestions>(`/api/mappings/${id}/questions`),

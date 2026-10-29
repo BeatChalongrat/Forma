@@ -21,7 +21,15 @@ from forma.auth import Principal, llm_rate_limited, require_role
 from forma.core.errors import FormaError, ValidationFailed
 from forma.db.session import get_session, session_scope
 from forma.jobs import runner
-from forma.services import config, conversations, review_evidence, review_questions, verdict_flow, workspace
+from forma.services import (
+    config,
+    conversations,
+    learning,
+    review_evidence,
+    review_questions,
+    verdict_flow,
+    workspace,
+)
 from forma.services import publishing as pub
 from forma.services import workspace_assistant as assistant
 from forma.services.context import ServiceContext
@@ -137,6 +145,62 @@ def accept_verdict(
             request_id=p.request_id,
         )
     return result
+
+
+@router.get("/learning")
+def learning_view(
+    customer_id: str = "",
+    offset: int = Query(0, ge=0),
+    session: Session = Depends(get_session),
+    ctx: ServiceContext = Depends(ctx_dep),
+    p: Principal = Depends(require_role("importer")),
+) -> dict[str, Any]:
+    """What human decisions taught FORMA (ADR-038): the trend, the learned aliases and the suggestions."""
+    schema = ctx.registry.get_ref(config.default_target_schema(session))
+    scope = customer_id or None
+    if p.customers is not None:
+        scope = customer_id if customer_id in p.customers else None
+    learned = (
+        learning.list_learned(session, customer_id=scope, offset=offset)
+        if (scope or p.customers is None)
+        else {"total": 0, "items": []}
+    )
+    return {
+        "stats": learning.stats(session),
+        "learned": learned,
+        "suggestions": learning.suggestions(session, schema) if p.has_role("admin") else [],
+    }
+
+
+class PromoteIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    header: str = Field(min_length=1, max_length=255)
+    target: str = Field(min_length=1, max_length=255)
+
+
+@router.post("/learning/promote", status_code=201)
+def promote_alias(
+    body: PromoteIn,
+    session: Session = Depends(get_session),
+    ctx: ServiceContext = Depends(ctx_dep),
+    p: Principal = Depends(require_role("admin")),
+) -> dict[str, Any]:
+    """An alias several customers taught becomes everyone's (a runtime synonym keyed by target pointer)."""
+    schema = ctx.registry.get_ref(config.default_target_schema(session))
+    if not schema.has_field(body.target):
+        raise ValidationFailed("Unknown target field")
+    row = learning.promote(session, body.header, body.target, p.actor)
+    return {"id": row.id, "header": row.header, "target": row.target}
+
+
+@router.delete("/learning/{correction_id}", status_code=204)
+def forget_learned(
+    correction_id: str,
+    session: Session = Depends(get_session),
+    p: Principal = Depends(require_role("approver")),
+) -> Response:
+    learning.forget(session, correction_id, p.actor)
+    return Response(status_code=204)
 
 
 class AnswersIn(BaseModel):
