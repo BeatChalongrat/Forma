@@ -66,7 +66,7 @@ async function chatStream(id: string, body: { question: string; request_id: stri
 // Types (mirror backend serializers)
 // ---------------------------------------------------------------------------------------------
 export type Customer = {
-  id: string; code: string; name: string; erp_type: string | null; notes: string | null; active: boolean; default_target_schema: string | null; created_at: string
+  id: string; code: string; name: string; erp_type: string | null; notes: string | null; active: boolean; default_target_schema: string | null; policy_overrides?: Record<string, unknown> | null; created_at: string
   rounds?: number | ImportRound[]; last_round_at?: string | null; has_approved_mapping?: boolean
   mappings?: MappingVersion[]; overrides?: Override[]
 }
@@ -108,6 +108,10 @@ export type LearningMonth = { month: string; mappings_approved: number; accepted
 export type LearningStats = { series: LearningMonth[]; aliases: number; constants: number; promoted: number; customers_taught: number; uses: number }
 export type LearningSuggestion = { header: string; target: string; field: FieldSpec; customers: number }
 export type LearningView = { stats: LearningStats; learned: { total: number; items: LearnedItem[] }; suggestions: LearningSuggestion[] }
+/** policy calibration from outcomes (ADR-037) */
+export type OutcomeCounts = { n: number; right: number; precision: number | null; accepted_unchanged?: number; corrected?: number; rejected?: number; auto_ok?: number; auto_then_edited?: number; auto_then_rolled_back?: number }
+export type CalibrationReport = { since: string; decisions: number; per_rule: Record<string, OutcomeCounts>; per_decision: Record<string, OutcomeCounts>; customers: (OutcomeCounts & { customer_id: string; code: string; auto: number; review: number })[] }
+export type Proposal = { id: string; digest: string; scope: 'policy' | 'customer'; customer_id?: string; customer_code?: string; path: string; value: unknown; current: unknown; title: Bilingual; why: Bilingual; saves: number; evidence: string[] }
 export type VerdictAccepted = { did: 'approve_mapping' | 'apply_answers' | 'approve_dataset'; mapping_id?: string; dataset_id?: string; auto_publish?: boolean; verdict: Verdict }
 export type BatchMatch = { kind: 'known' | 'unknown'; how?: 'exact' | 'same_columns' | 'similar' | 'file_name'; named?: boolean; customer_id?: string; customer_code?: string | null; similarity?: number | null; classification?: string; reason?: string; candidates?: { customer_id: string; customer_code: string | null; similarity: number | null }[] }
 export type BatchItemState = 'processing' | 'needs_customer' | 'needs_review' | 'needs_data_check' | 'ready' | 'failed'
@@ -214,7 +218,7 @@ export type Policy = {
   review: { priority_weights: Record<string, number>; high_impact_ratio?: number }
   block: Record<string, boolean>
   risk_overrides: Record<string, string>
-  sandbox: { enabled: boolean; max_lost_records: number; max_new_errors: number; max_new_invalid_prices: number; max_new_duplicates: number; max_changed_prices_auto: number }
+  sandbox: { enabled: boolean; max_lost_records: number; max_new_errors: number; max_new_invalid_prices: number; max_new_duplicates: number; max_changed_prices_auto: number; trust_data_checks?: boolean }
   publish?: { enabled: boolean; max_high_anomalies: number; max_error_findings: number }
   anomaly?: { max_price_change_pct: number; max_discount_pct: number; max_stock_drop_pct: number; max_removed_pct: number; row_count_tolerance_pct: number; outlier_mad: number; history_rounds: number; block_approval_on_high: boolean }
   [k: string]: unknown
@@ -273,6 +277,8 @@ export const api = {
   preferences: () => request<Preferences>('/api/me/preferences', { cache: 'no-store' }),
   savePreferences: (b: Preferences) => put<Preferences>('/api/me/preferences', b),
   history: (q: HistoryFilters) => get<{ items: ImportRound[]; total: number; offset: number; limit: number; timezone: string }>('/api/history' + qs(q)),
+  calibration: () => get<{ report: CalibrationReport; proposals: Proposal[] }>('/api/calibration'),
+  applyProposal: (b: { id: string; digest: string }) => post<{ applied: string; path: string; value: unknown; scope: string }>('/api/calibration/apply', b),
   learning: (customer_id = '', offset = 0) => get<LearningView>('/api/learning' + qs({ customer_id: customer_id || undefined, offset })),
   promoteAlias: (b: { header: string; target: string }) => post<{ id: string }>('/api/learning/promote', b),
   forgetLearned: (id: string) => del<void>(`/api/learning/${encodeURIComponent(id)}`),

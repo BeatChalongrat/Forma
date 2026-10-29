@@ -369,6 +369,29 @@ function NewFormatModal({ open, onClose, onRegistered }: { open: boolean; onClos
 const DRIFT = ['identical', 'header_moved', 'columns_added', 'columns_renamed', 'columns_removed', 'types_changed', 'sheets_added', 'sheets_removed']
 const RISKS = ['critical', 'high', 'medium', 'low']
 
+function CalibrationSection() {
+  const { prefs, t } = usePreferences(), qc = useQueryClient(), toast = useToast()
+  const lang = prefs.language
+  const q = useQuery({ queryKey: ['calibration'], queryFn: api.calibration })
+  const apply = useMutation({ mutationFn: (b: { id: string; digest: string }) => api.applyProposal(b), onSuccess: () => { void qc.invalidateQueries(); toast.push({ kind: 'ok', title: t('Applied', 'ปรับแล้ว'), detail: t('Applies to the next proposal; the report will show whether it was right.', 'มีผลกับข้อเสนอถัดไป รายงานจะบอกว่าถูกหรือไม่') }) }, onError: (e: Error) => toast.push({ kind: 'bad', title: t('Not applied', 'ปรับไม่ได้'), detail: e.message }) })
+  const d = q.data
+  const rules = d ? Object.entries(d.report.per_rule) : []
+  const dec = d?.report.per_decision
+  return <>
+    <Section title={t('What the policy could allow', 'สิ่งที่กฎยอมให้ได้มากขึ้น')} hint="ข้อเสนอจากผลลัพธ์จริง: อะไรที่คนอนุมัติตามเดิมทุกครั้ง ระบบเสนอให้ผ่านเอง คุณเป็นคนกดรับ" className="mb-5">
+      {d?.proposals.length ? <ul className="divide-y divide-line">{d.proposals.map((x) => <li key={x.id} className="px-4 py-3 flex flex-wrap items-start gap-3"><div className="flex-1 min-w-[240px]"><div className="font-medium">{x.title[lang]}</div><div className="text-sm text-ink-2 mt-1">{x.why[lang]}</div><div className="text-xs text-muted mt-1 mono">{x.scope === 'customer' ? `${x.customer_code} · ` : ''}{x.path}: {JSON.stringify(x.current)} → {JSON.stringify(x.value)} · {t(`would have saved ${x.saves} reviews`, `จะลด review ได้ ${x.saves} รายการ`)}</div></div><button className="btn btn-primary btn-sm" disabled={apply.isPending} onClick={() => apply.mutate({ id: x.id, digest: x.digest })}><Check size={13} />{t('Apply', 'ปรับตามนี้')}</button></li>)}</ul>
+        : <div className="p-5 text-sm text-muted">{q.isPending ? t('Loading…', 'กำลังโหลด…') : t('No proposal yet: the evidence is too thin (3 or more matching outcomes are needed) or the policy already allows it.', 'ยังไม่มีข้อเสนอ: หลักฐานยังน้อย (ต้องมีผลลัพธ์แบบเดียวกันอย่างน้อย 3 ครั้ง) หรือกฎยอมให้อยู่แล้ว')}</div>}
+    </Section>
+    <Section title={t('How often FORMA was right', 'ระบบตัดสินถูกบ่อยแค่ไหน')} hint="นับจากสิ่งที่คนทำหลังการตัดสิน: อนุมัติตามเดิม แก้ ปฏิเสธ หรือต้องแก้ข้อมูลทีหลัง" className="mb-5">
+      {d ? <div className="px-4 py-3 space-y-4">
+        <div className="grid sm:grid-cols-2 gap-3">{(['auto', 'review'] as const).map((k) => { const c = dec?.[k]; return <div key={k} className="rounded-lg border border-line p-3"><div className="text-xs text-muted">{k === 'auto' ? t('Automatic approvals', 'อนุมัติอัตโนมัติ') : t('Reviews', 'ส่งให้คนตรวจ')}</div><div className="text-2xl font-semibold mt-1">{c ? `${Math.round((c.precision ?? 0) * 100)}%` : '–'} <span className="text-sm font-normal text-muted">{c ? t(`right of ${c.n}`, `ถูก จาก ${c.n}`) : t('no decisions yet', 'ยังไม่มีการตัดสิน')}</span></div>{c && <div className="text-xs text-muted mt-1">{k === 'auto' ? t(`${c.auto_then_edited ?? 0} edited later · ${c.auto_then_rolled_back ?? 0} rolled back`, `แก้ทีหลัง ${c.auto_then_edited ?? 0} · ย้อนกลับ ${c.auto_then_rolled_back ?? 0}`) : t(`${c.accepted_unchanged ?? 0} accepted as proposed · ${c.corrected ?? 0} corrected · ${c.rejected ?? 0} rejected`, `รับตามเดิม ${c.accepted_unchanged ?? 0} · แก้ ${c.corrected ?? 0} · ปฏิเสธ ${c.rejected ?? 0}`)}</div>}</div> })}</div>
+        {rules.length > 0 && <table className="table"><thead><tr><th>{t('Verdict rule', 'กฎที่ตัดสิน')}</th><th className="text-right">{t('Decisions', 'ครั้ง')}</th><th className="text-right">{t('Right', 'ถูก')}</th><th className="text-right">{t('Corrected', 'แก้')}</th><th className="text-right">{t('Rejected', 'ปฏิเสธ')}</th><th className="text-right">{t('Precision', 'ความแม่น')}</th></tr></thead><tbody>{rules.map(([rule, c]) => <tr key={rule}><td className="mono">{rule}</td><td className="text-right tnum">{c.n}</td><td className="text-right tnum">{c.right}</td><td className="text-right tnum">{c.corrected ?? 0}</td><td className="text-right tnum">{c.rejected ?? 0}</td><td className="text-right tnum font-semibold">{c.precision == null ? '–' : `${Math.round(c.precision * 100)}%`}</td></tr>)}</tbody></table>}
+        <p className="text-xs text-muted">{t(`Since ${d.report.since} · ${d.report.decisions} decisions`, `ตั้งแต่ ${d.report.since} · ${d.report.decisions} การตัดสิน`)}</p>
+      </div> : <div className="p-5 text-sm text-muted">{t('Loading…', 'กำลังโหลด…')}</div>}
+    </Section>
+  </>
+}
+
 function PolicyTab() {
   const qc = useQueryClient()
   const toast = useToast()
@@ -391,6 +414,7 @@ function PolicyTab() {
   )
   return (
     <div className="flex flex-col gap-4">
+      <CalibrationSection />
       <div className="flex flex-wrap items-center gap-2 text-[12.5px]">
         <Badge tone={view.source === 'ui' ? 'signal' : 'neutral'}>{view.source === 'ui' ? 'edited here' : 'from policies/approval.yaml'}</Badge>
         {view.updated_at && <span className="text-muted">last changed by {view.updated_by} · {fmtDate(view.updated_at)}</span>}
@@ -431,6 +455,7 @@ function PolicyTab() {
             {num('Block on extra invalid prices (more than)', p.sandbox.max_new_invalid_prices, (v) => edit((x) => { x.sandbox.max_new_invalid_prices = Math.round(v) }))}
             {num('Block on extra duplicates (more than)', p.sandbox.max_new_duplicates, (v) => edit((x) => { x.sandbox.max_new_duplicates = Math.round(v) }))}
             {num('Changed prices a human must see (more than)', p.sandbox.max_changed_prices_auto, (v) => edit((x) => { x.sandbox.max_changed_prices_auto = Math.round(v) }))}
+            {flag('Trust the data check: a moved layout whose values are identical on the same SKUs needs no review', !!p.sandbox.trust_data_checks, (v) => edit((x) => { x.sandbox.trust_data_checks = v }))}
           </div></Section>
           {p.anomaly && <Section title="Anomalies: what counts as unusual"><div className="px-4 py-2">
             {num('Price moves more than (%) vs last round', p.anomaly.max_price_change_pct, (v) => edit((x) => { x.anomaly!.max_price_change_pct = v }))}

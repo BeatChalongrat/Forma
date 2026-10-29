@@ -44,7 +44,7 @@ def create_customer(
     return c
 
 
-CUSTOMER_FIELDS = ("code", "name", "erp_type", "notes", "active", "default_target_schema")
+CUSTOMER_FIELDS = ("code", "name", "erp_type", "notes", "active", "default_target_schema", "policy_overrides")
 
 
 def update_customer(session: Session, customer_id: str, patch: dict[str, Any], actor: str) -> Customer:
@@ -71,6 +71,16 @@ def update_customer(session: Session, customer_id: str, patch: dict[str, Any], a
             setattr(c, k, (str(v).strip() or None) if v is not None else None)
     if "active" in patch:
         c.active = bool(patch["active"])
+    if "policy_overrides" in patch:
+        from forma.ai.policy import DEFAULT_POLICY, _merge, validate_policy
+
+        ov = patch["policy_overrides"]
+        if ov is not None and not isinstance(ov, dict):
+            raise ValidationFailed("policy_overrides must be an object of policy sections")
+        problems = validate_policy(_merge(DEFAULT_POLICY, ov)) if ov else []
+        if problems:
+            raise ValidationFailed("policy_overrides are not valid", details={"problems": problems})
+        c.policy_overrides = ov or None
     after = {k: getattr(c, k) for k in fields}
     if before != after:
         audit(session, "customer.update", "customer", c.id, actor=actor, before=before, after=after)

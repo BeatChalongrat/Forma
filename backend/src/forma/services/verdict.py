@@ -299,6 +299,16 @@ def for_mapping(
             f"{studio}?tab=compare",
             **{k: sandbox.get(k) for k in ("changed_records", "lost", "gained", "changed_prices")},
         )
+    learned = policy.get("learning") or {}
+    if learned.get("used"):
+        n = len(learned["used"])
+        ev(
+            "learned",
+            f"{n} fields mapped from what you taught FORMA before",
+            f"{n} ฟิลด์จับคู่จากสิ่งที่คุณเคยสอน FORMA ไว้",
+            f"{studio}?tab=fields",
+            used=learned["used"],
+        )
     if rows_out:
         ev(
             "rows",
@@ -317,16 +327,6 @@ def for_mapping(
         )
     if llm_fallback:
         ev("ai", "AI was unavailable; the deterministic draft is in use", "AI ใช้งานไม่ได้ ใช้ร่างจากกฎแทน", None)
-    learned = policy.get("learning") or {}
-    if learned.get("used"):
-        n = len(learned["used"])
-        ev(
-            "learned",
-            f"{n} fields mapped from what you taught FORMA before",
-            f"{n} ฟิลด์จับคู่จากสิ่งที่คุณเคยสอน FORMA ไว้",
-            f"{studio}?tab=fields",
-            used=learned["used"],
-        )
     if questions:
         ev(
             "questions",
@@ -559,7 +559,7 @@ def for_mapping(
         "confidence": _clamp(confidence),
         "word": word(_clamp(confidence)),
         "must_decide": must[:cap],
-        "evidence": evidence[:6],
+        "evidence": evidence[:8],
         "suppressed": suppressed,
         "rules_fired": rules,
         "policy_decision": decision,
@@ -735,7 +735,7 @@ def for_dataset(
         "confidence": _clamp(confidence),
         "word": word(_clamp(confidence)),
         "must_decide": must[: int(cfg["max_must_decide"])],
-        "evidence": evidence[:6],
+        "evidence": evidence[:8],
         "suppressed": suppressed,
         "rules_fired": rules,
         "policy_decision": (publish or {}).get("decision"),

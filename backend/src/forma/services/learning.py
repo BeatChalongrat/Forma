@@ -150,6 +150,21 @@ def record_from_approval(session: Session, m: MappingVersion, actor: str) -> lis
                     round_id=m.round_id,
                 )
             )
+    if not out:
+        # answered or confirmed without changing a single source column or constant: accepted as proposed
+        out.append(
+            Correction(
+                customer_id=m.customer_id,
+                kind="accepted",
+                target=None,
+                header=None,
+                before={"proposal": base.id},
+                after=None,
+                actor=actor,
+                mapping_version_id=m.id,
+                round_id=m.round_id,
+            )
+        )
     for row in out:
         session.add(row)
     return out

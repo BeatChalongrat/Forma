@@ -22,6 +22,7 @@ from forma.core.errors import FormaError, ValidationFailed
 from forma.db.session import get_session, session_scope
 from forma.jobs import runner
 from forma.services import (
+    calibration,
     config,
     conversations,
     learning,
@@ -170,6 +171,36 @@ def learning_view(
         "learned": learned,
         "suggestions": learning.suggestions(session, schema) if p.has_role("admin") else [],
     }
+
+
+@router.get("/calibration")
+def calibration_view(
+    session: Session = Depends(get_session),
+    ctx: ServiceContext = Depends(ctx_dep),
+    p: Principal = Depends(require_role("admin")),
+) -> dict[str, Any]:
+    """How often FORMA was right, per rule and per decision, and what the policy could allow (ADR-037)."""
+    policy = config.policy_view(session, ctx.settings)["effective"]
+    return {"report": calibration.report(session), "proposals": calibration.proposals(session, policy)}
+
+
+class ApplyProposalIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    id: str = Field(min_length=1, max_length=120)
+    digest: str = Field(min_length=8, max_length=64)
+
+
+@router.post("/calibration/apply")
+def apply_proposal(
+    body: ApplyProposalIn,
+    session: Session = Depends(get_session),
+    ctx: ServiceContext = Depends(ctx_dep),
+    p: Principal = Depends(require_role("admin")),
+) -> dict[str, Any]:
+    result = calibration.apply(ctx, session, body.id, body.digest, p.actor)
+    session.commit()
+    ctx.refresh()  # the saved policy applies to the next proposal in this process at once
+    return result
 
 
 class PromoteIn(BaseModel):

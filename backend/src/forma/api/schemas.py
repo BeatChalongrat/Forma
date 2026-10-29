@@ -95,6 +95,7 @@ class CustomerPatch(BaseModel):
     notes: str | None = None
     active: bool | None = None
     default_target_schema: str | None = None
+    policy_overrides: dict[str, Any] | None = None
 
 
 class AISettingsIn(BaseModel):
