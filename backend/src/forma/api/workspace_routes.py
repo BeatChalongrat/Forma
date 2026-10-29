@@ -25,6 +25,7 @@ from forma.services import (
     calibration,
     config,
     conversations,
+    foresight,
     learning,
     review_evidence,
     review_questions,
@@ -171,6 +172,14 @@ def learning_view(
         "learned": learned,
         "suggestions": learning.suggestions(session, schema) if p.has_role("admin") else [],
     }
+
+
+@router.get("/foresight")
+def foresight_view(
+    session: Session = Depends(get_session), p: Principal = Depends(require_role("importer"))
+) -> dict[str, Any]:
+    """Who has not sent this round, and who will probably need a check next time (ADR-039)."""
+    return foresight.view(session, p)
 
 
 @router.get("/calibration")

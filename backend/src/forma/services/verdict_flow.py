@@ -110,7 +110,30 @@ def attach_to_dataset(
     publish: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     v = dataset_verdict(ctx, session, dv, r, anomalies=anomalies, publish=publish)
-    r.summary = {**_summary(r), "verdict": v}
+    extra: dict[str, Any] = {"verdict": v}
+    if anomalies is None and dv.status not in ("approved", "published"):
+        from forma.services import datasets as ds
+
+        anomalies = (
+            ds.anomaly_report(ctx, session, dv) if _summary(r).get("anomaly_summary") is None else None
+        )
+    if anomalies:
+        jumps = sorted(
+            (
+                abs(float(a.get("score") or 0))
+                for a in anomalies.get("items") or []
+                if a.get("kind") == "price_jump"
+            ),
+            reverse=True,
+        )
+        extra["anomaly_summary"] = {
+            "dataset_id": dv.id,
+            "high": int(anomalies.get("high") or 0),
+            "medium": int(anomalies.get("medium") or 0),
+            "by_kind": anomalies.get("by_kind") or {},
+            "price_jump_pcts": jumps[:50],
+        }
+    r.summary = {**_summary(r), **extra}
     return v
 
 

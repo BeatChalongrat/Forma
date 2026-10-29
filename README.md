@@ -34,6 +34,8 @@ without writing code.
 * **The policy learns where it is too strict.** Every decision gets an outcome; Settings › Approval policy
   shows how often FORMA was right per rule and proposes the threshold changes the evidence supports — an
   admin applies them, audited, and the next report shows whether they were right (ADR-037).
+* **It knows who is late.** From each customer's cadence FORMA expects the next delivery and lists who has
+  not sent this round and who will probably need a check next time, with the reason (ADR-039).
 * **Memory + drift detection from day one.** Every file is fingerprinted. A returning customer with an
   unchanged format is approved automatically; a renamed column goes to review with the diff; a file that
   matches another customer's format is blocked as a probable wrong file.

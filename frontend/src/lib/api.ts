@@ -67,7 +67,7 @@ async function chatStream(id: string, body: { question: string; request_id: stri
 // ---------------------------------------------------------------------------------------------
 export type Customer = {
   id: string; code: string; name: string; erp_type: string | null; notes: string | null; active: boolean; default_target_schema: string | null; policy_overrides?: Record<string, unknown> | null; created_at: string
-  rounds?: number | ImportRound[]; last_round_at?: string | null; has_approved_mapping?: boolean
+  rounds?: number | ImportRound[]; last_round_at?: string | null; has_approved_mapping?: boolean; next_expected?: Cadence
   mappings?: MappingVersion[]; overrides?: Override[]
 }
 export type Override = { id: string; target: string; where: Record<string, unknown>; value: unknown; note: string | null; author: string; created_at: string }
@@ -112,6 +112,11 @@ export type LearningView = { stats: LearningStats; learned: { total: number; ite
 export type OutcomeCounts = { n: number; right: number; precision: number | null; accepted_unchanged?: number; corrected?: number; rejected?: number; auto_ok?: number; auto_then_edited?: number; auto_then_rolled_back?: number }
 export type CalibrationReport = { since: string; decisions: number; per_rule: Record<string, OutcomeCounts>; per_decision: Record<string, OutcomeCounts>; customers: (OutcomeCounts & { customer_id: string; code: string; auto: number; review: number })[] }
 export type Proposal = { id: string; digest: string; scope: 'policy' | 'customer'; customer_id?: string; customer_code?: string; path: string; value: unknown; current: unknown; title: Bilingual; why: Bilingual; saves: number; evidence: string[] }
+/** proactive intelligence (ADR-039) */
+export type Cadence = { status: 'overdue' | 'due' | 'ahead' | 'unknown'; rounds: number; every_days?: number; last?: string | null; expected?: string; late_days?: number; grace_days?: number }
+export type ExpectedDelivery = Cadence & { customer_id: string; code: string; name: string; text: Bilingual }
+export type WatchItem = { customer_id: string; code: string; name: string; reasons: Bilingual[]; text: Bilingual; last_round_id: string }
+export type Foresight = { generated_at: string; expected: ExpectedDelivery[]; counts: Record<Cadence['status'], number>; watchlist: WatchItem[] }
 export type VerdictAccepted = { did: 'approve_mapping' | 'apply_answers' | 'approve_dataset'; mapping_id?: string; dataset_id?: string; auto_publish?: boolean; verdict: Verdict }
 export type BatchMatch = { kind: 'known' | 'unknown'; how?: 'exact' | 'same_columns' | 'similar' | 'file_name'; named?: boolean; customer_id?: string; customer_code?: string | null; similarity?: number | null; classification?: string; reason?: string; candidates?: { customer_id: string; customer_code: string | null; similarity: number | null }[] }
 export type BatchItemState = 'processing' | 'needs_customer' | 'needs_review' | 'needs_data_check' | 'ready' | 'failed'
@@ -277,6 +282,7 @@ export const api = {
   preferences: () => request<Preferences>('/api/me/preferences', { cache: 'no-store' }),
   savePreferences: (b: Preferences) => put<Preferences>('/api/me/preferences', b),
   history: (q: HistoryFilters) => get<{ items: ImportRound[]; total: number; offset: number; limit: number; timezone: string }>('/api/history' + qs(q)),
+  foresight: () => get<Foresight>('/api/foresight'),
   calibration: () => get<{ report: CalibrationReport; proposals: Proposal[] }>('/api/calibration'),
   applyProposal: (b: { id: string; digest: string }) => post<{ applied: string; path: string; value: unknown; scope: string }>('/api/calibration/apply', b),
   learning: (customer_id = '', offset = 0) => get<LearningView>('/api/learning' + qs({ customer_id: customer_id || undefined, offset })),

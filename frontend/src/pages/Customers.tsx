@@ -18,7 +18,7 @@ export function Customers() {
       <PageHeader title="Customers" subtitle={`${fmtInt(data?.length)} customers sending ERP exports every two weeks.`} actions={<input className="input w-64" placeholder="Search code, name, ERP…" value={q} onChange={(e) => setQ(e.target.value)} />} />
       <Section title={`${rows.length} shown`}>
         <table className="table">
-          <thead><tr><th>Code</th><th>Name</th><th>ERP</th><th>Mapping</th><th className="text-right">Rounds</th><th className="text-right">Last import</th></tr></thead>
+          <thead><tr><th>Code</th><th>Name</th><th>ERP</th><th>Mapping</th><th className="text-right">Rounds</th><th className="text-right">Last import</th><th>Next expected</th></tr></thead>
           <tbody>
             {rows.map((c) => (
               <tr key={c.id} className="row-link" onClick={() => nav(`/customers/${c.id}`)}>
@@ -26,6 +26,7 @@ export function Customers() {
                 <td>{c.has_approved_mapping ? <Badge tone="ok">approved</Badge> : <Badge tone="neutral">none yet</Badge>}</td>
                 <td className="text-right tnum">{typeof c.rounds === 'number' ? c.rounds : c.rounds?.length ?? 0}</td>
                 <td className="text-right text-muted">{timeAgo(c.last_round_at)}</td>
+                <td>{c.next_expected?.expected ? <span className="inline-flex items-center gap-2"><Badge tone={c.next_expected.status === 'overdue' ? 'bad' : c.next_expected.status === 'due' ? 'warn' : 'neutral'}>{c.next_expected.status === 'overdue' ? `${c.next_expected.late_days}d late` : c.next_expected.status === 'due' ? 'due' : c.next_expected.expected}</Badge><span className="text-muted text-[12px]">every {c.next_expected.every_days}d</span></span> : <span className="text-muted">–</span>}</td>
               </tr>
             ))}
           </tbody>

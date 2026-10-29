@@ -11,6 +11,7 @@ import { usePreferences } from '../lib/preferences'
 import { Workflow, workflowStep } from '../components/Workflow'
 import { PageHeader, Stat, Section, Empty, Badge, Spinner } from '../components/ui'
 import { VerdictLine } from '../components/VerdictCard'
+import { Foresight } from '../components/Foresight'
 
 export function Overview() {
   const { t } = usePreferences()
@@ -30,6 +31,7 @@ export function Overview() {
     {error && <div role="alert" className="card p-4 mb-5 text-bad">Some tasks could not be loaded. <button className="btn btn-sm ml-2" onClick={() => { void roundsQuery.refetch(); void uploadsQuery.refetch(); void dashboard.refetch() }}>Try again</button></div>}
     <Workflow />
     <WorkRoundDashboard />
+    <Foresight />
     <Section title={t("Needs your attention", "งานที่รอคุณตรวจ")} className="mb-7" actions={<Link to="/review" className="btn btn-ghost btn-sm">{t("Questions & issues", "คำถามและปัญหา")} <ArrowRight size={14} /></Link>}>
       {loading && <div className="p-5 flex gap-2 items-center text-muted"><Spinner /> Loading tasks…</div>}
       {unknown.map((u) => <Link key={u.id} to={`/uploads/${u.id}`} className="flex flex-wrap items-center gap-3 px-5 py-4 border-b border-line hover:bg-surface-2">

@@ -134,12 +134,18 @@ def list_customers(
         m.customer_id
         for m in session.scalars(select(MappingVersion).where(MappingVersion.status == "approved"))
     }
+    from forma.services import foresight
+
+    by_customer: dict[str, list[ImportRound]] = {}
+    for r in session.scalars(select(ImportRound).order_by(ImportRound.created_at)):
+        by_customer.setdefault(r.customer_id, []).append(r)
     return [
         ser.customer(
             c,
             rounds=counts.get(c.id, 0),
             last_round_at=ser._dt(last.get(c.id)),
             has_approved_mapping=c.id in approved,
+            next_expected=foresight.cadence(by_customer.get(c.id, [])),  # ADR-039
         )
         for c in rows
     ]
