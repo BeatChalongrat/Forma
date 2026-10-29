@@ -1,0 +1,362 @@
+"""Policy calibration from outcomes (ADR-037): how often FORMA was right, and what the policy could allow.
+
+Every approval, rejection, correction and later edit is an outcome of an earlier decision. This module
+turns them into (1) a report — precision per verdict rule and per decision kind — and (2) *proposals*:
+concrete, reversible policy changes with the evidence behind them and the reviews they would have saved.
+Nothing is applied here on its own: an admin applies a proposal (audited), the policy still decides
+(rule 6), and the next report shows whether it was right.
+"""
+
+from __future__ import annotations
+
+import datetime as dt
+from collections import Counter, defaultdict
+from typing import Any
+
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from forma.ai.policy import DEFAULT_POLICY, _merge, validate_policy
+from forma.core.errors import NotFound, ValidationFailed
+from forma.core.hashing import stable_hash
+from forma.db.models import (
+    AuditLog,
+    ChangeSet,
+    Correction,
+    Customer,
+    DatasetVersion,
+    ImportRound,
+    MappingVersion,
+)
+from forma.services.context import ServiceContext
+from forma.services.rounds import audit
+
+OUTCOMES = (
+    "accepted_unchanged",
+    "corrected",
+    "rejected",
+    "auto_ok",
+    "auto_then_edited",
+    "auto_then_rolled_back",
+)
+RIGHT = ("accepted_unchanged", "auto_ok")
+MIN_EVIDENCE = 3
+
+
+# --------------------------------------------------------------------------------------------
+# outcomes: what happened after each decision
+# --------------------------------------------------------------------------------------------
+def outcomes(session: Session, *, since: dt.datetime | None = None) -> list[dict[str, Any]]:
+    """One row per decided mapping version: the decision, the verdict rules, and what a person did next."""
+    q = select(MappingVersion).where(
+        MappingVersion.status.in_(("approved", "superseded", "rejected", "published"))
+    )
+    if since is not None:
+        q = q.where(MappingVersion.created_at >= since)
+    versions = session.scalars(q.order_by(MappingVersion.created_at)).all()
+    by_id = {m.id: m for m in versions}
+    corrections: dict[str, list[Correction]] = defaultdict(list)
+    for c in session.scalars(select(Correction).where(Correction.mapping_version_id.in_(list(by_id)))):
+        corrections[c.mapping_version_id or ""].append(c)
+    rounds = {
+        r.id: r
+        for r in session.scalars(
+            select(ImportRound).where(ImportRound.id.in_({m.round_id for m in versions if m.round_id}))
+        )
+    }
+    edited_rounds = {
+        dv.round_id
+        for dv in session.scalars(
+            select(DatasetVersion)
+            .join(ChangeSet, ChangeSet.dataset_version_id == DatasetVersion.id)
+            .where(DatasetVersion.round_id.in_(list(rounds)))
+        )
+    }
+    rolled_back = {
+        str((a.details or {}).get("round_id") or "")
+        for a in session.scalars(select(AuditLog).where(AuditLog.action == "dataset.rollback"))
+    }
+    rows: list[dict[str, Any]] = []
+    for m in versions:
+        pol = m.policy or {}
+        rules = list(((pol.get("verdict") or {}).get("rules_fired")) or [])
+        decision = "auto" if m.approved_by == "policy" else "review"
+        if m.created_by == "human":
+            # a human version: its outcome belongs to the proposal it corrected (recorded by learning)
+            continue
+        own = corrections.get(m.id, [])
+        descendants = [
+            c
+            for x in versions
+            if x.parent_id == m.id or _descends(x, m.id, by_id)
+            for c in corrections.get(x.id, [])
+        ]
+        if m.status == "rejected":
+            outcome = "rejected"
+        elif decision == "auto":
+            if m.round_id and m.round_id in rolled_back:
+                outcome = "auto_then_rolled_back"
+            elif any(x.parent_id == m.id and x.created_by == "human" for x in versions) or (
+                m.round_id in edited_rounds
+            ):
+                outcome = "auto_then_edited"
+            else:
+                outcome = "auto_ok"
+        elif any(c.kind in ("alias", "constant") for c in [*own, *descendants]):
+            outcome = "corrected"
+        elif m.status in ("approved", "published") or any(c.kind == "accepted" for c in [*own, *descendants]):
+            outcome = "accepted_unchanged"
+        else:
+            continue  # superseded without an approval: no outcome yet
+        r = rounds.get(m.round_id or "")
+        rows.append(
+            {
+                "mapping_id": m.id,
+                "round_id": m.round_id,
+                "customer_id": m.customer_id,
+                "decision": decision,
+                "policy_decision": pol.get("decision"),
+                "rules": rules or ["(no verdict)"],
+                "reasons": list(pol.get("reasons") or [])[:3],
+                "drift": (r.summary or {}).get("drift") if r else None,
+                "row_change": _row_change(pol),
+                "low_high": list((pol.get("checks") or {}).get("low_confidence_high") or []),
+                "outcome": outcome,
+                "at": (m.approved_at or m.created_at).isoformat()
+                if (m.approved_at or m.created_at)
+                else None,
+            }
+        )
+    return rows
+
+
+def _descends(x: MappingVersion, ancestor_id: str, by_id: dict[str, MappingVersion]) -> bool:
+    cur = x
+    for _ in range(50):
+        if not cur.parent_id:
+            return False
+        if cur.parent_id == ancestor_id:
+            return True
+        nxt = by_id.get(cur.parent_id)
+        if nxt is None:
+            return False
+        cur = nxt
+    return False
+
+
+def _row_change(pol: dict[str, Any]) -> float | None:
+    for reason in pol.get("reasons") or []:
+        s = str(reason)
+        if s.startswith("row count changed"):
+            try:
+                return float(s.split("changed", 1)[1].split("%", 1)[0].strip()) / 100
+            except ValueError:
+                return None
+    return None
+
+
+# --------------------------------------------------------------------------------------------
+# report: precision per rule and per decision kind
+# --------------------------------------------------------------------------------------------
+def report(session: Session, *, months: int = 6) -> dict[str, Any]:
+    since = dt.datetime.now(dt.UTC) - dt.timedelta(days=31 * months)
+    rows = outcomes(session, since=since)
+    per_rule: dict[str, Counter[str]] = defaultdict(Counter)
+    per_decision: dict[str, Counter[str]] = defaultdict(Counter)
+    per_customer: dict[str, Counter[str]] = defaultdict(Counter)
+    for r in rows:
+        for rule in r["rules"]:
+            per_rule[rule][r["outcome"]] += 1
+        per_decision[r["decision"]][r["outcome"]] += 1
+        per_customer[r["customer_id"]][r["outcome"]] += 1
+        per_customer[r["customer_id"]][r["decision"]] += 1
+
+    def summarise(c: Counter[str]) -> dict[str, Any]:
+        n = sum(v for k, v in c.items() if k in OUTCOMES)
+        right = sum(c[k] for k in RIGHT)
+        return {
+            "n": n,
+            "right": right,
+            "precision": round(right / n, 3) if n else None,
+            **{k: c[k] for k in OUTCOMES if c[k]},
+        }
+
+    codes = {
+        c.id: c.code for c in session.scalars(select(Customer).where(Customer.id.in_(list(per_customer))))
+    }
+    customers = [
+        {
+            "customer_id": cid,
+            "code": codes.get(cid, cid),
+            "auto": c["auto"],
+            "review": c["review"],
+            **summarise(c),
+        }
+        for cid, c in per_customer.items()
+    ]
+    customers.sort(key=lambda x: (-x["review"], x["code"]))
+    return {
+        "since": since.date().isoformat(),
+        "decisions": len(rows),
+        "per_rule": {
+            k: summarise(v) for k, v in sorted(per_rule.items(), key=lambda kv: -sum(kv[1].values()))
+        },
+        "per_decision": {k: summarise(v) for k, v in per_decision.items()},
+        "customers": customers[:50],
+    }
+
+
+# --------------------------------------------------------------------------------------------
+# proposals: what the policy could allow, with the evidence
+# --------------------------------------------------------------------------------------------
+def proposals(session: Session, policy: dict[str, Any], *, months: int = 6) -> list[dict[str, Any]]:
+    since = dt.datetime.now(dt.UTC) - dt.timedelta(days=31 * months)
+    rows = outcomes(session, since=since)
+    out: list[dict[str, Any]] = []
+    sb = policy.get("sandbox", {})
+    aa = policy.get("auto_approve", {})
+
+    # 1) renamed layouts whose values were identical: trust the data check over the sandbox delta
+    renamed = [r for r in rows if "rename_only" in r["rules"] and r["decision"] == "review"]
+    ok = [r for r in renamed if r["outcome"] == "accepted_unchanged"]
+    bad = [r for r in renamed if r["outcome"] in ("corrected", "rejected")]
+    if not sb.get("trust_data_checks") and len(ok) >= MIN_EVIDENCE and not bad:
+        out.append(
+            _proposal(
+                "trust_data_checks",
+                scope="policy",
+                path="sandbox.trust_data_checks",
+                value=True,
+                current=False,
+                title=(
+                    "Approve a changed layout automatically when the values are identical",
+                    "อนุมัติ layout ที่เปลี่ยนอัตโนมัติเมื่อค่าเหมือนเดิมทุกฟิลด์",
+                ),
+                why=(
+                    f"{len(ok)} reviews of a renamed or moved layout were accepted without any change; none was corrected or rejected",
+                    f"{len(ok)} รายการที่ layout เปลี่ยนแต่ค่าเหมือนเดิม ถูกอนุมัติโดยไม่แก้เลย ไม่มีรายการใดถูกแก้หรือปฏิเสธ",
+                ),
+                saves=len(ok),
+                evidence=[r["mapping_id"] for r in ok][:10],
+            )
+        )
+
+    # 2) high-risk fields just under the confidence bar that people confirmed as read
+    thr = float(aa.get("min_field_confidence_high", 0.8))
+    near = [r for r in rows if r["decision"] == "review" and r["low_high"] and not r["drift"]]
+    confirmed = [r for r in near if r["outcome"] == "accepted_unchanged"]
+    corrected = [r for r in near if r["outcome"] == "corrected"]
+    if thr > 0.6 and len(confirmed) >= MIN_EVIDENCE + 2 and len(corrected) * 4 < len(confirmed):
+        out.append(
+            _proposal(
+                "lower_high_confidence",
+                scope="policy",
+                path="auto_approve.min_field_confidence_high",
+                value=round(thr - 0.05, 2),
+                current=thr,
+                title=(
+                    "Lower the confidence bar for high-risk fields by 0.05",
+                    "ลดเกณฑ์ความมั่นใจของฟิลด์ความเสี่ยงสูงลง 0.05",
+                ),
+                why=(
+                    f"{len(confirmed)} reviews were raised only by a high-risk field below {thr:.2f} and were confirmed as read; {len(corrected)} were corrected",
+                    f"{len(confirmed)} รายการเข้า review เพราะฟิลด์ความเสี่ยงสูงต่ำกว่า {thr:.2f} แล้วถูกยืนยันว่าอ่านถูก มี {len(corrected)} รายการที่ถูกแก้",
+                ),
+                saves=len(confirmed),
+                evidence=[r["mapping_id"] for r in confirmed][:10],
+            )
+        )
+
+    # 3) per customer: row counts that swing but were always fine
+    by_customer: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for r in rows:
+        if "row_shift" in r["rules"] or r["row_change"] is not None:
+            by_customer[r["customer_id"]].append(r)
+    codes = {c.id: c for c in session.scalars(select(Customer).where(Customer.id.in_(list(by_customer))))}
+    for cid, rs in by_customer.items():
+        fine = [r for r in rs if r["outcome"] in RIGHT and r["row_change"] is not None]
+        wrong = [r for r in rs if r["outcome"] in ("corrected", "rejected")]
+        c = codes.get(cid)
+        if c is None or len(fine) < 2 or wrong:
+            continue
+        current = float(
+            ((c.policy_overrides or {}).get("auto_approve") or {}).get("max_row_change_ratio")
+            or aa.get("max_row_change_ratio", 0.3)
+        )
+        observed = max(float(r["row_change"]) for r in fine)
+        value = round(min(0.95, observed + 0.1), 2)
+        if value <= current:
+            continue
+        out.append(
+            _proposal(
+                f"row_change:{cid}",
+                scope="customer",
+                customer_id=cid,
+                customer_code=c.code,
+                path="auto_approve.max_row_change_ratio",
+                value=value,
+                current=current,
+                title=(
+                    f"Let {c.code}'s record count move up to {value:.0%} without a review",
+                    f"ยอมให้จำนวนรายการของ {c.code} เปลี่ยนได้ถึง {value:.0%} โดยไม่ต้อง review",
+                ),
+                why=(
+                    f"{len(fine)} rounds moved by up to {observed:.0%} and were approved as they were",
+                    f"{len(fine)} รอบมีจำนวนรายการเปลี่ยนถึง {observed:.0%} และถูกอนุมัติตามเดิม",
+                ),
+                saves=len(fine),
+                evidence=[r["mapping_id"] for r in fine][:10],
+            )
+        )
+    return out
+
+
+def _proposal(pid: str, **kw: Any) -> dict[str, Any]:
+    title = kw.pop("title")
+    why = kw.pop("why")
+    p = {"id": pid, "title": {"en": title[0], "th": title[1]}, "why": {"en": why[0], "th": why[1]}, **kw}
+    p["digest"] = stable_hash({k: v for k, v in p.items() if k != "evidence"}, 16)
+    return p
+
+
+# --------------------------------------------------------------------------------------------
+# apply: an admin's decision, audited, through the ordinary settings paths
+# --------------------------------------------------------------------------------------------
+def apply(ctx: ServiceContext, session: Session, proposal_id: str, digest: str, actor: str) -> dict[str, Any]:
+    from forma.services import config
+
+    policy = config.policy_view(session, ctx.settings)["effective"]
+    p = next((x for x in proposals(session, policy) if x["id"] == proposal_id), None)
+    if p is None:
+        raise NotFound("This proposal is no longer available; the evidence changed")
+    if p["digest"] != digest:
+        raise ValidationFailed("The proposal changed since it was shown; reload")
+    section, key = p["path"].split(".", 1)
+    if p["scope"] == "policy":
+        new_policy = _merge(policy, {section: {key: p["value"]}})
+        problems = validate_policy(new_policy)
+        if problems:
+            raise ValidationFailed("policy is not valid", details={"problems": problems})
+        config.update_policy(session, ctx.settings, new_policy, actor)
+    else:
+        c = session.get(Customer, p["customer_id"])
+        if c is None:
+            raise NotFound("customer not found")
+        overrides = _merge(dict(c.policy_overrides or {}), {section: {key: p["value"]}})
+        problems = validate_policy(_merge(DEFAULT_POLICY, overrides))
+        if problems:
+            raise ValidationFailed("policy is not valid", details={"problems": problems})
+        c.policy_overrides = overrides
+    audit(
+        session,
+        "policy.calibrate",
+        "customer" if p["scope"] == "customer" else "settings",
+        p.get("customer_id") or "policy",
+        actor=actor,
+        proposal=p["id"],
+        path=p["path"],
+        before=p["current"],
+        after=p["value"],
+        saves=p["saves"],
+    )
+    return {"applied": p["id"], "path": p["path"], "value": p["value"], "scope": p["scope"]}

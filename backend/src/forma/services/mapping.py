@@ -383,7 +383,9 @@ def propose_for_round(
         if previous is not None and rep.ok and source_kind != "memory"
         else None
     )
-    decision = ctx.policy.evaluate(
+    if review is not None and previous is not None:
+        _inherit_confidence(doc, review, previous)  # a person approved these exact field mappings before
+    decision = ctx.policy.for_customer(r.customer.policy_overrides if r.customer else None).evaluate(
         doc,
         schema,
         findings=findings,
@@ -478,6 +480,18 @@ def propose_for_round(
         source=source_kind,
     )
     return mv
+
+
+def _inherit_confidence(doc: MappingDocument, review: dict[str, Any], previous: MappingVersion) -> None:
+    """Field memory (ADR-006, ADR-037): a field mapped exactly as in the approved mapping — same expression,
+    same table — carries the confidence a person already gave it, so it is not asked about again."""
+    unchanged = {f["pointer"] for f in review.get("fields") or [] if f.get("status") == "unchanged"}
+    if not unchanged:
+        return
+    for fm in [*doc.fields, *(x for c in doc.collections for x in c.fields)]:
+        if fm.target in unchanged and (fm.confidence is None or fm.confidence < 1.0):
+            fm.confidence = 1.0
+            fm.evidence = [*fm.evidence, f"same as the approved mapping v{previous.version} ({previous.id})"]
 
 
 def _learned_pointers(doc: MappingDocument) -> set[str]:
@@ -670,7 +684,8 @@ def save_mapping_edit(
         if r is not None
         else None
     )
-    decision = ctx.policy.evaluate(
+    engine = ctx.policy.for_customer(r.customer.policy_overrides if r is not None and r.customer else None)
+    decision = engine.evaluate(
         doc,
         schema,
         findings=findings,

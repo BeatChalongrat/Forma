@@ -31,6 +31,9 @@ without writing code.
   column alias or the confirmed constant — for that customer's next file, with evidence saying where it came
   from; an alias several customers taught becomes everyone's once an admin promotes it. Corrections per
   approval, by month, are on the Settings page (ADR-038).
+* **The policy learns where it is too strict.** Every decision gets an outcome; Settings › Approval policy
+  shows how often FORMA was right per rule and proposes the threshold changes the evidence supports — an
+  admin applies them, audited, and the next report shows whether they were right (ADR-037).
 * **Memory + drift detection from day one.** Every file is fingerprinted. A returning customer with an
   unchanged format is approved automatically; a renamed column goes to review with the diff; a file that
   matches another customer's format is blocked as a probable wrong file.

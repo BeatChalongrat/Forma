@@ -71,6 +71,10 @@ DEFAULT_POLICY: dict[str, Any] = {
         "max_new_invalid_prices": 0,  # records without a valid price beyond the approved mapping's → block
         "max_new_duplicates": 0,  # duplicate identities beyond the approved mapping's → block
         "max_changed_prices_auto": 0,  # more changed prices than this → a human reviews (never auto)
+        # ADR-037: when every important field keeps last round's published values on the same SKUs, the
+        # sandbox delta describes the *approved* mapping breaking on a moved layout, not a risk in the
+        # proposal — and the drift is not a reason either. Off by default; calibration proposes it.
+        "trust_data_checks": False,
     },
     # Change intelligence (ADR-022): what counts as unusual in a round's data.
     "anomaly": {
@@ -146,9 +150,9 @@ def validate_policy(policy: dict[str, Any]) -> list[str]:
         if k not in DEFAULT_POLICY["block"] or not isinstance(v, bool):
             problems.append(f"block.{k} must be a known switch set to true or false")
     for k, v in p["sandbox"].items():
-        if k == "enabled":
+        if k in ("enabled", "trust_data_checks"):
             if not isinstance(v, bool):
-                problems.append("sandbox.enabled must be true or false")
+                problems.append(f"sandbox.{k} must be true or false")
         elif k not in DEFAULT_POLICY["sandbox"]:
             problems.append(f"sandbox.{k} is not a known setting")
         elif isinstance(v, bool) or not isinstance(v, int) or v < 0:
@@ -185,6 +189,18 @@ def validate_policy(policy: dict[str, Any]) -> list[str]:
     return problems
 
 
+def _data_identical(checks: list[dict[str, Any]] | None, *, min_pairs: int = 3) -> bool:
+    """Every important changed field keeps last round's published values on enough SKUs (ADR-037)."""
+    important = [
+        c
+        for c in checks or []
+        if c.get("risk") in ("critical", "high") and c.get("verdict") not in (None, "no_data")
+    ]
+    return bool(important) and all(
+        c.get("verdict") == "same" and int(c.get("pairs") or 0) >= min_pairs for c in important
+    )
+
+
 def _meaning_doubts(checks: list[dict[str, Any]] | None) -> list[dict[str, Any]]:
     """Self-healing data checks (ADR-021) that doubt a critical/high field still means the same thing."""
     doubtful = ("vat_added", "vat_removed", "scaled", "different")
@@ -200,6 +216,10 @@ class PolicyEngine:
         """``approval.yaml``, with the version saved in the web app on top when there is one."""
         base = file_policy(directory)
         return cls(_merge(base, override) if override else base)
+
+    def for_customer(self, overrides: dict[str, Any] | None) -> PolicyEngine:
+        """This policy with a customer's overrides on top (ADR-037); the same engine when there are none."""
+        return PolicyEngine(_merge(self.policy, overrides)) if overrides else self
 
     def evaluate_publish(
         self,
@@ -406,8 +426,12 @@ class PolicyEngine:
         if sandbox_failures:
             return PolicyDecision("block", w.get("sandbox_failed", 60), sandbox_failures, 1.0, checks)
         changed = (sandbox or {}).get("delta") or {}
-        if self.policy["sandbox"]["enabled"] and changed.get("changed_prices", 0) > int(
-            self.policy["sandbox"]["max_changed_prices_auto"]
+        trusted = bool(self.policy["sandbox"].get("trust_data_checks")) and _data_identical(field_checks)
+        checks["data_checks_trusted"] = trusted
+        if (
+            self.policy["sandbox"]["enabled"]
+            and not trusted
+            and changed.get("changed_prices", 0) > int(self.policy["sandbox"]["max_changed_prices_auto"])
         ):
             reasons.append(
                 f"sandbox: {changed['changed_prices']} prices differ from the approved mapping's output"
@@ -466,11 +490,15 @@ class PolicyEngine:
             reasons.append(f"{len(warnings)} warnings > {aa['max_warning_findings']}")
             priority += w["warnings"] * len(warnings)
 
-        if drift is not None and drift not in aa["allowed_drift"]:
+        if (
+            drift is not None
+            and drift not in aa["allowed_drift"]
+            and not (trusted and drift != "unrelated_file")
+        ):
             reasons.append(f"schema drift: {drift}")
             priority += w.get(f"drift_{drift}", 20)
             risk += 0.2
-        if other_customer:
+        if other_customer and not trusted:  # identical values on this customer's own SKUs settle the owner
             code = other_customer.get("customer_code") or other_customer.get("customer_id")
             reasons.append(
                 f"structure is identical to customer {code}'s approved format — confirm this file belongs here"

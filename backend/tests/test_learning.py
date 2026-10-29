@@ -113,7 +113,7 @@ def test_a_correction_is_learned_and_used_next_round(client: TestClient, isolate
     assert price["confidence"] == 1.0 and any("learned:" in e for e in price["evidence"])
     assert m2["policy"]["learning"]["used"] and taught["target"] in m2["policy"]["learning"]["used"]
     assert c.get("/api/learning").json()["stats"]["uses"] >= 1
-    v = c.get(f"/api/rounds/{r2['id']}/verdict").json()["verdict"]
+    v = m2["policy"]["verdict"]  # the mapping-stage verdict (the round may already be past it)
     assert any(e["kind"] == "learned" for e in v["evidence"])
     # another customer does not inherit it
     other = c.post("/api/customers", json={"code": "L2", "name": "L2"}).json()["id"]

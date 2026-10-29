@@ -69,6 +69,8 @@ class Customer(Base):
     active: Mapped[bool] = mapped_column(Boolean, default=True)
     # target format new rounds of this customer use ("catalog" = latest, "catalog@2" = pinned)
     default_target_schema: Mapped[str | None] = mapped_column(String(80))
+    # policy sections this customer overrides (ADR-037), applied from calibration proposals
+    policy_overrides: Mapped[dict[str, Any] | None] = mapped_column(JSONType)
     created_at: Mapped[dt.datetime] = mapped_column(UTCDateTime, default=utcnow)
 
     rounds: Mapped[list[ImportRound]] = relationship(back_populates="customer")

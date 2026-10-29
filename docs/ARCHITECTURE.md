@@ -71,6 +71,11 @@ ImportRound: uploaded ─▶ profiled ─▶ ┬─ auto_approved ─▶ transfo
    (a field whose rule is unchanged but whose values differ is a data change, not a mapping change). The
    policy decision is unchanged; `POST /rounds/{id}/verdict/accept` acts through the ordinary approval
    paths and records the rules that fired. Stored on the round's summary; recomputed when the rules move on.
+6c. **Calibration** (ADR-037) — each decided mapping version gets an outcome from what a person did next
+   (accepted unchanged, corrected, rejected; auto then edited or rolled back). Precision per verdict rule and
+   per decision kind is reported, and consistent outcomes become proposals an admin applies through the
+   settings service (`sandbox.trust_data_checks`, a confidence bar, a customer's row-count tolerance via
+   `Customer.policy_overrides`). The policy still decides; its thresholds are now justified.
 7. **Transform** — full run with the approved mapping; persistent overrides for the customer are
    re-applied; records are validated against the schema (the count of records that break it is kept on the
    version, ADR-026); a `DatasetVersion` (JSONL on disk) is created.

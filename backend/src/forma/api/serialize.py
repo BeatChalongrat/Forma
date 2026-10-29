@@ -27,6 +27,7 @@ def customer(c: Customer, **extra: Any) -> dict[str, Any]:
         "notes": c.notes,
         "active": c.active,
         "default_target_schema": c.default_target_schema,
+        "policy_overrides": c.policy_overrides,
         "created_at": _dt(c.created_at),
         **extra,
     }
