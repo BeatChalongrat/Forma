@@ -256,19 +256,25 @@ def reset_backend() -> None:
 
 
 def start() -> dict[str, Any]:
-    """Worker/API start: re-queue stale ``running`` jobs and re-submit ``queued`` ones (in-memory queues
-    do not survive a restart; arq's does, and a duplicate submit is harmless thanks to the claim)."""
+    """Reconcile finished work, recover stale workers, then restore durable pending jobs to the queue."""
+    from forma.jobs.recovery import reconcile_completed_jobs
+
+    reconciled = reconcile_completed_jobs()
     stale = recover_stale()
     _start_retention_scheduler()
     resubmitted: list[str] = []
     backend = get_backend()
-    if backend.name != "arq":
-        with session_scope() as s:
-            ids = list(s.scalars(select(Job.id).where(Job.status == "queued").order_by(Job.created_at)))
-        for jid in ids:
-            backend.submit(jid)
-            resubmitted.append(jid)
-    return {"backend": backend.name, "stale_requeued": stale, "resubmitted": resubmitted}
+    with session_scope() as s:
+        ids = list(s.scalars(select(Job.id).where(Job.status == "queued").order_by(Job.created_at)))
+    for jid in ids:
+        backend.submit(jid)  # Redis also needs repair after losing a queue entry; _job_id deduplicates.
+        resubmitted.append(jid)
+    return {
+        "backend": backend.name,
+        "stale_requeued": stale,
+        "resubmitted": resubmitted,
+        "reconciled": reconciled,
+    }
 
 
 def stop() -> None:
@@ -408,6 +414,7 @@ def _claim(job_id: str) -> tuple[str, dict[str, Any]] | None:
 def run_job(job_id: str) -> bool:
     """Execute one job in this process. Safe to call from any backend, any number of times."""
     from forma.jobs import handlers as _h  # noqa: F401  (register handlers in worker processes)
+    from forma.jobs.recovery import completed_job_result, record_reconciliation
 
     claimed = _claim(job_id)
     if claimed is None:
@@ -428,7 +435,10 @@ def run_job(job_id: str) -> bool:
     t0 = time.perf_counter()
     try:
         with _trace_job(job_id, kind):
-            result = _HANDLERS[kind](ctx, payload, prog)
+            with session_scope() as s:
+                job = s.get(Job, job_id)
+                completed = completed_job_result(s, job) if job else None
+            result = completed if completed is not None else _HANDLERS[kind](ctx, payload, prog)
         with session_scope() as s:
             j = s.get(Job, job_id)
             if j:
@@ -437,6 +447,10 @@ def run_job(job_id: str) -> bool:
                 j.progress = 100
                 j.message = None
                 j.finished_at = _utcnow()
+                if result.get("reconciled"):
+                    j.round_id = result["round_id"]
+                    j.message = "Reconciled with existing published output"
+                    record_reconciliation(s, job_id, result)
         metrics.observe_job(kind, "done", time.perf_counter() - t0)
         return True
     except Exception as e:
@@ -619,7 +633,9 @@ async def arq_run_job(ctx: dict[str, Any], job_id: str) -> bool:
 
 
 async def _arq_startup(ctx: dict[str, Any]) -> None:
-    log.info("arq worker start", **start())
+    import asyncio
+
+    log.info("arq worker start", **await asyncio.to_thread(start))
 
 
 def arq_worker_settings() -> type:

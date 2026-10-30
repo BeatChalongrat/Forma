@@ -102,17 +102,72 @@ SEMANTIC_RISK: dict[str, Risk] = {
 }
 
 
+def mapping_support_issues(document: dict[str, Any]) -> list[dict[str, str]]:
+    """JSON Schema validity does not imply the mapper can enumerate/build that document shape."""
+    issues: list[dict[str, str]] = []
+    unsupported = {
+        "$ref",
+        "$dynamicRef",
+        "allOf",
+        "anyOf",
+        "oneOf",
+        "if",
+        "then",
+        "else",
+        "patternProperties",
+        "dependentSchemas",
+        "prefixItems",
+    }
+
+    def issue(pointer: str, message: str) -> None:
+        issues.append({"level": "error", "pointer": pointer or "/", "message": message})
+
+    def walk(node: Any, pointer: str, collection_depth: int = 0) -> None:
+        if not isinstance(node, dict):
+            issue(pointer, "boolean field schemas cannot be mapped; declare the field type explicitly")
+            return
+        for keyword in sorted(unsupported & node.keys()):
+            issue(
+                pointer, f"{keyword} is not supported by the mapping catalogue; use explicit properties/items"
+            )
+        for name, child in node.get("properties", {}).items():
+            if any(char in name for char in ("/", "~", "*")) or name == "":
+                issue(
+                    pointer + "/" + name,
+                    "field names containing /, ~, * or an empty name are not supported by mapping paths",
+                )
+            walk(child, pointer + "/" + name, collection_depth)
+        items = node.get("items")
+        if isinstance(items, dict):
+            if "properties" in items and collection_depth:
+                issue(
+                    pointer,
+                    "nested collections of objects are not supported; flatten to one collection level",
+                )
+            walk(items, pointer + "/*", collection_depth + 1)
+
+    if document.get("type") != "object" or not isinstance(document.get("properties"), dict):
+        issue("/", "target must describe one object record with explicit properties")
+    walk(document, "")
+    return issues
+
+
 def schema_findings(schema: TargetSchema) -> list[dict[str, str]]:
     """What the web app shows before a schema is registered: how well FORMA can map onto it."""
-    out: list[dict[str, str]] = []
+    out = mapping_support_issues(schema.document)
+    if out:
+        return out
     for f in schema.leaf_fields():
-        if f.semantic is None and not (f.synonyms_en or f.synonyms_th):
+        if not (f.synonyms_en or f.synonyms_th):
             level = "warning" if f.required else "info"
             out.append(
                 {
                     "level": level,
                     "pointer": f.pointer,
-                    "message": "no semantic or synonyms: matched by field name only",
+                    "message": (
+                        "no source-column synonyms: header matching uses the field name only; "
+                        "semantics guide conversion, not header aliases"
+                    ),
                 }
             )
         elif f.semantic and f.semantic not in SEMANTICS:
@@ -412,7 +467,7 @@ def _walk(
             is_collection=is_arr_of_obj,
             system=system or bool(xf.get("system", False)),
             default=sub.get("default"),
-            examples=tuple(xf.get("examples", [])),
+            examples=tuple(sub.get("examples", xf.get("examples", []))),
         )
         yield spec
         if is_arr_of_obj:
@@ -486,6 +541,12 @@ class SchemaRegistry:
         (the web app previews it first). The caller's document is never modified."""
         document = copy.deepcopy(document)
         Draft202012Validator.check_schema(document)
+        unsupported = mapping_support_issues(document)
+        if unsupported:
+            raise ValidationFailed(
+                "target JSON Schema contains shapes the mapper does not support",
+                details={"findings": unsupported},
+            )
         xf = document.setdefault("x-forma", {})
         # the id becomes a file name: an explicit one must already be safe, a title is slugified
         if xf.get("schema_id"):

@@ -18,7 +18,7 @@ from forma.auth import Principal, ensure_customer
 from forma.core.errors import Conflict, NotFound, ValidationFailed
 from forma.db.models import AssistantConversation as Chat
 from forma.db.models import AssistantTurn as Turn
-from forma.db.models import DatasetVersion, ImportRound, utcnow
+from forma.db.models import DatasetVersion, ImportRound, MappingVersion, utcnow
 from forma.db.session import session_scope
 from forma.services.context import ServiceContext
 from forma.services.rounds import audit
@@ -75,6 +75,7 @@ def summary(chat: Chat) -> dict[str, Any]:
         "title": chat.title,
         "round_id": chat.round_id,
         "dataset_id": chat.dataset_id,
+        "mapping_id": chat.mapping_id,
         "archived": chat.archived,
         "pinned": chat.pinned,
         "created_at": chat.created_at,
@@ -98,7 +99,22 @@ def turn_view(turn: Turn, chat: Chat) -> dict[str, Any]:
     }
 
 
-def create(session: Session, p: Principal, title: str, round_id: str | None, dataset_id: str | None) -> Chat:
+def create(
+    session: Session,
+    p: Principal,
+    title: str,
+    round_id: str | None,
+    dataset_id: str | None,
+    mapping_id: str | None = None,
+) -> Chat:
+    if mapping_id:
+        mapping = session.get(MappingVersion, mapping_id)
+        if mapping is None:
+            raise NotFound("Review context not found")
+        ensure_customer(p, mapping.customer_id)
+        if not mapping.round_id or (round_id and round_id != mapping.round_id):
+            raise ValidationFailed("Mapping does not belong to this import")
+        round_id = mapping.round_id
     for model, entity_id in ((ImportRound, round_id), (DatasetVersion, dataset_id)):
         if entity_id:
             row = (
@@ -118,6 +134,7 @@ def create(session: Session, p: Principal, title: str, round_id: str | None, dat
         title=title.strip() or "New chat",
         round_id=round_id,
         dataset_id=dataset_id,
+        mapping_id=mapping_id,
     )
     session.add(chat)
     session.flush()
@@ -210,7 +227,17 @@ def read_history(
         "offset": offset,
         "next_offset": offset + 3 if offset + 3 < total else None,
         "messages": [
-            {"sequence": t.sequence, "question": t.question, "answer": t.answer, "historical_not_live": True}
+            {
+                "sequence": t.sequence,
+                "question": t.question,
+                "answer": t.answer,
+                "clarifications": (t.reply or {}).get("clarifications", []),
+                "reports": [
+                    {k: report.get(k) for k in ("title", "scope", "query", "generated_at")}
+                    for report in (t.reply or {}).get("visualizations", [])
+                ],
+                "historical_not_live": True,
+            }
             for t in turns
         ],
         "links": [],
@@ -372,12 +399,27 @@ def send(
                 "content": (
                     ("[Stopped by user; incomplete answer]\n" if previous.status == "stopped" else "")
                     + previous.answer
+                    + "\nClarification questions: "
+                    + json.dumps((previous.reply or {}).get("clarifications", []), ensure_ascii=False)
+                    + "\nHistorical report queries (recheck live data): "
+                    + json.dumps(
+                        [
+                            {k: report.get(k) for k in ("title", "query", "generated_at")}
+                            for report in (previous.reply or {}).get("visualizations", [])
+                        ],
+                        ensure_ascii=False,
+                    )
                     + "\nReferences: "
                     + refs
                 )[:6000],
             },
         ]
     try:
+        extra: dict[str, Any] = {}
+        if chat.mapping_id:
+            extra["mapping_id"] = chat.mapping_id
+        if stream:
+            extra["stream"] = stream
         reply = workspace_assistant.ask(
             ctx,
             session,
@@ -389,7 +431,7 @@ def send(
             chat.dataset_id,
             timezone,
             conversation_id=chat.id,
-            **({"stream": stream} if stream else {}),
+            **extra,
         )
         state = "complete" if reply.get("ai") else "failed"
     except StreamCancelled:

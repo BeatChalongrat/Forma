@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowRight, Check, ChevronDown, Scale } from 'lucide-react'
+import { ArrowRight, Check, ChevronDown } from 'lucide-react'
 import type { Verdict, VerdictBrief, VerdictDecision } from '../lib/api'
 import { usePreferences } from '../lib/preferences'
 import { cn } from '../lib/utils'
@@ -58,12 +58,11 @@ export function VerdictCard({ v, editable, busy, onAccept, onOpenDecision, compa
   const firstLink = v.evidence.find((e) => e.link)?.link
   const confidenceWord = v.word === 'sure' ? t('sure', 'มั่นใจสูง') : v.word === 'likely' ? t('likely', 'ค่อนข้างมั่นใจ') : t('unsure', 'ไม่แน่ใจ')
   return (
-    <section className={cn('card border-l-4', v.outcome === 'accept' ? 'border-l-ok' : v.outcome === 'assign_customer' || v.outcome === 'reject_file' || v.outcome === 'fix_data' ? 'border-l-bad' : 'border-l-warn', compact ? 'p-4' : 'p-5 sm:p-6')} aria-label={t('Verdict', 'คำตัดสิน')}>
+    <section className={cn('card shadow-none', compact ? 'p-4' : 'p-5 sm:p-6')} aria-label={t('Verdict', 'คำตัดสิน')}>
       <div className="flex flex-wrap items-start gap-3">
-        <Scale size={compact ? 18 : 22} className="text-navy shrink-0 mt-0.5" />
-        <div className="flex-1 min-w-[220px]">
-          <div className="flex flex-wrap items-center gap-2 text-xs text-muted"><span>{t('FORMA concludes', 'FORMA สรุปว่า')}</span><Badge tone={o.tone}>{o[lang]}</Badge><span className="inline-flex items-center gap-1.5"><ConfidenceDot word={v.word} />{confidenceWord}</span></div>
-          <p className={cn('mt-1 font-semibold text-navy leading-snug', compact ? 'text-base' : 'text-lg sm:text-xl')}>{v.conclusion[lang]}</p>
+        <div className="flex-1 min-w-0 basis-60">
+          <div className="flex flex-wrap items-center gap-2 text-xs text-muted"><span>{t('Review summary', 'สรุปการตรวจ')}</span><Badge tone={o.tone}>{o[lang]}</Badge><span>{confidenceWord}</span></div>
+          <p className={cn('mt-3 font-medium text-navy leading-relaxed break-words', compact ? 'text-base' : 'text-lg')}>{v.conclusion[lang]}</p>
           {v.narrative && <p className="mt-2 text-sm text-ink-2">{v.narrative.text}</p>}
         </div>
         {!compact && (oneClick ? (
@@ -76,15 +75,15 @@ export function VerdictCard({ v, editable, busy, onAccept, onOpenDecision, compa
       </div>
 
       {!compact && v.must_decide.length > 0 && (
-        <div className="mt-5 space-y-3">
-          <h3 className="text-sm font-semibold">{t('Only you can decide', 'สิ่งที่ต้องให้คุณตัดสิน')} · {v.must_decide.length}</h3>
+        <div className="mt-6 divide-y divide-line">
+          <h3 className="text-sm font-medium pb-3">{t('Questions to confirm', 'คำถามที่ต้องยืนยัน')} <span className="text-muted ml-1">({v.must_decide.length})</span></h3>
           {v.must_decide.map((d, i) => <Decision key={d.id} n={i + 1} d={d} value={decisions[d.id]} editable={editable && !busy} onChange={(val) => setDecisions((cur) => ({ ...cur, [d.id]: val }))} onOpen={onOpenDecision} />)}
         </div>
       )}
 
       {v.evidence.length > 0 && (
-        <div className="mt-4">
-          <button className="text-xs text-muted inline-flex items-center gap-1 hover:text-ink" onClick={() => setShowEvidence((x) => !x)} aria-expanded={showEvidence}><ChevronDown size={14} className={cn('transition-transform', showEvidence && 'rotate-180')} />{t('Why', 'เพราะอะไร')} · {v.evidence.length}</button>
+        <div className="mt-2 border-t border-line pt-2">
+          <button className="w-full flex items-center justify-between gap-3 py-3 text-sm text-ink-2 hover:text-ink rounded focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal" onClick={() => setShowEvidence((x) => !x)} aria-expanded={showEvidence}><span>{t('Supporting evidence', 'หลักฐานประกอบ')} <span className="text-muted ml-1">({v.evidence.length})</span></span><ChevronDown size={16} className={cn('shrink-0 transition-transform', showEvidence && 'rotate-180')} /></button>
           {showEvidence && <ul className="mt-2 space-y-1.5 text-sm">{v.evidence.map((e) => <li key={e.id} className="flex gap-2"><span className="text-muted tnum shrink-0">{e.id}.</span>{e.link ? <Link className="text-signal hover:underline break-words" to={e.link}>{e.text[lang]}</Link> : <span className="break-words">{e.text[lang]}</span>}</li>)}</ul>}
         </div>
       )}
@@ -106,7 +105,7 @@ function Decision({ n, d, value, editable, onChange, onOpen }: { n: number; d: V
   const yes = isVat ? t('VAT included', 'รวม VAT แล้ว') : t('Yes', 'ใช่')
   const no = isVat ? t('VAT excluded', 'ยังไม่รวม VAT') : t('No', 'ไม่ใช่')
   return (
-    <div className="rounded-lg border border-line p-3">
+    <div className="py-4">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0"><p className="font-medium"><span className="text-muted mr-1">{n}.</span>{d.question[lang]}</p><p className="text-xs text-muted mt-0.5">{d.why[lang]}{d.default !== null && d.default !== undefined && d.default_reason ? ` · ${t('Default', 'ค่าตั้งต้น')}: ${String(d.default === true ? yes : d.default === false ? no : d.default)} (${d.default_reason[lang]})` : ''}</p></div>
         {onOpen && <button className="btn btn-ghost btn-sm" onClick={() => onOpen(d.id)}>{t('Look at the evidence', 'ดูหลักฐาน')}<ArrowRight size={13} /></button>}

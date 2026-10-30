@@ -308,6 +308,7 @@ class PolicyEngine:
         llm_fallback: bool = False,
         sandbox: dict[str, Any] | None = None,
         field_checks: list[dict[str, Any]] | None = None,
+        open_questions: list[Any] | None = None,
     ) -> PolicyDecision:
         d = self._decide(
             mapping,
@@ -323,6 +324,13 @@ class PolicyEngine:
             sandbox=sandbox,
             field_checks=field_checks,
         )
+        if open_questions:
+            d.checks["unresolved_questions"] = len(open_questions)
+            if d.decision == "auto_approve":
+                d.decision = "review"
+                d.reasons = []
+            d.reasons.append(f"{len(open_questions)} questions still need operator confirmation")
+            d.priority = max(d.priority, 50)
         self._classify(
             d, findings=findings, rows_out=rows_out, drift=drift, sandbox=sandbox, field_checks=field_checks
         )
@@ -407,6 +415,14 @@ class PolicyEngine:
         checks["drift"] = drift
         checks["reused_approved"] = reused_approved
         checks["llm_fallback"] = llm_fallback
+        # Input uncertainty cannot be cleared by a high model confidence or reuse of an old mapping.
+        source_notices = [
+            str(f.get("message", "source needs review")) for f in findings if f.get("kind") == "source_review"
+        ]
+        if source_notices:
+            reasons.extend(source_notices)
+            priority += w["warnings"] * len(source_notices)
+            checks["source_review_required"] = True
         if sandbox is not None:
             checks["sandbox"] = sandbox.get("delta")
 

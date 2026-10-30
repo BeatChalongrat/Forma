@@ -32,10 +32,11 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from forma.core.errors import NotFound, UnsupportedFile, ValidationFailed
-from forma.db.models import Batch, BatchItem, Customer, ImportRound, Job, MappingVersion, SourceFile
-from forma.fingerprint.fingerprint import Fingerprint, compare, merge_fingerprints
+from forma.db.models import Batch, BatchItem, Customer, ImportRound, Job, MappingVersion
+from forma.fingerprint.fingerprint import Fingerprint, compare
 from forma.ingestion.sniff import sniff_kind
 from forma.services import config as cfg
+from forma.services import format_memory
 from forma.services import rounds as rs
 from forma.services.context import ServiceContext
 from forma.services.publishing import FORMAT, latest_export
@@ -145,22 +146,8 @@ def get_item(session: Session, item_id: str) -> BatchItem:
 # identification: whose file is this?
 # --------------------------------------------------------------------------------------------
 def _approved_formats(session: Session) -> list[tuple[MappingVersion, Fingerprint]]:
-    """Each customer's latest approved mapping with the fingerprint of the files it was approved on."""
-    latest: dict[str, MappingVersion] = {}
-    for mv in session.scalars(
-        select(MappingVersion).where(MappingVersion.status == "approved").order_by(MappingVersion.approved_at)
-    ):
-        latest[mv.customer_id] = mv
-    out: list[tuple[MappingVersion, Fingerprint]] = []
-    for mv in latest.values():
-        fps = [
-            Fingerprint.from_dict(f.fingerprint)
-            for f in session.scalars(select(SourceFile).where(SourceFile.round_id == mv.round_id))
-            if f.fingerprint
-        ]
-        if fps:
-            out.append((mv, merge_fingerprints(fps)))
-    return out
+    """Every approved layout, including older layouts; this identifies customers, not reuse eligibility."""
+    return format_memory.catalog(session)
 
 
 def named_customer(session: Session, file_name: str) -> Customer | None:
@@ -239,7 +226,14 @@ def _match_format(session: Session, fp: Fingerprint) -> dict[str, Any]:
                     for mv, _ in hits
                 ][:5],
             }
-    scored = sorted(((compare(f, fp), mv) for mv, f in formats), key=lambda x: x[0].similarity, reverse=True)
+    ranked = sorted(((compare(f, fp), mv) for mv, f in formats), key=lambda x: x[0].similarity, reverse=True)
+    # Competing layouts from the same customer are not competing customer identities.
+    seen_customers: set[str] = set()
+    scored = []
+    for report, mapping in ranked:
+        if mapping.customer_id not in seen_customers:
+            seen_customers.add(mapping.customer_id)
+            scored.append((report, mapping))
     candidates = [
         {
             "customer_id": mv.customer_id,
@@ -423,6 +417,7 @@ def batch_view(session: Session, b: Batch) -> dict[str, Any]:
                 "round_id": it.round_id,
                 "round_status": r.status if r else None,
                 "mapping_version_id": (r.summary or {}).get("mapping_version_id") if r else None,
+                "format_memory": (r.summary or {}).get("format_memory") if r else None,
                 "dataset_version_id": (r.summary or {}).get("dataset_version_id") if r else None,
                 "publish": (r.summary or {}).get("publish") if r else None,
                 "export_id": art.id if art else None,

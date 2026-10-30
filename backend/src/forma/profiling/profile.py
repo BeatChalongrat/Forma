@@ -257,7 +257,9 @@ def profile_workbook(path: Path, *, max_rows_per_table: int = 50_000) -> Workboo
     meta = read_meta(path)
     tables: list[TableProfile] = []
     for sh in meta.sheets:
-        raw = read_raw(path, sh.index if meta.kind == "excel" else None)
+        # Profiling describes damaged cells too (metadata contains their coordinates). Execution
+        # uses the strict reader and refuses missing caches/errors in any selected source sheet.
+        raw = read_raw(path, sh.index if meta.kind == "excel" else None, validate_cells=False)
         if raw.height == 0:
             continue
         for cand in detect_tables(raw):

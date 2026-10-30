@@ -36,7 +36,10 @@ async def lifespan(app_: FastAPI) -> AsyncIterator[None]:
     init_db()
     if telemetry.configure(s.otel_endpoint, s.otel_service_name):
         telemetry.instrument_app(app_)
-    runner.start()
+    # Redis submission uses a synchronous adapter; never nest asyncio.run in this event loop.
+    import asyncio
+
+    await asyncio.to_thread(runner.start)
     yield
     runner.stop()
 

@@ -114,7 +114,7 @@ export function BulkUpload() {
             <summary className="hover:text-ink"><Localized>What happens after upload?</Localized></summary>
             <ol className="mt-2 flex flex-col gap-2">
               {[
-                ['Match the format', 'Known format → its customer, automatically. Unknown → you choose the customer.', 'ดูจาก format ว่าเป็นของใคร ถ้าไม่รู้จักจะให้คุณเลือกลูกค้า'],
+                ['Identify the customer', 'Identify the customer first, then check approved mappings for this layout and target format.', 'ระบุลูกค้าก่อน แล้วตรวจว่ามีกฎที่เคยอนุมัติสำหรับไฟล์และรูปแบบปลายทางนี้หรือไม่'],
                 ['Map', 'The approved mapping is reused; a changed or new format is proposed and checked.', 'ใช้ mapping เดิม หรือเสนอใหม่ถ้า format เปลี่ยน'],
                 ['Create & check the data', 'Every record is checked against the target format and the last round.', 'ตรวจทุก record กับ format และรอบก่อน'],
                 ['JSON', 'One JSON per file, named after it — download one or all as a zip.', 'ได้ JSON ไฟล์ละ 1 ชุด ดาวน์โหลดทีละไฟล์หรือทั้งหมด'],
@@ -135,7 +135,7 @@ export function BulkUpload() {
 
 const STATE: Record<BatchItemState, { label: string; tone: 'ok' | 'warn' | 'bad' | 'signal' | 'neutral' }> = {
   processing: { label: 'Working', tone: 'neutral' },
-  needs_customer: { label: 'Unknown format', tone: 'warn' },
+  needs_customer: { label: 'Choose customer', tone: 'warn' },
   needs_review: { label: 'Check mapping', tone: 'warn' },
   needs_data_check: { label: 'Check data', tone: 'warn' },
   ready: { label: 'JSON ready', tone: 'ok' },
@@ -198,7 +198,7 @@ export function UploadPage() {
       )}
 
       {unknown.length > 0 && (
-        <Section className="mb-5" title={`${unknown.length} file${unknown.length > 1 ? 's' : ''} with an unknown format`} hint="ไม่ตรงกับ format ของลูกค้ารายไหน — เลือกลูกค้า (หรือสร้างใหม่) แล้วระบบทำต่อเอง">
+        <Section className="mb-5" title={t(`${unknown.length} files need a customer`, `${unknown.length} ไฟล์ต้องระบุลูกค้า`)} hint="ยังระบุเจ้าของไฟล์ไม่ได้แน่ชัด — เลือกลูกค้า (หรือสร้างใหม่) แล้วระบบจะตรวจรูปแบบไฟล์ต่อ">
           <div className="p-4 flex flex-col gap-3">
             <ul className="flex flex-col gap-1.5">
               {unknown.map((i) => (
@@ -255,7 +255,18 @@ function ItemRow({ i }: { i: BatchItem }) {
       <td><div className="flex items-center gap-2"><FileSpreadsheet size={15} className="text-signal shrink-0" /><span className="font-semibold text-navy truncate max-w-[260px]" title={i.file_name}>{i.file_name}</span></div><div className="text-[11.5px] text-muted pl-6">{fmtBytes(i.size)}</div></td>
       <td>
         {i.customer ? <span className="font-semibold">{i.customer.code}</span> : <span className="text-ink-3">—</span>}
-        {i.match && <div className="text-[11.5px] text-muted">{i.match.kind === 'known' ? (i.match.how === 'exact' ? 'known format' : i.match.how === 'same_columns' ? 'known format · columns moved' : i.match.how === 'file_name' ? 'named in the file name' : `similar format · ${Math.round((i.match.similarity ?? 0) * 100)}%`) + (i.match.named && i.match.how !== 'file_name' ? ' · name agrees' : '') : i.customer ? 'chosen by a person' : 'unknown format'}</div>}
+        {i.match && <div className="text-[11.5px] text-muted">{i.match.kind === 'known'
+          ? i.match.how === 'file_name' ? t('Customer identified by file name', 'ระบุลูกค้าจากชื่อไฟล์') : t('Customer identified by layout', 'ระบุลูกค้าจากรูปแบบไฟล์')
+          : i.customer ? t('Customer selected by you', 'คุณเลือกลูกค้าแล้ว') : t('Customer not yet identified', 'ยังระบุลูกค้าไม่ได้')}</div>}
+        {i.format_memory && <div className="text-[11.5px] mt-1" title={i.format_memory.target_schema}>
+          {i.format_memory.status === 'reused'
+            ? t(`Reused approved mapping v${i.format_memory.mapping_version} · no AI remapping`, `ใช้กฎที่อนุมัติ v${i.format_memory.mapping_version} · ไม่เรียก AI จับคู่ใหม่`)
+            : i.format_memory.status === 'known' ? t('Approved format found · checking data', 'พบกฎที่เคยอนุมัติ · กำลังตรวจข้อมูล')
+              : i.format_memory.status === 'changed' ? t('Layout changed · mapping needs checking', 'รูปแบบเปลี่ยน · ต้องตรวจการจับคู่')
+                : i.format_memory.status === 'edited' ? t('Mapping edited by a reviewer', 'ผู้ตรวจปรับกฎจับคู่')
+                  : t('New format for this target', 'รูปแบบใหม่สำหรับปลายทางนี้')}
+          {i.format_memory.mapping_id && <Link className="ml-1 underline" to={`/review?mapping=${i.format_memory.mapping_id}`}>{t('View rule', 'ดูกฎ')}</Link>}
+        </div>}
       </td>
       <td>
         <div className="flex items-center gap-1" title={stages.map((s, k) => `${k + 1}. ${s}`).join('  ')}>

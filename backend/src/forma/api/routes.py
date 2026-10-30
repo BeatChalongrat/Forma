@@ -653,6 +653,8 @@ def review_queue(
     session: Session = Depends(get_session),
     p: Principal = Depends(current_principal),
 ) -> list[dict[str, Any]]:
+    from forma.services.review_explanations import explain
+
     q = _scoped(p, select(ReviewTask), ReviewTask.customer_id)
     if round_id:
         q = q.where(ReviewTask.round_id == round_id)
@@ -673,6 +675,14 @@ def review_queue(
         if tasks
         else {}
     )
+    mappings = {
+        m.id: m
+        for m in session.scalars(
+            select(MappingVersion).where(
+                MappingVersion.id.in_([t.mapping_version_id for t in tasks if t.mapping_version_id])
+            )
+        ).all()
+    }
     out = []
     for t in tasks:
         c = customers.get(t.customer_id)
@@ -680,6 +690,13 @@ def review_queue(
         out.append(
             ser.review_task(
                 t,
+                explanations=explain(
+                    get_context(),
+                    t.reasons,
+                    mappings[t.mapping_version_id].target_schema
+                    if t.mapping_version_id in mappings
+                    else None,
+                ),
                 customer={"id": c.id, "code": c.code, "name": c.name} if c else None,
                 round={"id": r.id, "label": r.label, "status": r.status} if r else None,
             )

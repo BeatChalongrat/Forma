@@ -16,6 +16,7 @@ from forma.db.models import AuditLog, Customer, ImportRound, MappingVersion, Sou
 from forma.fingerprint.fingerprint import Fingerprint, compare, fingerprint_profile, merge_fingerprints
 from forma.ingestion.sniff import sniff_kind
 from forma.profiling.profile import WorkbookProfile, merge_profiles, profile_workbook
+from forma.services import format_memory
 from forma.services.context import ServiceContext
 from forma.storage import safe_name
 
@@ -168,14 +169,10 @@ def profile_round(
     """Profile every file of the round (concurrently), fingerprint, classify drift and wrong-file matches.
 
     Idempotent: files already ``profiled`` keep their profile unless ``force``; drift and the round
-    summary are always recomputed because they depend on the customer's *current* approved format.
+    summary are always recomputed against the customer's compatible approved format library.
     """
     r = get_round(session, round_id)
-    previous = latest_approved_mapping(session, r.customer_id)
-    prev_fps: dict[str, Fingerprint] = {}
-    if previous and previous.policy and previous.policy.get("file_fingerprints"):
-        prev_fps = {k: Fingerprint.from_dict(v) for k, v in previous.policy["file_fingerprints"].items()}
-    prev_round_fp = merge_fingerprints(list(prev_fps.values())) if prev_fps else None
+    schema = ctx.registry.get_ref(r.target_schema)
     cur_fps: list[Fingerprint] = []
     other_matches: list[dict[str, Any]] = []
 
@@ -226,12 +223,25 @@ def profile_round(
             n_tables = len((f.profile or {}).get("tables", []))
         fp = Fingerprint.from_dict(f.fingerprint or {})
         cur_fps.append(fp)
+        results.append(
+            {"file_id": f.id, "name": f.original_name, "tables": n_tables, "fingerprint": fp.strict}
+        )
+    current_fp = merge_fingerprints(cur_fps) if cur_fps else None
+    previous = format_memory.select_baseline(session, r.customer_id, schema, current_fp)
+    prev_fps = {
+        k: Fingerprint.from_dict(v)
+        for k, v in ((previous.policy or {}).get("file_fingerprints", {}) if previous else {}).items()
+    }
+    prev_round_fp = merge_fingerprints(list(prev_fps.values())) if prev_fps else None
+    by_id = {result["file_id"]: result for result in results}
+    for f in r.files:
+        if f.status != "profiled" or not f.fingerprint:
+            continue
+        fp = Fingerprint.from_dict(f.fingerprint)
         drift: dict[str, Any] | None = None
         if prev_fps:
-            # per-file view: best match among previous files of this customer (informational)
             reports = [compare(pfp, fp) for pfp in prev_fps.values()]
-            best = max(reports, key=lambda d: d.similarity)
-            drift = best.to_dict()
+            drift = max(reports, key=lambda d: d.similarity).to_dict()
         # wrong-file check against other customers' approved formats
         other = _match_other_customer(session, r.customer_id, fp)
         if other:
@@ -244,15 +254,7 @@ def profile_round(
             }
             other_matches.append(other)
         f.drift = drift
-        results.append(
-            {
-                "file_id": f.id,
-                "name": f.original_name,
-                "tables": n_tables,
-                "fingerprint": fp.strict,
-                "drift": drift,
-            }
-        )
+        by_id[f.id]["drift"] = drift
     round_drift: dict[str, Any] | None = None
     if prev_round_fp is not None and cur_fps:
         rep = compare(prev_round_fp, merge_fingerprints(cur_fps))
@@ -266,6 +268,16 @@ def profile_round(
         "drift_report": round_drift,
         "matches_other_customer": other_matches[0] if other_matches else None,
         "has_previous_approval": previous is not None,
+        "format_memory": {
+            "status": "known"
+            if previous and worst in ("identical", "header_moved") and prev_round_fp
+            else "changed"
+            if previous
+            else "new",
+            "mapping_id": previous.id if previous else None,
+            "mapping_version": previous.version if previous else None,
+            "target_schema": schema.ref,
+        },
         "profiled_files": len(todo),
         "skipped_files": skipped,
     }

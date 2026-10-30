@@ -25,7 +25,7 @@ from forma.mapping_dsl.models import CallExpr, ColExpr, ConstExpr, MappingDocume
 from forma.schema_registry import INTERNAL_KEYS, PROVENANCE_KEY, TargetSchema
 from forma.services.context import ServiceContext
 from forma.services.mapping import bind_sources, get_mapping
-from forma.services.rounds import audit, get_round, latest_approved_mapping
+from forma.services.rounds import audit, get_round
 
 
 # --------------------------------------------------------------------------------------------
@@ -108,15 +108,33 @@ def transform_round(
     apply_overrides: bool = True,
 ) -> DatasetVersion:
     r = get_round(session, round_id)
+    from forma.fingerprint.fingerprint import compare
+    from forma.services import format_memory
+
+    target = ctx.registry.get_ref(r.target_schema)
+    current_fp = format_memory.files_fingerprint(r.files)
+    selected_id = mapping_version_id or (r.summary or {}).get("mapping_version_id")
     mv = (
-        get_mapping(session, mapping_version_id)
-        if mapping_version_id
-        else latest_approved_mapping(session, r.customer_id)
+        get_mapping(session, selected_id)
+        if selected_id
+        else format_memory.select_baseline(session, r.customer_id, target, current_fp)
     )
     if mv is None:
         raise ValidationFailed("no approved mapping for this customer; approve a mapping first")
-    if mv.status not in ("approved",) and not mapping_version_id:
-        raise Conflict("mapping is not approved")
+    if mv.customer_id != r.customer_id or not format_memory.compatible(mv, target):
+        raise ValidationFailed("mapping belongs to another customer or target schema version")
+    if not mapping_version_id and not (
+        mv.status == "approved" or (mv.status == "superseded" and mv.approved_at is not None)
+    ):
+        raise Conflict("mapping is not approved; approve a mapping first")
+    if not selected_id:
+        previous_fp = format_memory.mapping_fingerprint(mv)
+        if (
+            not previous_fp
+            or not current_fp
+            or compare(previous_fp, current_fp).classification not in ("identical", "header_moved")
+        ):
+            raise ValidationFailed("no approved mapping matches this layout; run mapping first")
     schema = ctx.registry.get_ref(mv.target_schema)
     doc = MappingDocument.model_validate(mv.document)
     bindings, problems = bind_sources(doc, r.files, resolve=ctx.storage.local_path)

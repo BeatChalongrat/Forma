@@ -54,6 +54,61 @@ def tool(
 
 EXTRA_TOOLS = [
     tool(
+        "build_report",
+        "Build an exact server-computed table/chart snapshot, never model-generated values. "
+        "work_rounds compares 1-8 explicit batch_ids (discover with work_rounds); work_round_files lists up to 50 files of ONE batch, optional states filter. "
+        "uploads_by_day requires explicit start/end YYYY-MM-DD and timezone (max 92 days); CURRENT status grouped by upload date, NOT completions by date, excludes unassigned/duplicate files. "
+        "dataset_grouped scans ONE dataset version; requires dataset_id, scalar group_by pointer, operation; numeric field for non-count operations. "
+        "Inspect target_formats first. Optional exact-match filters; no collection cross-products, no mixed currencies, max 30 groups. "
+        "Ask for missing scope, period, metric or business units; never silently pick latest rounds or add dataset versions. "
+        "Select the returned report via visualizations in the final reply; values, labels, sources and permitted views are server-owned.",
+        {
+            "report": {"enum": ["work_rounds", "work_round_files", "uploads_by_day", "dataset_grouped"]},
+            "batch_ids": {"type": "array", "minItems": 1, "maxItems": 8, "uniqueItems": True, "items": TEXT},
+            "states": {
+                "type": "array",
+                "uniqueItems": True,
+                "items": {
+                    "enum": [
+                        "ready",
+                        "needs_customer",
+                        "needs_review",
+                        "needs_data_check",
+                        "processing",
+                        "failed",
+                    ]
+                },
+            },
+            "start": TEXT,
+            "end": TEXT,
+            "timezone": TEXT,
+            "customer_id": TEXT,
+            "dataset_id": TEXT,
+            "group_by": TEXT,
+            "field": TEXT,
+            "operation": {"enum": ["count", "sum", "average", "min", "max"]},
+            "filters": {
+                "type": "array",
+                "maxItems": 3,
+                "items": {
+                    "type": "object",
+                    "properties": {"field": TEXT, "value": {"type": ["string", "number", "boolean", "null"]}},
+                    "required": ["field", "value"],
+                    "additionalProperties": False,
+                },
+            },
+        },
+        ["report"],
+    ),
+    tool(
+        "inspect_review",
+        "Explain one exact review version: questions, actual source evidence, changes and checks. "
+        "Includes bounded examples, NOT a complete dataset. Changes are paginated (10 per page). "
+        "Optional field returns its cell evidence and change details; inspect_mapping reads full rules.",
+        {"mapping_id": TEXT, "field": TEXT, "offset": OFFSET},
+        ["mapping_id"],
+    ),
+    tool(
         "customers",
         "Find customers by code/name, including notes, ERP and default target format. Paginated.",
         {"search": TEXT, "offset": OFFSET},
@@ -247,6 +302,64 @@ def run_extra(
     offset = a.get("offset", 0)
     q: Any
     result: dict[str, Any]
+    if name == "build_report":
+        from forma.services.assistant_reports import build_report
+
+        return build_report(ctx, session, p, a)
+    if name == "inspect_review":
+        from forma.services import review_evidence, review_questions
+
+        m = session.get(MappingVersion, a["mapping_id"])
+        if m is None:
+            raise NotFound("Mapping not found")
+        ensure_customer(p, m.customer_id)
+        overview = review_evidence.overview(ctx, session, m)
+        questions = review_questions.questions(ctx, m)
+        pointers = [a["field"]] if a.get("field") else [q["id"] for q in questions["questions"][:2]]
+        cells = []
+        for pointer in pointers:
+            cells.append(review_evidence.evidence(ctx, session, m, pointer))
+        latest = session.scalar(
+            select(MappingVersion.id)
+            .where(MappingVersion.round_id == m.round_id)
+            .order_by(MappingVersion.version.desc())
+            .limit(1)
+        )
+        changes = overview["changes"]
+        if a.get("field"):
+            changes = [f for f in changes if f["pointer"] == a["field"]]
+        compact = []
+        for change in changes[offset : offset + 10]:
+            check = change.get("check") or {}
+            compact.append(
+                {
+                    "pointer": change["pointer"],
+                    "status": change["status"],
+                    "risk": change["risk"],
+                    "field": {
+                        k: change["field"].get(k)
+                        for k in ("name", "semantic", "description", "description_th")
+                    },
+                    "check": {**check, "examples": check.get("examples", [])[:2]},
+                }
+            )
+        return {
+            "context": overview["context"],
+            "mapping_id": m.id,
+            "status": m.status,
+            "is_latest_version": latest == m.id,
+            "questions": questions["questions"],
+            "open_questions": questions["open_questions"],
+            "reasons": questions["reasons"],
+            "checks": overview["checks"],
+            "source_evidence": cells,
+            "changes": compact,
+            "total_changes": len(changes),
+            "next_offset": offset + 10 if offset + 10 < len(changes) else None,
+            "comparison_dataset_id": overview["comparison_dataset_id"],
+            "scope": "This exact mapping version. Source examples sample at most 50 records; use read_source for more. User chat answers do not save or approve review answers.",
+            "links": [{"label": f"Review v{m.version}", "url": f"/review?mapping={m.id}&round={m.round_id}"}],
+        }
     if name == "query_records":
         return query_records(ctx, session, p, a)
     if name == "customers":

@@ -4,6 +4,8 @@ import { ArrowRight, Check, Copy, FileSpreadsheet } from 'lucide-react'
 import { type Me, type WorkspaceAnswer } from '../lib/api'
 import { usePreferences } from '../lib/preferences'
 import { ConfirmAction } from './ConfirmAction'
+import { ClarificationCard } from './ClarificationCard'
+import { AssistantReport } from './AssistantReport'
 function ReplyText({ text }: { text: string }) {
   return <div className="assistant-prose">{text.split('\n').map((line, i) => {
     if (!line.trim()) return <div key={i} className="h-3" />
@@ -13,11 +15,13 @@ function ReplyText({ text }: { text: string }) {
   })}</div>
 }
 
-export function AssistantResponse({ reply, me }: { reply: WorkspaceAnswer; me: Me }) {
+export function AssistantResponse({ reply, me, onClarify, disabled }: { reply: WorkspaceAnswer; me: Me; onClarify?: (text: string) => void; disabled?: boolean }) {
   const { t } = usePreferences()
   const [copied, setCopied] = useState(false)
   return <>
 <div className="flex gap-2 items-center font-medium text-navy"><span className="h-1.5 w-1.5 bg-brand-lime rounded-full" />FORMA</div><ReplyText text={reply.answer} />
+            {!reply.clarifications?.length && reply.visualizations?.filter((report, i, all) => all.findIndex(r => r.id === report.id) === i).map(report => <AssistantReport key={report.id} report={report} />)}
+            {!!reply.clarifications?.length && <ClarificationCard questions={reply.clarifications} onAnswer={onClarify} disabled={disabled} />}
             {!reply.ai && reply.reason !== 'imported_history' && <p className="text-sm text-warn">{t('AI could not answer this time. You can open the evidence below.', 'ครั้งนี้ AI ยังตอบไม่ได้ เปิดข้อมูลอ้างอิงด้านล่างเพื่อตรวจต่อได้')}{me.effective_roles.includes('admin') && <Link className="underline ml-2" to="/settings?tab=ai">{t('Check connection', 'ตรวจการเชื่อมต่อ')}</Link>}</p>}
             {!!reply.actions?.some(a => a.kind === 'act' && a.act?.type === 'verdict.accept') && <div className="space-y-2">{reply.actions.filter(a => a.kind === 'act' && a.act?.type === 'verdict.accept').slice(0, 1).map(a => <ConfirmAction key={a.id} action={a} />)}</div>}
             {!!reply.actions?.length && <div className="space-y-2"><p className="text-xs text-muted">{t('Next steps', 'ทำต่อ')}</p><div className="grid sm:grid-cols-2 gap-2">{reply.actions.filter(a => a.kind !== 'act').filter(a => /^\/(review|imports|uploads|rounds|datasets|customers|settings|guide)(?:[/?]|$)/.test(a.url) && !a.url.includes('\\')).slice(0, 3).map(action => <Link key={action.id} to={action.url} className="flex items-center gap-3 rounded-xl border border-line px-4 py-3 hover:bg-signal-soft hover:border-signal/30 transition-colors min-w-0 group"><span className="min-w-0 flex-1"><span className="block text-sm font-medium text-navy">{action.label}</span>{action.detail && <span className="block text-xs text-muted mt-1 break-words line-clamp-2">{action.detail}</span>}</span><ArrowRight size={17} className="shrink-0 text-muted group-hover:text-navy" /></Link>)}</div></div>}

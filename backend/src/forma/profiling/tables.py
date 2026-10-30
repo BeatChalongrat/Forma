@@ -170,16 +170,37 @@ def detect_tables(df: pl.DataFrame, *, max_scan_rows: int = 60, gap: int = 2) ->
     """Find table regions in a raw string grid (``c0..cN`` columns)."""
     if df.height == 0 or df.width == 0:
         return []
-    total_rows = df.height
-    grid = _grid(df, max(max_scan_rows, min(total_rows, 5000)))
+    # Find separators across the whole sheet with a compact boolean column. Only materialise a
+    # bounded header window per block; a second table after row 5000 must not disappear.
+    blank = df.select(pl.all_horizontal(pl.all().is_null()).alias("blank"))["blank"].to_list()
+    blocks: list[tuple[int, int]] = []
+    start: int | None = None
+    blanks = 0
+    for i, empty in enumerate(blank):
+        if empty:
+            blanks += 1
+            if start is not None and gap and blanks >= gap:
+                blocks.append((start, i - blanks + 1))
+                start = None
+        else:
+            if start is None:
+                start = i
+            blanks = 0
+    if start is not None:
+        blocks.append((start, df.height - blanks))
     out: list[TableCandidate] = []
-    for r0, r1 in _row_blocks(grid, gap):
-        for c0, c1 in _col_blocks(grid, r0, r1):
-            sub = [row[c0:c1] + [None] * max(0, c1 - len(row)) for row in grid[r0:r1]]
+    for r0, r1 in blocks:
+        block = df.slice(r0, r1 - r0)
+        grid = _grid(block, max_scan_rows + 10)
+        # Column occupancy also covers the full block, including sparse columns near the end.
+        occupied = block.select(pl.all().is_not_null().any()).row(0)
+        col_grid = [["used" if used else None for used in occupied]]
+        for c0, c1 in _col_blocks(col_grid, 0, 1):
+            sub = [row[c0:c1] + [None] * max(0, c1 - len(row)) for row in grid]
             if len(sub) < 2:
                 continue
             best_i, best_s = 0, -1.0
-            for i in range(min(len(sub) - 1, 12)):
+            for i in range(min(len(sub) - 1, max_scan_rows)):
                 s = _header_score(sub[i], sub[i + 1 :])
                 if s > best_s + 1e-9:
                     best_i, best_s = i, s
@@ -196,9 +217,8 @@ def detect_tables(df: pl.DataFrame, *, max_scan_rows: int = 60, gap: int = 2) ->
                         header_rows = 2
             headers = merge_header_rows(sub[best_i : best_i + header_rows])
             data_start = r0 + best_i + header_rows
-            # data_end: in the scanned window it's the block end; if block reaches the end of the
-            # scan window the real table may continue beyond -> use total rows.
-            data_end = r0 + len(sub) if (r0 + len(sub)) < len(grid) else total_rows
+            # Boundaries cover the full sheet even though header scoring uses a bounded sample.
+            data_end = r1
             title = None
             if best_i > 0:
                 title_cells = [c for c in sub[0] if c is not None]

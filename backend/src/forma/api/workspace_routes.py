@@ -342,6 +342,7 @@ class ConversationIn(BaseModel):
     title: str = Field(default="New chat", max_length=160)
     round_id: str | None = Field(default=None, max_length=40)
     dataset_id: str | None = Field(default=None, max_length=40)
+    mapping_id: str | None = Field(default=None, max_length=40)
 
 
 class ConversationEdit(BaseModel):
@@ -390,7 +391,9 @@ def create_conversation(
     session: Session = Depends(get_session),
     p: Principal = Depends(require_role("importer")),
 ) -> dict[str, Any]:
-    return conversations.summary(conversations.create(session, p, body.title, body.round_id, body.dataset_id))
+    return conversations.summary(
+        conversations.create(session, p, body.title, body.round_id, body.dataset_id, body.mapping_id)
+    )
 
 
 @router.post("/assistant/conversations/import", status_code=201)

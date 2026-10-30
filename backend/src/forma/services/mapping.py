@@ -8,7 +8,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from forma.ai.agents import PROMPT_VERSION, AgentResult, adaptation_agent, mapping_agent, schema_agent
@@ -16,6 +16,7 @@ from forma.ai.heuristics import HeuristicProposal, propose_mapping
 from forma.ai.llm import LLMError
 from forma.ai.policy import PolicyDecision
 from forma.core.errors import Conflict, NotFound, PolicyBlocked, ValidationFailed
+from forma.core.hashing import stable_hash
 from forma.core.ids import new_id
 from forma.db.models import ImportRound, LLMCall, MappingVersion, Override, ReviewTask, SourceFile
 from forma.engine.transform import BoundSource, TransformEngine, TransformResult
@@ -23,9 +24,9 @@ from forma.mapping_dsl.models import MappingDocument, SourceSpec
 from forma.mapping_dsl.validate import validate_mapping
 from forma.profiling.profile import WorkbookProfile
 from forma.schema_registry import TargetSchema
-from forma.services import healing, sandbox
+from forma.services import format_memory, healing, sandbox
 from forma.services.context import ServiceContext
-from forma.services.rounds import audit, get_round, latest_approved_mapping, round_profile
+from forma.services.rounds import audit, get_round, round_profile
 
 
 # --------------------------------------------------------------------------------------------
@@ -221,12 +222,12 @@ def field_review(ctx: ServiceContext, session: Session, mapping_id: str) -> dict
     stored = (m.policy or {}).get("field_review")
     if stored:
         return dict(stored)
-    baseline = latest_approved_mapping(session, m.customer_id)
+    schema = ctx.registry.get_ref(m.target_schema)
+    baseline = format_memory.select_baseline(session, m.customer_id, schema, None)
     if baseline is not None and baseline.id == m.id:
         baseline = session.get(MappingVersion, m.parent_id) if m.parent_id else None
     if baseline is None:
         return {"baseline_id": None, "fields": [], "checks": [], "needs_decision": [], "counts": {}}
-    schema = ctx.registry.get_ref(m.target_schema)
     doc = MappingDocument.model_validate(m.document)
     r = session.get(ImportRound, m.round_id) if m.round_id else None
     sim, _ = simulate(ctx, doc, schema, r.files if r else [], limit=FIELD_REVIEW_ROWS)
@@ -251,9 +252,24 @@ def propose_for_round(
 ) -> MappingVersion:
     r = get_round(session, round_id)
     schema = ctx.registry.get_ref(r.target_schema)
+    r.target_schema = schema.ref  # pin this round before defaults or latest schema aliases can change
     profile = round_profile(session, round_id)
-    previous = latest_approved_mapping(session, r.customer_id)
-    drift = (r.summary or {}).get("drift")
+    current_fp = format_memory.files_fingerprint(r.files)
+    previous = format_memory.select_baseline(session, r.customer_id, schema, current_fp)
+    previous_fp = format_memory.mapping_fingerprint(previous) if previous else None
+    # Recheck at proposal time: a cached round summary can predate another approval or schema edit.
+    from forma.fingerprint.fingerprint import compare
+
+    drift = compare(previous_fp, current_fp).classification if previous_fp and current_fp else None
+    next_version = (
+        int(
+            session.scalar(
+                select(func.max(MappingVersion.version)).where(MappingVersion.customer_id == r.customer_id)
+            )
+            or 0
+        )
+        + 1
+    )
     use_llm = (not ctx.llm.is_mock) if use_llm is None else use_llm
     agent_log: list[dict[str, Any]] = []
     open_questions: list[str] = []
@@ -264,7 +280,7 @@ def propose_for_round(
     # 1) Mapping memory: identical structure → reuse the approved mapping verbatim
     if previous is not None and drift in ("identical", "header_moved"):
         doc = MappingDocument.model_validate(previous.document)
-        doc.meta.version = previous.version + 1
+        doc.meta.version = next_version
         doc.meta.confidence = 1.0
         doc.meta.created_by = "system"
         doc.meta.evidence = [
@@ -340,7 +356,7 @@ def propose_for_round(
                 llm_fallback = True
         doc.meta.customer_id = r.customer_id
         doc.meta.target_schema = schema.ref
-        doc.meta.version = (previous.version + 1) if previous else 1
+        doc.meta.version = next_version
     doc.meta.fingerprints = {
         s.id: (file_fps.get(_bound_file_id(s, r.files)) or {}).get("strict", "") for s in doc.sources
     }
@@ -398,6 +414,7 @@ def propose_for_round(
         llm_fallback=llm_fallback,
         sandbox=sandbox_report,
         field_checks=review["checks"] if review else None,
+        open_questions=open_questions,
     )
     _verdict(ctx, sandbox_report)
     mv = MappingVersion(
@@ -416,6 +433,8 @@ def propose_for_round(
         policy={
             **decision.to_dict(),
             "source": source_kind,
+            "target_schema_hash": stable_hash(schema.document),
+            "reused_from": previous.id if source_kind == "memory" and previous else None,
             "file_fingerprints": file_fps,
             "simulation": sim.summary() if sim else None,
             "sample": (sim.records[:5] if sim else []),
@@ -432,6 +451,17 @@ def propose_for_round(
     )
     session.add(mv)
     session.flush()
+    r.summary = {
+        **(r.summary or {}),
+        "drift": drift,
+        "has_previous_approval": previous is not None,
+        "format_memory": {
+            "status": "reused" if source_kind == "memory" else "changed" if previous else "new",
+            "mapping_id": previous.id if previous else None,
+            "mapping_version": previous.version if previous else None,
+            "target_schema": schema.ref,
+        },
+    }
     task: ReviewTask | None = None
     if decision.decision == "auto_approve":
         _supersede_others(session, r.customer_id, mv.id)
@@ -668,7 +698,18 @@ def save_mapping_edit(
     if not rep.ok:
         raise ValidationFailed("mapping failed validation", details=rep.to_dict())
     doc.meta.created_by = "human"
-    doc.meta.version = parent.version + 1
+    doc.meta.version = (
+        int(
+            session.scalar(
+                select(func.max(MappingVersion.version)).where(
+                    MappingVersion.customer_id == parent.customer_id
+                )
+            )
+            or 0
+        )
+        + 1
+    )
+    doc.meta.target_schema = schema.ref
     doc.meta.customer_id = parent.customer_id
     r = session.get(ImportRound, parent.round_id) if parent.round_id else None
     sim, problems = simulate(ctx, doc, schema, r.files if r else [], limit=simulate_rows) if r else (None, [])
@@ -678,7 +719,9 @@ def save_mapping_edit(
         else [{"kind": "binding", "severity": "error", "message": p} for p in problems]
     )
     mv_id = new_id("map")
-    approved = latest_approved_mapping(session, parent.customer_id)
+    approved = format_memory.select_baseline(
+        session, parent.customer_id, schema, format_memory.files_fingerprint(r.files) if r else None
+    )
     sandbox_report = (
         _sandbox(ctx, schema, doc, approved, r.files, mv_id, active_overrides(session, parent.customer_id))
         if r is not None
@@ -694,6 +737,7 @@ def save_mapping_edit(
         drift=((parent.policy or {}).get("checks") or {}).get("drift"),
         has_previous_approval=True,
         sandbox=sandbox_report,
+        open_questions=remaining_questions,
     )
     _verdict(ctx, sandbox_report)
     mv = MappingVersion(
@@ -711,6 +755,7 @@ def save_mapping_edit(
         policy={
             **decision.to_dict(),
             "source": "human_edit",
+            "target_schema_hash": stable_hash(schema.document),
             "file_fingerprints": (parent.policy or {}).get("file_fingerprints", {}),
             "simulation": sim.summary() if sim else None,
             "sample": sim.records[:5] if sim else [],
@@ -748,7 +793,17 @@ def save_mapping_edit(
     if r is not None:
         from forma.services import verdict_flow
 
-        r.summary = {**(r.summary or {}), "mapping_version_id": mv.id, "decision": decision.decision}
+        r.summary = {
+            **(r.summary or {}),
+            "mapping_version_id": mv.id,
+            "decision": decision.decision,
+            "format_memory": {
+                "status": "edited",
+                "mapping_id": approved.id if approved else None,
+                "mapping_version": approved.version if approved else None,
+                "target_schema": schema.ref,
+            },
+        }
         verdict_flow.attach_to_mapping(ctx, session, mv, r, task)  # the conclusion (ADR-036)
     audit(session, "mapping.edit", "mapping", mv.id, actor=actor, parent=parent.id)
     return mv
@@ -779,7 +834,9 @@ def sandbox_compare(
     rep = validate_mapping(doc, schema)
     if not rep.ok:
         raise ValidationFailed("mapping failed validation", details=rep.to_dict())
-    baseline = latest_approved_mapping(session, m.customer_id)
+    baseline = format_memory.select_baseline(
+        session, m.customer_id, schema, format_memory.files_fingerprint(r.files)
+    )
     if baseline is not None and baseline.id == m.id and document is None:
         baseline = session.get(MappingVersion, m.parent_id) if m.parent_id else None
     if baseline is None:
