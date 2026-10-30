@@ -6,3 +6,4 @@
 * Change the profiler/heuristics/engine? Run `make eval` — field accuracy on the corpus must not drop.
 * Runtime data lives under `data/` and is git-ignored; `make reset` wipes it, `make seed` rebuilds the demo.
 * Commit messages: conventional (`feat:`, `fix:`, `docs:`, `test:`).
+* The full change process (branches, gates, migrations, settings, deploy) is in [RELEASE_PROCESS.md](RELEASE_PROCESS.md); the test layers in [TESTING_STRATEGY.md](TESTING_STRATEGY.md); the vocabulary in [GLOSSARY.md](GLOSSARY.md).

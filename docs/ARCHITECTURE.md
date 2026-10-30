@@ -1,5 +1,8 @@
 # Architecture
 
+> Short overview. The long form — every component, table, security measure and scaling note — is
+> [SYSTEM_ARCHITECTURE.md](SYSTEM_ARCHITECTURE.md); the flows as diagrams are [SYSTEM_FLOWS.md](SYSTEM_FLOWS.md).
+
 ## The two planes
 
 ```
