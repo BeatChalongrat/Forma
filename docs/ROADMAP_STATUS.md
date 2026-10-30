@@ -58,7 +58,7 @@
 * **Real target contract** — `target_schema/product.v1.json` is still the draft; swap in the downstream
   schema and run the schema diff + a full re-eval.
 * **OIDC against a real IdP** — the token path is unit-tested with RSA keys and the SPA has the PKCE flow;
-  it has not been exercised against Keycloak/Entra yet (`docs/PHASE7_HANDOFF.md`).
+  it has not been exercised against Keycloak/Entra yet (`docs/PHASE7_REVIEW.md`).
 * **Multi-node arq in anger** — the compose stack runs two workers on one host; a multi-host run needs a
   shared S3 (not MinIO-on-the-same-box) and Postgres connection pooling (pgbouncer) sized to workers.
 * **Engine next levers** — schema validation per column, nested structs from Polars (see PERFORMANCE.md).

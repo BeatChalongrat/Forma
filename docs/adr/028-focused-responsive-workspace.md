@@ -45,19 +45,14 @@ Production rollout is limited to the local `web` service; API, workers and data 
 are not recreated. Known existing bundle-size and lint warnings are recorded separately
 from functional or type errors.
 
-### Verification completed
+### Verification
 
-- TypeScript + Vite production build succeeded locally and in the web Docker image.
-- oxlint: no errors; two existing warnings in toast Fast Refresh exports and FieldEditor
-  effect synchronization. Vite still reports the existing >500 kB application chunk.
-- Browser: Home, Imports, Round, Mapping, Data Editor, Upload and command search inspected.
-- 1440, 1280, 1024 and 390 CSS-pixel widths checked across these views; tested light/dark.
-- Imports: `Missing columns` chips have 24px client/scroll heights (no clipped text).
-- At 390px, Imports and Data Editor document width stays 390px; editor grid keeps a
-  usable 469px height in an 844px viewport, with local table scrolling.
-- Mapping drawer: Tab and Shift+Tab wrap inside, Escape closes, focus returns to
-  Inspect results. Resizing no longer creates two simultaneous mapping drawers.
-- Thai command search for อัปโหลด opens Upload through Enter.
-- Local Docker web container updated; the served JS hash is index-BOtXuKzK.js.
-  `/ready` reports database, object storage and queue healthy. Existing API/worker
-  containers retain their uptime. No stored records were edited or approved during QA.
+- TypeScript and Vite production build pass locally and in the web image; oxlint reports no errors
+  (two pre-existing warnings remain; the application chunk is still above 500 kB).
+- Home, Imports, Round, Mapping, Data Editor, Upload and the command search were checked at 1440, 1280,
+  1024 and 390 CSS-pixel widths in both themes: status chips no longer clip, narrow viewports have no
+  horizontal document overflow, the editor grid keeps a usable height with local table scrolling.
+- Dialog focus wraps with Tab / Shift+Tab, Escape closes, focus returns to the opener; resizing never shows
+  two mapping drawers at once; the Thai command search opens Upload with Enter.
+- The web image was redeployed alone; `/ready` reported database, object storage and queue healthy and no
+  stored records were changed during the checks.

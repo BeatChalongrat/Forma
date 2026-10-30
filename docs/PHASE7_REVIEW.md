@@ -1,7 +1,7 @@
-# Phase 7 handoff — production hardening & enterprise scale
+# Phase 7 review — production hardening & enterprise scale
 
-Date: 2026-10-28. Branch `main`, commits `7932e01 … b6a25d8` (one per step) plus this docs commit.
-Everything below was run on this machine (Windows 11, 12 cores, 31 GB, Docker Desktop) unless stated.
+Status as of 2026-10-28 (commits `7932e01 … b6a25d8`, one per step). Measurements were taken on a
+development machine (Windows 11, 12 cores, 31 GB, Docker Desktop) unless stated otherwise.
 
 ## What was done
 

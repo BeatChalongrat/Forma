@@ -29,11 +29,10 @@ Validation covers schema/model agreement, pin ordering and authorization, delete
 turn cleanup, deletion during an active reply, build/type checks, and live desktop/mobile UI checks
 in both themes. Theme contrast is checked against actual surfaces, including cards and selected rows.
 
-Verified on 2026-10-29: 13 conversation tests and 8 migration tests passed; Ruff and strict mypy
-passed. Live checks covered rename, pin after reload, archive/restore, delete confirmation/cancel,
-keyboard focus, and a 390px mobile drawer. Main text/action/status pairs measured at least 4.62:1
-in light mode and 6.29:1 in dark mode. The temporary test conversation was removed; existing
-conversation history was preserved.
+Verification: the conversation and migration test suites, Ruff and strict mypy pass. Browser checks
+covered rename, pin after reload, archive and restore, delete confirmation and cancel, keyboard focus and
+the 390 px mobile drawer. Text, action and status colour pairs measure at least 4.6:1 in light mode and
+6.3:1 in dark mode against their actual surfaces.
 
 Assistant icon refinement: use Lucide MessageCircleMore consistently for the sidebar,
 review-page assistant links and assistant feature catalogue. The sidebar uses a 20px,

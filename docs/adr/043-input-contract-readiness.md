@@ -55,12 +55,12 @@ support-ticket contracts with flat/nested objects and no built-in semantics, AI 
 review, unsupported-schema rejection and formula failure gates. Existing table, Thai conversion, join,
 custom-contract, schema-gate, lineage and synthetic-corpus tests remain regression coverage.
 
-The automated suite runs offline. A separate, bounded live smoke probe on 2026-10-30 used the configured
-DeepSeek model (`deepseek-flash`) with entirely synthetic data: a new non-product nested contract mapped
-staff time from XLSX, preserved zero-padded IDs, and converted 90/120/100 minutes to 1.5/2/1.666... hours
-without rounding. A second case with retail and wholesale prices produced an explicit clarification
-question. Both probes passed their narrow checks; the latter still produced a provisional value, so
-the unresolved-question policy gate is essential. These two cases are not an accuracy benchmark.
+The automated suite runs offline. A separate, bounded live check with the configured provider and
+entirely synthetic data covered two cases: a new non-product nested contract mapped staff time from an xlsx,
+preserved zero-padded identifiers and converted 90/120/100 minutes to 1.5/2/1.666… hours without rounding;
+a file with retail and wholesale prices produced an explicit clarification question. Both passed their
+narrow checks; the second still produced a provisional value, so the unresolved-question policy gate is
+essential. These two cases are not an accuracy benchmark.
 
 These checks do not establish general live-provider accuracy, throughput of a production deployment,
 or accuracy on unseen customer files. The old
@@ -89,7 +89,7 @@ performance figures in ADR-003/PERFORMANCE.md predate full XML scanning and need
 
 ## Reproduce
 
-From `backend/` with its existing development environment:
+From `backend/` with the development environment:
 
 ```
 python -m pytest tests/test_ingestion_readiness.py tests/test_contract_readiness.py --no-cov -o addopts='' -q

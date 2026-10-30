@@ -41,8 +41,7 @@ and 300 stored files dispatched once across three batches with processing mocked
 batch pipeline tests cover matching/review/export. Frontend build/lint and live browser checks
 cover work-round selection, filters, themes, responsive layout, and stable polling geometry.
 
-Observed on localhost: 42 history rows remained visible through two ten-second refreshes;
-table top stayed at 472.0875 px. Previously the loading banner shifted the table by 46.4 px.
-At a 390 px viewport the work-round list and upload form had no document-level horizontal
-overflow. The targeted batch/migration/workspace suite passed 29 tests. Production data was
-backed up before the nullable-date migration; browser checks did not modify existing round labels.
+Browser checks confirmed that the history table keeps its position through periodic refreshes (the
+loading banner used to shift it) and that the work-round list and upload form have no horizontal overflow
+at a 390 px viewport. The batch, migration and workspace suites pass. The database was backed up before
+the nullable-date migration was applied to an existing deployment.

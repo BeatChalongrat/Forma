@@ -50,11 +50,9 @@ upstream close, guard reset, durable endpoint replay, owned cancellation and par
 receipt-target validation/scope and migration compatibility. UI checks include real provider
 streaming and stop/reopen, receipt dashboard, both themes and narrow viewports.
 
-Live validation (2026-10-29): DeepSeek through the saved connection emitted 102 observed
-incremental text lengths in one answer. Stop saved a 1,034-character partial answer; reloading
-preserved the stopped state, and a follow-up continued from that incomplete answer. QA chat was
-archived after testing. Existing work-round targets were left unset. A real five-file round
-showed three ready and two requiring review; clicking the latter filtered the round to two rows.
-Desktop light/dark and a 390-pixel viewport were inspected. The recent-files table's hidden
-header was changed to an accessible label to avoid an absolutely positioned offscreen label
-expanding the mobile document width. Build, ruff, mypy and focused backend tests passed.
+Live validation with the configured provider confirmed incremental streaming of one answer, that Stop
+saves the partial text, that reloading preserves the stopped state and that a follow-up continues from the
+incomplete answer. A five-file work round showed three files ready and two requiring review; clicking the
+latter filtered the round to those two rows. Desktop light and dark themes and a 390-pixel viewport were
+checked; the recent-files table's hidden header became an accessible label so an off-screen element no
+longer widens the mobile document. Build, ruff, mypy and the focused backend tests pass.
