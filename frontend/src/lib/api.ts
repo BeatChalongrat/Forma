@@ -83,7 +83,7 @@ export type RoundStatus = 'uploaded' | 'profiled' | 'review' | 'auto_approved' |
 export type ImportRound = {
   uploaded_at?: string
   id: string; customer_id: string; label: string | null; status: RoundStatus; target_schema: string; notes: string | null
-  summary: { drift?: string | null; drift_report?: DriftReport | null; decision?: string; mapping_version_id?: string; dataset_version_id?: string; rows?: number; errors?: number; error?: string; simulation?: SimSummary | null; has_previous_approval?: boolean; batch_id?: string; auto_publish?: boolean; publish?: PublishDecision; verdict?: Verdict | null }
+  summary: { drift?: string | null; drift_report?: DriftReport | null; decision?: string; mapping_version_id?: string; dataset_version_id?: string; rows?: number; errors?: number; error?: string; simulation?: SimSummary | null; has_previous_approval?: boolean; batch_id?: string; auto_publish?: boolean; publish?: PublishDecision; verdict?: Verdict | null; format_memory?: FormatMemory }
   created_at: string; updated_at: string; files?: SourceFile[]; customer?: { id: string; code: string; name: string }
   mappings?: MappingVersion[]; datasets?: DatasetVersion[]; review_tasks?: ReviewTask[]; jobs?: Job[]
 }
@@ -120,11 +120,13 @@ export type Foresight = { generated_at: string; expected: ExpectedDelivery[]; co
 export type VerdictAccepted = { did: 'approve_mapping' | 'apply_answers' | 'approve_dataset'; mapping_id?: string; dataset_id?: string; auto_publish?: boolean; verdict: Verdict }
 export type BatchMatch = { kind: 'known' | 'unknown'; how?: 'exact' | 'same_columns' | 'similar' | 'file_name'; named?: boolean; customer_id?: string; customer_code?: string | null; similarity?: number | null; classification?: string; reason?: string; candidates?: { customer_id: string; customer_code: string | null; similarity: number | null }[] }
 export type BatchItemState = 'processing' | 'needs_customer' | 'needs_review' | 'needs_data_check' | 'ready' | 'failed'
+export type FormatMemory = { status: 'known' | 'reused' | 'changed' | 'new' | 'edited'; mapping_id: string | null; mapping_version: number | null; target_schema: string }
 export type BatchItem = {
   id: string; file_name: string; size: number; match: BatchMatch | null; customer: { id: string; code: string | null; name: string | null } | null
   round_id: string | null; round_status: string | null; mapping_version_id: string | null; dataset_version_id: string | null
   publish: PublishDecision | null; export_id: string | null; json_name: string; rows: number | null
   state: BatchItemState; step: number; message: string; reasons?: string[]; verdict?: VerdictBrief | null
+  format_memory?: FormatMemory | null
 }
 export type BatchSummary = { id: string; label: string | null; work_date: string | null; expected_files: number | null; complete: boolean; auto_publish: boolean; created_by: string; created_at: string; total: number; counts: Partial<Record<BatchItemState, number>>; done: boolean; stuck: number }
 export type Batch = BatchSummary & { items: BatchItem[] }
@@ -171,6 +173,7 @@ export type MappingVersion = {
   parent_id: string | null; approved_by: string | null; approved_at: string | null; comment: string | null; created_at: string; agent_log: Record<string, unknown>[]; sample: Record<string, unknown>[]; document?: MappingDocument
 }
 export type ReviewTask = {
+  explanations?: { en: string; th: string }[]
   id: string; round_id: string; customer_id: string; mapping_version_id: string | null; dataset_version_id: string | null; kind: string; priority: number; status: string
   reasons: string[]; details: { decision?: string; risk_level?: RiskLevel; risk_factors?: string[]; impact?: PolicyDecision['impact']; open_questions?: string[]; findings?: Finding[]; verdict?: VerdictBrief }; resolver: string | null; comment: string | null; created_at: string; resolved_at: string | null
   customer?: { id: string; code: string; name: string } | null; round?: { id: string; label: string | null; status: string } | null
@@ -263,16 +266,25 @@ export type ReviewQuestions = { mapping_id: string; round_id: string; status: st
 export type ReviewEvidence = { field: string; sample_limit: number; sample_records: number; constant: boolean; context_only: boolean; unavailable: boolean; examples: { identity: string; item: number | null; value: unknown; source_complete: boolean; cells: { file: string | null; sheet: string | null; row: number | null; column: string | null; header: string; raw: unknown; verified: boolean | null }[] }[] }
 export type AnswerPreview = { digest: string; remaining_questions: string[]; before: Record<string, unknown>[]; comparison: { counts: { changed_records: number; lost: number; gained: number }; rows: SandboxItem[]; sample_limit: number; before_records: number; after_records: number; reliable: boolean; confirmed_fields: string[] }; preview: { ok: boolean; records: Record<string, unknown>[]; findings: Finding[]; validation?: { ok: boolean }; stats?: Record<string, unknown>; errors?: string[] } }
 export type AssistantAction = { id: string; label: string; detail: string; url: string; kind?: 'act'; act?: { type: 'verdict.accept'; round_id: string; digest: string; decisions?: Record<string, boolean | number | string | null>; preview?: Bilingual[] } }
-export type WorkspaceAnswer = { answer: string; ai: boolean; reason?: string; tools_used?: string[]; actions?: AssistantAction[]; evidence: { id: number; tool: string; data: unknown; links: { label: string; url: string }[] }[] }
+export type Clarification = { question: string; reason: string; options: string[] }
+export type AssistantReport = {
+  schema_version: number; id: string; evidence_id: number; title: { en: string; th: string };
+  scope: { en: string; th: string }; generated_at: string; complete: boolean;
+  columns: { key: string; label: { en: string; th: string }; type: 'number' | 'text' | 'date' | 'status' }[];
+  rows: Record<string, string | number | null>[]; series: string[];
+  views: ('table' | 'bar' | 'line')[]; view: 'table' | 'bar' | 'line';
+  notes: { en: string; th: string }[]; links: { label: string; url: string }[];
+}
+export type WorkspaceAnswer = { answer: string; ai: boolean; reason?: string; clarifications?: Clarification[]; tools_used?: string[]; actions?: AssistantAction[]; visualizations?: AssistantReport[]; evidence: { id: number; tool: string; data: unknown; links: { label: string; url: string }[] }[] }
 
-export type ChatSummary = { id: string; title: string; round_id: string | null; dataset_id: string | null; archived: boolean; pinned: boolean; created_at: string; updated_at: string; busy: boolean }
+export type ChatSummary = { id: string; title: string; round_id: string | null; dataset_id: string | null; mapping_id?: string | null; archived: boolean; pinned: boolean; created_at: string; updated_at: string; busy: boolean }
 export type ChatTurn = { id: string; request_id: string; sequence: number; question: string; reply: WorkspaceAnswer | null; status: 'pending' | 'complete' | 'failed' | 'stopped'; created_at: string }
 export type ChatDetail = { conversation: ChatSummary; turns: ChatTurn[]; total: number; older_before: number | null }
 export type ChatList = { items: ChatSummary[]; total: number; next_offset: number | null }
 
 export const api = {
   chats: (search = '', offset = 0, archived = false) => get<ChatList>(`/api/assistant/conversations?search=${encodeURIComponent(search)}&offset=${offset}&archived=${archived}`),
-  createChat: (b: { round_id?: string; dataset_id?: string }) => post<ChatSummary>('/api/assistant/conversations', b),
+  createChat: (b: { round_id?: string; dataset_id?: string; mapping_id?: string }) => post<ChatSummary>('/api/assistant/conversations', b),
   importChat: (b: { round_id?: string; dataset_id?: string; messages: { question: string; answer: string }[] }) => post<ChatSummary>('/api/assistant/conversations/import', b),
   chat: (id: string, before?: number) => get<ChatDetail>(`/api/assistant/conversations/${encodeURIComponent(id)}${before ? '?before=' + before : ''}`),
   editChat: (id: string, b: { title?: string; archived?: boolean; pinned?: boolean }) => patch<ChatSummary>(`/api/assistant/conversations/${encodeURIComponent(id)}`, b),

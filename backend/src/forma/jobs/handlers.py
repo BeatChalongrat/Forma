@@ -91,6 +91,13 @@ def run_pipeline(ctx: ServiceContext, payload: dict[str, Any], prog: JobProgress
     force = bool(payload.get("force"))
     actor = payload.get("actor", "system")
     out: dict[str, Any] = {}
+    if not force:
+        from forma.jobs.recovery import published_result
+
+        with session_scope() as s:
+            completed = published_result(s, rid)
+        if completed is not None:
+            return completed
 
     # ---- profile ------------------------------------------------------------------------
     skip_profile = False

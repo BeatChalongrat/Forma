@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Link } from 'react-router-dom'
-import { ArrowLeft, ArrowRight, Check, CircleHelp, FileText, MessageCircleMore, TriangleAlert } from 'lucide-react'
+import { Link, useNavigate } from 'react-router-dom'
+import { ArrowLeft, ArrowRight, Check, ChevronDown, CircleHelp, FileText, MessageCircleMore, TriangleAlert } from 'lucide-react'
 import { api, type AnswerPreview, type Expr, type FieldSpec, type ReviewQuestions } from '../lib/api'
 import { usePreferences } from '../lib/preferences'
 import { Badge, Spinner } from './ui'
@@ -35,8 +35,19 @@ function rule(expr: Expr, t: T): string {
 }
 
 export function ReviewWorkspace({ id, onSaved, onDone }: { id: string; onSaved: (id: string) => void; onDone: () => void }) {
+  const nav = useNavigate()
   const { prefs, t } = usePreferences(), th = prefs.language === 'th', qc = useQueryClient()
   const query = useQuery({ queryKey: ['questions', id], queryFn: () => api.reviewQuestions(id) })
+  const explain = useMutation({
+    mutationFn: api.createChat,
+    onSuccess: chat => {
+      const q = query.data!
+      const focused = q.questions.find(x => x.id === selected)
+      const question = t('Explain the problems in this file and mapping version. What is known, what is uncertain, and what should I check next?', 'ช่วยอธิบายปัญหาของไฟล์และเวอร์ชันที่เปิดอยู่นี้ อะไรยืนยันได้แล้ว อะไรยังไม่แน่ใจ และต้องตรวจอะไรต่อ?') + (focused ? ' ' + t('Focus on: ', 'เน้นเรื่อง: ') + title(focused, t, th) : '')
+      void qc.invalidateQueries({ queryKey: ['assistant-chats'] })
+      nav('/assistant?chat=' + chat.id, { state: { send: { question, request_id: crypto.randomUUID() } } })
+    },
+  })
   const verdictQuery = useQuery({ queryKey: ['verdict', query.data?.round_id], queryFn: () => api.verdict(query.data!.round_id), enabled: !!query.data?.round_id })
   const accepting = useMutation({
     mutationFn: (decisions: Record<string, boolean | number | string | null>) => api.acceptVerdict(query.data!.round_id, { digest: verdictQuery.data!.verdict!.digest, decisions }),
@@ -67,8 +78,9 @@ export function ReviewWorkspace({ id, onSaved, onDone }: { id: string; onSaved: 
     <button className="btn btn-ghost btn-sm" onClick={onDone} disabled={busy}><ArrowLeft size={15} />{t('Review queue', 'กลับรายการที่รอตรวจ')}</button>
     <header className="flex flex-wrap justify-between gap-4 items-start">
       <div className="min-w-0"><div className="flex gap-3 items-center flex-wrap"><h1 className="text-2xl font-semibold text-navy">{t('Check this file', 'ตรวจไฟล์นี้')}</h1><Badge tone={q.blocked ? 'bad' : 'warn'}>{q.blocked ? t('Source check required', 'ต้องตรวจต้นทางก่อน') : t('Waiting for review', 'รอตรวจ')}</Badge></div><p className="mt-2 break-words">{q.context.customer?.name.startsWith(q.context.customer.code) ? q.context.customer.name : `${q.context.customer?.code} · ${q.context.customer?.name}`} <span className="text-muted">/ {q.context.round_label}</span></p><p className="text-xs text-muted mt-1">{t('Mapping version', 'การจับคู่เวอร์ชัน')} {q.context.mapping_version} · {t('Answer → preview → save and recheck', 'ตอบคำถาม → ดูผลที่จะเปลี่ยน → บันทึกและตรวจอีกครั้ง')}</p></div>
-      <Link className="btn btn-sm" to={`/assistant?round=${q.round_id}`}><MessageCircleMore size={16} />{t('Explain this file', 'ให้ผู้ช่วยอธิบายไฟล์นี้')}</Link>
+      <button className="btn btn-sm" disabled={explain.isPending} onClick={() => explain.mutate({ round_id: q.round_id, mapping_id: id })}>{explain.isPending ? <Spinner /> : <MessageCircleMore size={16} />}{t('Explain this file', 'ให้ผู้ช่วยอธิบายไฟล์นี้')}</button>
     </header>
+    {explain.isError && <p role="alert" className="text-bad text-sm">{t('Could not open the assistant. Please try again.', 'ยังเปิดผู้ช่วยไม่ได้ ลองกดอีกครั้ง')}</p>}
     <div className="flex flex-wrap gap-2">{q.context.files.map(f => <Link key={f.id} className="btn btn-sm max-w-full text-left" to={`/rounds/${q.round_id}`}><FileText size={14} className="shrink-0" /><span className="break-all">{f.name}</span></Link>)}</div>
     {verdictQuery.data?.verdict && verdictQuery.data.verdict.stage === 'mapping' && verdictQuery.data.verdict.subject.id === q.mapping_id
       ? <VerdictCard v={verdictQuery.data.verdict} editable={editable} busy={busy} onAccept={(d) => accepting.mutate(d)} onOpenDecision={(fid) => { if (q.questions.some(x => x.id === fid)) setSelected(fid) }} error={accepting.error?.message} />
@@ -85,7 +97,7 @@ export function ReviewWorkspace({ id, onSaved, onDone }: { id: string; onSaved: 
       </nav>
       <main ref={content} className="min-w-0 space-y-4 scroll-mt-20">
         {current === 'issues' && <>
-          <details className="card" open={!verdictQuery.data?.verdict}><summary className="px-4 py-3 text-sm font-medium cursor-pointer">{t(`All fields and checks (${q.changes.length})`, `ทุกฟิลด์และผลตรวจ (${q.changes.length})`)}</summary><div className="border-t border-line"><ImportantIssues q={q} t={t} th={th} /></div></details>
+          <details className="review-disclosure" open={!verdictQuery.data?.verdict}><summary><span className="min-w-0"><span className="block font-medium text-ink">{t('Review details', 'รายละเอียดการตรวจ')} {q.changes.length > 0 && <span className="font-normal text-muted ml-1">({q.changes.length})</span>}</span><span className="block text-xs text-muted mt-1 leading-5">{t('Source evidence and individual field checks', 'ดูหลักฐานจากไฟล์และผลตรวจแต่ละฟิลด์')}</span></span><ChevronDown size={17} className="review-disclosure-chevron shrink-0 text-muted" /></summary><div className="border-t border-line"><ImportantIssues q={q} t={t} th={th} /></div></details>
           <div className="flex justify-end"><button className="btn" onClick={() => setSelected(q.questions[0]?.id || 'finish')}>{t('Go to questions', 'ไปตอบคำถาม')}<ArrowRight size={15} /></button></div>
         </>}
         {item && <section className="card p-4 sm:p-6 space-y-5">
@@ -139,7 +151,7 @@ function ImportantIssues({ q, t, th }: { q: ReviewQuestions; t: T; th: boolean }
   const wrong = q.reasons.find(r => r.includes('structure is identical to customer'))
   const other = wrong?.match(/customer (.+?)'s approved format/)?.[1]
   const rowChange = q.reasons.find(r => r.startsWith('row count changed'))?.match(/(\d+%)/)?.[1]
-  return <section className="card p-4 sm:p-6 space-y-5"><div><h2 className="text-xl font-semibold">{t('Check these before answering', 'ตรวจเรื่องเหล่านี้ก่อนตอบคำถาม')}</h2><p className="text-sm text-muted mt-2">{t('Differences are signals to investigate, not proof that the data is wrong.', 'ความแตกต่างเป็นสัญญาณให้ตรวจ ยังไม่ได้แปลว่าข้อมูลผิด')}</p></div>
+  return <section className="p-4 sm:p-6 space-y-5"><div><h2 className="text-xl font-semibold">{t('Check these before answering', 'ตรวจเรื่องเหล่านี้ก่อนตอบคำถาม')}</h2><p className="text-sm text-muted mt-2">{t('Differences are signals to investigate, not proof that the data is wrong.', 'ความแตกต่างเป็นสัญญาณให้ตรวจ ยังไม่ได้แปลว่าข้อมูลผิด')}</p></div>
     {(wrong || q.blocked) && <div className="rounded-xl border border-bad/30 bg-bad-soft p-4 space-y-2"><h3 className="font-semibold text-bad">{t('Confirm the source file and customer', 'ตรวจว่าไฟล์เป็นของลูกค้ารายนี้จริง')}</h3><p className="text-sm">{other ? t(`Its structure matches a previously approved format for ${other}. This does not prove the owner; check the file sender and customer.`, `โครงสร้างไฟล์เหมือนรูปแบบที่เคยอนุมัติของ ${other} แต่ยังสรุปเจ้าของไฟล์ไม่ได้ ต้องตรวจชื่อผู้ส่งและลูกค้าให้ตรงกัน`) : t('The policy has blocked this file. Check the source and detailed issues before approval.', 'กฎของระบบระงับไฟล์นี้ไว้ ต้องตรวจต้นทางและสาเหตุให้เรียบร้อยก่อนอนุมัติ')}</p><Link className="btn btn-sm" to={`/rounds/${q.round_id}`}>{t('Open source file & customer', 'เปิดไฟล์ต้นทางและข้อมูลลูกค้า')}<ArrowRight size={14} /></Link></div>}
     {q.changes.length > 0 && <div className="space-y-3"><h3 className="font-semibold">{t('Data and field matching that changed', 'ข้อมูลและการจับคู่ที่เปลี่ยนไป')}</h3><p className="text-xs text-muted">{q.comparison_dataset_id ? t('Values compare the stored sample with the previous published dataset. Examples may include unchanged values.', 'ค่าเปรียบเทียบจากตัวอย่างที่บันทึกไว้กับชุดข้อมูลที่เผยแพร่ก่อนหน้า ตัวอย่างอาจมีค่าที่ไม่เปลี่ยนด้วย') : t('No previous published data comparison is available; only mapping changes can be shown.', 'ยังไม่มีข้อมูลที่เผยแพร่ก่อนหน้าให้เทียบ แสดงได้เฉพาะการเปลี่ยนกฎการจับคู่')}</p>{q.changes.map(f => <div key={f.pointer} className="border border-line rounded-xl p-4 space-y-3"><div className="flex flex-wrap justify-between gap-2"><h4 className="font-semibold">{fieldName(f.field, th)}</h4><Badge tone={f.risk === 'critical' || f.risk === 'high' ? 'warn' : 'neutral'}>{f.status === 'removed' ? t('No longer mapped', 'ไม่ได้จับคู่แล้ว') : f.status === 'added' ? t('New mapping', 'เพิ่มการจับคู่') : t('Changed', 'มีการเปลี่ยนแปลง')}</Badge></div>
       {f.check && <p className="text-sm text-ink-2">{f.check.verdict === 'no_data' ? t('Not enough matching records to compare.', 'มีรายการที่จับคู่กันไม่พอ จึงยังเทียบค่าไม่ได้') : t(`${f.check.pairs} matching records compared; ${Math.round((f.check.equal_share ?? 0) * 100)}% kept the same value.`, `เทียบรายการที่ตรงกัน ${f.check.pairs} รายการ มี ${Math.round((f.check.equal_share ?? 0) * 100)}% ที่ค่าเท่าเดิม`)}{f.check.ratio !== undefined && <span> · {t('Ratio', 'อัตราส่วนค่าใหม่ต่อค่าเดิม')} ×{f.check.ratio}</span>}</p>}

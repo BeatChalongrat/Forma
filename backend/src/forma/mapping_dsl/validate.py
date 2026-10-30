@@ -15,6 +15,7 @@ from forma.mapping_dsl.models import (
     Op,
 )
 from forma.schema_registry import TargetSchema
+from forma.schema_registry.registry import mapping_support_issues
 
 
 @dataclass
@@ -81,6 +82,10 @@ def _check_expr(e: Expr, path: str, rep: ValidationReport, source_ids: set[str])
 
 def validate_mapping(doc: MappingDocument, schema: TargetSchema) -> ValidationReport:
     rep = ValidationReport()
+    for issue in mapping_support_issues(schema.document):
+        rep.error("unsupported_schema", issue["message"], issue["pointer"])
+    if not rep.ok:
+        return rep
     source_ids = set(doc.source_ids())
 
     # sources ---------------------------------------------------------------------------------

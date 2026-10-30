@@ -206,6 +206,40 @@ class TransformEngine:
                     findings.append(Finding("compile", "error", f"source {spec.id!r} is not bound to a file"))
                 continue
             try:
+                if spec.id in used_sources and b.path.suffix.lower() in {".xlsx", ".xlsm"}:
+                    from forma.ingestion.ooxml import inspect_workbook
+
+                    selected = resolve_sheet(spec, b)
+                    checked = inspect_workbook(b.path)
+                    sheet_info = (
+                        checked[selected or 0]
+                        if selected is None or isinstance(selected, int)
+                        else next(s for s in checked if s.name == selected)
+                    )
+                    notices = []
+                    if sheet_info.formula_cells:
+                        notices.append(
+                            "formula values are saved Excel caches; FORMA does not recalculate or verify cache freshness"
+                        )
+                    if sheet_info.hidden or sheet_info.hidden_rows or sheet_info.hidden_columns:
+                        notices.append(
+                            "hidden sheet/rows/columns are included; confirm they belong in this import"
+                        )
+                    if sheet_info.display_format_warnings:
+                        notices.append(
+                            "complex numeric display formats were not interpreted; verify values/identifiers: "
+                            + ", ".join(sheet_info.display_format_warnings)
+                        )
+                    for notice in notices:
+                        findings.append(Finding("source_review", "warning", f"{spec.id}: {notice}"))
+                elif spec.id in used_sources and b.path.suffix.lower() in {".xls", ".xlsb"}:
+                    findings.append(
+                        Finding(
+                            "source_review",
+                            "warning",
+                            f"{spec.id}: legacy/binary Excel values read without OOXML formula/style inspection; verify or save as .xlsx",
+                        )
+                    )
                 frames[spec.id] = _prefixed(
                     load_source_frame(
                         spec, b, limit=limit, expected_columns=_source_columns(mapping, spec.id)

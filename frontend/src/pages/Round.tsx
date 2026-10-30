@@ -7,10 +7,12 @@ import { formatLabel, fmtBytes, fmtDate, fmtInt, cn } from '../lib/utils'
 import { PageHeader, StatusBadge, Section, Badge, Confidence, Drawer, KV, Spinner, FindingRow, Empty } from '../components/ui'
 import { RoundSteps } from '../components/RoundSteps'
 import { useToast } from '../lib/toast'
+import { usePreferences } from '../lib/preferences'
 
 const driftTone = (d?: string | null) => (d === 'identical' || d === 'header_moved' ? 'ok' : d === 'unrelated_file' ? 'bad' : d ? 'warn' : 'neutral')
 
 export function RoundPage() {
+  const { t } = usePreferences()
   const { roundId = '' } = useParams()
   const qc = useQueryClient()
   const toast = useToast()
@@ -37,6 +39,7 @@ export function RoundPage() {
   const latestMapping = r.mappings?.[0]
   const latestDataset = r.datasets?.[0]
   const drift = r.summary.drift
+  const memory = r.summary.format_memory
 
   return (
     <>
@@ -50,6 +53,20 @@ export function RoundPage() {
 
       <RoundSteps r={r} busy={runJob.isPending || doExport.isPending} onRun={(k) => runJob.mutate(k)} onExport={(id, fmt) => doExport.mutate({ id, fmt })} />
 
+      {memory && <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line bg-surface px-4 py-3 text-sm">
+        <div>
+          <p className="font-medium">{memory.status === 'reused'
+            ? t(`Reused approved mapping v${memory.mapping_version}`, `ใช้กฎจับคู่ที่เคยอนุมัติ เวอร์ชัน ${memory.mapping_version}`)
+            : memory.status === 'known' ? t('An approved mapping matches this format', 'พบกฎที่เคยอนุมัติสำหรับรูปแบบนี้')
+              : memory.status === 'changed' ? t('The layout changed; check the mapping', 'รูปแบบไฟล์เปลี่ยน ต้องตรวจการจับคู่')
+                : memory.status === 'edited' ? t('Mapping edited by a reviewer', 'ผู้ตรวจปรับกฎจับคู่')
+                  : t('New format for this target', 'รูปแบบใหม่สำหรับปลายทางนี้')}</p>
+          <p className="text-muted mt-1">{memory.target_schema} · {memory.status === 'reused'
+            ? t('No AI remapping. New file values are transformed and validated again.', 'ไม่เรียก AI จับคู่ใหม่ อ่านค่าจากไฟล์ใหม่และตรวจผลอีกครั้ง')
+            : t('Customer identification and mapping approval are separate checks.', 'การระบุลูกค้าและการอนุมัติกฎจับคู่เป็นคนละขั้นตอน')}</p>
+        </div>
+        {memory.mapping_id && <Link className="btn btn-outline btn-sm" to={`/review?mapping=${memory.mapping_id}`}>{t('View saved mapping', 'ดูกฎที่เคยอนุมัติ')}</Link>}
+      </div>}
       <details className="mt-6" open={r.status === 'blocked' || r.status === 'failed'}><summary className="text-[14px] font-medium text-ink-2 mb-4">Files, issues &amp; version history</summary>
       <div className="grid lg:grid-cols-[1fr_380px] gap-4">
         <div className="flex flex-col gap-4">

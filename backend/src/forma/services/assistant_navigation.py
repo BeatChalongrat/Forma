@@ -150,6 +150,16 @@ def navigation_choices(
             "Open review queue",
             "เปิดรายการตรวจทั้งหมด",
         )
+    elif name == "inspect_review":
+        mapping = session.get(MappingVersion, args.get("mapping_id"))
+        if mapping:
+            ensure_customer(p, mapping.customer_id)
+            add(
+                "/review?" + urlencode({"mapping": mapping.id, "round": mapping.round_id}),
+                "Return to this review",
+                "กลับไปตรวจไฟล์นี้",
+                f"Version {mapping.version}",
+            )
     elif name == "inspect_import":
         round_choices(data.get("id"), review=data.get("status") in ("review", "blocked"))
         mapping_choices(data.get("mapping_id"))

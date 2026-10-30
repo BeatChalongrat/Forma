@@ -1,5 +1,9 @@
 # ADR-003 — fastexcel/Polars for data, streaming XML for structure
 
+**Update 2026-10-30:** ADR-043 replaces the bounded structure scan with full streaming OOXML checks,
+preserves physical coordinates and simple zero/percentage formats, and blocks missing caches/errors.
+The measurements below describe the earlier implementation and are not a benchmark of ADR-043.
+
 **Decision** Cell values are read with fastexcel (calamine) as strings into Polars — fast and explicit about
 parsing (Thai-aware DSL ops decide what a value means). Structure facts (hidden sheets, formulas and whether
 they carry cached values, merged ranges) are read directly from the xlsx zip with a streaming XML parser,

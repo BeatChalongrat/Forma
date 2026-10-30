@@ -86,6 +86,60 @@
 :root { color-scheme: light; }
 .dark { color-scheme: dark; }
 
+/* Saved assistant reports: a quiet data surface, with the same palette in both themes. */
+:root { --report-blue: #397fc2; --report-teal: #308478; --report-amber: #b78029; --report-rose: #bd6273; }
+.dark { --report-blue: #80b7ec; --report-teal: #71bca6; --report-amber: #e0b869; --report-rose: #e49aa9; }
+.assistant-report { margin: 20px 0; min-width: 0; overflow: hidden; border: 1px solid var(--color-line); border-radius: 16px; background: var(--color-surface); }
+.assistant-report-header { display: flex; gap: 16px; justify-content: space-between; align-items: flex-start; padding: 22px 22px 16px; }
+.report-eyebrow { font-size: 10px; font-weight: 600; letter-spacing: .09em; color: var(--color-muted); }
+.report-eyebrow span { font-weight: 400; letter-spacing: 0; }
+.assistant-report-header h3 { margin: 8px 0 5px; font-size: 17px; font-weight: 600; line-height: 1.5; color: var(--color-navy); overflow-wrap: anywhere; }
+.assistant-report-header p { margin: 0; font-size: 12px; color: var(--color-muted); overflow-wrap: anywhere; }
+.report-icon-button { padding: 8px; border-radius: 8px; color: var(--color-muted); flex-shrink: 0; }
+.report-icon-button:hover { background: var(--color-surface-2); color: var(--color-ink); }
+.assistant-report-toolbar { padding: 0 22px 16px; display: flex; gap: 12px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+.report-view-switch { display: flex; gap: 3px; padding: 3px; border: 1px solid var(--color-line); border-radius: 9px; background: var(--color-surface-2); }
+.report-view-switch button { display: inline-flex; gap: 6px; align-items: center; padding: 6px 9px; font-size: 12px; color: var(--color-muted); border-radius: 6px; }
+.report-view-switch button[aria-pressed=true] { background: var(--color-surface); color: var(--color-ink); box-shadow: 0 1px 3px #00000012; }
+.report-view-switch button:hover { color: var(--color-ink); }
+.report-row-count { font-size: 11px; color: var(--color-muted); font-variant-numeric: tabular-nums; }
+.assistant-report-table { max-height: 400px; overflow: auto; border-top: 1px solid var(--color-line); }
+.assistant-report-table table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 12px; }
+.assistant-report-table th { position: sticky; top: 0; z-index: 1; background: var(--color-surface-2); color: var(--color-muted); font-weight: 500; text-align: left; white-space: nowrap; }
+.assistant-report-table th, .assistant-report-table td { padding: 12px 16px; border-bottom: 1px solid var(--color-line); }
+.assistant-report-table tr:last-child td { border-bottom: 0; }
+.assistant-report-table td:first-child { min-width: 170px; max-width: 300px; overflow-wrap: anywhere; }
+.assistant-report-table tbody tr:hover { background: var(--color-surface-2); }
+.assistant-report-table .report-number { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.report-row-link { display: inline-flex; align-items: center; gap: 8px; }
+.report-row-link svg { flex-shrink: 0; opacity: .6; }
+.report-row-link:hover { text-decoration: underline; text-underline-offset: 3px; }
+.report-legend { display: flex; flex-wrap: wrap; gap: 8px 18px; padding: 0 22px 8px; font-size: 11px; color: var(--color-ink-2); }
+.report-legend span { display: inline-flex; gap: 6px; align-items: center; }
+.report-legend i { display: inline-block; width: 8px; height: 8px; border-radius: 2px; }
+.assistant-report-chart { overflow: auto; max-height: 470px; padding: 0 12px; }
+.assistant-report-chart svg { width: 100%; min-width: 540px; display: block; }
+.report-grid line { stroke: var(--color-line); stroke-width: 1; stroke-dasharray: 3 4; }
+.report-grid text, .report-axis-label { fill: var(--color-muted); font-family: var(--font-sans); font-size: 11px; }
+.assistant-report-chart rect:focus, .assistant-report-chart circle:focus { outline: 2px solid var(--color-focus); outline-offset: 3px; }
+.report-inspection { padding: 8px 22px 16px; font-size: 11px; min-height: 42px; color: var(--color-muted); overflow-wrap: anywhere; }
+.assistant-report-footer { border-top: 1px solid var(--color-line); padding: 14px 22px; font-size: 11px; color: var(--color-muted); }
+.assistant-report-footer summary { width: fit-content; cursor: pointer; }
+.assistant-report-footer ul { margin: 10px 0; padding-left: 18px; list-style: disc; }
+.assistant-report-footer li { padding: 3px 0; }
+.report-sources { display: flex; gap: 8px 14px; flex-wrap: wrap; margin-top: 12px; }
+.report-sources a { display: inline-flex; align-items: center; gap: 4px; color: var(--color-ink-2); }
+.report-sources a:hover { text-decoration: underline; }
+.report-note { margin: 0 0 10px; font-size: 12px; line-height: 1.7; color: var(--color-ink-2); }
+.report-snapshot { margin: 10px 0 0; font-size: 11px; }
+.report-empty { padding: 26px 22px; color: var(--color-muted); font-size: 13px; }
+@media (max-width: 600px) {
+  .assistant-report-header { padding: 16px 14px 12px; }
+  .assistant-report-toolbar, .report-legend { padding-left: 14px; padding-right: 14px; }
+  .assistant-report-footer { padding: 12px 14px; }
+  .assistant-report-header h3 { font-size: 15px; }
+}
+
 html, body, #root { height: 100%; }
 body {
   @apply bg-paper text-ink font-sans antialiased;
@@ -101,6 +155,13 @@ button, input, select, textarea { font-family: inherit; }
 /* primitives — in the components layer so Tailwind utilities can override them */
 @layer components {
 .card { @apply bg-surface border border-line rounded-[var(--radius-lg)]; box-shadow: var(--shadow-soft); }
+.review-disclosure { @apply bg-surface border border-line rounded-xl overflow-hidden; }
+.review-disclosure > summary { @apply flex items-center justify-between gap-4 px-5 py-4 text-sm transition-colors hover:bg-surface-2; list-style: none; }
+.review-disclosure > summary::-webkit-details-marker { display: none; }
+.review-disclosure > summary::marker { content: ''; }
+.review-disclosure > summary:focus-visible { outline: 2px solid var(--color-signal); outline-offset: -3px; }
+.review-disclosure-chevron { transition: transform .15s; }
+.review-disclosure[open] > summary .review-disclosure-chevron { transform: rotate(180deg); }
 .btn { @apply inline-flex items-center gap-2 min-h-9 py-1.5 px-3 rounded-[var(--radius-sm)] border border-line-2 bg-surface text-ink text-[13px] font-medium whitespace-nowrap select-none transition-colors hover:bg-surface-2 hover:border-signal/40 disabled:opacity-50 disabled:pointer-events-none; }
 .btn-primary { @apply border-transparent; background: var(--color-action); color: var(--color-on-action); }
 .btn-primary:hover { background: #2c538d; color: white; }

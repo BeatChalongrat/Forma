@@ -11,4 +11,9 @@ only, and `compare` reports a column whose type family changed as `types_changed
 equal (int/float are one family; mixed/empty columns carry no signal). Same headers holding different data
 therefore never reuse a mapping verbatim.
 
-**Consequences** Unchanged formats cost zero review and zero tokens; renamed columns show the exact diff.
+**Amendment (ADR-046)** The library searches approved history, including superseded approvals, by
+customer, pinned target schema and layout. It can return to A after B; the newest compatible exact
+approval wins. New mappings record a target-schema digest as an additional contract check.
+
+**Consequences** Reused formats need no AI remapping tokens. New values are still transformed and
+validated, and approval/publishing policy can still require review. Renamed columns show the exact diff.

@@ -24,8 +24,11 @@ def client(isolated_env: Path) -> Iterator[TestClient]:
         yield c
 
 
-def _job(c: TestClient, url: str) -> None:
-    jid = c.post(url, params={"sync": "true"}).json()["job_id"]
+def _job(c: TestClient, url: str, mapping_id: str | None = None) -> None:
+    params = {"sync": "true"}
+    if mapping_id is not None:
+        params["mapping_version_id"] = mapping_id
+    jid = c.post(url, params=params).json()["job_id"]
     assert c.get(f"/api/jobs/{jid}").json()["status"] == "done"
 
 
@@ -48,9 +51,11 @@ def published_round(
         wb.save(p2)
     r2 = c.post("/api/rounds", json={"customer_id": cust, "label": "R2"}).json()["id"]
     _upload(c, r2, p2, name="ERP.xlsx")
-    _run(c, r2)
+    proposed = _run(c, r2)["result"]["mapping_version_id"]
     if not c.get(f"/api/rounds/{r2}").json()["datasets"]:
-        _job(c, f"/api/rounds/{r2}/transform")
+        # Explicitly preview this round's proposal; automatic transform must not silently
+        # fall back to a different historical layout while the new proposal needs review.
+        _job(c, f"/api/rounds/{r2}/transform", mapping_id=proposed)
     return cust, c.get(f"/api/rounds/{r2}").json()["datasets"][0]["id"]
 
 

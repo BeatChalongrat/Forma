@@ -395,6 +395,7 @@ class AssistantConversation(Base):
     title: Mapped[str] = mapped_column(String(160))
     round_id: Mapped[str | None] = mapped_column(String(40))
     dataset_id: Mapped[str | None] = mapped_column(String(40))
+    mapping_id: Mapped[str | None] = mapped_column(String(40))
     archived: Mapped[bool] = mapped_column(Boolean, default=False)
     pinned: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
     legacy_key: Mapped[str | None] = mapped_column(String(64))
