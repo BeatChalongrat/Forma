@@ -268,10 +268,15 @@ def promote(session: Session, header: str, target: str, actor: str) -> Correctio
     return row
 
 
-def forget(session: Session, correction_id: str, actor: str) -> Correction:
+def get_correction(session: Session, correction_id: str) -> Correction:
     row = session.get(Correction, correction_id)
     if row is None:
         raise NotFound(f"correction {correction_id} not found")
+    return row
+
+
+def forget(session: Session, correction_id: str, actor: str) -> Correction:
+    row = get_correction(session, correction_id)
     row.status = "retired"
     audit(session, "learning.forget", "correction", row.id, actor=actor, kind=row.kind, target=row.target)
     return row
@@ -280,10 +285,16 @@ def forget(session: Session, correction_id: str, actor: str) -> Correction:
 # --------------------------------------------------------------------------------------------
 # show: is FORMA getting better?
 # --------------------------------------------------------------------------------------------
-def stats(session: Session, *, months: int = 6) -> dict[str, Any]:
+def _only(query: Any, column: Any, customers: frozenset[str] | None) -> Any:
+    return query if customers is None else query.where(column.in_(sorted(customers)))
+
+
+def stats(session: Session, *, months: int = 6, customers: frozenset[str] | None = None) -> dict[str, Any]:
     """Per month: mappings approved, accepted as proposed, corrections made, learned fields used."""
     since = dt.datetime.now(dt.UTC) - dt.timedelta(days=31 * months)
-    rows = session.scalars(select(Correction).where(Correction.created_at >= since)).all()
+    rows = session.scalars(
+        _only(select(Correction).where(Correction.created_at >= since), Correction.customer_id, customers)
+    ).all()
     by_month: dict[str, Counter[str]] = defaultdict(Counter)
     uses_by_month: dict[str, int] = defaultdict(int)
     for r in rows:
@@ -291,8 +302,12 @@ def stats(session: Session, *, months: int = 6) -> dict[str, Any]:
         by_month[key][r.kind] += 1
         uses_by_month[key] += int(r.uses or 0)
     approved_at = session.scalars(
-        select(MappingVersion.approved_at).where(
-            MappingVersion.approved_at.is_not(None), MappingVersion.approved_at >= since
+        _only(
+            select(MappingVersion.approved_at).where(
+                MappingVersion.approved_at.is_not(None), MappingVersion.approved_at >= since
+            ),
+            MappingVersion.customer_id,
+            customers,
         )
     ).all()
     approved_counter: Counter[str] = Counter(a.strftime("%Y-%m") for a in approved_at if a is not None)
@@ -313,7 +328,9 @@ def stats(session: Session, *, months: int = 6) -> dict[str, Any]:
                 "learned_fields_used": uses_by_month.get(mth, 0),
             }
         )
-    active = session.scalars(select(Correction).where(Correction.status == "confirmed")).all()
+    active = session.scalars(
+        _only(select(Correction).where(Correction.status == "confirmed"), Correction.customer_id, customers)
+    ).all()
     return {
         "series": series,
         "aliases": sum(1 for r in active if r.kind == "alias"),
@@ -327,13 +344,19 @@ def stats(session: Session, *, months: int = 6) -> dict[str, Any]:
 
 
 def list_learned(
-    session: Session, *, customer_id: str | None = None, offset: int = 0, limit: int = 50
+    session: Session,
+    *,
+    customer_id: str | None = None,
+    offset: int = 0,
+    limit: int = 50,
+    customers: frozenset[str] | None = None,
 ) -> dict[str, Any]:
     q = select(Correction).where(
         Correction.status == "confirmed", Correction.kind.in_(("alias", "constant", "promoted"))
     )
     if customer_id:
         q = q.where(Correction.customer_id == customer_id)
+    q = _only(q, Correction.customer_id, customers)
     total = session.scalar(select(func.count()).select_from(q.subquery())) or 0
     rows = session.scalars(q.order_by(Correction.created_at.desc()).offset(offset).limit(limit)).all()
     return {

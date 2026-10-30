@@ -26,6 +26,12 @@
 | 8 Proactive intelligence | expected deliveries from each customer's cadence (due / overdue with the reason), a watchlist of customers likely to need a check, per-customer price-move baselines proposed from acknowledged rounds | **phase 1 done** | ADR-039 |
 | 8 Case page & assistant actions | the round page carries the full verdict card with its one-click accept for both stages; the assistant proposes a server-built `verdict.accept` action (round + digest) that a person confirms in the UI through the ordinary endpoint | **phase 1 done** | ADR-040 |
 | 8 Evaluation modes | `forma eval --llm` (AI-refined mapping scored, draft as fallback), `--replay` (round-0 corrections become learned aliases; later rounds scored without / with), `--index` + `data/real/` for real customer files (git-ignored) | **harness done**; real files and their baseline pending | ADR-041 |
+| 8 Review explanations & clarification | policy reasons explained in Thai and English; the assistant asks clarification questions before assuming, with the review context carried into the chat | **done** | ADR-042 |
+| 8 Input contract readiness | full OOXML scan, strict CSV decoding, formula and error-cell gates, table detection across the whole sheet, unsupported schema shapes refused, the full target schema in AI prompts | **done** | ADR-043 |
+| 8 Durable queue reconciliation | on startup, queued jobs are checked against durable results before recovery and resubmission | **done** | ADR-044 |
+| 8 Grounded chat reports | server-computed tables and charts in assistant conversations; the model selects a view, never values | **done** | ADR-045 |
+| 8 Approved format library | a customer's approved layouts stay reusable across history, keyed by target schema and fingerprint | **done** | ADR-046 |
+| 8 Decisions and scope fixes | the VAT decision saves from the card; nothing is accepted past an open decision; an account needs a FORMA role; jobs, figures and learning follow the caller's customers | **done** | ADR-047 |
 | 7+ Work rounds | a bulk upload is a named, dated work round that accepts more files later; receipt dashboard (received / expected / ready) on Home and the round | **done** | ADR-033, ADR-034 |
 
 ## Phase 7 — production hardening (done)

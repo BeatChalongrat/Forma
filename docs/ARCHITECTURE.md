@@ -42,14 +42,16 @@ ImportRound: uploaded ─▶ profiled ─▶ ┬─ auto_approved ─▶ transfo
 1. **Upload** — files are stored content-addressed (sha256). A duplicate upload is detected, never re-stored.
 2. **Profile** — every sheet is read as a string grid (fastexcel); tables are detected (title rows, header
    offsets, multi-row headers, stacked and side-by-side tables, totals); columns are profiled (type, nulls,
-   uniqueness, samples, hints such as `sku_like`, `thai_date`, `price_like`). openpyxl adds structure
-   facts (hidden sheets, merged ranges, formulas without cached values) with bounded cost.
+   uniqueness, samples, hints such as `sku_like`, `thai_date`, `price_like`). Every worksheet row of
+   an xlsx is scanned for missing formula caches, error cells, hidden data and number formats; a selected
+   sheet with missing caches or errors cannot be transformed (ADR-043).
 3. **Fingerprint & drift** — the round's tables are hashed into a structural fingerprint and compared with the
    customer's last approved format (`identical · header_moved · columns_added · columns_renamed ·
    columns_removed · sheets_added/removed · types_changed · unrelated_file`), and with other customers'
    approved formats (wrong-file signal). Identical headers with a retyped column are `types_changed`, not
    `identical` (int/float count as one family; mixed/empty columns carry no type signal).
-4. **Mapping** — in order: *memory* (identical/moved structure → reuse the approved mapping verbatim),
+4. **Mapping** — in order: *memory* (identical/moved structure → reuse the approved mapping verbatim, from
+   any approved layout in the customer's history under the same target schema, ADR-046),
    *heuristic draft* (synonyms + hints + value overlap, fully explainable), *AI* (schema agent → mapping
    agent, or adaptation agent when the format drifted) if an LLM is configured. The result is validated
    statically against the target schema and simulated on a sample.
@@ -162,7 +164,8 @@ A round's format: the request's, else the customer's (`default_target_schema`), 
 ```
 
 * **Workers** (ADR-010). `FORMA_JOB_BACKEND=thread|process|arq`. Jobs are rows claimed atomically; handlers
-  record finished stages and skip them on re-run; stale `running` jobs are re-queued on start; the queue is
+  record finished stages and skip them on re-run; on start, queued jobs are reconciled against durable results
+  (ADR-044) and stale `running` jobs are re-queued; the queue is
   bounded (429). `forma bench` measures a 300-file night (`docs/PERFORMANCE.md`).
 * **Storage** (ADR-012). `forma.storage.Storage` with `LocalStorage` (dev) and `S3Storage`; rows hold keys
   (`files/…`, `datasets/…`, `exports/…`), readers get a local path (cache on S3), downloads are pre-signed.
@@ -175,6 +178,9 @@ A round's format: the request's, else the customer's (`default_target_schema`), 
 * **Security** (ADR-013). Uploads are sniffed by content, names sanitised, sizes capped; LLM endpoints are
   rate-limited and samples capped; agent output passes a guard (instruction-like text or pointers outside
   the schema → rejected → heuristic draft → review).
+* **Assistant** (ADR-029, 030, 040, 042, 045). A bounded tool loop over read-only, tenant-scoped tools;
+  citations must name real evidence; the model selects server-built navigation, reports and one confirmable
+  action, and asks clarification questions before assuming; conversations are stored per owner and access scope.
 * **Observability** (ADR-014). `span()` tracing (OTLP when configured), Prometheus `/metrics` with
   scrape-time gauges from the DB, JSON logs with request ids that follow a job into its worker, `/health`
   and `/ready`, an admin Ops page (queue, workers, failed jobs + retry, spend, slowest rounds).

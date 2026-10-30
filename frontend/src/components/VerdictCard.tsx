@@ -54,7 +54,7 @@ export function VerdictCard({ v, editable, busy, onAccept, onOpenDecision, compa
   const oneClick = ['accept', 'answer', 'check_data'].includes(v.outcome)
   const needed = v.must_decide.filter((d) => d.kind !== 'confirm' || v.outcome === 'answer')
   const answered = needed.filter((d) => decisions[d.id] !== undefined && decisions[d.id] !== null)
-  const canAct = editable && !busy && oneClick && (v.outcome === 'accept' ? true : answered.length === needed.length && needed.length > 0)
+  const canAct = editable && !busy && oneClick && (v.outcome === 'accept' ? v.must_decide.length === 0 : answered.length === needed.length && needed.length > 0)
   const firstLink = v.evidence.find((e) => e.link)?.link
   const confidenceWord = v.word === 'sure' ? t('sure', 'มั่นใจสูง') : v.word === 'likely' ? t('likely', 'ค่อนข้างมั่นใจ') : t('unsure', 'ไม่แน่ใจ')
   return (
@@ -101,7 +101,7 @@ export function VerdictCard({ v, editable, busy, onAccept, onOpenDecision, compa
 function Decision({ n, d, value, editable, onChange, onOpen }: { n: number; d: VerdictDecision; value: boolean | number | string | null | undefined; editable: boolean; onChange: (v: boolean | number | string | null) => void; onOpen?: (id: string) => void }) {
   const { prefs, t } = usePreferences()
   const lang = prefs.language
-  const isVat = d.id.includes('vat')
+  const isVat = d.semantic === 'price.vat_included'
   const yes = isVat ? t('VAT included', 'รวม VAT แล้ว') : t('Yes', 'ใช่')
   const no = isVat ? t('VAT excluded', 'ยังไม่รวม VAT') : t('No', 'ไม่ใช่')
   return (

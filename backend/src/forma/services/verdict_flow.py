@@ -209,6 +209,11 @@ def accept(
     if set(decisions) - allowed:
         raise ValidationFailed("A decision refers to something this verdict did not ask")
     outcome = v["outcome"]
+    if outcome == "accept" and v["must_decide"]:
+        raise Conflict(
+            "Decisions are still open; answer them before accepting",
+            details={"open": [m["id"] for m in v["must_decide"]]},
+        )
     changed = {
         k: val
         for k, val in decisions.items()

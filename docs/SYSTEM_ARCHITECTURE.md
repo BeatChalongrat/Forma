@@ -87,11 +87,12 @@ structlog; strict mypy; ruff.
 
 ### 3.3 Ingestion — `ingestion/`
 
-* `FileStore`: content-addressed (sha256) immutable storage through the storage protocol; a duplicate upload
-  is recorded, never re-stored (ADR-005, ADR-012).
+* `FileStore`: immutable storage keyed by sha256 and file name through the storage protocol. The same bytes
+  under the same name are not stored twice, and a file already uploaded in another round is marked
+  `duplicate_of` (ADR-005, ADR-012).
 * Sniffing by content (not extension), safe names, size caps (ADR-013).
-* Readers: fastexcel for speed, openpyxl for structure facts (hidden sheets, merged ranges, formulas without
-  cached values), CSV with BOM and strict decoding, TIS-620/cp874 handled.
+* Readers: fastexcel (calamine) for cell values, the streaming OOXML scan below for structure facts, CSV with
+  BOM and strict decoding, TIS-620/cp874 handled. openpyxl is used only to read a cell back for lineage checks.
 * `ooxml.py` (ADR-043): streams every worksheet row of an xlsx; records formula counts, missing caches, error
   cells, hidden rows/columns, external formulas and numeric-format transformations; restores pure zero masks
   and percentage masks; never recalculates formulas or executes macros. A selected sheet with missing formula
@@ -102,13 +103,14 @@ structlog; strict mypy; ruff.
 * Table detection across the full sheet: title rows, header offsets, multi-row headers, stacked and
   side-by-side tables, totals rows, blank-row boundaries; column profiles with inferred type, null and
   unique ratios, samples and hints (`sku_like`, `thai_date`, `price_like`, `unit_like`, `percent`, …).
-* Fingerprints: a strict hash (headers + types) and a loose hash (normalised headers) per table; `compare`
+* Fingerprints: a strict hash (sheet names + ordered headers) and a loose hash (sorted normalised headers) per
+  file, plus a shape per table. Types are compared by `compare`, not hashed. `compare`
   classifies drift as `identical · header_moved · columns_added · columns_renamed · columns_removed ·
   sheets_added/removed · types_changed · unrelated_file` with a similarity score (ADR-006).
 
 ### 3.5 Engine — `engine/`
 
-* `TransformEngine` compiles the DSL to Polars lazy expressions, runs joins and collections, applies quality
+* `TransformEngine` compiles the DSL to Polars expressions on eager DataFrames, runs joins and collections, applies quality
   rules, builds nested records (vectorised record builder), validates against the schema and counts records
   that break it (`invalid_records`), and keeps provenance (`source_meta`, row and cell lineage) when asked.
 * `thai.py` / `thai_vec.py`: the Thai rules as explicit operations with parametrised tests (ADR-007).
@@ -131,7 +133,7 @@ structlog; strict mypy; ruff.
 
 The services own the business flows; the API and job handlers are thin. Every service takes a
 `ServiceContext` (settings, storage, file store, and the registry / policy / LLM client that follow the
-saved configuration) and a SQLAlchemy `Session`; every write records a `Principal.actor`.
+saved configuration) and a SQLAlchemy `Session`; decisions and edits record the acting principal.
 
 | Service | Responsibility | ADR |
 |---|---|---|
@@ -168,7 +170,9 @@ saved configuration) and a SQLAlchemy `Session`; every write records a `Principa
 
 * `routes.py` (core), `config_routes.py` (settings), `batch_routes.py` (bulk upload), `workspace_routes.py`
   (preferences, history, questions, verdict, learning, calibration, foresight, assistant, MCP). ~110
-  endpoints; every one declares a role with `require_role` and scopes queries to the principal's customers.
+  endpoints. Writes declare a role with `require_role`; most reads need an authenticated principal
+  (`current_principal`); customer-owned data is scoped to the principal's customers, with the exceptions listed
+  in [RBAC_AND_SECURITY.md](RBAC_AND_SECURITY.md).
   See [API_OVERVIEW.md](API_OVERVIEW.md) and `/api/docs`.
 * `serialize.py` is the single place that shapes rows into JSON; `frontend/src/lib/api.ts` mirrors it.
 * `POST /api/mcp`: the assistant's read-only tools as a stateless Streamable HTTP JSON-RPC endpoint for
@@ -178,8 +182,8 @@ saved configuration) and a SQLAlchemy `Session`; every write records a `Principa
 
 Modes `dev` (headers `X-Forma-User`, `X-Forma-Roles`, `X-Forma-Customers`; refused when `FORMA_ENV=prod`
 unless explicitly allowed for a local smoke test) and `oidc` (JWT via JWKS, PKCE in the SPA). Roles
-`importer ⊂ reviewer ⊂ approver ⊂ admin`; an optional customers claim scopes everything to a tenant's
-customers (ADR-013). Details and the endpoint matrix: [RBAC_AND_SECURITY.md](RBAC_AND_SECURITY.md).
+`importer ⊂ reviewer ⊂ approver ⊂ admin`; an optional customers claim scopes customer-owned data to a
+tenant's customers (ADR-013). Details and the endpoint matrix: [RBAC_AND_SECURITY.md](RBAC_AND_SECURITY.md).
 
 ## 4. Frontend
 
@@ -230,7 +234,8 @@ migration and CI checks models against migrations (ADR-011).
 ### 5.2 Object storage
 
 `forma.storage.Storage` with `LocalStorage` and `S3Storage`. Rows hold keys (`files/…`, `datasets/…`,
-`exports/…`, `sandbox/…`), never paths; readers get a local path (cache on S3); downloads are pre-signed.
+`exports/…`, `sandbox/…`), never paths; readers get a local path (cache on S3); on S3, export downloads are
+pre-signed.
 Dataset versions are written object-first, row last, so no partial version is ever visible (ADR-012, ADR-015).
 
 ### 5.3 Configuration
@@ -244,7 +249,8 @@ formats, defaults, preferences). A revision row tells every process when to relo
 * AI never executes code; the DSL is whitelisted; the guard checks every model output; cell contents are
   data, never instructions, in every prompt and tool.
 * Uploads sniffed by content, names sanitised, sizes capped; formulas never recalculated, macros never run.
-* RBAC on every endpoint, tenant scoping on every query, LLM endpoints rate-limited and sample-capped.
+* Roles on every write, an authenticated principal on reads, tenant scoping on customer-owned data, AI endpoints
+  rate-limited and samples capped. Known gaps are listed in [RBAC_AND_SECURITY.md](RBAC_AND_SECURITY.md).
 * Secrets encrypted at rest with `FORMA_SECRET_KEY`; audit records never contain secrets or chat contents.
 * The assistant and MCP tools are read-only; the only writable action a model can propose is server-built,
   tied to a verdict digest, and performed only after a person confirms (ADR-040).
@@ -269,7 +275,7 @@ file (ADR-016). Dev stays SQLite + local disk + no auth + no external service.
 ## 8. Observability and reliability
 
 * `span()` tracing (OTLP when configured), Prometheus `/metrics` with scrape-time gauges from the database
-  (queue, review age, automation rate, breaker), JSON logs with request ids that follow a job into its worker,
+  (queue, review age, automation rate) and an in-process breaker gauge, JSON logs with request ids that follow a job into its worker,
   `/health` and `/ready`, the Ops page (ADR-014).
 * Retries with backoff and per-route circuit breakers for the model; backup keys; fallback never auto-approves
   (ADR-015, ADR-025).
@@ -300,7 +306,10 @@ ADR-043's full OOXML scan postdates these numbers; re-measure before quoting the
 11. Nothing partial is ever visible.
 12. Settings edited in the web app go through the configuration service.
 
+These are the project's rules. Where the code does not yet meet one, the gap is tracked in
+[RISK_REGISTER.md](RISK_REGISTER.md) (R20–R22, R30).
+
 ## 11. Decision records
 
-ADRs 001–046 in [adr/](adr/) are binding unless superseded by a newer ADR. The index with one line each is in
-[TEAM_LEAD_HANDBOOK.md](TEAM_LEAD_HANDBOOK.md#decision-log).
+ADRs 001–047 in [adr/](adr/) are binding unless superseded by a newer ADR. The index with one line each is in
+[TEAM_LEAD_HANDBOOK.md](TEAM_LEAD_HANDBOOK.md#5-decision-log-adr-index).

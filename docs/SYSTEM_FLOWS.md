@@ -117,11 +117,11 @@ flowchart TD
 | 13 | Verdict | `services/verdict.py` | ordered hypothesis rules over the stored reports; suppression of same-rule-different-data, repeated patterns, no-data checks; confidence word; digest | A reviewer reads one sentence and decides one to three things; the evidence is one click away, not in the way (ADR-036) |
 | 14 | Review | `review_questions.py`, `review_evidence.py`, `ReviewWorkspace` | questions from fields under the confidence bar; answers become a new version with evidence; evidence traced to cells through engine provenance; preview on the same sample | Decisions are bounded and auditable; the person sees the actual cell, never a guess (ADR-029, ADR-035) |
 | 15 | Learning | `services/learning.py` | diff approved vs proposed (nearest system/ai ancestor) → aliases, constants, accepted; uses counted; suggestions ≥ 3 customers; admin promotes | A correction is made once per customer and once for everyone; the evidence on every learned field says where it came from (ADR-038) |
-| 16 | Transform | `engine/transform.py`, `services/datasets.py` | Polars lazy compilation, vectorised records, persistent overrides re-applied, schema validation with invalid count, object-first write | Deterministic, fast, and nothing partial is visible (ADR-002, ADR-015, ADR-024, ADR-026) |
+| 16 | Transform | `engine/transform.py`, `services/datasets.py` | DSL compiled to Polars expressions, vectorised records, persistent overrides re-applied, schema validation with invalid count, object-first write | Deterministic, fast, and nothing partial is visible (ADR-002, ADR-015, ADR-024, ADR-026) |
 | 17 | Change intelligence | `datasets.py::change_report`, `anomalies.py` | diff vs the last published dataset; robust outliers (median/MAD); per-kind anomalies with severity; "% normal" | Reviewers need what changed and what looks wrong, not the whole table; high anomalies need an acknowledgement (ADR-022) |
 | 18 | Edit | `datasets.py::apply_changes`, `assistant.py` | staged operations, impact preview, schema check that refuses only added errors, change set → new version; copilot plans, never applies | Fixes are reviewable and reversible; invalid records can be fixed one at a time (ADR-023, ADR-024, ADR-026) |
-| 19 | Approve and export | `datasets.py::approve_dataset/export_dataset`, `publishing.py` | contract gate (no invalid records), anomaly acknowledgement, approver role for export, atomic artifact with sha256, exact `export_view` fields | The downstream never receives a record that breaks the contract or a field it did not ask for (ADR-017, ADR-026) |
-| 20 | Calibration | `services/calibration.py` | outcomes per decision from corrections, version chain, change sets, rollbacks; precision per rule; proposals with evidence; admin applies | Thresholds are justified by what happened, and the next report shows whether a change was right (ADR-037) |
+| 19 | Approve and export | `datasets.py::approve_dataset/export_dataset`, `publishing.py` | contract gate (no invalid records), anomaly acknowledgement, approver role for a manual export (a bulk round set to publish automatically exports on approval), atomic artifact with sha256, exact `export_view` fields | The downstream never receives a record that breaks the contract or a field it did not ask for (ADR-017, ADR-026) |
+| 20 | Calibration | `services/calibration.py` | outcomes per decision from corrections, the version chain and change sets; precision per rule; proposals with evidence; admin applies | Thresholds are justified by what happened, and the next report shows whether a change was right (ADR-037) |
 
 ## 4. Bulk upload and automatic publishing
 
@@ -177,7 +177,7 @@ sequenceDiagram
   alt outcome = accept
     R->>UI: Accept and continue
     UI->>API: POST /rounds/{id}/verdict/accept {digest}
-    API->>M: approve_mapping (block refused; audit verdict.accept with rules_fired)
+    API->>M: approve_mapping (block refused, audit verdict.accept with rules_fired)
   else outcome = answer
     R->>UI: answer the 1–3 decisions (yes/no, number, confirm as read)
     UI->>API: POST /rounds/{id}/verdict/accept {digest, decisions}
@@ -187,7 +187,8 @@ sequenceDiagram
   end
 ```
 
-A stale digest (the file changed since the verdict was shown) is refused with 409 (ADR-036).
+A stale digest (the file changed since the verdict was shown) is refused with 409 (ADR-036). Accepting while
+decisions are listed is refused with 409 too, so the card has to be answered first (ADR-047).
 
 ## 6. Learning and calibration loop
 
@@ -248,61 +249,83 @@ stateDiagram-v2
   profiled --> auto_approved: policy auto_approve
   profiled --> review: policy review
   profiled --> blocked: policy block
-  review --> approved: reviewer approves / accepts verdict
+  review --> review: answers saved, policy still reviews
+  review --> blocked: answers saved, policy blocks
+  review --> approved: reviewer approves or accepts the verdict
   review --> rejected: reviewer rejects
-  blocked --> approved: approver overrides with reason
-  blocked --> rejected
+  blocked --> approved: approver overrides with a reason
+  blocked --> rejected: reviewer rejects
   auto_approved --> transformed: transform_round
   approved --> transformed: transform_round
-  transformed --> approved_data: approve_dataset (contract gate, anomalies acknowledged)
-  transformed --> review: human edit of the mapping → new proposed version
+  transformed --> approved_data: approve_dataset, person or publish policy
   approved_data --> published: export
-  uploaded --> failed: job exception (error on the round)
-  profiled --> failed
-  approved --> failed
-  failed --> uploaded: retry
+  uploaded --> failed: job error
+  profiled --> failed: job error
+  auto_approved --> failed: job error
+  approved --> failed: job error
+  failed --> profiled: retry finishes profiling
+  failed --> review: retry finishes proposing
+  failed --> transformed: retry finishes transforming
 ```
+
+Any job that raises sets its round to `failed` and keeps the error on the summary (`jobs/runner.py`), so the
+failure edges above are the common ones, not a complete list. A retry re-queues the same job: the round stays
+`failed` until the job reaches its first unfinished stage and sets the next status. A saved Studio edit creates
+a new proposed version and leaves the round's status unchanged; saved answers set it to `review` or `blocked`.
 
 ### 8.2 Mapping version
 
 ```mermaid
 stateDiagram-v2
-  [*] --> proposed: propose / human edit / answers
+  [*] --> proposed: proposal, human edit or saved answers
   [*] --> approved: policy auto_approve
-  proposed --> approved: approve (supersedes the customer's other approved versions)
-  proposed --> rejected
-  proposed --> superseded: a newer version replaces it
-  approved --> superseded: a newer version is approved (stays in the approved-format library)
+  proposed --> approved: approve_mapping
+  proposed --> rejected: reject_mapping
+  proposed --> superseded: a human edit or saved answers replace it
+  approved --> rejected: reject_mapping
+  approved --> superseded: another version of the customer is approved
 ```
+
+`approve_mapping` accepts only proposed or approved versions. `reject_mapping` has no status check. A superseded
+version that was once approved stays in the approved-format library (ADR-046); other superseded and rejected
+versions are never reused.
 
 ### 8.3 Dataset version
 
 ```mermaid
 stateDiagram-v2
-  [*] --> draft: transform / apply_changes / rollback
+  [*] --> draft: transform, change set or rollback
   draft --> approved: approve_dataset
+  draft --> superseded: a change set creates a newer version
   approved --> published: export
-  draft --> superseded: a newer version
-  approved --> superseded
-  published --> superseded
+  approved --> superseded: another version of the round is approved
+  published --> superseded: another version of the round is approved
+  draft --> purged: retention
+  superseded --> purged: retention
 ```
+
+A rollback creates a new draft and leaves the version it came from unchanged. Retention removes the JSONL object
+of old draft and superseded versions and marks the row `purged`; approved and published versions and the parents
+of kept versions are kept (`policies/retention.yaml`).
 
 ### 8.4 Bulk-upload item
 
 ```mermaid
 stateDiagram-v2
-  [*] --> received
-  received --> identified: layout matched
-  received --> needs_customer: unknown layout
-  needs_customer --> identified: person assigns
-  identified --> attached: round created
-  attached --> processing
+  [*] --> processing: file stored
+  [*] --> failed: unreadable at upload
+  processing --> needs_customer: no format match or a contradiction
+  needs_customer --> processing: person assigns a customer
   processing --> needs_review: mapping needs a person
-  processing --> needs_data_check: publish decision = review
-  processing --> ready: published, JSON available
-  received --> failed
-  processing --> failed
+  needs_review --> processing: mapping approved
+  processing --> needs_data_check: publish decision is review
+  needs_data_check --> processing: data approved
+  processing --> ready: JSON exported
+  processing --> failed: pipeline error
 ```
+
+These are the states a file row shows (`batches.item_state`). They are derived from the stored item status
+(`received`, `identified`, `needs_customer`, `attached`, `failed`) and, once attached, from the round's status.
 
 ### 8.5 Job
 
@@ -310,10 +333,11 @@ stateDiagram-v2
 stateDiagram-v2
   [*] --> queued
   queued --> running: claimed atomically
-  running --> done: handler finished (stages recorded)
-  running --> failed: exception, attempts exhausted
-  running --> queued: stale recovery
-  queued --> done: reconciled on startup (durable result exists)
+  running --> done: handler finished, stages recorded
+  running --> failed: handler error
+  running --> queued: stale worker, attempts left
+  running --> failed: stale worker, attempt limit reached
+  queued --> done: reconciled on startup, durable result exists
   failed --> queued: retry
 ```
 
@@ -323,11 +347,12 @@ stateDiagram-v2
 |---|---|---|
 | Model fails, times out, or output rejected by the guard | heuristic draft used, `llm_fallback` → review, never auto-approve; breaker opens after N failures; backup routes tried | ADR-013, 015, 025 |
 | Wrong file for a customer | drift `unrelated_file` → block; verdict names the likely owner when the layout matches another customer and the values differ | ADR-006, 036 |
-| Zero rows, missing identity | block | ADR-008 |
+| Zero rows | block | ADR-008 |
+| Identity missing on some rows | review, with a high-priority reason (the `on_missing_identity` switch does not block) | ADR-008 |
 | Records break the contract | approval and export refused; Data Editor shows them; a save is refused only for errors it adds | ADR-026 |
 | Worker dies mid-job | stale recovery re-queues; stages already recorded are skipped; dataset objects are never partial | ADR-010, 015 |
 | Queue was full or Redis down at upload time | bulk items detected as stuck; Resume re-enqueues; startup reconciliation marks jobs done when results exist | ADR-027, 044 |
 | Storage outage | reads fail loudly; writes are object-first so a failed write leaves no row | ADR-012, 015 |
 | Wrong data published | rollback creates a new version equal to the parent; re-export with a new sha256; audit lists every step | RUNBOOK |
 | Provider key invalid or exhausted | Settings › AI test fails; backups take over in order; spend and breaker on Ops | ADR-025, 032 |
-| Schema version rollout | register the new version; assign per customer or as default; diff view; sandbox and policy re-run on the next round | ADR-017, RUNBOOK |
+| Schema version rollout | register the new version; assign per customer or as default; diff view; the next round has no approved mapping under that version, so it is proposed like a first-time format, with no sandbox or field review | ADR-017, ADR-046, RUNBOOK |

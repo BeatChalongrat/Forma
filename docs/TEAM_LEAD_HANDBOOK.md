@@ -43,11 +43,14 @@ the real downstream contract, OIDC against a real IdP, multi-host workers in ang
    alternatively, build the from-database evaluation that uses published rounds as the answer key (R1).
 3. **Automation appetite** — which calibration proposals to accept first (`trust_data_checks`, per-customer
    thresholds), and the review cadence for the precision report.
-4. **AI provider and budget** — provider, model, backup keys, monthly cap, and whether the assistant's
-   narrative and reports are enabled for all roles.
+4. **AI provider and budget** — provider, model, backup keys, monthly cap, and whether the assistant
+   and its reports are enabled for all roles.
 5. **Identity provider** — Keycloak or Entra, role and customer claims, who gets approver and admin.
 6. **Retention** — how long source files, datasets and exports are kept; when to switch retention from dry-run
    to apply.
+
+Before any production use, the open items in the risk register need a decision, first R30 (a customer-scoped
+admin can change shared settings) and R20–R22.
 
 ## 4. Operating rhythm
 
@@ -64,7 +67,7 @@ the real downstream contract, OIDC against a real IdP, multi-host workers in ang
 |---|---|
 | 001 | The target schema is configuration (JSON Schema + `x-forma`), never code |
 | 002 | AI emits a declarative Mapping DSL; the engine executes; no generated code runs |
-| 003 | Excel reading engines: fastexcel for speed, openpyxl for structure facts, CSV sniffing |
+| 003 | Excel reading engines: fastexcel for speed, CSV sniffing; structure facts later moved to the OOXML scan (ADR-043) |
 | 004 | Record identity comes from the schema's identity keys |
 | 005 | Immutable sources; append-only versions; edits are change sets; rollback is a new version |
 | 006 | Fingerprints, drift classification, mapping memory, wrong-file detection |
@@ -108,6 +111,7 @@ the real downstream contract, OIDC against a real IdP, multi-host workers in ang
 | 044 | Durable queue reconciliation before recovery |
 | 045 | Server-computed reports (tables, charts) in assistant conversations |
 | 046 | Approved mapping library across a customer's ERP layouts |
+| 047 | Verdict decisions, accounts with no role, and tenant scope beyond owned rows |
 
 ## 6. Numbers to quote (and where they come from)
 
@@ -115,8 +119,8 @@ the real downstream contract, OIDC against a real IdP, multi-host workers in ang
 |---|---|---|
 | Field accuracy on the synthetic corpus, no AI | 0.996 (30/30 variants ≥ 0.99); identity 1.00; critical 1.00; drift 9/9 | `make eval-gate`, `data/eval_baseline.json` |
 | A 300-file night | 17 min, 8 worker processes, 12-core node, 30M rows | PERFORMANCE.md (pre-ADR-043; re-measure) |
-| Tests | ~450 passing, coverage ≥ 85 % in CI | CI |
-| Endpoints / tables / ADRs | ~110 / 20 / 46 | API_OVERVIEW.md, DATA_MODEL.md, adr/ |
+| Tests | 512 passed, 3 skipped locally, coverage 91 % (gate 85 % in CI) | `pytest`, CI |
+| Endpoints / tables / ADRs | ~110 / 19 / 46 | API_OVERVIEW.md, DATA_MODEL.md, adr/ |
 
 Anything else — accuracy on real files, provider accuracy, production throughput — is not yet measured and
 should be said so.

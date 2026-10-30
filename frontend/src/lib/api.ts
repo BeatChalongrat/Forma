@@ -93,7 +93,7 @@ export type PublishDecision = { decision: 'publish' | 'review'; reasons: string[
 export type Bilingual = { en: string; th: string }
 export type VerdictOutcome = 'accept' | 'assign_customer' | 'answer' | 'fix_mapping' | 'check_data' | 'fix_data' | 'reject_file' | 'wait'
 export type VerdictBrief = { conclusion: Bilingual; outcome: VerdictOutcome; confidence: number; word: 'sure' | 'likely' | 'unsure'; rules_fired: string[]; digest: string; stage: 'mapping' | 'data' }
-export type VerdictDecision = { id: string; kind: 'boolean' | 'number' | 'confirm'; question: Bilingual; why: Bilingual; options: unknown[]; default: unknown; default_reason?: Bilingual; evidence_ids: number[] }
+export type VerdictDecision = { id: string; kind: 'boolean' | 'number' | 'confirm'; semantic?: string | null; question: Bilingual; why: Bilingual; options: unknown[]; default: unknown; default_reason?: Bilingual; evidence_ids: number[] }
 export type Verdict = VerdictBrief & {
   subject: { kind: 'mapping' | 'dataset'; id: string; round_id: string }
   must_decide: VerdictDecision[]

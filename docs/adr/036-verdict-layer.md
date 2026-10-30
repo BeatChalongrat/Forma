@@ -84,8 +84,8 @@ Conclusion rules (data stage), after `transform_round`:
 | `publishable` | publish decision `publish` | "Ready" → `accept` |
 
 Decision rules turn open questions and risky checks into `must_decide` items, capped at three, ordered by
-risk then records affected; the rest are counted in `suppressed`. Each item has a `default` only when a
-documented convention exists (Thai retail prices VAT-inclusive, ADR-007) and says so.
+risk then records affected; the rest are counted in `suppressed`. Each item has a `default` only when the
+evidence points one way (the direction of a 7 % move, ADR-047) and says so.
 
 Suppression rules (the part that makes the page short):
 

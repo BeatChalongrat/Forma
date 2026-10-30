@@ -13,8 +13,22 @@ from forma.core.errors import Conflict, ValidationFailed
 from forma.core.hashing import stable_hash
 from forma.db.models import ImportRound, MappingVersion
 from forma.mapping_dsl.models import MappingDocument
+from forma.schema_registry import TargetSchema
 from forma.services import mapping as ms
 from forma.services.context import ServiceContext
+
+
+def _vat_flags(schema: TargetSchema, policy: dict[str, Any]) -> set[str]:
+    """VAT fields beside a value that moved by exactly the VAT rate: only a person can settle those."""
+    flags: set[str] = set()
+    for check in (policy.get("field_review") or {}).get("checks") or []:
+        if check.get("verdict") not in ("vat_added", "vat_removed") or not schema.has_field(check["pointer"]):
+            continue
+        spec = schema.field(check["pointer"])
+        flag = schema.semantic_field("price.vat_included", in_collection=spec.in_collection)
+        if flag is not None:
+            flags.add(flag.pointer)
+    return flags
 
 
 def questions(ctx: ServiceContext, m: MappingVersion) -> dict[str, Any]:
@@ -29,17 +43,19 @@ def questions(ctx: ServiceContext, m: MappingVersion) -> dict[str, Any]:
         for value in checks.get(key, [])
     }
     has_checks = "low_confidence_critical" in checks or "low_confidence_high" in checks
+    vat_flags = _vat_flags(schema, m.policy or {})
     items: list[dict[str, Any]] = []
     for f in fields:
-        if not has_checks and f.confidence is not None and f.confidence >= 0.95:
-            continue
         spec = specs.get(f.target)
         if spec is None:
             continue
-        if has_checks and f.target not in required:
-            continue
-        if not has_checks and spec.risk not in ("critical", "high"):
-            continue
+        if f.target not in vat_flags:
+            if not has_checks and f.confidence is not None and f.confidence >= 0.95:
+                continue
+            if has_checks and f.target not in required:
+                continue
+            if not has_checks and spec.risk not in ("critical", "high"):
+                continue
         kind = "confirm"
         if f.expr.op == "const" and "boolean" in spec.json_type:
             kind = "boolean"

@@ -28,7 +28,15 @@ from forma.api.schemas import (
     SchemaIn,
     SourcePreviewIn,
 )
-from forma.auth import Principal, current_principal, ensure_customer, llm_rate_limited, require_role
+from forma.auth import (
+    Principal,
+    authenticated_principal,
+    current_principal,
+    ensure_all_customers,
+    ensure_customer,
+    llm_rate_limited,
+    require_role,
+)
 from forma.core.errors import Forbidden, NotFound, PayloadTooLarge, ValidationFailed
 from forma.db.models import (
     ChangeSet,
@@ -91,7 +99,7 @@ def _dataset_scoped(session: Session, p: Principal, dataset_id: str) -> DatasetV
 # Identity
 # ============================================================================================
 @api.get("/me")
-def me(p: Principal = Depends(current_principal)) -> dict[str, Any]:
+def me(p: Principal = Depends(authenticated_principal)) -> dict[str, Any]:
     return p.to_dict()
 
 
@@ -1136,11 +1144,11 @@ def get_policy(
     return ctx.policy.policy
 
 
-def _learning_brief(session: Session) -> dict[str, Any]:
+def _learning_brief(session: Session, p: Principal) -> dict[str, Any]:
     """Home's 'learned from you' figures (ADR-038)."""
     from forma.services import learning
 
-    s = learning.stats(session, months=2)
+    s = learning.stats(session, months=2, customers=p.customers)
     latest = s["series"][-1] if s["series"] else None
     return {
         "aliases": s["aliases"] + s["promoted"],
@@ -1172,47 +1180,44 @@ def dashboard(
         or 0
     )
     customers = session.scalar(_scoped(p, select(func.count()).select_from(Customer), Customer.id)) or 0
-    approved_mappings = (
-        session.scalar(
-            select(func.count()).select_from(MappingVersion).where(MappingVersion.status == "approved")
-        )
-        or 0
-    )
-    auto = (
-        session.scalar(
-            select(func.count()).select_from(MappingVersion).where(MappingVersion.approved_by == "policy")
-        )
-        or 0
-    )
-    total_mv = session.scalar(select(func.count()).select_from(MappingVersion)) or 0
+    versions = _scoped(p, select(func.count()).select_from(MappingVersion), MappingVersion.customer_id)
+    approved_mappings = session.scalar(versions.where(MappingVersion.status == "approved")) or 0
+    auto = session.scalar(versions.where(MappingVersion.approved_by == "policy")) or 0
+    total_mv = session.scalar(versions) or 0
     reused = (
         session.scalar(
-            select(func.count())
-            .select_from(MappingVersion)
-            .where(MappingVersion.created_by == "system", MappingVersion.confidence == 1.0)
+            versions.where(MappingVersion.created_by == "system", MappingVersion.confidence == 1.0)
         )
         or 0
     )
     rows = (
         session.scalar(
-            select(func.sum(DatasetVersion.row_count)).where(
+            _scoped(p, select(func.sum(DatasetVersion.row_count)), DatasetVersion.customer_id).where(
                 DatasetVersion.status.in_(["approved", "published"])
             )
         )
         or 0
     )
-    llm = session.execute(
-        select(
-            func.count(), func.sum(LLMCall.cost_usd), func.sum(LLMCall.input_tokens + LLMCall.output_tokens)
-        ).select_from(LLMCall)
-    ).one()
+    llm_query = select(
+        func.count(), func.sum(LLMCall.cost_usd), func.sum(LLMCall.input_tokens + LLMCall.output_tokens)
+    ).select_from(LLMCall)
+    if p.customers is not None:  # calls hang off a round; those without one belong to no customer
+        llm_query = _scoped(
+            p, llm_query.join(ImportRound, ImportRound.id == LLMCall.round_id), ImportRound.customer_id
+        )
+    llm = session.execute(llm_query).one()
     recent = session.scalars(
         _scoped(p, select(ImportRound), ImportRound.customer_id)
         .order_by(ImportRound.updated_at.desc())
         .limit(8)
     ).all()
     cmap = {c.id: c for c in session.scalars(select(Customer)).all()}
-    failed_jobs = session.scalar(select(func.count()).select_from(Job).where(Job.status == "failed")) or 0
+    failed_query = select(func.count()).select_from(Job).where(Job.status == "failed")
+    if p.customers is not None:
+        failed_query = _scoped(
+            p, failed_query.join(ImportRound, ImportRound.id == Job.round_id), ImportRound.customer_id
+        )
+    failed_jobs = session.scalar(failed_query) or 0
     return {
         "customers": customers,
         "rounds_by_status": by_status,
@@ -1235,7 +1240,7 @@ def dashboard(
             ser.import_round(r, files=False, customer_obj=cmap.get(r.customer_id)) for r in recent
         ],
         "automation_rate": round(auto / total_mv, 3) if total_mv else None,
-        "learning": _learning_brief(session),
+        "learning": _learning_brief(session, p),
     }
 
 
@@ -1247,18 +1252,19 @@ def list_jobs(
     offset: int = Query(0, ge=0),
     p: Principal = Depends(current_principal),
 ) -> list[dict[str, Any]]:
-    return runner.list_jobs(status=status, kind=kind, limit=limit, offset=offset)
+    return runner.list_jobs(status=status, kind=kind, limit=limit, offset=offset, customers=p.customers)
 
 
 @api.get("/jobs/stats")
 def job_stats(p: Principal = Depends(current_principal)) -> dict[str, Any]:
+    ensure_all_customers(p)
     return runner.queue_stats()
 
 
 @api.get("/jobs/batch/{batch_id}")
 def get_batch(batch_id: str, p: Principal = Depends(current_principal)) -> dict[str, Any]:
     try:
-        return runner.batch_status(batch_id)
+        return runner.batch_status(batch_id, customers=p.customers)
     except KeyError as e:
         raise NotFound("batch not found") from e
 
@@ -1266,13 +1272,17 @@ def get_batch(batch_id: str, p: Principal = Depends(current_principal)) -> dict[
 @api.get("/jobs/{job_id}")
 def get_job(job_id: str, p: Principal = Depends(current_principal)) -> dict[str, Any]:
     try:
-        return runner.job_status(job_id)
+        return runner.job_status(job_id, customers=p.customers)
     except KeyError as e:
         raise NotFound("job not found") from e
 
 
 @api.post("/jobs/{job_id}/retry")
 def retry_job(job_id: str, p: Principal = Depends(require_role("admin"))) -> dict[str, Any]:
+    try:
+        runner.job_status(job_id, customers=p.customers)
+    except KeyError as e:
+        raise NotFound("job not found") from e
     return {"job_id": runner.retry_job(job_id)}
 
 
@@ -1283,6 +1293,7 @@ def ops_summary(
     p: Principal = Depends(require_role("admin")),
 ) -> dict[str, Any]:
     """Everything the Ops page shows: queue, workers, failures, spend, slowest rounds, health."""
+    ensure_all_customers(p)
     from forma.api.health import readiness
     from forma.api.ops import ops_summary as _ops
 
@@ -1297,6 +1308,7 @@ def audit_log(
     session: Session = Depends(get_session),
     p: Principal = Depends(require_role("admin")),
 ) -> list[dict[str, Any]]:
+    ensure_all_customers(p)
     from forma.db.models import AuditLog
 
     q = select(AuditLog).order_by(AuditLog.created_at.desc()).limit(limit).offset(offset)

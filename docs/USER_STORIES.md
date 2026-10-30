@@ -11,6 +11,8 @@ it covers, and a table of the techniques used at each step with the reason. Role
 
 ## Personas
 
+The names are illustrative; replace them with the real team when this is used for planning.
+
 | Persona | Role | Goal | Pain today |
 |---|---|---|---|
 | **Nok**, import operator | importer | Get every customer's fortnightly files into the system with the least clicking | 300 files, many layouts, no idea which need a person |
@@ -27,8 +29,8 @@ it covers, and a table of the techniques used at each step with the reason. Role
 **As** Nok **I want** to upload one or more files of a customer as one round **so that** FORMA reads them
 and tells me what happens next.
 
-AC: files are stored once (a re-upload of identical bytes is marked duplicate, not re-stored); every sheet is
-read; the round shows its five steps and FORMA's conclusion; unreadable files fail loudly on the round, not
+AC: the same bytes under the same name are stored once, and a file already uploaded in another round is marked
+as a duplicate; every sheet is read; the round shows its three stages (upload, answer and check, download) and FORMA's conclusion; unreadable files fail loudly on the round, not
 silently as empty data.
 
 Edge cases: xlsx with a title block and the header on row 7 · CSV in TIS-620 · an xlsx whose formulas have no
@@ -39,10 +41,10 @@ cached values (transformation refused, review forced) · legacy .xls (review for
 |---|---|---|
 | Store | sha256 content addressing, storage key on the row | immutability and duplicate detection (ADR-005, ADR-012) |
 | Sniff | content sniffing, strict CSV decoding with BOMs | extensions lie; a decode error must not become `?` characters (ADR-013, ADR-043) |
-| Read | fastexcel for speed, openpyxl for structure facts, full-row OOXML scan | speed for 100K rows; hidden sheets, merged ranges and uncached formulas are facts the policy needs (ADR-003, ADR-043) |
+| Read | fastexcel for cell values, full-row OOXML scan for structure facts | speed for 100K rows; hidden data, error cells and uncached formulas are facts the policy needs (ADR-003, ADR-043) |
 | Profile | full-sheet blank-row block detection, bounded header window, type inference, hints | multiple tables per sheet and long preambles are normal in ERP exports |
 
-Tests: `test_api.py::test_full_flow`, `test_ingestion_readiness.py`, `test_profiling.py`, `test_guard_sniff.py`.
+Tests: `test_api.py::test_full_flow`, `test_ingestion_readiness.py`, `test_tables.py`, `test_guard_sniff.py`.
 
 ### A2. Upload many files at once (bulk)
 **As** Nok **I want** to drop all of tonight's files in one go **so that** each is matched to its customer
@@ -75,7 +77,9 @@ processing continues.
 AC: candidates with similarity are shown; assigning re-enqueues the items; a tenant-scoped user cannot assign
 across customers (403).
 
-Tests: `test_batches.py::…unknown…`, `test_auth.py`.
+Tests: `test_batches.py::test_unknown_file_gets_a_customer_then_finishes_after_review`. Scoped users:
+`test_batches.py::test_customer_scoped_users_cannot_bulk_upload` covers upload; assigning as a scoped user has no
+test yet.
 
 ### A4. Work rounds
 **As** Nok **I want** a named, dated round I can add files to later and compare against an expected count
@@ -84,7 +88,8 @@ Tests: `test_batches.py::…unknown…`, `test_auth.py`.
 AC: rename, date and expected target editable (importer, all-customer access); dashboard on Home and the
 round; status counts link to filtered files; unknown targets are labelled unknown, never "missing".
 
-Tests: `test_batches.py::test_work_round_date_append_and_retry`, `test_workspace.py`.
+Tests: `test_batches.py::test_work_round_date_append_and_retry`, `test_append_scope_validation_and_audit`,
+`test_expected_files_target_is_separate_from_received_and_ready`.
 
 ---
 
@@ -100,14 +105,14 @@ AC: the approved mapping is reused verbatim (`memory`), confidence 1.0, policy a
 |---|---|
 | strict/loose fingerprint equality → reuse | a person approved exactly these rules for exactly this layout (ADR-006) |
 
-Tests: `test_api.py` sequences, `test_heuristics_eval.py` (drift 9/9).
+Tests: `test_api.py::test_full_flow`, `test_heuristics_eval.py` (drift 9/9).
 
 ### B2. A renamed or moved column
 **As** Pim **I want** FORMA to adapt the mapping and prove on the data that the renamed column still means
 the same **so that** I accept with one click instead of re-mapping.
 
-AC: drift `columns_renamed`/`header_moved`/`columns_removed`; the new draft (or the AI adaptation) is checked
-field by field against last round's published values on the same SKUs; when every important field keeps its
+AC: a moved header (`header_moved`) reuses the approved mapping verbatim, as in B1. For `columns_renamed`,
+`columns_added`, `columns_removed` or `types_changed`, the new draft (or the AI adaptation) is checked field by field against last round's published values on the same SKUs; when every important field keeps its
 values, the verdict is `rename_only` → **Accept** with one click; with `sandbox.trust_data_checks` on, the
 policy auto-approves it outright.
 
@@ -123,8 +128,9 @@ Tests: `test_healing.py`, `test_sandbox.py`, `test_verdict.py`, `test_calibratio
 **As** Pim **I want** to be told when a renamed column no longer holds the same values **so that** I fix the
 mapping instead of publishing wrong prices.
 
-AC: data check `different` on a critical/high field → policy review with "meaning check" reason; verdict
-`meaning_changed` names the field and the share of SKUs that kept their value; link to that field in the Studio.
+AC: data check `different` on a critical/high field → policy review with a `data check:` reason and a high
+risk factor; verdict `meaning_changed` names the field and the share of SKUs that kept their value; the evidence
+links to the Studio's *What changed* tab.
 
 Tests: `test_healing.py::test_data_check[different]`, `test_policy.py::…meaning_checks…`.
 
@@ -132,15 +138,19 @@ Tests: `test_healing.py::test_data_check[different]`, `test_policy.py::…meanin
 **As** Pim **I want** FORMA to tell me when a price column moved by exactly 7 % **so that** I confirm the VAT
 convention with one yes/no.
 
-AC: data check `vat_added`/`vat_removed`; verdict `vat_shift` with one boolean decision and the Thai retail
-default stated as a default, not a fact; the answer becomes a new mapping version with evidence.
+AC: data check `vat_added`/`vat_removed`; verdict `vat_shift` with one decision on the VAT field, whose default
+follows the direction of the move and is stated as a suggestion; answering it on the card or in the review
+questions saves a new mapping version with evidence; with no VAT field to answer, the verdict sends the mapping
+to be fixed.
 
 | Technique | Why |
 |---|---|
 | steady-ratio detection with the named constant `VAT_RATE` | VAT is the most common silent price change in Thai price lists (ADR-007, ADR-021) |
 | answer → `ConstExpr`, confidence 1.0, open question retired | the decision is bounded and auditable (ADR-029) |
 
-Tests: `test_workspace.py::test_answer_preview_versions_and_policy`, `test_verdict.py::test_vat_shift…`.
+Tests: `test_workspace.py::test_answer_preview_versions_and_policy` (the question path),
+`test_verdict.py::test_vat_shift_asks_about_the_vat_field_with_a_stated_default` (the rule),
+`test_verdict.py::test_the_vat_decision_on_the_card_saves_and_the_round_can_finish` (saving from the card).
 
 ### B5. A wrong file (another customer's export)
 **As** Pim **I want** a file that belongs to another customer to be stopped and named **so that** it is never
@@ -156,7 +166,8 @@ reason (audited).
 | other-customer fingerprint match + identity-matched data checks with constants and identity keys excluded | the layout alone is weak (shared ERPs); layout + different values on the same SKUs is strong (ADR-036) |
 | block as an explicit override path | a wrong file must never be an ordinary approval (ADR-008) |
 
-Tests: `test_api.py::test_file_matching_another_customer…`, `test_verdict.py::test_wrong_file_is_named…`.
+Tests: `test_api.py::test_export_needs_approved_data_and_block_needs_explicit_override`,
+`test_verdict.py::test_wrong_file_is_named_through_the_api`.
 
 ### B6. A first-time customer
 **As** Pim **I want** a new customer's first file to come to me with the few fields FORMA is unsure about
@@ -170,20 +181,26 @@ Tests: `test_api.py::test_full_flow`, `test_verdict.py::test_first_time_and_clea
 ### B7. A new customer whose layout equals another customer's
 **As** Pim **I want** to be told the layout is shared (same ERP), not accused of a wrong file.
 
-AC: verdict `first_time_shared_layout`, outcome *answer*, sender confirmed in passing.
+AC: verdict `first_time_shared_layout`, outcome *answer* when fields need confirming and *accept* otherwise, sender
+confirmed in passing.
+
+Tests: `test_api.py::test_file_matching_another_customer_goes_to_review` covers the policy; no test asserts this
+verdict rule.
 
 ### B8. The AI is unavailable
 **As** Pim **I want** FORMA to keep working without AI and to tell me it did **so that** nothing stops and
 nothing is silently trusted.
 
-AC: heuristic draft used; `llm_fallback` → review, never auto-approve; verdict `ai_unavailable`; breaker open
-on Ops; backup keys tried in order first.
+AC: heuristic draft used; `llm_fallback` → review, never auto-approve; verdict `ai_unavailable` (a first-time file
+shows `first_time`, because that rule runs first); backup keys tried in order first; breaker state on Ops for
+failures in the API process (R27).
 
 | Technique | Why |
 |---|---|
 | deterministic floor + circuit breaker + backup routes | availability without lowering the bar (ADR-015, ADR-025) |
 
-Tests: `test_failure_injection.py`, `test_backup_keys.py`.
+Tests: `test_failure_injection.py::test_llm_timeout_falls_back_and_never_auto_approves`, `test_backup_keys.py`.
+No test asserts the `ai_unavailable` verdict rule.
 
 ### B9. The model returns something unsafe
 **As** Dao **I want** injected or malformed model output rejected **so that** a cell saying "ignore the rules"
@@ -199,7 +216,8 @@ mapping without writing JSON.
 AC: every save is a new proposed version with parent; validation, simulation, sandbox and policy run again;
 a wrong-file block cannot be cleared by an edit; relationships are measured on the data before a join is added.
 
-Tests: `test_sandbox.py::test_an_edit_that_makes_data_worse_is_blocked`, `test_relationships.py`.
+Tests: `test_sandbox.py::test_an_edit_that_makes_data_worse_is_blocked`, `test_relationships.py`,
+`test_api.py::test_export_needs_approved_data_and_block_needs_explicit_override` (the wrong-file block).
 
 ### B11. The mapping is learned from my correction
 **As** Pim **I want** the column I re-pointed last round to be mapped right this round **so that** I never
@@ -237,7 +255,8 @@ the round, vs last round, vs usual size with "% normal"; data-stage verdict (`co
 |---|---|
 | diff by schema identity; robust outliers (median/MAD) | means and standard deviations are dragged by the outliers themselves (ADR-022) |
 
-Tests: `test_anomalies.py`, `test_datasets.py`.
+Tests: `test_anomalies.py`, `test_api.py::test_full_flow` (the no-change report). A non-zero change report has no
+end-to-end test yet.
 
 ### C2. Fix records that break the contract
 **As** Pim **I want** to see the records that break the target schema and fix them one at a time **so that**
@@ -255,7 +274,7 @@ seconds.
 AC: staged operations, impact preview (rows, cells, before/after), new version with a change set; persistent
 edits become overrides for every future round and collide loudly with a new mapping.
 
-Tests: `test_datasets.py`, `test_overrides.py`.
+Tests: `test_assistant.py::test_overrides_that_collide_with_a_new_mapping`, `test_schema_gate.py::test_overrides_are_validated_after_they_apply`, `test_lineage.py::test_manual_edits_show_in_history_and_cause`.
 
 ### C4. Ask the copilot
 **As** Pim **I want** to type "ลดราคาหมวด X 5 % เฉพาะที่สต็อกเกิน 100" **so that** the system plans the
@@ -264,7 +283,8 @@ operations and shows me the impact before anything is applied.
 AC: a plan, never an application; conditions across collections via derived figures; ambiguity → a
 clarification in Thai; "why" questions answered from lineage and join evidence.
 
-Tests: `test_assistant.py` (copilot), `test_lineage.py`.
+Tests: `test_assistant.py::test_copilot_api_plans_conditions_without_an_llm`,
+`test_assistant.py::test_why_questions_are_answered_from_evidence`.
 
 ### C5. Trace a value to its cell
 **As** Pim **I want** to click a value and see file, sheet, row, column, raw cell and the rule that produced
@@ -279,7 +299,7 @@ exactly the contract's fields **so that** the downstream gets what it asked for.
 AC: export needs approved data (409 otherwise); atomic write; sha256 recorded; `export_view` drops internal
 keys; a bulk round exports automatically after a manual approval.
 
-Tests: `test_export.py`, `test_api.py::test_export_needs_approved_data…`.
+Tests: `test_export_stream.py`, `test_api.py::test_export_needs_approved_data_and_block_needs_explicit_override`.
 
 ### C7. Roll back
 **As** Pim **I want** to roll back a dataset to its parent **so that** a wrong edit is undone without history
@@ -310,8 +330,12 @@ Tests: `test_verdict.py`.
 **As** Pim **I want** to accept a verdict with one click **so that** clear cases take seconds.
 
 AC: `POST /rounds/{id}/verdict/accept` goes through `approve_mapping`/`apply_answers`/`approve_dataset`;
-a stale digest is refused; a block is never acceptable this way; `verdict.accept` is audited with the rules
-that fired and the decisions that differed from the defaults.
+a stale digest is refused; a block is never acceptable this way; open decisions turn `accept` into `answer`, the
+button stays disabled and the server refuses with 409; `verdict.accept` is audited with the rules that fired and
+the decisions that differed from the defaults.
+
+Tests: `test_verdict.py::test_open_decisions_turn_accept_into_answer`,
+`test_verdict.py::test_accept_is_refused_while_decisions_remain`.
 
 ### D3. Understand why a file is in review
 **As** Pim **I want** policy reasons in plain Thai or English with counts in their real scope **so that** I
@@ -332,7 +356,7 @@ it **so that** mapping, validation and export follow the real contract without a
 AC: validity, mapping findings and diff to the previous version before registering; default or per customer;
 unsupported shapes refused with a reason; exports carry exactly the schema's fields.
 
-Tests: `test_registry.py`, `test_contract_readiness.py`, `test_config.py`.
+Tests: `test_schema_registry.py`, `test_custom_schema.py`, `test_contract_readiness.py`, `test_config.py`.
 
 ### E2. Connect AI with fail-over
 **As** Dao **I want** to paste a key, pick a model, add backup keys and test every one **so that** a provider
@@ -363,8 +387,8 @@ Tests: `test_foresight.py`.
 
 ### E5. Ask the assistant and let it do the one safe thing
 **As** Nok **I want** to ask "why is C902 waiting?" or "compare the last three work rounds" and get an answer
-with evidence, a chart when it helps, and a confirmable action when the verdict says accept **so that** I act
-from the conversation.
+with evidence, and a chart when it helps **so that** I act from the conversation. Reviewers also get a confirmable
+action when the verdict says accept and asks nothing.
 
 AC: read-only tools, citations to real evidence ids, server-built navigation and act actions, server-computed
 reports (the model picks a view, never values), clarification questions before assuming, streaming with
@@ -378,6 +402,8 @@ Tests: `test_workspace.py`, `test_workspace_tools.py`, `test_assistant_navigatio
 **As** Dao **I want** queue, workers, failed jobs with retry, breaker state and spend on one page, and a
 runbook for every incident **so that** the night is boring.
 
+Note: breakers live in each process's memory, so the Ops page does not show worker failures yet (R27).
+
 Tests: `test_jobs.py`, `test_failure_injection.py`, `test_postgres.py`, `test_minio.py`, `test_migrations.py`.
 
 ---
@@ -388,17 +414,20 @@ Tests: `test_jobs.py`, `test_failure_injection.py`, `test_postgres.py`, `test_mi
 **As** Ton **I want** importers to upload, reviewers to approve mappings and data, approvers to export and
 override blocks, admins to configure **so that** responsibility is explicit.
 
-AC: every endpoint declares a role; a lower role gets 403; the actor recorded is the authenticated identity,
-never a body field. Matrix: [RBAC_AND_SECURITY.md](RBAC_AND_SECURITY.md).
+AC: writes declare a role and a lower role gets 403; reads need a FORMA role, so a valid token with no role gets
+403 everywhere except `GET /me`, and the web app says so; the actor of approvals, edits and exports is the
+authenticated identity, never a body field. Matrix: [RBAC_AND_SECURITY.md](RBAC_AND_SECURITY.md).
 
 ### F2. Tenant scope
 **As** Ton **I want** a principal limited to certain customers to see nothing else **so that** a shared
 deployment is safe.
 
-AC: every list, read, write, assistant tool, learning and foresight view is scoped; bulk unknown files need
-all-customer access.
+AC: customer-owned lists, reads and writes, assistant tools, learned rows, foresight, jobs, dashboard figures and
+learning statistics are scoped; every bulk endpoint and all-customer view needs all-customer access. Shared
+settings are not limited by scope (R30).
 
-Tests: `test_auth.py`, `test_workspace.py::test_dataset_tools_are_scoped`, `test_learning.py::test_learning_is_customer_scoped`.
+Tests: `test_tenant_scope.py`, `test_auth.py`, `test_workspace.py::test_dataset_tools_are_scoped`,
+`test_learning.py::test_learning_is_customer_scoped`.
 
 ### F3. A cell that tries to give instructions
 **As** Dao **I want** spreadsheet content treated as data in every prompt **so that** prompt injection through
@@ -415,8 +444,8 @@ AC: `SYSTEM_BASE` states it; the guard enforces it; tools mark truncation; tests
 | A 300-file night finishes in time | ≤ 10 min profile+propose, ≤ 15 min transform on one 12-core node | `forma bench`, PERFORMANCE.md |
 | Accuracy never drops | identity 1.00, field 0.996, critical 1.00, drift 9/9 on the corpus | `make eval-gate`, CI |
 | Nothing partial is ever visible | object-first writes, atomic exports | `test_failure_injection.py` |
-| Everything is auditable | every write has actor, action, entity, details | `/api/audit`, tests |
-| Data loss on node loss ≤ 24 h; serve again ≤ 1 h | nightly backup, documented restore | RUNBOOK.md |
+| Decisions are auditable | approvals, edits, exports and settings have actor, action, entity, details (gaps: R21) | `/api/audit`, tests |
+| Data loss on node loss ≤ 24 h; serve again ≤ 1 h | daily `forma backup`, which must be scheduled outside the app (the compose `backup` service is a one-shot); documented restore | RUNBOOK.md |
 | Every setting is documented | generated `.env.production.example`, drift-checked | CI |
 
 ## Traceability

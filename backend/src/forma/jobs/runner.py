@@ -24,6 +24,7 @@ from concurrent.futures import Executor, ProcessPoolExecutor, ThreadPoolExecutor
 from typing import Any, Protocol
 
 from sqlalchemy import func, select, update
+from sqlalchemy.orm import Session
 
 from forma.core.errors import Conflict, NotFound, QueueFull
 from forma.core.ids import new_id
@@ -555,16 +556,29 @@ def _duration_ms(j: Job) -> float | None:
     return None
 
 
-def job_status(job_id: str) -> dict[str, Any]:
+def _visible(s: Session, j: Job, customers: frozenset[str] | None) -> bool:
+    """A principal limited to some customers sees a job only through a round of theirs (ADR-047)."""
+    if customers is None:
+        return True
+    r = s.get(ImportRound, j.round_id) if j.round_id else None
+    return r is not None and r.customer_id in customers
+
+
+def job_status(job_id: str, *, customers: frozenset[str] | None = None) -> dict[str, Any]:
     with session_scope() as s:
         j = s.get(Job, job_id)
-        if j is None:
+        if j is None or not _visible(s, j, customers):
             raise KeyError(job_id)
         return _job_dict(j)
 
 
 def list_jobs(
-    *, status: str | None = None, kind: str | None = None, limit: int = 100, offset: int = 0
+    *,
+    status: str | None = None,
+    kind: str | None = None,
+    limit: int = 100,
+    offset: int = 0,
+    customers: frozenset[str] | None = None,
 ) -> list[dict[str, Any]]:
     with session_scope() as s:
         q = select(Job).order_by(Job.created_at.desc()).limit(limit).offset(offset)
@@ -572,12 +586,17 @@ def list_jobs(
             q = q.where(Job.status == status)
         if kind:
             q = q.where(Job.kind == kind)
+        if customers is not None:
+            q = q.join(ImportRound, ImportRound.id == Job.round_id).where(
+                ImportRound.customer_id.in_(sorted(customers))
+            )
         return [_job_dict(j) for j in s.scalars(q)]
 
 
-def batch_status(batch_id: str) -> dict[str, Any]:
+def batch_status(batch_id: str, *, customers: frozenset[str] | None = None) -> dict[str, Any]:
     with session_scope() as s:
-        jobs = list(s.scalars(select(Job).where(Job.batch_id == batch_id).order_by(Job.created_at)))
+        found = s.scalars(select(Job).where(Job.batch_id == batch_id).order_by(Job.created_at))
+        jobs = [j for j in found if _visible(s, j, customers)]
         if not jobs:
             raise KeyError(batch_id)
         by: dict[str, int] = {}
