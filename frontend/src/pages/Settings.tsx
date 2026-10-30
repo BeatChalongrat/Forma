@@ -375,6 +375,7 @@ function CalibrationSection() {
   const q = useQuery({ queryKey: ['calibration'], queryFn: api.calibration })
   const apply = useMutation({ mutationFn: (b: { id: string; digest: string }) => api.applyProposal(b), onSuccess: () => { void qc.invalidateQueries(); toast.push({ kind: 'ok', title: t('Applied', 'ปรับแล้ว'), detail: t('Applies to the next proposal; the report will show whether it was right.', 'มีผลกับข้อเสนอถัดไป รายงานจะบอกว่าถูกหรือไม่') }) }, onError: (e: Error) => toast.push({ kind: 'bad', title: t('Not applied', 'ปรับไม่ได้'), detail: e.message }) })
   const d = q.data
+  if (q.isError) return <Section title={t('How often FORMA was right', 'ระบบตัดสินถูกบ่อยแค่ไหน')} className="mb-5"><div className="p-5 text-sm text-muted">{q.error.message}</div></Section>
   const rules = d ? Object.entries(d.report.per_rule) : []
   const dec = d?.report.per_decision
   return <>
@@ -541,11 +542,11 @@ function LearningTab() {
 }
 
 function AuditTab() {
-  const { data: audit } = useQuery({ queryKey: ['audit'], queryFn: () => api.audit(200) })
+  const { data: audit, error } = useQuery({ queryKey: ['audit'], queryFn: () => api.audit(200) })
   return (
     <Section title="Last 200 events">
-      <table className="table"><thead><tr><th>When</th><th>Actor</th><th>Action</th><th>Entity</th><th>Details</th></tr></thead>
-        <tbody>{audit?.map((a) => <tr key={a.id}><td className="text-muted whitespace-nowrap">{fmtDate(a.at)}</td><td>{a.actor}</td><td className="mono">{a.action}</td><td className="mono text-muted">{a.entity_id}</td><td className="text-muted text-[12px] truncate max-w-[420px]">{JSON.stringify(a.details)}</td></tr>)}</tbody></table>
+      {error ? <div className="p-5 text-sm text-muted">{error.message}</div> : <table className="table"><thead><tr><th>When</th><th>Actor</th><th>Action</th><th>Entity</th><th>Details</th></tr></thead>
+        <tbody>{audit?.map((a) => <tr key={a.id}><td className="text-muted whitespace-nowrap">{fmtDate(a.at)}</td><td>{a.actor}</td><td className="mono">{a.action}</td><td className="mono text-muted">{a.entity_id}</td><td className="text-muted text-[12px] truncate max-w-[420px]">{JSON.stringify(a.details)}</td></tr>)}</tbody></table>}
     </Section>
   )
 }

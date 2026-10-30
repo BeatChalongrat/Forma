@@ -576,7 +576,7 @@ def run_extra(
         return result
     if name == "runtime_configuration":
         result = {"ai": connection_status(ctx, session), "read_only": True}
-        if p.has_role("admin"):
+        if p.has_role("admin") and p.customers is None:
             result["approval_policy"] = config.policy_view(session, ctx.settings)
         result["links"] = [{"label": "Settings", "url": "/settings"}] if p.has_role("admin") else []
         return result

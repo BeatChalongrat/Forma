@@ -20,7 +20,7 @@
 3. The ADRs that shape everything: 001 (schema as config), 002 (DSL, AI never executes code), 005 (immutability),
    006 (fingerprints), 007 (Thai rules), 008 (policy decides), 013 (security), 017 (semantics), 018 (sandbox),
    026 (contract gate), 027 (bulk), 036 (verdict), 038 (learning), 037 (calibration), 043 (input fidelity).
-   Index: [TEAM_LEAD_HANDBOOK.md](TEAM_LEAD_HANDBOOK.md#decision-log).
+   Index: [TEAM_LEAD_HANDBOOK.md](TEAM_LEAD_HANDBOOK.md#5-decision-log-adr-index).
 4. The flows as diagrams: [SYSTEM_FLOWS.md](SYSTEM_FLOWS.md).
 
 ## Day 3 — follow one file through the code
@@ -30,10 +30,10 @@ Read in this order, each with its test next to it:
 1. `api/routes.py::upload_files` → `services/rounds.py::add_file` → `ingestion/store.py`
 2. `jobs/handlers.py::run_pipeline` → `services/rounds.py::profile_round` → `profiling/`, `fingerprint/`
 3. `services/mapping.py::propose_for_round` → `ai/heuristics.py::propose_mapping` → `ai/agents.py::mapping_agent`
-   → `services/sandbox.py` → `services/healing.py` → `ai/policy.py::evaluate` → `services/verdict.py::for_mapping`
+   → `services/sandbox.py` → `services/healing.py` → `ai/policy.py::evaluate` → `services/verdict.py::for_mapping`,
+   then `services/mapping.py::approve_mapping` → `services/learning.py::record_from_approval`
 4. `services/datasets.py::transform_round` → `engine/transform.py` → `services/anomalies.py` → `services/verdict.py::for_dataset`
-5. `services/datasets.py::approve_dataset / export_dataset` → `services/learning.py::record_from_approval`
-   → `services/calibration.py::outcomes`
+5. `services/datasets.py::approve_dataset / export_dataset`, then `services/calibration.py::outcomes`
 
 Then the web: `pages/Round.tsx` → `components/RoundSteps.tsx` → `components/VerdictCard.tsx` → `lib/api.ts`.
 
@@ -55,10 +55,11 @@ Then the web: `pages/Round.tsx` → `components/RoundSteps.tsx` → `components/
 
 * Never hard-code a target field name. Never let a model execute anything. Never mutate a source, a mapping
   document or a dataset version in place.
-* Every write goes through a service with a `Principal`; every endpoint declares a role.
+* Every write goes through a service with a `Principal` and declares a role.
 * Tests before fixes; docs in the same commit; `make check` before every commit.
-* Windows: use `scripts\dev.ps1 <target>` instead of `make`; run backend tools from `backend\.venv\Scripts\`;
-  set `PYTHONIOENCODING=utf-8` when a command prints Thai.
+* Windows: `scripts\dev.ps1` has no `check` target, so run its `lint` and `test` targets plus
+  `ruff format --check .` from `backend\`; backend tools are in `backend\.venv\Scripts\`; set
+  `PYTHONIOENCODING=utf-8` when a command prints Thai.
 
 ## Who to ask
 

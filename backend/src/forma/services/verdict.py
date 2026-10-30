@@ -15,7 +15,7 @@ from typing import Any
 from forma.core.hashing import stable_hash
 from forma.schema_registry import TargetSchema
 
-RULES_VERSION = "2026.10.3"
+RULES_VERSION = "2026.10.4"
 OUTCOMES = (
     "accept",
     "assign_customer",
@@ -342,6 +342,9 @@ def for_mapping(
     confidence: float
     row_shift = next((r for r in policy.get("reasons", []) if str(r).startswith("row count changed")), None)
     vat = next((c for c in checks if c.get("verdict") in ("vat_added", "vat_removed")), None)
+    vat_question = next(
+        (q for q in questions if (q.get("field") or {}).get("semantic") == "price.vat_included"), None
+    )
     scaled = next((c for c in checks if c.get("verdict") == "scaled"), None)
     enough = pairs >= int(cfg["min_pairs"])
 
@@ -391,7 +394,7 @@ def for_mapping(
             f"{lbl['en']} is 7% {'higher' if up else 'lower'} than last round on {vat.get('pairs')} SKUs — VAT is now {'included' if up else 'excluded'}?",
             f"{lbl['th']} สูง{'ขึ้น' if up else 'ลง'} 7% จากรอบก่อนบน {vat.get('pairs')} SKU — ราคา{'รวม' if up else 'ไม่รวม'} VAT แล้ว?",
         )
-        outcome = "answer"
+        outcome = "answer" if vat_question is not None else "fix_mapping"
         confidence = 0.75 + 0.15 * min(1.0, int(vat.get("pairs") or 0) / 30)
     elif scaled is not None:
         rules.append("scaled")
@@ -471,6 +474,11 @@ def for_mapping(
         conclusion = _text(f"The record count moved: {row_shift}", f"จำนวนรายการเปลี่ยน: {row_shift}")
         outcome = "check_data"
         confidence = 0.7
+    elif policy.get("source") == "human_edit" and not questions and not open_questions:
+        rules.append("answered")
+        conclusion = _text("Your changes are saved and nothing is left open", "บันทึกการแก้แล้ว ไม่มีเรื่องค้าง")
+        outcome = "accept"
+        confidence = 0.8
     else:
         rules.append("review")
         top = str((policy.get("reasons") or ["needs a look"])[0])
@@ -484,22 +492,28 @@ def for_mapping(
 
     must: list[dict[str, Any]] = []
     leaving = outcome in ("assign_customer", "reject_file")
-    if vat is not None and not leaving:
-        up = vat["verdict"] == "vat_added"
+    if vat is not None and vat_question is not None and not leaving:
+        boolean = vat_question["kind"] == "boolean"
         must.append(
             {
-                "id": vat["pointer"],
-                "kind": "boolean",
-                "question": _text("Do this round's prices include VAT?", "ราคารอบนี้รวม VAT แล้วหรือยัง?"),
+                "id": vat_question["id"],
+                "kind": vat_question["kind"],
+                "semantic": "price.vat_included",
+                "question": _question(vat_question),
                 "why": _text(
                     f"Values moved by exactly 7% on {vat.get('pairs')} SKUs",
                     f"ค่าเปลี่ยนไป 7% พอดีบน {vat.get('pairs')} SKU",
                 ),
-                "options": [True, False],
-                "default": up,
-                "default_reason": _text(
-                    "Thai retail prices are usually VAT-inclusive (ADR-007)",
-                    "ราคาขายปลีกไทยมักรวม VAT (ADR-007)",
+                "options": [True, False] if boolean else ["confirm"],
+                "default": (vat["verdict"] == "vat_added") if boolean else None,
+                **(
+                    {
+                        "default_reason": _text(
+                            "Suggested from the direction of the move", "แนะนำจากทิศทางที่ค่าขยับ"
+                        )
+                    }
+                    if boolean
+                    else {}
                 ),
                 "evidence_ids": [e["id"] for e in evidence if e["kind"] == "data_checks"],
             }
@@ -515,6 +529,7 @@ def for_mapping(
                 {
                     "id": q["id"],
                     "kind": q["kind"],
+                    "semantic": q["field"].get("semantic"),
                     "question": _question(q),
                     "why": _text(
                         "Below the confidence bar for its risk", "ความมั่นใจต่ำกว่าเกณฑ์ของระดับความเสี่ยงนี้"
@@ -528,6 +543,8 @@ def for_mapping(
                     "evidence_ids": [e["id"] for e in evidence if e["kind"] == "questions"],
                 }
             )
+    if outcome == "accept" and must:
+        outcome = "answer"  # nothing is accepted past an open decision (ADR-047)
     cap = int(cfg["max_must_decide"])
     more = max(0, len(must) - cap)
     suppressed = _suppress(review, checks)

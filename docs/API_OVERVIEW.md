@@ -4,12 +4,15 @@
 > รายละเอียด schema ของ request/response ดูที่ `/api/docs` (OpenAPI) ตอนรัน API; type ฝั่ง frontend อยู่ที่
 > `frontend/src/lib/api.ts` ซึ่งสะท้อน `backend/src/forma/api/serialize.py`
 
-Base path `/api`. JSON in and out; errors are `{error, message, details}` with the HTTP status (400 validation,
-403 forbidden, 404 not found, 409 conflict/policy, 413 too large, 429 backpressure with Retry-After).
-Interactive docs: `/api/docs`. Role per endpoint: [RBAC_AND_SECURITY.md](RBAC_AND_SECURITY.md).
+Base path `/api`, except `/health`, `/ready` and `/metrics` at the root. JSON in and out. Application errors are
+`{error, message, details}` with the HTTP status: 401 unauthorized, 403 forbidden or policy block, 404 not found,
+409 conflict (stale digest, open decisions, unacknowledged anomalies, invalid records), 413 too large, 415 unsupported file,
+422 validation, 429 backpressure or rate limit with Retry-After, 503 unavailable. Request-body validation errors
+raised by FastAPI use its default `{"detail": […]}` shape. Interactive docs: `/api/docs`. Role per endpoint: [RBAC_AND_SECURITY.md](RBAC_AND_SECURITY.md).
 
-Long operations run as jobs: `POST …/run`, `/profile`, `/propose`, `/transform`, `/batches` return a `job_id`
-(or run synchronously with `?sync=true`, used by tests); poll `GET /jobs/{id}`.
+Long operations run as jobs: `POST …/run`, `/profile`, `/propose` and `/transform` return a `job_id`; poll
+`GET /jobs/{id}`. `POST /batches` returns the batch view; poll `GET /batches/{id}`. Tests run a job inline with
+`sync`: in the JSON body on `/run` and `/propose`, as a query parameter on `/profile`, `/transform` and `/batches`.
 
 ## Rounds and files
 
@@ -62,7 +65,7 @@ Long operations run as jobs: `POST …/run`, `/profile`, `/propose`, `/transform
 |---|---|
 | `GET /review?status=&round_id=` | queue rows with reasons, risk and the verdict brief |
 | `GET /learning?customer_id=` · `POST /learning/promote` · `DELETE /learning/{id}` | what was learned, trend, suggestions; promote; forget |
-| `GET /calibration` · `POST /calibration/apply` | precision report and proposals; apply one (digest) |
+| `GET /calibration` · `POST /calibration/apply` | precision report and proposals; apply one (digest); all-customer access |
 | `GET /foresight` | expected deliveries and the watchlist |
 | `GET /history` | paginated upload history with filters in the chosen time zone |
 
@@ -98,16 +101,18 @@ Long operations run as jobs: `POST …/run`, `/profile`, `/propose`, `/transform
 
 | Endpoint | Purpose |
 |---|---|
-| `GET /jobs` · `/jobs/{id}` · `/jobs/stats` · `POST /jobs/{id}/retry` | job rows and retry (admin) |
-| `GET /ops` | queue, workers, failed jobs, breaker, spend, slowest rounds |
-| `GET /audit?entity_id=` | audit log |
-| `GET /dashboard` | Home figures: rounds by status, open reviews, automation rate, AI spend, learning, recent rounds |
+| `GET /jobs` · `/jobs/{id}` · `/jobs/stats` · `POST /jobs/{id}/retry` | job rows of the caller's customers and retry (admin); `/jobs/stats` needs all-customer access |
+| `GET /ops` | queue, workers, failed jobs, breaker, spend, slowest rounds (all-customer access) |
+| `GET /audit?entity_id=` | audit log (all-customer access) |
+| `GET /dashboard` | Home figures for the caller's customers: rounds by status, open reviews, automation rate, AI spend, learning, recent rounds |
 | `GET /health` · `/ready` · `/metrics` | liveness; dependencies; Prometheus |
 
 ## Conventions
 
-* Every write records `principal.actor`; the request's `request_id` follows a job into the worker logs.
+* Decisions and edits record the authenticated actor (gaps are listed in
+  [RBAC_AND_SECURITY.md](RBAC_AND_SECURITY.md)); the request's `request_id` follows a job into the worker logs.
 * Identifiers are prefixed (`cus_`, `rnd_`, `fil_`, `map_`, `dsv_`, `rev_`, `bch_`, `bit_`, `chg_`, `ovr_`,
   `cor_`, `chat_`, `turn_`); job groups are `bat_`.
 * Datetimes are UTC ISO-8601; the UI renders them in the user's time zone.
-* Pagination is `offset`/`limit` with the total where the list is unbounded.
+* Pagination is `offset`/`limit`. `/history` and `/learning` return a total; `/rounds`, `/review`, `/jobs`, `/audit`
+  and `/batches` return plain arrays.

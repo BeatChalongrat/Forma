@@ -14,7 +14,7 @@
 | **Work round / batch** | รอบงาน | A named, dated bulk upload of many files (possibly many customers); each file becomes its own round. |
 | **Batch item** | ไฟล์ในรอบงาน | One file of a bulk upload with its match, state and round. |
 | **Profile** | โปรไฟล์ไฟล์ | What the reader found: sheets, tables, columns, types, samples, hints, fidelity facts. |
-| **Fingerprint** | ลายนิ้วมือโครงสร้าง | Structural hash of the tables (strict: headers + types; loose: normalised headers). |
+| **Fingerprint** | ลายนิ้วมือโครงสร้าง | Structural hash of a file's tables (strict: sheet names + ordered headers; loose: sorted normalised headers), plus a shape per table. Types are compared, not hashed. |
 | **Drift** | การเปลี่ยนของโครงสร้าง | How a layout differs from the approved one: identical, header_moved, columns_added/renamed/removed, sheets_added/removed, types_changed, unrelated_file. |
 | **Mapping / MappingDocument** | การจับคู่ | The declarative DSL document: sources, joins, record, fields, collections, quality rules. |
 | **Mapping version** | เวอร์ชันการจับคู่ | An append-only row holding one document with status proposed / approved / rejected / superseded, its policy report and agent log. |
@@ -31,7 +31,7 @@
 | **Policy overrides** | กฎเฉพาะลูกค้า | Sections of the policy a customer overrides (from calibration proposals). |
 | **Decision** | คำตัดสินของกฎ | auto_approve, review, block. |
 | **Risk level** | ระดับความเสี่ยงของการตัดสิน | low / medium / high with factors and impact in records (ADR-019). |
-| **Review task** | งานที่รอตรวจ | A queue row: kind (mapping, drift, blocked, data), priority, reasons, verdict brief. |
+| **Review task** | งานที่รอตรวจ | A queue row: kind (mapping, drift, blocked), priority, reasons, verdict brief. Data held for a person opens no task. |
 | **Block / override** | ระงับ / อนุมัติข้าม | A block is not an ordinary review; approving it needs an approver and a reason. |
 | **Verdict** | คำตัดสินของ FORMA | One conclusion per file: outcome, confidence word, must-decide items, evidence, suppressed, rules fired, digest. |
 | **Outcome (verdict)** | ข้อสรุปว่าควรทำอะไร | accept, answer, assign_customer, fix_mapping, check_data, fix_data, reject_file, wait. |
@@ -51,7 +51,7 @@
 | **Job / handler / stage** | งานเบื้องหลัง | Durable job rows run by thread, process or arq workers; handlers are idempotent and record stages. |
 | **Reconciliation** | กระทบยอดคิว | On startup, queued jobs whose results already exist are marked done, not re-run. |
 | **Principal / role / tenant scope** | ตัวตน / บทบาท / ขอบเขตลูกค้า | The authenticated identity, its role (importer ⊂ reviewer ⊂ approver ⊂ admin) and the customers it may see. |
-| **Audit log** | บันทึกการทำงาน | Every write with actor, action, entity and details (never secrets or chat contents). |
+| **Audit log** | บันทึกการทำงาน | Writes with actor, action, entity and details, never secrets or chat contents. Gaps: [RISK_REGISTER.md](RISK_REGISTER.md) R21. |
 | **LLM ledger** | บัญชีการเรียก AI | Tokens, estimated cost, latency and attempts per model call. |
 | **MCP** | — | Model Context Protocol endpoint exposing the assistant's read-only tools to external clients. |
 | **ADR** | บันทึกการตัดสินใจ | Architecture decision record in `docs/adr/`; binding unless superseded. |

@@ -57,6 +57,7 @@ auditable and reversible.
  policy: auto_approve | review | block  ◀─────────────────┘
    │
    ├─ verdict (one conclusion, evidence, decisions, one-click accept)
+   ├─ on approval: learning (what did this approval teach?)
    │
    ▼
  transform (Polars engine + Thai ops + persistent overrides + schema validation) ──▶ dataset version
@@ -64,8 +65,9 @@ auditable and reversible.
    ├─ change report & anomalies vs last round ──▶ verdict (data stage)
    ├─ edit (spreadsheet, bulk, copilot) → new version, impact preview, lineage to the Excel cell
    ▼
- approve ──▶ export JSON / JSONL / CSV (atomic, sha256)  ──▶ learning (what did this approval teach?)
-                                                           ──▶ calibration (was the decision right?)
+ approve ──▶ export JSON / JSONL / CSV (atomic, sha256)
+
+ afterwards: calibration reads what people did next (was the decision right?)
 ```
 
 Each stage is described in detail in [docs/SYSTEM_FLOWS.md](docs/SYSTEM_FLOWS.md); the components behind
@@ -91,7 +93,7 @@ them in [docs/SYSTEM_ARCHITECTURE.md](docs/SYSTEM_ARCHITECTURE.md).
 * **It gets better with use.** Corrections become column aliases and conventions; outcomes calibrate the
   policy; evaluation modes measure the heuristic, the AI and the learning loop side by side.
 * **Measured, not promised.** A 30-variant synthetic ERP corpus with ground truth gates every change
-  (identity 1.00, field accuracy 0.996, critical 1.00, drift 9/9 — no model involved); 450+ tests, 85 %
+  (identity 1.00, field accuracy 0.996, critical 1.00, drift 9/9 — no model involved); 500+ tests, 85 %
   coverage in CI; a 300-file night benchmarked at 17 minutes on one 12-core node.
 
 ---
@@ -133,7 +135,8 @@ FORMA_LLM_API_KEY=sk-...
 # FORMA_LLM_BASE_URL=https://your-gateway/v1   # any /chat/completions-compatible gateway
 ```
 
-Token usage and estimated cost per round are recorded in the `llm_calls` ledger and shown on Home and Ops.
+Token usage and estimated cost are recorded per call in the `llm_calls` ledger. Home shows the total, Ops the
+recent days, and Prometheus the cost per round.
 
 ### Use the real downstream format
 
@@ -153,11 +156,11 @@ mapping catalogue cannot enumerate (references, conditionals, tuple schemas) are
 | **Home** | Upload files; see what needs you with FORMA's conclusion per file; expected deliveries and the watchlist; work-round dashboard; statistics |
 | **Upload files** | Drop many files at once. Each is matched to its customer by layout (and the customer code in the file name), becomes its own round, and is published automatically when every check passes. Unknown layouts wait for you to pick a customer. One JSON per file, all in one zip |
 | **Imports** | Work rounds (named, dated, reusable) and the history of every file with filters that survive the browser's Back button |
-| **Round** | The case: the verdict card with its one-click accept, the five steps, files, mapping versions, datasets, the assistant in context |
+| **Round** | The case: the verdict card with its one-click accept, the three stages, files, mapping versions, datasets, the assistant in context |
 | **Review** | Questions and issues: the verdict first, then each uncertain field as a question answered from evidence traced to the source cell; preview the impact before saving |
 | **Mapping Studio** | Field view (drag a column onto a field), *What changed* vs the approved mapping with the data check, *Compare* (sandbox), *Relationships* (how the sheets connect, measured on the data), DSL on demand |
 | **Data Editor** | Spreadsheet editing (paste, ranges, bulk on picked rows), copilot in Thai or English, lineage to the Excel cell, changes and anomalies vs last round, records that break the format, versions and rollback |
-| **Customers** | Every customer, its approved formats, overrides, policy overrides, next expected delivery |
+| **Customers** | Every customer, its approved formats, overrides, next expected delivery |
 | **Settings** | AI connection and backup keys; target formats; approval policy with the calibration report and proposals; what FORMA learned; DSL reference; audit log; system |
 | **Assistant** | Ask about files, customers, features, with cited evidence; server-computed reports (tables and charts); clarification questions; a confirmable "accept the verdict" action |
 | **System health** (admin) | Queue, workers, failed jobs with retry, breaker state, spend, slowest rounds |
@@ -206,7 +209,8 @@ crash, stuck round, wrong file published, provider outage, schema rollout, backu
 ## Command line
 
 All commands run from `backend/` through the venv (`.venv/Scripts/forma.exe` on Windows, `.venv/bin/forma`
-elsewhere) or via `make <target>` / `.\scripts\dev.ps1 <target>` from the repository root.
+elsewhere) or via `make <target>` / `.\scripts\dev.ps1 <target>` from the repository root. `dev.ps1` has no `check`
+target: on Windows run its `lint` and `test` targets plus `ruff format --check .` from `backend/`.
 
 | Command | What it does |
 |---|---|
@@ -233,7 +237,7 @@ backend/                  FastAPI + Polars service (Python 3.12, uv, strict mypy
   src/forma/
     schema_registry/      target JSON Schema + x-forma catalogue (configuration, not code)
     mapping_dsl/          declarative Mapping DSL (Pydantic) + static validator
-    ingestion/            immutable file store, sniffing, fastexcel/openpyxl/csv readers, OOXML fidelity checks
+    ingestion/            immutable file store, sniffing, fastexcel and csv readers, OOXML fidelity checks
     profiling/            table detection, column profiles
     fingerprint/          structural fingerprints, drift classification
     engine/               Thai operations, DSL → Polars compiler, transform engine, vectorised rules
@@ -250,7 +254,7 @@ backend/                  FastAPI + Polars service (Python 3.12, uv, strict mypy
     synth/                synthetic ERP corpus generator + database seeder
     eval/                 evaluation harness, correction replay
   alembic/                migrations (every model change ships one)
-  tests/                  ~450 tests: unit, API, failure injection, Postgres, MinIO, migrations, eval
+  tests/                  ~500 tests: unit, API, failure injection, Postgres, MinIO, migrations, eval
 frontend/                 React 19 + TypeScript + Vite + Tailwind v4; no UI library
   src/pages/              Overview, Upload, Imports, Round, Review, MappingStudio, RelationshipMap, DataEditor,
                           Customers, Settings, Ops, Guide, AuthCallback
@@ -260,7 +264,7 @@ target_schema/            product.v1.json — a DRAFT contract; register the rea
 policies/                 approval.yaml (auto-approve / review / block, sandbox, anomaly, publish, verdict)
 data/                     runtime data (git-ignored) · synthetic/ corpus with ground truth (committed) · real/ (local only)
 docs/                     architecture, flows, user stories, handbook, DSL, data model, Thai rules, evaluation,
-                          performance, runbook, ADRs 001–046
+                          performance, runbook, ADRs 001–047
 ```
 
 ---
@@ -268,8 +272,8 @@ docs/                     architecture, flows, user stories, handbook, DSL, data
 ## Quality gates
 
 Before any commit: `make check` (ruff, ruff format, mypy strict, pytest with 80 % coverage locally / 85 % in
-CI) and `make eval-gate` (accuracy on the synthetic corpus must not drop). CI additionally runs the tests
-against real Postgres and MinIO, a migration drift guard (models vs Alembic), a configuration drift guard
+CI) and `make eval-gate` (accuracy on the synthetic corpus must not drop). CI additionally runs the Postgres
+and MinIO integration tests, a migration drift guard (models vs Alembic), a configuration drift guard
 (`.env.production.example`), a short benchmark, the frontend lint and build, both Docker images and the
 compose config. Details: [docs/TESTING_STRATEGY.md](docs/TESTING_STRATEGY.md).
 

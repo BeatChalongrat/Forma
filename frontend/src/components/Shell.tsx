@@ -8,7 +8,7 @@ import { Profile } from './Profile'
 import { ChatHistory } from './ChatHistory'
 import { cn } from '../lib/utils'
 import { CommandPalette } from './CommandPalette'
-import { Drawer } from './ui'
+import { Drawer, Empty } from './ui'
 import { useMediaQuery } from '../lib/useMediaQuery'
 import logo from '../assets/acommerce-logo.svg'
 
@@ -104,7 +104,9 @@ export function Shell() {
           <Profile />
         </div>
       </header>
-      {wide ? <div className="flex-1 min-h-0 overflow-hidden"><Outlet /></div> : <div className="mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-8 max-w-[1440px] w-full"><Outlet /></div>}
+      {me?.roles.length === 0
+        ? <div className="mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-8 max-w-[1440px] w-full"><Empty title={t('This account has no FORMA role', 'บัญชีนี้ยังไม่มีบทบาทใน FORMA')} body={t('Ask your administrator to give you access.', 'ขอให้ผู้ดูแลระบบเพิ่มสิทธิ์ให้')} /></div>
+        : wide ? <div className="flex-1 min-h-0 overflow-hidden"><Outlet /></div> : <div className="mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-8 max-w-[1440px] w-full"><Outlet /></div>}
     </main>
     <CommandPalette open={search} onClose={() => setSearch(false)} isAdmin={isAdmin} />
   </div>

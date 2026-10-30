@@ -105,23 +105,35 @@ def test_rename_only_is_accepted_with_one_click(schema: TargetSchema) -> None:
     assert v["rules_fired"] == ["rename_only"] and v["outcome"] == "accept" and v["word"] == "sure"
 
 
-def test_vat_shift_asks_one_yes_no_question_with_the_thai_default(schema: TargetSchema) -> None:
+def test_vat_shift_asks_about_the_vat_field_with_a_stated_default(schema: TargetSchema) -> None:
     price = next(iter(schema.semantic_pointers("price.amount")))
-    v = _mapping_verdict(
-        schema,
-        policy={
-            "decision": "review",
-            "reasons": ["data check"],
-            "checks": {"drift": "columns_renamed"},
-            "field_review": {"checks": [_check(price, "vat_added", 30, 0.0, ratio=1.07)], "fields": []},
-        },
-        summary={"has_previous_approval": True, "drift": "columns_renamed"},
-    )
+    flag = next(iter(schema.semantic_pointers("price.vat_included")))
+    policy = {
+        "decision": "review",
+        "reasons": ["data check"],
+        "checks": {"drift": "columns_renamed"},
+        "field_review": {"checks": [_check(price, "vat_added", 30, 0.0, ratio=1.07)], "fields": []},
+    }
+    summary = {"has_previous_approval": True, "drift": "columns_renamed"}
+    question = {
+        "id": flag,
+        "kind": "boolean",
+        "field": {"name": "vat_included", "semantic": "price.vat_included"},
+    }
+    v = _mapping_verdict(schema, policy=policy, summary=summary, questions=[question])
     assert v["rules_fired"] == ["vat_shift"] and v["outcome"] == "answer"
     assert len(v["must_decide"]) == 1
     q = v["must_decide"][0]
     assert (
-        q["id"] == price and q["kind"] == "boolean" and q["default"] is True and q["options"] == [True, False]
+        q["id"] == flag and q["kind"] == "boolean" and q["default"] is True and q["options"] == [True, False]
+    )
+    assert q["semantic"] == "price.vat_included"
+    # a contract with no VAT field to answer on: the person fixes the mapping, nothing is asked
+    bare = _mapping_verdict(schema, policy=policy, summary=summary)
+    assert (
+        bare["rules_fired"] == ["vat_shift"]
+        and bare["outcome"] == "fix_mapping"
+        and bare["must_decide"] == []
     )
 
 
@@ -350,3 +362,93 @@ def test_wrong_file_is_named_through_the_api(client: TestClient, isolated_env: P
     v = c.get(f"/api/rounds/{r2['id']}/verdict").json()["verdict"]
     assert v["rules_fired"][0] in ("wrong_customer", "blocked_unrelated"), v
     assert v["outcome"] == "assign_customer" and "A" in v["conclusion"]["en"]
+
+
+def _published_then_vat_round(c: TestClient, root: Path) -> str:
+    """Round 1 published; round 2 renames the price column and takes the VAT out of every price."""
+    import openpyxl
+    from tests.test_lineage import _job
+
+    cust = c.post("/api/customers", json={"code": "VAT", "name": "VAT"}).json()["id"]
+    r1 = c.post("/api/rounds", json={"customer_id": cust, "label": "R1"}).json()["id"]
+    _upload(c, r1, make_workbook(root / "vat1.xlsx"), "ERP.xlsx")
+    mv = _run(c, r1)["result"]["mapping_version_id"]
+    assert c.post(f"/api/mappings/{mv}/approve", json={}).status_code == 200
+    _job(c, f"/api/rounds/{r1}/transform")
+    ds = c.get(f"/api/rounds/{r1}").json()["datasets"][0]["id"]
+    assert c.post(f"/api/datasets/{ds}/approve", json={}).status_code == 200
+    path = make_workbook(root / "vat2.xlsx")
+    wb = openpyxl.load_workbook(path)
+    ws = wb["สินค้า"]
+    ws["G3"] = "ราคาสุทธิ (ไม่รวม VAT)"
+    for i in range(1, 13):
+        ws.cell(row=3 + i, column=7, value=f"{i * 100:,}.00")
+    wb.save(path)
+    r2 = c.post("/api/rounds", json={"customer_id": cust, "label": "R2"}).json()["id"]
+    _upload(c, r2, path, "ERP.xlsx")
+    _run(c, r2)
+    return str(r2)
+
+
+def test_the_vat_decision_on_the_card_saves_and_the_round_can_finish(
+    client: TestClient, isolated_env: Path
+) -> None:
+    c = client
+    rid = _published_then_vat_round(c, isolated_env)
+    v = c.get(f"/api/rounds/{rid}/verdict").json()["verdict"]
+    assert v["rules_fired"] == ["vat_shift"] and v["outcome"] == "answer"
+    decision = next(d for d in v["must_decide"] if d["semantic"] == "price.vat_included")
+    assert decision["default"] is False  # the prices fell by exactly the VAT rate
+    res = c.post(
+        f"/api/rounds/{rid}/verdict/accept",
+        json={"digest": v["digest"], "decisions": {decision["id"]: False}},
+    )
+    assert res.status_code == 200, res.text
+    assert res.json()["did"] == "apply_answers"
+    doc = c.get(f"/api/mappings/{res.json()['mapping_id']}").json()["document"]
+    fields = [*doc["fields"], *(f for coll in doc["collections"] for f in coll["fields"])]
+    flag = next(f for f in fields if f["target"] == decision["id"])
+    assert flag["expr"] == {"op": "const", "value": False} and flag["confidence"] == 1.0
+    # answered: the next verdict lets the reviewer finish, with no dead end
+    after = c.get(f"/api/rounds/{rid}/verdict").json()["verdict"]
+    assert after["subject"]["id"] == res.json()["mapping_id"]
+    assert (
+        after["outcome"] == "accept" and after["must_decide"] == [] and after["rules_fired"] == ["answered"]
+    )
+    done = c.post(f"/api/rounds/{rid}/verdict/accept", json={"digest": after["digest"]})
+    assert done.status_code == 200, done.text
+    assert c.get(f"/api/rounds/{rid}").json()["status"] == "approved"
+
+
+def test_open_decisions_turn_accept_into_answer(schema: TargetSchema) -> None:
+    price = next(iter(schema.semantic_pointers("price.amount")))
+    q = {"id": "/unit/pack_size", "kind": "confirm", "field": {"name": "pack_size", "risk": "high"}}
+    v = _mapping_verdict(
+        schema,
+        policy={
+            "decision": "review",
+            "reasons": ["schema drift: columns_renamed"],
+            "checks": {"drift": "columns_renamed"},
+            "field_review": {"checks": [_check(price, "same", 40, 1.0)], "fields": []},
+        },
+        summary={"has_previous_approval": True, "drift": "columns_renamed"},
+        questions=[q],
+    )
+    assert v["rules_fired"] == ["rename_only"]
+    assert v["outcome"] == "answer" and [m["id"] for m in v["must_decide"]] == ["/unit/pack_size"]
+
+
+def test_accept_is_refused_while_decisions_remain(
+    client: TestClient, isolated_env: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A stored verdict from before the rule (or any bug) still cannot approve past open decisions."""
+    from forma.services import verdict_flow
+
+    c = client
+    r = _round(c, "OPEN", make_workbook(isolated_env / "open.xlsx"))
+    stored = c.get(f"/api/rounds/{r['id']}/verdict").json()["verdict"]
+    stale = {**stored, "outcome": "accept", "must_decide": [{"id": "/x", "default": None}]}
+    monkeypatch.setattr(verdict_flow, "current", lambda *a: stale)
+    res = c.post(f"/api/rounds/{r['id']}/verdict/accept", json={"digest": stale["digest"]})
+    assert res.status_code == 409 and "open" in res.json()["message"]
+    assert c.get(f"/api/rounds/{r['id']}").json()["status"] == "review"

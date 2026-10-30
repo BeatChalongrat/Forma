@@ -83,7 +83,9 @@ def _dev_principal(request: Request, s: Settings) -> Principal:
     )
 
 
-def current_principal(request: Request) -> Principal:
+def authenticated_principal(request: Request) -> Principal:
+    """Who is calling, whatever their roles. Only ``/me`` uses it directly, so the web app can say why a
+    signed-in account sees nothing; everything else goes through ``current_principal``."""
     s = get_settings()
     if s.auth == "dev":
         p = _dev_principal(request, s)
@@ -95,6 +97,13 @@ def current_principal(request: Request) -> Principal:
     else:
         raise Unauthorized(f"unknown FORMA_AUTH mode {s.auth!r}")
     request.state.principal = p
+    return p
+
+
+def current_principal(p: Principal = Depends(authenticated_principal)) -> Principal:
+    """The caller, who must hold a FORMA role: a valid token from the identity provider is not enough."""
+    if not p.roles:
+        raise Forbidden("this account has no FORMA role", details={"roles": []})
     return p
 
 
@@ -115,6 +124,12 @@ def ensure_customer(p: Principal, customer_id: str | None) -> None:
     """Tenant scoping: a principal with a ``customers`` claim only sees those customers."""
     if not p.can_see(customer_id):
         raise Forbidden("customer not visible to this user", details={"customer_id": customer_id})
+
+
+def ensure_all_customers(p: Principal) -> None:
+    """For views that cover every customer: a principal limited to some customers cannot use them."""
+    if p.customers is not None:
+        raise Forbidden("this view covers every customer; it needs access to all customers")
 
 
 class SlidingWindowLimiter:

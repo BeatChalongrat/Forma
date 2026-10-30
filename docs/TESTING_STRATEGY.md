@@ -1,6 +1,6 @@
 # Testing strategy and quality gates
 
-> **สรุปภาษาไทย** — ระบบมีด่านคุณภาพ 4 ชั้น: lint/type (ruff, mypy strict), unit + API tests (~450 ตัว,
+> **สรุปภาษาไทย** — ระบบมีด่านคุณภาพ 4 ชั้น: lint/type (ruff, mypy strict), unit + API tests (~500 ตัว,
 > coverage ≥ 80% local / 85% CI), eval ความแม่นบน corpus สังเคราะห์ที่ห้ามตก, และ drift guards (migration,
 > config example) + build ทั้งสอง image ใน CI ทุก feature ใหม่ต้องมี test ที่ล้มก่อนแก้และผ่านหลังแก้
 
@@ -39,10 +39,10 @@
 
 | Mode | Command | Measures | Gate |
 |---|---|---|---|
-| Heuristic | `forma eval --baseline data/eval_baseline.json` | mapper + engine vs ground truth on 30 synthetic variants and 3 sequences | CI, must not drop |
+| Heuristic | `forma eval --corpus ../data/synthetic --baseline ../data/eval_baseline.json` | mapper + engine vs ground truth on 30 synthetic variants and 3 sequences | CI, must not drop |
 | AI-refined | `forma eval --llm` | the draft refined by the configured provider; fallbacks counted | report (needs a key) |
 | Correction replay | `forma eval --replay` | later rounds of a sequence scored without and with the alias learned from round 0 | report |
-| Real files | `forma eval --corpus data/real --index` | the same metrics on reviewed real exports | pending files |
+| Real files | `forma eval --corpus ../data/real --index` | the same metrics on reviewed real exports | pending files |
 
 Details: [EVALUATION.md](EVALUATION.md), [adr/041](adr/041-evaluation-on-real-files-and-with-ai.md).
 

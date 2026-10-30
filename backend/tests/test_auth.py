@@ -196,6 +196,28 @@ def test_tenant_scoping(client: TestClient, isolated_env: Path) -> None:
     assert c.get("/api/dashboard", headers=h).json()["customers"] == 1
 
 
+def test_an_identity_with_no_forma_role_can_only_ask_who_it_is(
+    client: TestClient, isolated_env: Path
+) -> None:
+    c = client
+    c.post("/api/customers", json={"code": "NR", "name": "nr"})
+    h = {"X-Forma-User": "nobody", "X-Forma-Roles": "contractor"}  # authenticated, no FORMA role
+    me = c.get("/api/me", headers=h)
+    assert me.status_code == 200 and me.json()["roles"] == []
+    for path in (
+        "/api/customers",
+        "/api/rounds",
+        "/api/dashboard",
+        "/api/jobs",
+        "/api/review",
+        "/api/schemas",
+    ):
+        r = c.get(path, headers=h)
+        assert r.status_code == 403 and r.json()["error"] == "forbidden", path
+    assert c.get("/api/auth/config", headers=h).status_code == 200  # public, the sign-in page needs it
+    assert c.get("/api/customers", headers={"X-Forma-User": "importer"}).status_code == 200
+
+
 def test_oidc_mode_requires_bearer(isolated_env: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("FORMA_AUTH", "oidc")
     monkeypatch.setenv("FORMA_AUTH_ISSUER", "https://idp.example.com/realms/forma")

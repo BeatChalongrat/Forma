@@ -45,8 +45,9 @@ Ops page and never used.
 * The policy still decides (rule 6); what changes is that its thresholds are now justified by outcomes and
   the next report shows whether a change was right — an applied proposal that starts producing
   `auto_then_edited` outcomes is visible within the same report.
-* Proposals need evidence (`MIN_EVIDENCE` = 3 matching outcomes, zero contradicting ones), so a quiet
-  installation sees none; that is the intended behaviour, not a bug.
+* Proposals need repeated outcomes, so a quiet installation sees none: `trust_data_checks` needs 3 with none
+  corrected or rejected, `lower_high_confidence` 5 with corrections under a quarter, `row_change` 2 with none
+  corrected, `price_move` 2 acknowledged rounds.
 * Not in this phase: proposals about anomaly thresholds, dataset-stage decisions, or lowering the critical
   confidence bar (critical fields stay a person's call until real-file evidence exists, ADR-036 §F).
 

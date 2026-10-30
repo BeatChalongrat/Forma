@@ -17,7 +17,7 @@ from starlette.concurrency import run_in_threadpool
 from forma.ai.text_stream import AnswerStream
 from forma.api import serialize as ser
 from forma.api.routes import _mapping_scoped, _round_scoped, ctx_dep
-from forma.auth import Principal, llm_rate_limited, require_role
+from forma.auth import Principal, ensure_all_customers, ensure_customer, llm_rate_limited, require_role
 from forma.core.errors import FormaError, ValidationFailed
 from forma.db.session import get_session, session_scope
 from forma.jobs import runner
@@ -159,18 +159,13 @@ def learning_view(
 ) -> dict[str, Any]:
     """What human decisions taught FORMA (ADR-038): the trend, the learned aliases and the suggestions."""
     schema = ctx.registry.get_ref(config.default_target_schema(session))
-    scope = customer_id or None
-    if p.customers is not None:
-        scope = customer_id if customer_id in p.customers else None
-    learned = (
-        learning.list_learned(session, customer_id=scope, offset=offset)
-        if (scope or p.customers is None)
-        else {"total": 0, "items": []}
-    )
+    everyone = p.customers is None
     return {
-        "stats": learning.stats(session),
-        "learned": learned,
-        "suggestions": learning.suggestions(session, schema) if p.has_role("admin") else [],
+        "stats": learning.stats(session, customers=p.customers),
+        "learned": learning.list_learned(
+            session, customer_id=customer_id or None, offset=offset, customers=p.customers
+        ),
+        "suggestions": learning.suggestions(session, schema) if p.has_role("admin") and everyone else [],
     }
 
 
@@ -189,6 +184,7 @@ def calibration_view(
     p: Principal = Depends(require_role("admin")),
 ) -> dict[str, Any]:
     """How often FORMA was right, per rule and per decision, and what the policy could allow (ADR-037)."""
+    ensure_all_customers(p)
     policy = config.policy_view(session, ctx.settings)["effective"]
     return {"report": calibration.report(session), "proposals": calibration.proposals(session, policy)}
 
@@ -206,6 +202,7 @@ def apply_proposal(
     ctx: ServiceContext = Depends(ctx_dep),
     p: Principal = Depends(require_role("admin")),
 ) -> dict[str, Any]:
+    ensure_all_customers(p)
     result = calibration.apply(ctx, session, body.id, body.digest, p.actor)
     session.commit()
     ctx.refresh()  # the saved policy applies to the next proposal in this process at once
@@ -226,6 +223,7 @@ def promote_alias(
     p: Principal = Depends(require_role("admin")),
 ) -> dict[str, Any]:
     """An alias several customers taught becomes everyone's (a runtime synonym keyed by target pointer)."""
+    ensure_all_customers(p)
     schema = ctx.registry.get_ref(config.default_target_schema(session))
     if not schema.has_field(body.target):
         raise ValidationFailed("Unknown target field")
@@ -239,6 +237,11 @@ def forget_learned(
     session: Session = Depends(get_session),
     p: Principal = Depends(require_role("approver")),
 ) -> Response:
+    customer_id = learning.get_correction(session, correction_id).customer_id
+    if customer_id is None:  # a promoted alias belongs to everyone
+        ensure_all_customers(p)
+    else:
+        ensure_customer(p, customer_id)
     learning.forget(session, correction_id, p.actor)
     return Response(status_code=204)
 
