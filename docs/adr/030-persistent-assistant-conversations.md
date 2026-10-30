@@ -48,6 +48,5 @@ context window, and legacy migration. Migration tests compare ORM metadata again
 database and exercise upgrade/downgrade. UI checks cover a real provider answer, reload/reopen,
 sidebar selection, New chat, composer expansion, and narrow layouts.
 
-References: user-supplied ChatGPT UI screenshots; official
-[ChatGPT quickstart](https://learn.chatgpt.com/docs/quickstart) and
-[chat organization](https://learn.chatgpt.com/docs/projects?surface=app).
+The layout follows the conventions of current chat products: a sidebar of recent conversations
+with search, pin, archive and rename, a single rounded composer, and one conversation per URL.

@@ -29,9 +29,8 @@ No migration, credentials, LLM calls or new external integration are required. E
 contracts are extended additively. Tests cover verified Excel cells, root and collection row provenance,
 constant VAT context, missing sources, authorization, fresh comparison counts and immutable versions.
 
-Live QA: C902 Round 4 showed CTN 12 -> 12 from Products!G2, with its cell value verified;
-PCS/DZ/BOX produced no pack count and were displayed as missing rather than guessed. VAT preview
-was exercised without applying business-data edits. Unknown answers remained unresolved, and the
-incorrect-reading link selected the pack-size field in Mapping Studio. Mobile viewport 390px had
-no document overflow. Production readiness checks passed after deployment. Targeted workspace,
-evidence and lineage tests: 18 passed; strict mypy: 100 source files; frontend production build passed.
+Check on the demo corpus: C902 round 4 traced the pack count `12` to the cell Products!G2 with the cell
+value verified, while PCS/DZ/BOX units produced no pack count and were shown as missing rather than
+guessed. The VAT answer preview ran without applying any edit; unknown answers stayed unresolved; the
+"read incorrectly" link selected the pack-size field in the Mapping Studio; a 390 px viewport had no
+document overflow. The workspace, evidence and lineage suites, strict mypy and the frontend build pass.
