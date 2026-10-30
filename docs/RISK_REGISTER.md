@@ -6,6 +6,10 @@
 Severity: H high · M medium · L low. Status: open · mitigated · accepted · closed. Severities and owners are
 proposals by role; the team lead confirms them and assigns named people.
 
+**Operating context.** One person operates FORMA today, so that person is importer, reviewer, approver and admin,
+and no second person checks an approval. As a proposal, not a decision: R9, R10, R20, R21, R22, R27 and R30 wait
+until more people or customers share a deployment, and R11, R13 and R18 wait until they cause a problem.
+
 | # | Risk / limit | Impact | Mitigation in place | Still to do | Sev | Proposed owner | Status |
 |---|---|---|---|---|---|---|---|
 | R1 | Accuracy is only measured on a synthetic corpus | Real files may expose layouts the mapper handles worse than 0.996 | eval harness, real-file folder and modes ready (ADR-041); first-time rounds always reviewed; verdict shows confidence | collect 20–30 reviewed real exports, write `data/real/eval_baseline.json`, gate on it | H | team lead | open |
@@ -24,7 +28,7 @@ proposals by role; the team lead confirms them and assigns named people.
 | R14 | Real customer files on an evaluation machine | Confidentiality | `data/real/` git-ignored; harness never uploads | anonymisation procedure before copying | M | team lead | open |
 | R15 | Cost of AI calls | Unexpected spend | ledger with estimated cost on Home/Ops; rate limits; sample caps | alert threshold on spend | L | admin | open |
 | R16 | Prompt injection through cell contents | A file steers the model | rule 7 in every prompt, guard on every output, read-only tools, confirm-before-act | — | L | — | mitigated |
-| R17 | Reviewer accepts a verdict without reading | Wrong approval with a clean audit trail | evidence one click away; calibration counts corrections and rejections, but a later data edit of an accepted mapping stays `accepted_unchanged` | require decisions before accept (R29); training; spot checks | M | team lead | open |
+| R17 | Reviewer accepts a verdict without reading | Wrong approval with a clean audit trail | evidence one click away; calibration counts corrections and rejections, but a later data edit of an accepted mapping stays `accepted_unchanged` | training; spot checks | M | team lead | open |
 | R18 | SQLite in dev differs from Postgres in prod | Dialect bugs | CI runs the API flow and migrations on real Postgres (2 tests) and one MinIO test; the rest of the suite uses SQLite; UTC datetimes; JSONB variants | run the full suite on Postgres | M | admin | open |
 | R19 | Tenant scope was incomplete: jobs, dashboard, learning statistics, calibration, audit and ops were not filtered by customer, and `DELETE /learning/{id}` had no customer check | A customer-scoped user could see other customers' job rows and global figures | jobs, figures and learning follow the caller's customers; all-customer views need all-customer access (ADR-047) | none | H | admin | closed |
 | R20 | Provider response text reaches API responses | Text from a model provider appears in `agent_log` and AI settings results | the assistant path is sanitised | redact `LLMError` text before storing or returning it | M | admin | open |
@@ -38,6 +42,7 @@ proposals by role; the team lead confirms them and assigns named people.
 | R28 | A valid OIDC token with no recognised role could call every read that uses `current_principal` | Anyone the IdP authenticated could read in-scope data | an identity with no FORMA role gets 403 everywhere except `GET /me` (ADR-047) | none | H | admin | closed |
 | R29 | On an `accept` outcome, the verdict button and endpoint ignored the decisions listed on the card | A `rename_only` verdict with open questions could be approved unanswered | open decisions turn `accept` into `answer`; the endpoint refuses with 409 and the button is disabled (ADR-047) | none | H | admin | closed |
 | R30 | A customer-scoped admin can change settings shared by every customer: AI connection, approval policy, default format, customers, target formats | One tenant's admin affects all tenants | all-customer views are closed to them (ADR-047); settings changes are audited | decide whether these endpoints need all-customer access; until then give admin only to all-customer identities | M | admin | open |
+| R31 | The compose stack publishes the web port and MinIO on every network interface, and `FORMA_AUTH=dev` has no login | On a machine others can reach, anyone on that network acts with the default role, admin by default, and can read or change customer data | the prod stack needs an explicit setting to run in dev mode; MinIO has its own credentials | publish the ports on the local machine only, or switch on OIDC; confirm from another device | H | admin | open |
 
 ## Explicit non-claims
 

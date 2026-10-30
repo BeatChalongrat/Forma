@@ -49,8 +49,8 @@ the real downstream contract, OIDC against a real IdP, multi-host workers in ang
 6. **Retention** — how long source files, datasets and exports are kept; when to switch retention from dry-run
    to apply.
 
-Before any production use, the open items in the risk register need a decision, first R30 (a customer-scoped
-admin can change shared settings) and R20–R22.
+Before any production use, the open items in the risk register need a decision, first R31 (a stack without a
+login reachable from the network), R30 (a customer-scoped admin can change shared settings) and R20–R22.
 
 ## 4. Operating rhythm
 

@@ -11,6 +11,10 @@
 | Development | `dev` | headers `X-Forma-User`, `X-Forma-Roles`, `X-Forma-Customers`; unknown users get `FORMA_AUTH_DEV_DEFAULT_ROLE` | local only; the API refuses to start with `dev` when `FORMA_ENV=prod` unless `FORMA_AUTH_ALLOW_DEV_IN_PROD=true` is set deliberately for a local smoke test |
 | OIDC | `oidc` | JWT (bearer) verified against the issuer's JWKS; roles from `FORMA_AUTH_ROLE_CLAIM`; customers from `FORMA_AUTH_CUSTOMERS_CLAIM`; the SPA uses PKCE | production |
 
+Development mode has no login. The compose stack publishes the web port and MinIO on every network interface by
+default, so a local stack in `dev` must not be reachable from other devices (R31 in
+[RISK_REGISTER.md](RISK_REGISTER.md)).
+
 Approvals, edits, exports and settings changes record the authenticated identity as the actor, and request
 bodies cannot name one. Some early pipeline events are still logged as `system` (see section 8).
 
@@ -150,6 +154,6 @@ hidden when the access scope changes (ADR-030).
 ## 10. Residual risks
 
 See [RISK_REGISTER.md](RISK_REGISTER.md): provider text in API responses (R20), audit gaps (R21), rate-limit
-coverage (R22), shared settings and a customer-scoped admin (R30); OIDC not yet exercised against a real IdP; published data assumed
+coverage (R22), shared settings and a customer-scoped admin (R30), a stack without a login on the network (R31); OIDC not yet exercised against a real IdP; published data assumed
 correct by calibration; customer files in `data/real/` must be anonymised before use; legacy .xls/.xlsb
 compatibility claims need real fixtures.

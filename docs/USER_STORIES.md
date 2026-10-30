@@ -1,33 +1,39 @@
 # FORMA — User stories, every case, and the technique behind each step
 
-> **สรุปภาษาไทย** — เอกสารนี้รวบรวม user story ของทุกบทบาท (importer, reviewer, approver, admin) ครอบคลุม
-> ทั้งเส้นทางปกติและกรณีขอบ (ไฟล์ผิด, format เปลี่ยน, AI ล่ม, ข้อมูลผิด contract, งานค้าง, สิทธิ์ไม่พอ ฯลฯ)
-> ทุก story มี acceptance criteria และตารางว่าแต่ละขั้นตอน "ใช้เทคนิคอะไร เพราะอะไร" พร้อม ADR อ้างอิง
-> ใช้เป็นฐานของ test plan และของการเล่าให้ทีม/ลูกค้าฟังว่าระบบคิดอย่างไร
+> **สรุปภาษาไทย** — เอกสารนี้เล่าว่าผู้ใช้ใช้ FORMA ทำอะไรและเพื่ออะไร ระบบมีผู้ใช้คนเดียว จึงเขียนด้วยคำว่า "ฉัน"
+> เริ่มจากเส้นทางใช้งานจริงตั้งแต่ต้นจนจบ แล้วตามด้วยแต่ละเรื่อง ครอบคลุมทั้งเส้นทางปกติและกรณีขอบ
+> ทุกเรื่องมีเงื่อนไขการยอมรับ และตารางว่าแต่ละขั้นตอน "ใช้เทคนิคอะไร เพราะอะไร" พร้อม ADR อ้างอิง
+> ใช้เป็นฐานของ test plan ได้
 
-Format: **As a** role, **I want** …, **so that** …. Each story has acceptance criteria (AC), the edge cases
-it covers, and a table of the techniques used at each step with the reason. Roles nest: importer ⊂ reviewer
-⊂ approver ⊂ admin. Tests that cover each story are named so QA can trace them.
+Format: **ฉันอยาก** … **เพื่อ** …. Each story has acceptance criteria (AC), the edge cases it covers, and a table
+of the techniques used at each step with the reason. Tests that cover each story are named so they can be traced.
 
-## Personas
+## ผู้ใช้
 
-The names are illustrative; replace them with the real team when this is used for planning.
+FORMA มีผู้ใช้คนเดียว คือคนที่รับไฟล์จากลูกค้า ตรวจ อนุมัติ และดูแลการตั้งค่าเอง ระบบปลายทางเป็นผู้รับ JSON
+และไม่ได้ใช้หน้าเว็บ เมื่อไม่มีคนที่สองตรวจซ้ำ คำตัดสินของ FORMA ด่านตรวจของ policy และการสุ่มตรวจจึงเป็นด่านสุดท้าย
 
-| Persona | Role | Goal | Pain today |
-|---|---|---|---|
-| **Nok**, import operator | importer | Get every customer's fortnightly files into the system with the least clicking | 300 files, many layouts, no idea which need a person |
-| **Pim**, data reviewer | reviewer | Decide quickly and correctly what needs a human; never approve something wrong | Evidence everywhere, conclusion nowhere |
-| **Ton**, team lead / approver | approver | Publish only correct data; justify every exception; register new contracts | Blocks and overrides must be explainable to downstream teams |
-| **Dao**, platform admin | admin | Keep AI, policy and formats configured; know how often FORMA is right | Thresholds set once, never questioned; AI cost opaque |
-| **Downstream team** | consumer of the JSON | Receive exactly the contract, every time | Partial, drifting or renamed fields |
+## ใช้งานจริงตั้งแต่ต้นจนจบ
+
+ก่อนเริ่มใช้ครั้งแรก ฉันลงทะเบียนรูปแบบ JSON ปลายทาง (E1) และเชื่อม AI ถ้าจะใช้ (E2)
+
+จากนั้นทุก 14 วันที่ได้ไฟล์ Excel หรือ CSV จากลูกค้า:
+
+1. เปิด Home ดูว่าลูกค้ารายไหนส่งช้าหรือน่าจะต้องตรวจ (E4)
+2. อัปโหลดไฟล์ทั้งหมดทีเดียว แล้ว FORMA จับคู่แต่ละไฟล์กับลูกค้า (A2) ไฟล์ที่จับคู่ไม่ได้ ฉันเลือกลูกค้าให้ (A3)
+3. ไฟล์ที่ผ่านทุกด่านเดินต่อจนได้ JSON เอง ฉันไม่ต้องเปิดดู (A2, B1)
+4. ไฟล์ที่ต้องดู FORMA เปิดมาด้วยข้อสรุปและคำถามเท่าที่จำเป็น (D1) ถ้าชัดเจนฉันกดยอมรับได้ในคลิกเดียว (D2)
+5. ไฟล์ที่มีปัญหาจะบอกเหตุผล เช่น คอลัมน์เปลี่ยนความหมาย (B3), เรื่อง VAT (B4) หรือไฟล์ผิดลูกค้า (B5)
+6. ถ้า mapping ผิด ฉันแก้ใน Studio (B10) แล้วรอบหน้าระบบจำได้ (B11)
+7. ตรวจข้อมูลจากรายงานสิ่งที่เปลี่ยน (C1) และแก้รายการที่ผิด (C2, C3)
+8. อนุมัติแล้วดาวน์โหลด JSON (C6) ถ้าพบภายหลังว่าผิด ฉันย้อนกลับได้ (C7)
 
 ---
 
 ## Epic A — Receiving files
 
 ### A1. Upload one delivery
-**As** Nok **I want** to upload one or more files of a customer as one round **so that** FORMA reads them
-and tells me what happens next.
+**ฉันอยาก**อัปโหลดไฟล์ของลูกค้ารายหนึ่งเป็นหนึ่งรอบ ไม่ว่าจะไฟล์เดียวหรือหลายไฟล์ **เพื่อ**ให้ FORMA อ่านไฟล์และบอกว่าขั้นต่อไปต้องทำอะไร
 
 AC: the same bytes under the same name are stored once, and a file already uploaded in another round is marked
 as a duplicate; every sheet is read; the round shows its three stages (upload, answer and check, download) and FORMA's conclusion; unreadable files fail loudly on the round, not
@@ -47,8 +53,7 @@ cached values (transformation refused, review forced) · legacy .xls (review for
 Tests: `test_api.py::test_full_flow`, `test_ingestion_readiness.py`, `test_tables.py`, `test_guard_sniff.py`.
 
 ### A2. Upload many files at once (bulk)
-**As** Nok **I want** to drop all of tonight's files in one go **so that** each is matched to its customer
-and comes out as its own JSON without me opening each one.
+**ฉันอยาก**อัปโหลดไฟล์ของทุกลูกค้าทีเดียว **เพื่อ**ให้แต่ละไฟล์ถูกจับคู่กับลูกค้าและได้ JSON ของตัวเอง โดยฉันไม่ต้องเปิดทีละไฟล์
 
 AC: each file becomes a batch item; a known layout is matched to its customer (exact, same columns moved,
 similar ≥ 0.75 with a margin over the runner-up); a customer code in the file name confirms the match, names
@@ -71,8 +76,7 @@ and file list stay, retry).
 Tests: `test_batches.py`, `test_job_recovery.py`.
 
 ### A3. Choose a customer for an unknown layout
-**As** Nok **I want** to assign the files FORMA could not place to an existing or new customer **so that**
-processing continues.
+**ฉันอยาก**เลือกลูกค้าให้ไฟล์ที่ FORMA จับคู่ไม่ได้ จะเป็นลูกค้าเดิมหรือลูกค้าใหม่ก็ได้ **เพื่อ**ให้งานเดินต่อ
 
 AC: candidates with similarity are shown; assigning re-enqueues the items; a tenant-scoped user cannot assign
 across customers (403).
@@ -82,8 +86,7 @@ Tests: `test_batches.py::test_unknown_file_gets_a_customer_then_finishes_after_r
 test yet.
 
 ### A4. Work rounds
-**As** Nok **I want** a named, dated round I can add files to later and compare against an expected count
-**so that** I can see "received 280 of 300, 270 ready".
+**ฉันอยาก**มีรอบงานที่มีชื่อและวันที่ เพิ่มไฟล์ภายหลังได้ และเทียบกับจำนวนที่คาดไว้ **เพื่อ**ดูได้ว่า "ได้รับแล้ว 280 จาก 300 พร้อมแล้ว 270"
 
 AC: rename, date and expected target editable (importer, all-customer access); dashboard on Home and the
 round; status counts link to filtered files; unknown targets are labelled unknown, never "missing".
@@ -96,8 +99,7 @@ Tests: `test_batches.py::test_work_round_date_append_and_retry`, `test_append_sc
 ## Epic B — Deciding what a file means
 
 ### B1. A returning customer with an unchanged layout
-**As** Pim **I want** a file whose layout is identical to the approved one to pass without me **so that** I
-only see what changed.
+**ฉันอยาก**ให้ไฟล์ที่ layout เหมือนที่อนุมัติไว้ผ่านไปเองโดยฉันไม่ต้องดู **เพื่อ**ให้ฉันเห็นเฉพาะสิ่งที่เปลี่ยน
 
 AC: the approved mapping is reused verbatim (`memory`), confidence 1.0, policy auto-approves, verdict `clean`.
 
@@ -108,8 +110,7 @@ AC: the approved mapping is reused verbatim (`memory`), confidence 1.0, policy a
 Tests: `test_api.py::test_full_flow`, `test_heuristics_eval.py` (drift 9/9).
 
 ### B2. A renamed or moved column
-**As** Pim **I want** FORMA to adapt the mapping and prove on the data that the renamed column still means
-the same **so that** I accept with one click instead of re-mapping.
+**ฉันอยาก**ให้ FORMA ปรับ mapping เองและพิสูจน์จากข้อมูลว่าคอลัมน์ที่เปลี่ยนชื่อยังมีความหมายเดิม **เพื่อ**กดยอมรับได้ในคลิกเดียวโดยไม่ต้อง map ใหม่
 
 AC: a moved header (`header_moved`) reuses the approved mapping verbatim, as in B1. For `columns_renamed`,
 `columns_added`, `columns_removed` or `types_changed`, the new draft (or the AI adaptation) is checked field by field against last round's published values on the same SKUs; when every important field keeps its
@@ -125,8 +126,7 @@ policy auto-approves it outright.
 Tests: `test_healing.py`, `test_sandbox.py`, `test_verdict.py`, `test_calibration.py::…renamed…`.
 
 ### B3. A column that changed meaning
-**As** Pim **I want** to be told when a renamed column no longer holds the same values **so that** I fix the
-mapping instead of publishing wrong prices.
+**ฉันอยาก**รู้เมื่อคอลัมน์ที่เปลี่ยนชื่อไม่ได้เก็บค่าเดิมแล้ว **เพื่อ**แก้ mapping ก่อนจะส่งราคาผิดออกไป
 
 AC: data check `different` on a critical/high field → policy review with a `data check:` reason and a high
 risk factor; verdict `meaning_changed` names the field and the share of SKUs that kept their value; the evidence
@@ -135,8 +135,7 @@ links to the Studio's *What changed* tab.
 Tests: `test_healing.py::test_data_check[different]`, `test_policy.py::…meaning_checks…`.
 
 ### B4. VAT included or excluded
-**As** Pim **I want** FORMA to tell me when a price column moved by exactly 7 % **so that** I confirm the VAT
-convention with one yes/no.
+**ฉันอยาก**ให้ FORMA บอกเมื่อคอลัมน์ราคาขยับ 7 % พอดี **เพื่อ**ยืนยันเรื่อง VAT ได้ด้วยคำตอบเดียว
 
 AC: data check `vat_added`/`vat_removed`; verdict `vat_shift` with one decision on the VAT field, whose default
 follows the direction of the move and is stated as a suggestion; answering it on the card or in the review
@@ -153,8 +152,7 @@ Tests: `test_workspace.py::test_answer_preview_versions_and_policy` (the questio
 `test_verdict.py::test_the_vat_decision_on_the_card_saves_and_the_round_can_finish` (saving from the card).
 
 ### B5. A wrong file (another customer's export)
-**As** Pim **I want** a file that belongs to another customer to be stopped and named **so that** it is never
-published under the wrong customer.
+**ฉันอยาก**ให้ไฟล์ของลูกค้ารายอื่นถูกหยุดและบอกว่าน่าจะเป็นของใคร **เพื่อ**ไม่ให้ข้อมูลออกไปผิดลูกค้า
 
 AC: layout `unrelated_file` to this customer → block; when it matches another customer's approved format and
 the values on the shared SKUs differ, the verdict is `wrong_customer`: "This file is probably C901's, not
@@ -170,8 +168,7 @@ Tests: `test_api.py::test_export_needs_approved_data_and_block_needs_explicit_ov
 `test_verdict.py::test_wrong_file_is_named_through_the_api`.
 
 ### B6. A first-time customer
-**As** Pim **I want** a new customer's first file to come to me with the few fields FORMA is unsure about
-**so that** I confirm them once.
+**ฉันอยาก**ให้ไฟล์แรกของลูกค้าใหม่มาถึงฉันพร้อมฟิลด์ไม่กี่ตัวที่ FORMA ไม่แน่ใจ **เพื่อ**ยืนยันครั้งเดียวแล้วจบ
 
 AC: policy review ("first time"); verdict `first_time` lists ≤ 3 decisions; after approval the mapping is the
 customer's memory and the format library entry.
@@ -179,7 +176,7 @@ customer's memory and the format library entry.
 Tests: `test_api.py::test_full_flow`, `test_verdict.py::test_first_time_and_clean`.
 
 ### B7. A new customer whose layout equals another customer's
-**As** Pim **I want** to be told the layout is shared (same ERP), not accused of a wrong file.
+**ฉันอยาก**รู้ว่า layout นี้ใช้ร่วมกับลูกค้ารายอื่น เช่นมาจาก ERP เดียวกัน **เพื่อ**ไม่ถูกเตือนผิดว่าเป็นไฟล์ผิดลูกค้า
 
 AC: verdict `first_time_shared_layout`, outcome *answer* when fields need confirming and *accept* otherwise, sender
 confirmed in passing.
@@ -188,8 +185,7 @@ Tests: `test_api.py::test_file_matching_another_customer_goes_to_review` covers 
 verdict rule.
 
 ### B8. The AI is unavailable
-**As** Pim **I want** FORMA to keep working without AI and to tell me it did **so that** nothing stops and
-nothing is silently trusted.
+**ฉันอยาก**ให้ FORMA ทำงานต่อได้เมื่อไม่มี AI และบอกฉันว่าทำแบบนั้น **เพื่อ**ให้งานไม่หยุดและไม่มีอะไรถูกเชื่อโดยไม่ตรวจ
 
 AC: heuristic draft used; `llm_fallback` → review, never auto-approve; verdict `ai_unavailable` (a first-time file
 shows `first_time`, because that rule runs first); backup keys tried in order first; breaker state on Ops for
@@ -203,15 +199,13 @@ Tests: `test_failure_injection.py::test_llm_timeout_falls_back_and_never_auto_ap
 No test asserts the `ai_unavailable` verdict rule.
 
 ### B9. The model returns something unsafe
-**As** Dao **I want** injected or malformed model output rejected **so that** a cell saying "ignore the rules"
-cannot change a mapping.
+**ฉันอยาก**ให้ผลลัพธ์จาก AI ที่ผิดรูปแบบหรือถูกแทรกคำสั่งถูกปฏิเสธ **เพื่อ**ไม่ให้ข้อความในเซลล์อย่าง "ignore the rules" เปลี่ยน mapping ได้
 
 AC: guard rejects instruction-like text and pointers outside the schema; the draft is used; the round goes to
 review; `test_guard_sniff.py`, `test_workspace.py::test_assistant_rejects_injected_output`.
 
 ### B10. Edit the mapping by hand
-**As** Pim **I want** to drag a column onto a field or connect two sheets in the Studio **so that** I fix a
-mapping without writing JSON.
+**ฉันอยาก**ลากคอลัมน์ไปวางบนฟิลด์ หรือเชื่อมสองชีตใน Studio **เพื่อ**แก้ mapping โดยไม่ต้องเขียน JSON
 
 AC: every save is a new proposed version with parent; validation, simulation, sandbox and policy run again;
 a wrong-file block cannot be cleared by an edit; relationships are measured on the data before a join is added.
@@ -220,8 +214,7 @@ Tests: `test_sandbox.py::test_an_edit_that_makes_data_worse_is_blocked`, `test_r
 `test_api.py::test_export_needs_approved_data_and_block_needs_explicit_override` (the wrong-file block).
 
 ### B11. The mapping is learned from my correction
-**As** Pim **I want** the column I re-pointed last round to be mapped right this round **so that** I never
-correct the same thing twice.
+**ฉันอยาก**ให้คอลัมน์ที่ฉันแก้เมื่อรอบก่อนถูกจับคู่ถูกในรอบนี้ **เพื่อ**ไม่ต้องแก้เรื่องเดิมซ้ำ
 
 AC: the approved version is diffed against FORMA's proposal; the alias is stored for the customer; the next
 proposal maps it with evidence "learned: you mapped 'col_17' here on …"; a confirmed constant replaces the
@@ -231,8 +224,7 @@ approval falling.
 Tests: `test_learning.py`.
 
 ### B12. An alias several customers taught becomes everyone's
-**As** Dao **I want** to promote a header three customers mapped the same way **so that** the fourth customer
-gets it on day one.
+**ฉันอยาก**ตั้งหัวคอลัมน์ที่ลูกค้าสามรายจับคู่แบบเดียวกันให้เป็นค่ากลาง **เพื่อ**ให้ลูกค้ารายที่สี่ได้ตั้งแต่วันแรก
 
 AC: suggestion listed when ≥ 3 distinct customers taught it and it is not already a synonym; promote (admin,
 audited); forget retires it.
@@ -244,8 +236,7 @@ Tests: `test_learning.py::test_accepted_as_proposed_is_recorded_and_promotion_sh
 ## Epic C — The data
 
 ### C1. Create the data and see what changed
-**As** Pim **I want** the full dataset with a change report against last round **so that** I check what moved,
-not every row.
+**ฉันอยาก**ได้ข้อมูลเต็มชุดพร้อมรายงานสิ่งที่เปลี่ยนจากรอบก่อน **เพื่อ**ตรวจเฉพาะสิ่งที่ขยับ ไม่ต้องดูทุกแถว
 
 AC: SKUs added/removed, changed fields, price moves (large ones flagged), promotion changes; anomalies within
 the round, vs last round, vs usual size with "% normal"; data-stage verdict (`contract_broken`, `price_move`,
@@ -259,8 +250,7 @@ Tests: `test_anomalies.py`, `test_api.py::test_full_flow` (the no-change report)
 end-to-end test yet.
 
 ### C2. Fix records that break the contract
-**As** Pim **I want** to see the records that break the target schema and fix them one at a time **so that**
-nothing invalid is ever exported.
+**ฉันอยาก**เห็นรายการที่ผิดรูปแบบปลายทางและแก้ทีละรายการ **เพื่อ**ไม่ให้ข้อมูลที่ผิดรูปแบบถูก export ออกไป
 
 AC: approval and export refused while `invalid_records` > 0 (409 with the errors); the Data Editor lists
 them; a save is refused only for errors it *adds*; a deleted invalid record is a fix too.
@@ -268,8 +258,7 @@ them; a save is refused only for errors it *adds*; a deleted invalid record is a
 Tests: `test_schema_gate.py`.
 
 ### C3. Edit like a spreadsheet
-**As** Pim **I want** to paste from Excel, select ranges and bulk-edit picked rows **so that** fixes take
-seconds.
+**ฉันอยาก**วางข้อมูลจาก Excel เลือกช่วง และแก้หลายแถวพร้อมกัน **เพื่อ**แก้เสร็จในไม่กี่วินาที
 
 AC: staged operations, impact preview (rows, cells, before/after), new version with a change set; persistent
 edits become overrides for every future round and collide loudly with a new mapping.
@@ -277,8 +266,7 @@ edits become overrides for every future round and collide loudly with a new mapp
 Tests: `test_assistant.py::test_overrides_that_collide_with_a_new_mapping`, `test_schema_gate.py::test_overrides_are_validated_after_they_apply`, `test_lineage.py::test_manual_edits_show_in_history_and_cause`.
 
 ### C4. Ask the copilot
-**As** Pim **I want** to type "ลดราคาหมวด X 5 % เฉพาะที่สต็อกเกิน 100" **so that** the system plans the
-operations and shows me the impact before anything is applied.
+**ฉันอยาก**พิมพ์ว่า "ลดราคาหมวด X 5 % เฉพาะที่สต็อกเกิน 100" **เพื่อ**ให้ระบบวางแผนการแก้และแสดงผลกระทบก่อนลงมือจริง
 
 AC: a plan, never an application; conditions across collections via derived figures; ambiguity → a
 clarification in Thai; "why" questions answered from lineage and join evidence.
@@ -287,14 +275,12 @@ Tests: `test_assistant.py::test_copilot_api_plans_conditions_without_an_llm`,
 `test_assistant.py::test_why_questions_are_answered_from_evidence`.
 
 ### C5. Trace a value to its cell
-**As** Pim **I want** to click a value and see file, sheet, row, column, raw cell and the rule that produced
-it, plus why it differs from last round **so that** I trust what I publish.
+**ฉันอยาก**คลิกค่าหนึ่งแล้วเห็นไฟล์ ชีต แถว คอลัมน์ ค่าดิบ และกฎที่สร้างค่านั้น รวมถึงเหตุผลที่ต่างจากรอบก่อน **เพื่อ**มั่นใจในสิ่งที่ส่งออก
 
 Tests: `test_lineage.py`, `test_review_evidence.py`.
 
 ### C6. Approve and export
-**As** Ton **I want** to approve data (acknowledging high anomalies explicitly) and export JSON/JSONL/CSV with
-exactly the contract's fields **so that** the downstream gets what it asked for.
+**ฉันอยาก**อนุมัติข้อมูลโดยรับทราบความผิดปกติระดับสูงอย่างชัดเจน แล้ว export เป็น JSON, JSONL หรือ CSV ที่มีฟิลด์ตรงตามรูปแบบปลายทาง **เพื่อ**ให้ปลายทางได้สิ่งที่ต้องการ
 
 AC: export needs approved data (409 otherwise); atomic write; sha256 recorded; `export_view` drops internal
 keys; a bulk round exports automatically after a manual approval.
@@ -302,8 +288,7 @@ keys; a bulk round exports automatically after a manual approval.
 Tests: `test_export_stream.py`, `test_api.py::test_export_needs_approved_data_and_block_needs_explicit_override`.
 
 ### C7. Roll back
-**As** Pim **I want** to roll back a dataset to its parent **so that** a wrong edit is undone without history
-being rewritten.
+**ฉันอยาก**ย้อนข้อมูลกลับไปเวอร์ชันก่อนหน้า **เพื่อ**ยกเลิกการแก้ที่ผิดโดยประวัติเดิมไม่หาย
 
 AC: rollback = new version equal to the parent; audit lists it; re-export yields a new artifact.
 
@@ -312,8 +297,7 @@ AC: rollback = new version equal to the parent; audit lists it; re-export yields
 ## Epic D — The verdict and the review
 
 ### D1. Read one sentence, decide one thing
-**As** Pim **I want** each file to open with FORMA's conclusion, confidence and the decisions only I can
-make **so that** I am not reading 23 tables.
+**ฉันอยาก**ให้แต่ละไฟล์เปิดมาด้วยข้อสรุปของ FORMA ความมั่นใจ และเรื่องที่มีแต่ฉันตัดสินได้ **เพื่อ**ไม่ต้องอ่าน 23 ตาราง
 
 AC: verdict card on the Review page, the Round page, the queue rows, Home and batch rows; evidence lines link to
 the page that proves them; "folded away" says what was hidden and why; the same stored reports always give
@@ -327,7 +311,7 @@ the same verdict (digest).
 Tests: `test_verdict.py`.
 
 ### D2. Accept with one click
-**As** Pim **I want** to accept a verdict with one click **so that** clear cases take seconds.
+**ฉันอยาก**ยอมรับคำตัดสินได้ในคลิกเดียว **เพื่อ**ให้เคสที่ชัดเจนจบในไม่กี่วินาที
 
 AC: `POST /rounds/{id}/verdict/accept` goes through `approve_mapping`/`apply_answers`/`approve_dataset`;
 a stale digest is refused; a block is never acceptable this way; open decisions turn `accept` into `answer`, the
@@ -338,8 +322,7 @@ Tests: `test_verdict.py::test_open_decisions_turn_accept_into_answer`,
 `test_verdict.py::test_accept_is_refused_while_decisions_remain`.
 
 ### D3. Understand why a file is in review
-**As** Pim **I want** policy reasons in plain Thai or English with counts in their real scope **so that** I
-do not need to read raw diagnostics.
+**ฉันอยาก**เห็นเหตุผลเป็นภาษาไทยหรืออังกฤษที่เข้าใจง่าย พร้อมตัวเลขในขอบเขตจริง **เพื่อ**ไม่ต้องอ่านข้อมูลวินิจฉัยดิบ
 
 AC: deterministic bilingual explanations; raw diagnostics under a disclosure (ADR-042).
 
@@ -350,8 +333,7 @@ Tests: `test_review_assistant.py`.
 ## Epic E — Configuration and governance
 
 ### E1. Register the real target format
-**As** Ton **I want** to paste the downstream JSON Schema, tag semantics and synonyms, check it, and register
-it **so that** mapping, validation and export follow the real contract without a code change.
+**ฉันอยาก**วาง JSON Schema ของปลายทาง ติดป้ายความหมายและคำพ้อง ตรวจ แล้วลงทะเบียน **เพื่อ**ให้ mapping การตรวจ และการ export เป็นไปตามรูปแบบจริงโดยไม่ต้องแก้โค้ด
 
 AC: validity, mapping findings and diff to the previous version before registering; default or per customer;
 unsupported shapes refused with a reason; exports carry exactly the schema's fields.
@@ -359,8 +341,7 @@ unsupported shapes refused with a reason; exports carry exactly the schema's fie
 Tests: `test_schema_registry.py`, `test_custom_schema.py`, `test_contract_readiness.py`, `test_config.py`.
 
 ### E2. Connect AI with fail-over
-**As** Dao **I want** to paste a key, pick a model, add backup keys and test every one **so that** a provider
-outage does not stop the night.
+**ฉันอยาก**วาง API key เลือกโมเดล เพิ่ม key สำรอง และทดสอบทุกตัว **เพื่อ**ไม่ให้งานหยุดเมื่อผู้ให้บริการล่ม
 
 AC: key stored encrypted; applied without restart; per-route breaker; backups tried in order; model discovery
 admin-only and rate-limited; the saved key is never forwarded to a changed endpoint.
@@ -368,8 +349,7 @@ admin-only and rate-limited; the saved key is never forwarded to a changed endpo
 Tests: `test_backup_keys.py`, `test_model_discovery.py`, `test_config.py`.
 
 ### E3. Edit the policy and see whether it is right
-**As** Dao **I want** to edit thresholds in the web app, see precision per rule, and apply the proposals the
-evidence supports **so that** automation grows without lowering the bar.
+**ฉันอยาก**แก้เกณฑ์ในเว็บ ดูความแม่นยำของแต่ละกฎ และใช้ข้อเสนอที่มีหลักฐานรองรับ **เพื่อ**เพิ่มงานอัตโนมัติโดยไม่ลดมาตรฐาน
 
 AC: validated, audited policy edits; calibration report; proposals with evidence and the reviews they would
 have saved; apply with a digest (stale refused); per-customer overrides; the next report shows the effect.
@@ -377,8 +357,7 @@ have saved; apply with a digest (stale refused); per-customer overrides; the nex
 Tests: `test_calibration.py`, `test_policy.py`.
 
 ### E4. Know who is late and who will need a check
-**As** Nok **I want** Home to list customers whose files are overdue and customers likely to need a review
-**so that** I chase and prepare before the night.
+**ฉันอยาก**ให้หน้า Home แสดงลูกค้าที่ส่งไฟล์ช้าและลูกค้าที่น่าจะต้องตรวจ **เพื่อ**ตามงานและเตรียมตัวล่วงหน้า
 
 AC: cadence from round dates (median gap, grace a quarter of the cycle), due/overdue with the reason;
 watchlist from the last three rounds' drift and decisions; one round → unknown, never overdue.
@@ -386,9 +365,7 @@ watchlist from the last three rounds' drift and decisions; one round → unknown
 Tests: `test_foresight.py`.
 
 ### E5. Ask the assistant and let it do the one safe thing
-**As** Nok **I want** to ask "why is C902 waiting?" or "compare the last three work rounds" and get an answer
-with evidence, and a chart when it helps **so that** I act from the conversation. Reviewers also get a confirmable
-action when the verdict says accept and asks nothing.
+**ฉันอยาก**ถามว่า "ทำไม C902 ยังรออยู่" หรือ "เทียบสามรอบงานล่าสุด" แล้วได้คำตอบพร้อมหลักฐาน และได้กราฟเมื่อช่วยให้เข้าใจ **เพื่อ**ทำงานต่อจากในบทสนทนาได้ เมื่อคำตัดสินคือยอมรับและไม่มีคำถามค้าง ผู้ช่วยจะเสนอให้ฉันกดยืนยันได้เลย
 
 AC: read-only tools, citations to real evidence ids, server-built navigation and act actions, server-computed
 reports (the model picks a view, never values), clarification questions before assuming, streaming with
@@ -399,8 +376,7 @@ Tests: `test_workspace.py`, `test_workspace_tools.py`, `test_assistant_navigatio
 `test_conversations.py`, `test_chat_stream.py`.
 
 ### E6. Operate the system
-**As** Dao **I want** queue, workers, failed jobs with retry, breaker state and spend on one page, and a
-runbook for every incident **so that** the night is boring.
+**ฉันอยาก**เห็นคิว worker งานที่ล้มเหลวพร้อมปุ่มลองใหม่ สถานะ breaker และค่าใช้จ่ายในหน้าเดียว และมีคู่มือสำหรับเหตุขัดข้องทุกแบบ **เพื่อ**รับมือได้ทันทีเมื่อเกิดปัญหา
 
 Note: breakers live in each process's memory, so the Ops page does not show worker failures yet (R27).
 
@@ -408,30 +384,10 @@ Tests: `test_jobs.py`, `test_failure_injection.py`, `test_postgres.py`, `test_mi
 
 ---
 
-## Epic F — Security and tenancy
-
-### F1. Roles
-**As** Ton **I want** importers to upload, reviewers to approve mappings and data, approvers to export and
-override blocks, admins to configure **so that** responsibility is explicit.
-
-AC: writes declare a role and a lower role gets 403; reads need a FORMA role, so a valid token with no role gets
-403 everywhere except `GET /me`, and the web app says so; the actor of approvals, edits and exports is the
-authenticated identity, never a body field. Matrix: [RBAC_AND_SECURITY.md](RBAC_AND_SECURITY.md).
-
-### F2. Tenant scope
-**As** Ton **I want** a principal limited to certain customers to see nothing else **so that** a shared
-deployment is safe.
-
-AC: customer-owned lists, reads and writes, assistant tools, learned rows, foresight, jobs, dashboard figures and
-learning statistics are scoped; every bulk endpoint and all-customer view needs all-customer access. Shared
-settings are not limited by scope (R30).
-
-Tests: `test_tenant_scope.py`, `test_auth.py`, `test_workspace.py::test_dataset_tools_are_scoped`,
-`test_learning.py::test_learning_is_customer_scoped`.
+## Epic F — Security
 
 ### F3. A cell that tries to give instructions
-**As** Dao **I want** spreadsheet content treated as data in every prompt **so that** prompt injection through
-a customer file is impossible by construction.
+**ฉันอยาก**ให้เนื้อหาในสเปรดชีตถูกถือเป็นข้อมูลเสมอในทุก prompt **เพื่อ**ให้ไฟล์ลูกค้าแทรกคำสั่งเข้ามาไม่ได้
 
 AC: `SYSTEM_BASE` states it; the guard enforces it; tools mark truncation; tests inject and verify rejection.
 
@@ -458,3 +414,25 @@ AC: `SYSTEM_BASE` states it; the guard enforces it; tools mark truncation; tests
 | D Verdict & review | 029, 035, 036, 042 |
 | E Governance | 016, 017, 025, 032, 037, 039, 040, 041, 045 |
 | F Security | 013, 029, 030, 040 |
+
+## เมื่อมีคนใช้เพิ่ม
+
+วันนี้ฉันถือทุกบทบาทคนเดียว สองเรื่องนี้จึงไม่มีผลกับการใช้งานประจำวัน แต่จะใช้เมื่อมีคนหรือลูกค้าใช้ระบบเดียวกันเพิ่ม
+Roles nest: importer ⊂ reviewer ⊂ approver ⊂ admin.
+
+### F1. Roles
+**เมื่อมีคนเพิ่ม ฉันอยาก**แบ่งหน้าที่เป็นคนอัปโหลด คนตรวจ คนอนุมัติ และผู้ดูแล **เพื่อ**ให้ความรับผิดชอบชัดเจน
+
+AC: writes declare a role and a lower role gets 403; reads need a FORMA role, so a valid token with no role gets
+403 everywhere except `GET /me`, and the web app says so; the actor of approvals, edits and exports is the
+authenticated identity, never a body field. Matrix: [RBAC_AND_SECURITY.md](RBAC_AND_SECURITY.md).
+
+### F2. Tenant scope
+**เมื่อมีคนเพิ่ม ฉันอยาก**ให้คนที่จำกัดเฉพาะบางลูกค้าไม่เห็นข้อมูลอื่นเลย **เพื่อ**ให้ใช้ระบบเดียวร่วมกันได้อย่างปลอดภัย
+
+AC: customer-owned lists, reads and writes, assistant tools, learned rows, foresight, jobs, dashboard figures and
+learning statistics are scoped; every bulk endpoint and all-customer view needs all-customer access. Shared
+settings are not limited by scope (R30).
+
+Tests: `test_tenant_scope.py`, `test_auth.py`, `test_workspace.py::test_dataset_tools_are_scoped`,
+`test_learning.py::test_learning_is_customer_scoped`.
