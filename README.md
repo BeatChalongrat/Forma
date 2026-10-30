@@ -199,6 +199,9 @@ open http://localhost/            # web (set FORMA_WEB_PORT to change)
 curl http://localhost/ready       # db · storage · queue
 ```
 
+`FORMA_AUTH=dev` has no login, so anyone who can reach the published ports acts with the default role. Use it only
+on a machine other devices cannot reach (R31 in [docs/RISK_REGISTER.md](docs/RISK_REGISTER.md)).
+
 The stack is nginx (SPA + `/api` proxy) → FastAPI (N replicas) → Redis/arq workers (N nodes) → PostgreSQL
 (JSONB) + S3/MinIO. On start, API and workers reconcile queued jobs against durable results, recover stale
 jobs and resubmit pending ones (ADR-044). Operations are in [docs/RUNBOOK.md](docs/RUNBOOK.md): worker
@@ -287,7 +290,7 @@ compose config. Details: [docs/TESTING_STRATEGY.md](docs/TESTING_STRATEGY.md).
 | Everyone | [docs/GLOSSARY.md](docs/GLOSSARY.md) — the vocabulary (round, mapping version, drift, sandbox, verdict, …) |
 | Architects / engineers | [docs/SYSTEM_ARCHITECTURE.md](docs/SYSTEM_ARCHITECTURE.md) — components, planes, deployment, data, security, scaling |
 | Analysts / QA | [docs/SYSTEM_FLOWS.md](docs/SYSTEM_FLOWS.md) — context, use cases, process flows, sequences, state machines |
-| Product / QA | [docs/USER_STORIES.md](docs/USER_STORIES.md) — every story and edge case, with the technique used at each step and why |
+| Product / QA | [docs/USER_STORIES.md](docs/USER_STORIES.md) — how the user works through a round, then every story and edge case, with the technique used at each step and why |
 | Engineers | [docs/API_OVERVIEW.md](docs/API_OVERVIEW.md) · [docs/MAPPING_DSL.md](docs/MAPPING_DSL.md) · [docs/DATA_MODEL.md](docs/DATA_MODEL.md) · [docs/THAI_CONTEXT_RULES.md](docs/THAI_CONTEXT_RULES.md) |
 | Security / compliance | [docs/RBAC_AND_SECURITY.md](docs/RBAC_AND_SECURITY.md) |
 | QA | [docs/TESTING_STRATEGY.md](docs/TESTING_STRATEGY.md) · [docs/EVALUATION.md](docs/EVALUATION.md) |

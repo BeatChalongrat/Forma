@@ -72,6 +72,7 @@ Conclusion rules (mapping stage):
 | `engine_errors` | errors > 0 or zero rows | "{n} records cannot be produced: {top finding}" → `fix_mapping` |
 | `row_shift` | row_change_ratio over policy | "{rows} records vs {prev} last round ({pct})" → `check_data` |
 | `clean` | decision `auto_approve` | "Nothing to decide" → `accept` (already done by policy) |
+| `answered` | the current version is a human edit with no questions and no open questions (ADR-047) | "Your changes are saved and nothing is left open" → `accept` |
 
 Conclusion rules (data stage), after `transform_round`:
 
