@@ -34,6 +34,9 @@ works: the work opens in its own window beside the conversation.
    before it rested on: changing a title does not make old numbers new.
 8. **What the user picks goes to the model as `working_on`.** A box, a page, a slide or a cell becomes `target`. It is
    context for one message; it changes nothing by itself.
+9. **Works are listed with the chats, not on a page of their own.** The assistant's part of the sidebar has a Work tab
+   beside chat history, listing every work across chats, newest change first and searchable by name. A work is read and
+   changed in its chat, so a list that leads there is all that is needed to find one.
 
 ## Consequences
 

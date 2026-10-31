@@ -23,7 +23,7 @@ export function ChatMenu({ chat, identity, busy = false }: { chat: ChatSummary; 
     try { const key = 'forma.last-chat:' + identity; if (localStorage.getItem(key) === chat.id) localStorage.removeItem(key) } catch { /* optional convenience */ }
     await qc.cancelQueries({ queryKey: cacheKey }); qc.removeQueries({ queryKey: cacheKey })
     if (loc.pathname === '/assistant' && new URLSearchParams(loc.search).get('chat') === chat.id) nav(newChatUrl(), { replace: true })
-    void qc.invalidateQueries({ queryKey: ['assistant-chats', identity] })
+    void qc.invalidateQueries({ queryKey: ['assistant-chats', identity] }); void qc.invalidateQueries({ queryKey: ['artifacts'] })
   } })
   const pending = edit.isPending || remove.isPending, answering = busy || chat.busy
   const error = remove.error || edit.error
