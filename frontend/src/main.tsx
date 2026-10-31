@@ -19,7 +19,6 @@ import { DataEditor } from './pages/DataEditor'
 import { SettingsPage } from './pages/Settings'
 import { OpsPage } from './pages/Ops'
 import { GuidePage } from './pages/Guide'
-import { ArtifactsPage } from './pages/Artifacts'
 import { MemoryPage } from './pages/Memory'
 import { BulkUpload, UploadPage } from './pages/Upload'
 import { AuthCallback } from './pages/AuthCallback'
@@ -36,7 +35,6 @@ const router = createBrowserRouter([
     children: [
       { index: true, element: <Overview /> },
       { path: 'imports', element: <Imports /> },
-      { path: 'artifacts', element: <ArtifactsPage /> },
       { path: 'memory', element: <MemoryPage /> },
       { path: 'imports/new', element: <BulkUpload /> },
       { path: 'imports/new/single', element: <NewImport /> },

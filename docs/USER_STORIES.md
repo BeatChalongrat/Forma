@@ -405,7 +405,7 @@ Tests: `test_chat_images.py`.
 AC: a flow, document, deck, sheet or web page opens beside the chat by itself; picking a box, page, slide or cell tells
 the assistant what to change; a change is a new version and every version stays; an old version comes back as the next
 number; a work says what data it rests on and warns when that data has changed, without rewriting itself; a file that
-cannot be previewed can still be downloaded; everything is listed on one page across chats.
+cannot be previewed can still be downloaded; every work across chats is listed beside chat history in the sidebar.
 
 Technique: append-only versions, one version per message, previews made in the sandbox, a flow stored as data and drawn
 by the page, a web page in a frame with no origin and no network (ADR-050).
