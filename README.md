@@ -41,7 +41,7 @@ auditable and reversible.
 | The same correction is made every round | Every approval is diffed against FORMA's proposal; the correction is learned for that customer and suggested for everyone when several customers teach the same thing |
 | Policy thresholds are set once and never questioned | Every decision gets an outcome; precision per rule is reported and the policy proposes its own reversible changes for an admin to apply |
 | Nobody notices a customer who did not send | Expected deliveries from each customer's cadence; a watchlist of customers likely to need a check |
-| "Did the AI change my data?" | AI never executes code. It emits a declarative mapping document that a deterministic engine runs. The policy decides, a person confirms, the audit log records |
+| "Did the AI change my data?" | No generated code touches your data. The AI emits a declarative mapping document that a deterministic engine runs. The policy decides, a person confirms, the audit log records. The assistant can run code to answer a question, but only on copies, in a sandbox with no network, and the result goes to the chat |
 
 ## How a file flows through
 
@@ -162,7 +162,7 @@ mapping catalogue cannot enumerate (references, conditionals, tuple schemas) are
 | **Data Editor** | Spreadsheet editing (paste, ranges, bulk on picked rows), copilot in Thai or English, lineage to the Excel cell, changes and anomalies vs last round, records that break the format, versions and rollback |
 | **Customers** | Every customer, its approved formats, overrides, next expected delivery |
 | **Settings** | AI connection and backup keys; target formats; approval policy with the calibration report and proposals; what FORMA learned; DSL reference; audit log; system |
-| **Assistant** | Ask about files, customers, features, with cited evidence; server-computed reports (tables and charts); clarification questions; a confirmable "accept the verdict" action |
+| **Assistant** | Ask about files, customers, features, with cited evidence; server-computed reports (tables and charts); Python in an isolated sandbox for analysis, charts, flows and Word, Excel, PowerPoint or PDF files to download; images, documents, slides, emails, archives and data files in the chat; what it makes opens beside the chat with its versions kept; memory across chats that you can read and delete, and search of earlier chats; clarification questions; a confirmable "accept the verdict" action |
 | **System health** (admin) | Queue, workers, failed jobs with retry, breaker state, spend, slowest rounds |
 
 Every feature is findable with **Ctrl K** or the **Feature guide**, in English or Thai.
@@ -267,7 +267,7 @@ target_schema/            product.v1.json — a DRAFT contract; register the rea
 policies/                 approval.yaml (auto-approve / review / block, sandbox, anomaly, publish, verdict)
 data/                     runtime data (git-ignored) · synthetic/ corpus with ground truth (committed) · real/ (local only)
 docs/                     architecture, flows, user stories, handbook, DSL, data model, Thai rules, evaluation,
-                          performance, runbook, ADRs 001–047
+                          performance, runbook, ADRs 001–051
 ```
 
 ---

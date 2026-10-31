@@ -398,6 +398,8 @@ class AssistantConversation(Base):
     mapping_id: Mapped[str | None] = mapped_column(String(40))
     archived: Mapped[bool] = mapped_column(Boolean, default=False)
     pinned: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
+    memory_off: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
+    incognito: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
     legacy_key: Mapped[str | None] = mapped_column(String(64))
     active_run: Mapped[str | None] = mapped_column(String(40))
     busy_until: Mapped[dt.datetime | None] = mapped_column(UTCDateTime)
@@ -407,6 +409,81 @@ class AssistantConversation(Base):
         Index("ix_assistant_owner_access_updated", "owner_key", "access_key", "updated_at"),
         UniqueConstraint("owner_key", "access_key", "legacy_key", name="uq_assistant_legacy"),
     )
+
+
+class AssistantMemory(Base):
+    """One topic the assistant remembers about a person, read and changed by them (ADR-051)."""
+
+    __tablename__ = "assistant_memories"
+    id: Mapped[str] = mapped_column(String(40), primary_key=True, default=lambda: new_id("mem"))
+    owner_key: Mapped[str] = mapped_column(String(64), index=True)
+    topic: Mapped[str] = mapped_column(String(120))
+    content: Mapped[str] = mapped_column(Text)
+    origin: Mapped[str] = mapped_column(String(16))  # chat | user
+    sensitive: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
+    source_chat_id: Mapped[str | None] = mapped_column(String(40))  # no link: a memory outlives its chat
+    source_turn_id: Mapped[str | None] = mapped_column(String(40))
+    created_by: Mapped[str] = mapped_column(String(128))
+    created_at: Mapped[dt.datetime] = mapped_column(UTCDateTime, default=utcnow)
+    updated_at: Mapped[dt.datetime] = mapped_column(UTCDateTime, default=utcnow)
+
+
+class AssistantAttachment(Base):
+    """A file in a chat: what the user attached or what the code sandbox produced (ADR-048, ADR-049)."""
+
+    __tablename__ = "assistant_attachments"
+    id: Mapped[str] = mapped_column(String(40), primary_key=True, default=lambda: new_id("att"))
+    conversation_id: Mapped[str] = mapped_column(ForeignKey("assistant_conversations.id"), index=True)
+    turn_id: Mapped[str | None] = mapped_column(String(40))  # empty until sent with a message
+    kind: Mapped[str] = mapped_column(String(16))  # upload | output | preview
+    name: Mapped[str] = mapped_column(String(160))
+    media_type: Mapped[str] = mapped_column(String(120))
+    size: Mapped[int] = mapped_column(Integer)
+    sha256: Mapped[str] = mapped_column(String(64))
+    storage_key: Mapped[str] = mapped_column(Text)  # ADR-012: storage key, never a path
+    created_by: Mapped[str] = mapped_column(String(128))
+    created_at: Mapped[dt.datetime] = mapped_column(UTCDateTime, default=utcnow)
+
+
+class AssistantArtifact(Base):
+    """Something the assistant made in a chat: a flow or a file, with every version kept (ADR-050)."""
+
+    __tablename__ = "assistant_artifacts"
+    id: Mapped[str] = mapped_column(String(40), primary_key=True, default=lambda: new_id("art"))
+    conversation_id: Mapped[str] = mapped_column(ForeignKey("assistant_conversations.id"), index=True)
+    kind: Mapped[str] = mapped_column(String(16))  # flow | deck | doc | sheet | web | image | text | file
+    title: Mapped[str] = mapped_column(String(160))
+    name: Mapped[str] = mapped_column(
+        String(160)
+    )  # the file's name, which ties its versions; empty for a flow
+    latest: Mapped[int] = mapped_column(Integer, default=0)
+    created_by: Mapped[str] = mapped_column(String(128))
+    created_at: Mapped[dt.datetime] = mapped_column(UTCDateTime, default=utcnow)
+    updated_at: Mapped[dt.datetime] = mapped_column(UTCDateTime, default=utcnow)
+
+
+class AssistantArtifactVersion(Base):
+    """One version of a work. Append-only: a change or a restore adds the next number."""
+
+    __tablename__ = "assistant_artifact_versions"
+    id: Mapped[str] = mapped_column(String(40), primary_key=True, default=lambda: new_id("artv"))
+    artifact_id: Mapped[str] = mapped_column(ForeignKey("assistant_artifacts.id"), index=True)
+    number: Mapped[int] = mapped_column(Integer)
+    parent_id: Mapped[str | None] = mapped_column(String(40))
+    restored_from: Mapped[int | None] = mapped_column(Integer)
+    turn_id: Mapped[str | None] = mapped_column(String(40), index=True)
+    note: Mapped[str] = mapped_column(String(160), default="")
+    attachment_id: Mapped[str | None] = mapped_column(String(40))  # the file; empty for a flow
+    content: Mapped[dict[str, Any] | None] = mapped_column(JSONType)  # a flow's nodes and edges
+    code: Mapped[str | None] = mapped_column(Text)
+    preview: Mapped[dict[str, Any] | None] = mapped_column(JSONType)
+    checked: Mapped[int] = mapped_column(
+        Integer, default=0
+    )  # pictures the model looked at before handing over
+    source: Mapped[dict[str, Any] | None] = mapped_column(JSONType)  # when, and what data it rests on
+    created_by: Mapped[str] = mapped_column(String(128))
+    created_at: Mapped[dt.datetime] = mapped_column(UTCDateTime, default=utcnow)
+    __table_args__ = (UniqueConstraint("artifact_id", "number", name="uq_assistant_artifact_version"),)
 
 
 class AssistantTurn(Base):
@@ -419,6 +496,7 @@ class AssistantTurn(Base):
     answer: Mapped[str] = mapped_column(Text, default="")
     reply: Mapped[dict[str, Any] | None] = mapped_column(JSONType)
     status: Mapped[str] = mapped_column(String(20), default="pending")
+    attachments: Mapped[list[Any] | None] = mapped_column(JSONType)  # what was sent with this question
     created_at: Mapped[dt.datetime] = mapped_column(UTCDateTime, default=utcnow)
     completed_at: Mapped[dt.datetime | None] = mapped_column(UTCDateTime)
     __table_args__ = (

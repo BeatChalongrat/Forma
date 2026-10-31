@@ -37,8 +37,20 @@ const del = <T>(p: string) => request<T>(p, { method: 'DELETE' })
 const put = <T>(p: string, body: unknown) => request<T>(p, { method: 'PUT', body: JSON.stringify(body) })
 const patch = <T>(p: string, body: unknown) => request<T>(p, { method: 'PATCH', body: JSON.stringify(body) })
 
-export type ChatStreamEvent = { type: 'started'; request_id: string } | { type: 'phase'; phase: 'research' | 'writing' } | { type: 'delta'; text: string } | { type: 'reset' } | { type: 'done'; turn: ChatTurn } | { type: 'error'; message: string }
-async function chatStream(id: string, body: { question: string; request_id: string; language: 'th' | 'en'; timezone: string }, onEvent: (event: ChatStreamEvent) => void, signal: AbortSignal): Promise<ChatTurn> {
+export type ChatStreamEvent = { type: 'started'; request_id: string } | { type: 'phase'; phase: 'research' | 'coding' | 'writing' } | { type: 'delta'; text: string } | { type: 'reset' } | { type: 'done'; turn: ChatTurn } | { type: 'error'; message: string }
+async function chatFile(id: string): Promise<Blob> {
+  const res = await fetch(`/api/assistant/attachments/${encodeURIComponent(id)}`, { headers: authHeaders() })
+  if (!res.ok) throw new ApiError(res.status, 'error', res.statusText)
+  return res.blob()
+}
+
+function attachChatFile(id: string, file: File): Promise<ChatFile> {
+  const body = new FormData()
+  body.append('file', file)
+  return request<ChatFile>(`/api/assistant/conversations/${encodeURIComponent(id)}/attachments`, { method: 'POST', body })
+}
+
+async function chatStream(id: string, body: { question: string; request_id: string; language: 'th' | 'en'; timezone: string; attachment_ids?: string[]; artifact_id?: string; target?: string }, onEvent: (event: ChatStreamEvent) => void, signal: AbortSignal): Promise<ChatTurn> {
   const response = await fetch(`/api/assistant/conversations/${encodeURIComponent(id)}/messages/stream`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() }, body: JSON.stringify(body), signal })
   if (response.status === 401) void login()
   if (!response.ok || !response.body) throw new ApiError(response.status, 'stream_failed', 'Could not start reply')
@@ -207,6 +219,7 @@ export type FieldSpec = { pointer: string; name: string; json_type: string[]; se
 export type SchemaSummary = { schema_id: string; version: number; ref: string; entity: string; status: string; title: string; description: string; identity_keys: string[]; field_count: number; fields?: FieldSpec[]; document?: unknown; source?: 'ui' | 'file'; is_latest?: boolean; is_default?: boolean }
 export type SchemaPreview = SchemaSummary & { fields: FieldSpec[]; findings: { level: 'warning' | 'info'; pointer: string; message: string }[]; previous: string | null; diff: { added: string[]; removed: string[]; changed: { pointer: string; changes: Record<string, unknown> }[] } | null }
 export type BackupKey = {
+  vision: boolean | null
   id: string; provider: string; model: string; base_url: string | null; api_key_hint: string | null
   usable: boolean; circuit_open: boolean; warning: string | null; added_by?: string; added_at?: string
 }
@@ -216,7 +229,7 @@ export type AISettings = {
   active_provider: string; active_model: string; active_route: string | null; offline: boolean; warning: string | null; providers: string[]
   /** known model names per provider (any other name can still be typed) */
   models: Record<string, string[]>
-  circuit_open: boolean; backups: BackupKey[]; max_backups: number
+  circuit_open: boolean; backups: BackupKey[]; max_backups: number; vision: boolean | null; supports_vision: boolean
   updated_by?: string; updated_at?: string
 }
 export type AiProbe = { ok: boolean; offline?: boolean; message: string; model?: string; provider?: string; latency_ms?: number }
@@ -260,7 +273,9 @@ export type Trace = {
 export type Answer = { intent: string; ai: boolean; answer: string; evidence: unknown[]; suggestions: string[]; trace?: { identity: string; pointer: string | null } }
 
 // ---------------------------------------------------------------------------------------------
-export type Preferences = { display_name: string; avatar?: string; language: 'th' | 'en'; theme: 'light' | 'dark' | 'system'; timezone: string; date_format: 'day-first' | 'iso' }
+export type Preferences = { display_name: string; avatar?: string; language: 'th' | 'en'; theme: 'light' | 'dark' | 'system'; timezone: string; date_format: 'day-first' | 'iso'; memory_enabled: boolean; chat_search: boolean; memory_sensitive: boolean }
+export type MemoryItem = { id: string; topic: string; content: string; origin: 'chat' | 'user'; sensitive: boolean; source_chat_id: string | null; created_at: string; updated_at: string }
+export type MemoryChange = { action: 'save' | 'change' | 'forget'; id: string; topic: string; sensitive?: boolean }
 export type HistoryFilters = { status?: string; customer_id?: string; search?: string; start?: string; end?: string; timezone?: string; offset?: number; limit?: number }
 export type ReviewQuestions = { mapping_id: string; round_id: string; status: string; blocked: boolean; questions: { id: string; field: FieldSpec; kind: 'boolean' | 'number' | 'confirm'; current: Expr; evidence: string[]; note?: string }[]; open_questions: string[]; reasons: string[]; sample: Record<string, unknown>[]; context: { customer: { code: string; name: string } | null; round_label: string | null; files: { id: string; name: string }[]; mapping_version: number }; changes: (FieldChange & { field: FieldSpec })[]; comparison_dataset_id: string | null; checks: Record<string, unknown>; impact: PolicyDecision['impact'] | null; fields: FieldSpec[] }
 export type ReviewEvidence = { field: string; sample_limit: number; sample_records: number; constant: boolean; context_only: boolean; unavailable: boolean; examples: { identity: string; item: number | null; value: unknown; source_complete: boolean; cells: { file: string | null; sheet: string | null; row: number | null; column: string | null; header: string; raw: unknown; verified: boolean | null }[] }[] }
@@ -275,22 +290,43 @@ export type AssistantReport = {
   views: ('table' | 'bar' | 'line')[]; view: 'table' | 'bar' | 'line';
   notes: { en: string; th: string }[]; links: { label: string; url: string }[];
 }
-export type WorkspaceAnswer = { answer: string; ai: boolean; reason?: string; clarifications?: Clarification[]; tools_used?: string[]; actions?: AssistantAction[]; visualizations?: AssistantReport[]; evidence: { id: number; tool: string; data: unknown; links: { label: string; url: string }[] }[] }
+export type ChatFile = { id: string; name: string; media_type: string; size: number; kind: 'upload' | 'output' | 'preview' }
+export type ArtifactKind = 'flow' | 'deck' | 'doc' | 'sheet' | 'web' | 'image' | 'text' | 'file'
+export type ArtifactRef = { id: string; kind: ArtifactKind; title: string; version: number; note: string }
+export type FlowNode = { id: string; label: string; detail?: string; tone?: 'plain' | 'question' | 'problem' | 'done' }
+export type FlowEdge = { from: string; to: string; label?: string; back?: boolean }
+export type FlowContent = { nodes: FlowNode[]; edges: FlowEdge[]; direction: 'down' | 'right' }
+export type SheetPreview = { name: string; rows: string[][]; formulas: Record<string, string>; total_rows: number; total_columns: number }
+export type ArtifactVersion = { number: number; note: string; restored_from: number | null; file: ChatFile | null; content: FlowContent | null; preview: { status: 'ready' | 'failed' | 'none'; pages?: string[]; pdf?: string | null; sheets?: SheetPreview[] } | null; code: string | null; checked: number; generated_at: string | null; uses_data: boolean; created_at: string }
+export type ArtifactSummary = { id: string; conversation_id: string; kind: ArtifactKind; title: string; name: string; latest: number; created_at: string; updated_at: string; chat_title?: string }
+export type ArtifactDetail = ArtifactSummary & { stale: boolean; versions: ArtifactVersion[] }
+export type CodeRun = { id: string; code: string; status: 'ok' | 'error' | 'timeout' | 'killed'; exit_code: number; duration_ms: number; stdout: string; stderr: string; files: ChatFile[]; omitted: string[]; inputs: string[] }
+export type WorkspaceAnswer = { answer: string; ai: boolean; reason?: string; clarifications?: Clarification[]; tools_used?: string[]; actions?: AssistantAction[]; visualizations?: AssistantReport[]; code_runs?: CodeRun[]; artifacts?: ArtifactRef[]; memory_changes?: MemoryChange[]; evidence: { id: number; tool: string; data: unknown; links: { label: string; url: string }[] }[] }
 
-export type ChatSummary = { id: string; title: string; round_id: string | null; dataset_id: string | null; mapping_id?: string | null; archived: boolean; pinned: boolean; created_at: string; updated_at: string; busy: boolean }
-export type ChatTurn = { id: string; request_id: string; sequence: number; question: string; reply: WorkspaceAnswer | null; status: 'pending' | 'complete' | 'failed' | 'stopped'; created_at: string }
+export type ChatSummary = { id: string; title: string; round_id: string | null; dataset_id: string | null; mapping_id?: string | null; archived: boolean; pinned: boolean; memory_off?: boolean; incognito?: boolean; created_at: string; updated_at: string; busy: boolean }
+export type ChatTurn = { id: string; request_id: string; sequence: number; question: string; reply: WorkspaceAnswer | null; attachments?: ChatFile[]; status: 'pending' | 'complete' | 'failed' | 'stopped'; created_at: string }
 export type ChatDetail = { conversation: ChatSummary; turns: ChatTurn[]; total: number; older_before: number | null }
 export type ChatList = { items: ChatSummary[]; total: number; next_offset: number | null }
 
 export const api = {
   chats: (search = '', offset = 0, archived = false) => get<ChatList>(`/api/assistant/conversations?search=${encodeURIComponent(search)}&offset=${offset}&archived=${archived}`),
-  createChat: (b: { round_id?: string; dataset_id?: string; mapping_id?: string }) => post<ChatSummary>('/api/assistant/conversations', b),
+  createChat: (b: { round_id?: string; dataset_id?: string; mapping_id?: string; memory_off?: boolean; incognito?: boolean }) => post<ChatSummary>('/api/assistant/conversations', b),
   importChat: (b: { round_id?: string; dataset_id?: string; messages: { question: string; answer: string }[] }) => post<ChatSummary>('/api/assistant/conversations/import', b),
   chat: (id: string, before?: number) => get<ChatDetail>(`/api/assistant/conversations/${encodeURIComponent(id)}${before ? '?before=' + before : ''}`),
   editChat: (id: string, b: { title?: string; archived?: boolean; pinned?: boolean }) => patch<ChatSummary>(`/api/assistant/conversations/${encodeURIComponent(id)}`, b),
   deleteChat: (id: string) => del<void>(`/api/assistant/conversations/${encodeURIComponent(id)}`),
   chatSend: (id: string, b: { question: string; request_id: string; language: 'th' | 'en'; timezone: string }) => post<ChatTurn>(`/api/assistant/conversations/${encodeURIComponent(id)}/messages`, b),
   chatStream,
+  chatFile,
+  attachChatFile,
+  memory: () => get<{ items: MemoryItem[] }>('/api/assistant/memory'),
+  addMemory: (b: { topic: string; content: string }) => post<MemoryItem>('/api/assistant/memory', b),
+  editMemory: (id: string, b: { topic?: string; content?: string }) => patch<MemoryItem>(`/api/assistant/memory/${encodeURIComponent(id)}`, b),
+  deleteMemory: (id: string) => del<void>(`/api/assistant/memory/${encodeURIComponent(id)}`),
+  resetMemory: () => del<{ deleted: number }>('/api/assistant/memory'),
+  artifacts: () => get<{ items: ArtifactSummary[] }>('/api/assistant/artifacts'),
+  artifact: (id: string) => get<ArtifactDetail>(`/api/assistant/artifacts/${encodeURIComponent(id)}`),
+  restoreArtifact: (id: string, number: number) => post<ArtifactDetail>(`/api/assistant/artifacts/${encodeURIComponent(id)}/versions/${number}/restore`),
   chatStop: (id: string, request_id: string) => post<ChatTurn>(`/api/assistant/conversations/${encodeURIComponent(id)}/stop`, { request_id }),
   preferences: () => request<Preferences>('/api/me/preferences', { cache: 'no-store' }),
   savePreferences: (b: Preferences) => put<Preferences>('/api/me/preferences', b),
@@ -307,7 +343,7 @@ export const api = {
   reviewEvidence: (id: string, field: string) => get<ReviewEvidence>(`/api/mappings/${id}/questions/evidence?field=${encodeURIComponent(field)}`),
   previewAnswers: (id: string, answers: Record<string, boolean | number | string>) => post<AnswerPreview>(`/api/mappings/${id}/answers/preview`, { answers }),
   applyAnswers: (id: string, answers: Record<string, boolean | number | string>, digest: string) => post<MappingVersion>(`/api/mappings/${id}/answers/apply`, { answers, digest }),
-  assistantStatus: () => get<{ enabled: boolean; provider: string; model: string; tools: string[] }>('/api/assistant/status'),
+  assistantStatus: () => get<{ enabled: boolean; provider: string; model: string; tools: string[]; vision: boolean; code_sandbox: boolean; file_types: string[] }>('/api/assistant/status'),
   workspaceAsk: (b: { question: string; language: 'th' | 'en'; timezone: string; round_id?: string; dataset_id?: string; conversation: { role: 'user' | 'assistant'; content: string }[] }) => post<WorkspaceAnswer>('/api/assistant/ask', b),
   dashboard: () => get<Dashboard>('/api/dashboard'),
   customers: () => get<Customer[]>('/api/customers'),
@@ -398,6 +434,7 @@ export const api = {
   semantics: () => get<Record<string, string>>('/api/settings/semantics'),
   setDefaultFormat: (target_schema: string) => put<{ target_schema: string }>('/api/settings/default-format', { target_schema }),
   aiSettings: () => get<AISettings>('/api/settings/ai'),
+  testVision: () => post<{ results: { id: string; model: string; vision: boolean | null; message: string }[]; message?: string; ai: AISettings }>('/api/settings/ai/vision-test'),
   saveAiSettings: (b: AISettingsPatch) => put<AISettings>('/api/settings/ai', b),
   connectAi: (api_key: string, provider?: string, model?: string, base_url?: string) => post<{ test: { ok: boolean; message: string; model?: string; provider?: string; latency_ms?: number }; ai: AISettings }>('/api/settings/ai/connect', { api_key, provider, model, base_url }),
   discoverModels: (b: { provider: string; api_key?: string; base_url?: string }) => post<{ models: string[]; source: string; message: string; truncated: boolean }>('/api/settings/ai/models', b),

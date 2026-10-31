@@ -6,7 +6,7 @@ import { VerdictLine } from '../components/VerdictCard'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { ArrowRight, CircleAlert, CircleCheck, Download, FileSpreadsheet, Loader2, UploadCloud, UserPlus, X } from 'lucide-react'
+import { ArrowRight, CircleAlert, CircleCheck, Download, FileSpreadsheet, LoaderCircle, Upload, UserPlus, X } from 'lucide-react'
 import { api, type BatchItem, type BatchItemState } from '../lib/api'
 import { cn, fmtBytes, fmtDate, fmtInt } from '../lib/utils'
 import { Badge, PageHeader, Section, Spinner, Modal } from '../components/ui'
@@ -65,7 +65,7 @@ export function BulkUpload() {
             className={cn('card border-2 border-dashed p-12 text-center cursor-pointer transition-colors', over ? 'border-brand-blue bg-signal-soft' : 'border-line-2 hover:border-brand-blue/60')}
           >
             <input ref={input} type="file" multiple accept=".xlsx,.xlsm,.csv,.txt,.tsv" className="hidden" onChange={(e) => { add(Array.from(e.target.files ?? [])); e.target.value = '' }} />
-            <span className="w-14 h-14 mx-auto grid place-items-center text-signal"><UploadCloud size={26} /></span>
+            <span className="w-14 h-14 mx-auto grid place-items-center text-signal"><Upload size={26} /></span>
             <div className="heading text-[17px] mt-3"><Localized>Drop all the files here</Localized></div>
             <div className="text-ink-2 mt-1"><Localized>Excel (.xlsx) or CSV — any number, from any customers</Localized></div>
             <div className="hint-th mt-1">หรือคลิกเพื่อเลือกไฟล์ เลือกหลายไฟล์พร้อมกันได้</div>
@@ -106,7 +106,7 @@ export function BulkUpload() {
             </div>
           </Section>
           <button className="btn btn-primary btn-lg justify-center" disabled={!files.length || upload.isPending || (!batchId && !workDate) || (!!batchId && !existing.data)} onClick={() => upload.mutate()}>
-            {upload.isPending ? <><Spinner className="border-t-white" /> {t(`Uploading ${files.length} files…`, `กำลังอัปโหลด ${files.length} ไฟล์…`)}</> : <><UploadCloud size={16} /> {t(`Upload ${files.length || ""} files`, `อัปโหลด ${files.length || ""} ไฟล์`)}</>}
+            {upload.isPending ? <><Spinner className="border-t-white" /> {t(`Uploading ${files.length} files…`, `กำลังอัปโหลด ${files.length} ไฟล์…`)}</> : <><Upload size={16} /> {t(`Upload ${files.length || ""} files`, `อัปโหลด ${files.length || ""} ไฟล์`)}</>}
           </button>
           {upload.isPending && <p role="status" className="text-sm text-muted">{t(`Uploaded ${progress} / ${files.length} files`, `ส่งแล้ว ${progress} / ${files.length} ไฟล์`)}</p>}
           {upload.isError && <p role="alert" className="text-sm text-bad">{t('Upload interrupted. Retry to continue; identical files in this round will be skipped.', 'อัปโหลดหยุดกลางทาง กดอัปโหลดอีกครั้งเพื่อทำต่อ ระบบข้ามไฟล์ที่มีแล้วในรอบนี้')}</p>}
@@ -181,7 +181,7 @@ export function UploadPage() {
         title={b.label ?? 'Upload'}
         subtitle={<span className="flex items-center gap-2 flex-wrap"><span>{t('Round date', 'วันที่รอบงาน')}: {b.work_date || t('Not set', 'ยังไม่ได้กำหนด')} · {fmtInt(b.total)} {t('files', 'ไฟล์')} · {t('Created', 'สร้างเมื่อ')} {fmtDate(b.created_at)}</span><Badge tone={b.complete ? 'ok' : 'neutral'}>{b.complete ? t('Received files ready', 'ไฟล์ที่รับมาพร้อมแล้ว') : t('Work remaining', 'ยังมีงานต้องทำ')}</Badge></span>}
         hint="แต่ละไฟล์อยู่ขั้นไหน และต้องทำอะไรต่อ — ไฟล์ที่พร้อมดาวน์โหลด JSON ได้ทันที"
-        actions={<><Link className="btn" to={'/imports/new?batch=' + b.id}><UploadCloud size={15} />{t('Add files to this round', 'เพิ่มไฟล์เข้ารอบนี้')}</Link><a className={cn('btn btn-primary', !ready && 'pointer-events-none')} href={api.uploadDownloadUrl(b.id)} aria-disabled={!ready} tabIndex={ready ? 0 : -1} onClick={e => { if (!ready) e.preventDefault() }}><Download size={15} />{t('Download ready files', 'ดาวน์โหลดไฟล์ที่พร้อม')} ({ready})</a></>}
+        actions={<><Link className="btn" to={'/imports/new?batch=' + b.id}><Upload size={15} />{t('Add files to this round', 'เพิ่มไฟล์เข้ารอบนี้')}</Link><a className={cn('btn btn-primary', !ready && 'pointer-events-none')} href={api.uploadDownloadUrl(b.id)} aria-disabled={!ready} tabIndex={ready ? 0 : -1} onClick={e => { if (!ready) e.preventDefault() }}><Download size={15} />{t('Download ready files', 'ดาวน์โหลดไฟล์ที่พร้อม')} ({ready})</a></>}
       />
 
       <button className="btn btn-sm mb-4" onClick={() => { setRoundLabel(b.label || ''); setRoundDate(b.work_date || dateInZone(prefs.timezone)); edit.reset(); setEditing(true) }}>{t('Edit round name / date', 'แก้ชื่อ / วันที่รอบงาน')}</button>
@@ -281,7 +281,7 @@ function ItemRow({ i }: { i: BatchItem }) {
         <details className="text-xs text-muted mt-2"><summary>{t('What is happening?', 'ระบบกำลังทำอะไร?')}</summary><p className="mt-1">{i.message}</p></details></div>
       </td>
       <td>
-        <Badge tone={st.tone}>{i.state === 'processing' ? <Loader2 size={11} className="animate-spin" /> : i.state === 'ready' ? <CircleCheck size={11} /> : null}{st.label}</Badge>
+        <Badge tone={st.tone}>{i.state === 'processing' ? <LoaderCircle size={11} className="animate-spin" /> : i.state === 'ready' ? <CircleCheck size={11} /> : null}{st.label}</Badge>
         <div className="text-[11.5px] text-muted mt-1 max-w-[280px]">{i.verdict && i.state !== 'ready' && i.state !== 'processing' ? <VerdictLine v={i.verdict} /> : i.state === 'needs_data_check' && i.reasons?.length ? i.reasons.join(' · ') : i.message}</div>
       </td>
       <td className="text-right tnum">{fmtInt(i.rows)}</td>

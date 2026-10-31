@@ -1,5 +1,8 @@
 # ADR-002 — AI emits a declarative DSL; no generated code is executed
 
+**Scope** Holds for everything in the data path. ADR-048 lets the assistant run code in an isolated sandbox whose
+results reach a person, never a record.
+
 **Decision** Every transformation is a tree of whitelisted operations (`mapping_dsl.models.Op`) compiled to
 Polars expressions in `engine/ops.py`. LLMs return a `MappingDocument` as structured JSON that is Pydantic-
 validated and statically checked against the target schema, with retry-on-error feedback. Unknown ops fail

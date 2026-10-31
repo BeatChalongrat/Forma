@@ -2,7 +2,7 @@ import { Localized } from '../lib/locale'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { Check, X, Save, SearchCheck, ChevronDown, ChevronRight, Braces, Plus, Trash2, PencilLine, ShieldAlert, Network, PanelLeft, PanelRight } from 'lucide-react'
+import { Check, X, Save, SearchCheck, ChevronDown, ChevronRight, Braces, Plus, Trash2, Pencil, ShieldAlert, Network, PanelLeft, PanelRight } from 'lucide-react'
 import { api, type SandboxItem, type SandboxReport, type Expr, type FieldChange, type FieldMapping, type FieldSpec, type MappingDocument, type TableProfile } from '../lib/api'
 import { cn, describeExpr, fmtInt, pyRegex } from '../lib/utils'
 import { Badge, Confidence, HelpStrip, RiskDot, RiskLevel, Spinner, StatusBadge, Tabs, FindingRow, Modal } from '../components/ui'
@@ -387,7 +387,7 @@ export function MappingStudio() {
                     </div>
                   ))}
                   {diagnose.data.root_causes.length === 0 && <div className="text-muted">Nothing to diagnose — the mapping runs clean on the sample.</div>}
-                  {diagnose.data.patched_mapping && !locked && <button className="btn btn-primary btn-sm self-start" onClick={() => { setDoc(diagnose.data!.patched_mapping!); setDirty(true); toast.push({ kind: 'info', title: 'Patched mapping loaded', detail: 'Review the changes, then save as a new version.' }) }}><PencilLine size={13} /> Review suggested fix</button>}
+                  {diagnose.data.patched_mapping && !locked && <button className="btn btn-primary btn-sm self-start" onClick={() => { setDoc(diagnose.data!.patched_mapping!); setDirty(true); toast.push({ kind: 'info', title: 'Patched mapping loaded', detail: 'Review the changes, then save as a new version.' }) }}><Pencil size={13} /> Review suggested fix</button>}
                 </div>
               ) : <div className="text-muted text-[12.5px]">Choose Explain issues to see the cause and suggested fixes.</div>
             )}

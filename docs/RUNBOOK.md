@@ -70,6 +70,21 @@ Symptoms: `forma_llm_breaker_open` = 1, Ops page shows "circuit breaker OPEN", r
    own breakers, so the next round uses them at once (ADR-025); "Test all keys" shows which key answers.
    The mapping DSL is provider-agnostic.
 
+### The assistant cannot run code
+
+Symptoms: Settings → AI shows the sandbox as not available; the composer says the sandbox is off; the assistant says
+it cannot run code. Everything else keeps working.
+
+1. `docker compose ps sandbox`. If it is not healthy: `docker compose restart sandbox`, then the API once, so both
+   see the same socket.
+2. The service has no network by design (ADR-048). Do not add one to debug it. To look inside, use
+   `docker compose exec sandbox python -c "import pandas; print(pandas.__version__)"`.
+3. A run that ends "stopped by a limit" ran out of memory or processes. Limits are in `code_sandbox/runner.py` and the
+   service definition. `FORMA_CODE_SANDBOX_TIMEOUT_S` sets the time limit and `FORMA_CODE_SANDBOX_MAX_INPUT_MB` the data
+   one run can receive.
+4. A new library goes in `deploy/sandbox/requirements.txt`, followed by a rebuild of the image.
+5. LibreOffice failing with "no valid pipe path found" means the service lost its `/tmp` mount.
+
 ### Storage outage (S3/MinIO)
 
 `/ready` reports `storage: ok=false`; uploads fail with 5xx; transforms fail with the boto3 error on the job.

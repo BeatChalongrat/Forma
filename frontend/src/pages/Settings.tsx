@@ -4,14 +4,24 @@ import { providerName } from '../lib/providerName'
 import { useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowDown, ArrowUp, MessageSquare, Check, FileJson, KeyRound, Plus, RotateCcw, Save, Star, Trash2, Upload, Wifi } from 'lucide-react'
+import { ArrowDown, ArrowUp, Brain, Check, CodeXml, FileJson, FlaskConical, ImagePlus, KeyRound, Monitor, Plug, Plus, RotateCcw, Save, Scale, ScrollText, Star, Trash2, Upload, Wifi, type LucideIcon } from 'lucide-react'
 import { api, ApiError, type AISettings, type AiProbe, type BackupKey, type Policy, type SchemaPreview } from '../lib/api'
-import { PageHeader, Section, Badge, RiskDot, Tabs, Json, KV, Modal, Spinner, Stat } from '../components/ui'
+import { PageHeader, Section, Badge, RiskDot, Json, KV, Modal, Spinner, Stat } from '../components/ui'
 import { cn, fmtDate } from '../lib/utils'
 import { useToast } from '../lib/toast'
 
 const TABS = ['ai', 'formats', 'policy', 'learning', 'dsl', 'audit', 'system'] as const
 type Tab = (typeof TABS)[number]
+
+const SECTIONS: { id: Tab; label: string; hint: string; icon: LucideIcon }[] = [
+  { id: 'ai', label: 'AI', hint: 'เชื่อม AI, key สำรอง, เลือก model', icon: Plug },
+  { id: 'formats', label: 'Target formats', hint: 'อัป Target JSON และตั้งค่าเริ่มต้น', icon: FileJson },
+  { id: 'policy', label: 'Approval policy', hint: 'เกณฑ์ approve อัตโนมัติ และเกณฑ์ความผิดปกติ', icon: Scale },
+  { id: 'learning', label: 'What FORMA learned', hint: 'สิ่งที่ระบบเรียนจากการแก้ของคุณ และแนวโน้มการแก้ต่อรอบ', icon: Brain },
+  { id: 'dsl', label: 'Mapping DSL', hint: 'รายการคำสั่งแปลงข้อมูลที่ใช้ได้', icon: CodeXml },
+  { id: 'audit', label: 'Audit log', hint: 'ใครทำอะไร เมื่อไร', icon: ScrollText },
+  { id: 'system', label: 'System', hint: 'การตั้งค่าเครื่อง server', icon: Monitor },
+]
 
 /** Admins change AI, the approval policy and target formats here — validated, audited, applied without a restart. */
 export function SettingsPage() {
@@ -21,8 +31,11 @@ export function SettingsPage() {
   return (
     <>
       <PageHeader title="Settings" subtitle="AI provider, target formats and the approval policy — edited here, checked before saving, recorded in the audit log, applied without a restart." hint="ตั้งค่า AI (key หลัก/สำรอง, model) · Target format ที่ระบบปลายทางต้องการ · กฎว่าเมื่อไรระบบ approve เองได้" />
-      <Tabs value={tab} onChange={setTab} items={[{ id: 'ai', label: 'AI', hint: 'เชื่อม AI, key สำรอง, เลือก model' }, { id: 'formats', label: 'Target formats', hint: 'อัป Target JSON และตั้งค่าเริ่มต้น' }, { id: 'policy', label: 'Approval policy', hint: 'เกณฑ์ approve อัตโนมัติ และเกณฑ์ความผิดปกติ' }, { id: 'learning', label: 'What FORMA learned', hint: 'สิ่งที่ระบบเรียนจากการแก้ของคุณ และแนวโน้มการแก้ต่อรอบ' }, { id: 'dsl', label: 'Mapping DSL', hint: 'รายการคำสั่งแปลงข้อมูลที่ใช้ได้' }, { id: 'audit', label: 'Audit log', hint: 'ใครทำอะไร เมื่อไร' }, { id: 'system', label: 'System', hint: 'การตั้งค่าเครื่อง server' }]} />
-      <div className="mt-4">
+      <div className="grid lg:grid-cols-[230px_minmax(0,1fr)] gap-6 items-start">
+        <nav aria-label="Settings sections" className="flex flex-wrap lg:flex-col gap-1">
+          {SECTIONS.map(({ id, label, hint, icon: Icon }) => <button key={id} onClick={() => setTab(id)} title={hint} aria-current={tab === id ? 'page' : undefined} className={cn('flex items-center gap-3 min-h-11 rounded-lg px-3 text-left text-[14px] font-medium hover:bg-surface-2', tab === id ? 'bg-signal-soft text-navy font-semibold' : 'text-ink-2')}><Icon size={20} className="shrink-0" aria-hidden="true" /><Localized>{label}</Localized></button>)}
+        </nav>
+        <div className="min-w-0">
         {tab === 'ai' && <AITab />}
         {tab === 'formats' && <FormatsTab />}
         {tab === 'policy' && <PolicyTab />}
@@ -30,6 +43,7 @@ export function SettingsPage() {
         {tab === 'dsl' && <DslTab />}
         {tab === 'audit' && <AuditTab />}
         {tab === 'system' && <SystemTab />}
+        </div>
       </div>
     </>
   )
@@ -68,11 +82,12 @@ function AITab() {
   return (
     <div className="flex flex-col gap-4">
       <ConnectCard key={`${ai.provider}:${ai.base_url}:${ai.model}:${ai.updated_at}`} ai={ai} />
+      <AssistantAbilities ai={ai} />
       <BackupKeysCard ai={ai} />
       <div><button className="btn btn-ghost btn-sm whitespace-normal text-left h-auto max-w-full" onClick={() => setAdvanced(!advanced)}>{advanced ? t('Hide advanced settings', 'ซ่อนการตั้งค่าขั้นสูง') : t('Show advanced settings — provider, model, gateway URL, timeout', 'การตั้งค่าขั้นสูง — ผู้ให้บริการ โมเดล Gateway และเวลารอ')}</button></div>
       {advanced && (
     <div className="grid lg:grid-cols-[1fr_340px] gap-4">
-      <Section title="Advanced settings" actions={ai.offline ? <Badge tone="warn">offline · deterministic mapper only</Badge> : <Badge tone="ok"><MessageSquare size={12} /> {ai.active_provider} · {ai.model}</Badge>}>
+      <Section title="Advanced settings" actions={ai.offline ? <Badge tone="warn">offline · deterministic mapper only</Badge> : <Badge tone="ok"><Plug size={12} /> {ai.active_provider} · {ai.model}</Badge>}>
         <div className="p-4 grid sm:grid-cols-2 gap-4 text-[13px]">
           <label className="flex flex-col gap-1.5"><span className="text-muted">Provider</span>
             <select className="input" value={f.provider} onChange={(e) => { const p = e.target.value; const known = ai.models[p] ?? []; setDraft({ ...f, provider: p, model: !known.length || known.includes(f.model) ? f.model : known[0] }) }}>{ai.providers.map((p) => <option key={p} value={p}>{p === 'mock' ? 'off (mock)' : p}</option>)}</select>
@@ -167,6 +182,46 @@ function ModelPicker({ provider, models, value, onChange, allowDefault, disabled
 }
 
 const PROVIDER_LABEL: Record<string, string> = { anthropic: 'Anthropic', openai: 'OpenAI', openai_compatible: 'Gateway' }
+
+/** What the assistant can do beyond text: read images (ADR-049) and run code (ADR-048). */
+function AssistantAbilities({ ai }: { ai: AISettings }) {
+  const { t } = usePreferences()
+  const qc = useQueryClient()
+  const toast = useToast()
+  const { data: status } = useQuery({ queryKey: ['assistant-status'], queryFn: api.assistantStatus })
+  const test = useMutation({
+    mutationFn: api.testVision,
+    onSuccess: (r) => { qc.setQueryData(['ai-settings'], r.ai); void qc.invalidateQueries({ queryKey: ['assistant-status'] }); toast.push({ kind: r.ai.supports_vision ? 'ok' : 'bad', title: r.ai.supports_vision ? t('A connected model reads images', 'มีโมเดลที่อ่านรูปได้') : t('No connected model reads images', 'ยังไม่มีโมเดลที่อ่านรูปได้'), detail: r.message ?? r.results.map((x) => `${x.model}: ${x.message}`).join(' · ') }) },
+    onError: (e: Error) => toast.push({ kind: 'bad', title: t('Could not test', 'ทดสอบไม่สำเร็จ'), detail: e.message }),
+  })
+  const seen = (v: boolean | null) => v === null ? <Badge tone="warn">{t('Not tested', 'ยังไม่ได้ทดสอบ')}</Badge> : v ? <Badge tone="ok">{t('Reads images', 'อ่านรูปได้')}</Badge> : <Badge tone="neutral">{t('Cannot read images', 'อ่านรูปไม่ได้')}</Badge>
+  return (
+    <Section title={t('What the assistant can do', 'ความสามารถของผู้ช่วย')}>
+      <div className="p-4 flex flex-col gap-4 text-[13.5px]">
+        <div className="flex flex-wrap items-start gap-3">
+          <ImagePlus size={20} className="shrink-0 mt-0.5 text-navy" aria-hidden="true" />
+          <div className="flex-1 min-w-[260px]">
+            <p className="font-medium">{t('Read images', 'อ่านรูป')}</p>
+            <p className="text-[12.5px] text-muted mt-0.5">{t('The test sends one small coloured picture to each connected model. It contains no customer data.', 'การทดสอบจะส่งรูปสีเล็กๆ ไปที่โมเดลทุกตัวที่เชื่อมอยู่ ไม่มีข้อมูลลูกค้า')}</p>
+            <ul className="mt-2 flex flex-col gap-1.5">
+              <li className="flex flex-wrap items-center gap-2"><span className="mono text-[12.5px]">{ai.active_model}</span>{seen(ai.vision)}</li>
+              {ai.backups.map((b) => <li key={b.id} className="flex flex-wrap items-center gap-2"><span className="mono text-[12.5px]">{b.model}</span>{seen(b.vision)}</li>)}
+            </ul>
+          </div>
+          <button className="btn" disabled={ai.offline || test.isPending} onClick={() => test.mutate()}>{test.isPending ? t('Testing…', 'กำลังทดสอบ…') : t('Test image reading', 'ทดสอบการอ่านรูป')}</button>
+        </div>
+        <div className="flex flex-wrap items-start gap-3 border-t border-line pt-4">
+          <FlaskConical size={20} className="shrink-0 mt-0.5 text-navy" aria-hidden="true" />
+          <div className="flex-1 min-w-[260px]">
+            <p className="font-medium">{t('Run code in a sandbox', 'รันโค้ดในห้องทดลอง')}</p>
+            <p className="text-[12.5px] text-muted mt-0.5">{t('Python in a separate box with no internet and no passwords. It works on copies and cannot change FORMA data.', 'Python ในกล่องแยก ไม่มีอินเทอร์เน็ตและไม่มีรหัสผ่าน ทำงานกับสำเนา แก้ข้อมูลใน FORMA ไม่ได้')}</p>
+          </div>
+          {status?.code_sandbox ? <Badge tone="ok">{t('Ready', 'พร้อมใช้')}</Badge> : <Badge tone="warn">{t('Not available', 'ยังไม่พร้อม')}</Badge>}
+        </div>
+      </div>
+    </Section>
+  )
+}
 
 /** Backup keys (ADR-025): tried in order when the main key fails — error, rate limit, no credit. */
 function BackupKeysCard({ ai }: { ai: AISettings }) {

@@ -23,6 +23,7 @@ x-forma-env: &forma-env
     FORMA_LOG_FORMAT: json
     FORMA_CORS_ORIGINS: '["${FORMA_PUBLIC_URL:-http://localhost}"]'
     FORMA_OTEL_ENDPOINT: ${FORMA_OTEL_ENDPOINT:-}
+    FORMA_CODE_SANDBOX_SOCKET: /run/sandbox/runner.sock
 
 services:
   postgres:
@@ -88,8 +89,27 @@ services:
       migrate: { condition: service_completed_successfully }
       redis: { condition: service_healthy }
       minio-init: { condition: service_completed_successfully }
-    volumes: ["formadata:/data"]          # local cache for S3 objects + tmp
+    volumes:
+      - formadata:/data                   # local cache for S3 objects + tmp
+      - sandbox-socket:/run/sandbox       # the only way to the code sandbox (ADR-048)
     expose: ["8000"]
+    restart: unless-stopped
+
+  sandbox:
+    # The assistant's code runner (ADR-048). No network at all: the API reaches it through one socket on a
+    # shared volume, and the code it runs reaches nothing. It holds no secrets and keeps nothing between runs.
+    build: { context: ., dockerfile: deploy/sandbox/Dockerfile }
+    network_mode: none
+    read_only: true
+    tmpfs: ["/workspace:size=1g,mode=0711", "/tmp:size=64m,mode=1777"]
+    volumes: ["sandbox-socket:/run/sandbox"]
+    cap_drop: [ALL]
+    cap_add: [SETUID, SETGID, KILL, CHOWN, DAC_OVERRIDE]
+    security_opt: ["no-new-privileges:true"]
+    pids_limit: 256
+    mem_limit: 3g
+    memswap_limit: 3g
+    cpus: 2
     restart: unless-stopped
 
   worker:
@@ -140,3 +160,4 @@ volumes:
   minio: {}
   formadata: {}
   backups: {}
+  sandbox-socket: {}

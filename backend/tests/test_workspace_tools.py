@@ -159,7 +159,8 @@ def test_status_and_configuration_exclude_secrets(client: TestClient) -> None:
     status = client.get("/api/assistant/status").json()
     assert not status["enabled"]
     assert "query_records" in status["tools"]
-    assert set(status) == {"enabled", "provider", "model", "tools"}
+    assert set(status) == {"enabled", "provider", "model", "tools", "vision", "code_sandbox", "file_types"}
+    assert status["vision"] is False and status["code_sandbox"] is False
     config = call(client, "runtime_configuration", {})
     assert "approval_policy" in config
     importer = call(client, "runtime_configuration", {}, headers={"X-Forma-User": "importer"})

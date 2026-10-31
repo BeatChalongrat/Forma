@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useMemo, type ReactNode } from 'r
 import { useQuery } from '@tanstack/react-query'
 import { api, type Preferences } from './api'
 
-const defaults: Preferences = { display_name: '', language: 'th', theme: 'light', timezone: 'Asia/Bangkok', date_format: 'day-first' }
+const defaults: Preferences = { display_name: '', language: 'th', theme: 'light', timezone: 'Asia/Bangkok', date_format: 'day-first', memory_enabled: true, chat_search: true, memory_sensitive: false }
 const Context = createContext(defaults)
 
 export function PreferencesProvider({ children }: { children: ReactNode }) {

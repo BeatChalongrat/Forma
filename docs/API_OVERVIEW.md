@@ -84,6 +84,7 @@ Long operations run as jobs: `POST …/run`, `/profile`, `/propose` and `/transf
 |---|---|
 | `GET/PUT /settings/ai` · `POST /settings/ai/connect` · `/test` · `/models` | primary AI connection; paste-a-key connect; probe; model discovery |
 | `POST/PATCH/DELETE /settings/ai/backups[/{id}]` · `PUT /settings/ai/backups/order` | backup routes |
+| `POST /settings/ai/vision-test` | show each connected model a test picture and keep the result (ADR-049) |
 | `GET/PUT/DELETE /settings/policy` · `GET /policy` | approval policy (web edits on top of the file) |
 | `PUT /settings/default-format` | default target format |
 
@@ -91,10 +92,14 @@ Long operations run as jobs: `POST …/run`, `/profile`, `/propose` and `/transf
 
 | Endpoint | Purpose |
 |---|---|
-| `GET /assistant/status` | provider, model, tools |
+| `GET /assistant/status` | provider, model, tools, whether images can be read, whether the code sandbox is up, the file types a chat accepts |
 | `POST /assistant/ask` | one-shot answer with evidence (legacy) |
 | `GET/POST /assistant/conversations` · `GET/PATCH/DELETE /assistant/conversations/{id}` · `POST …/import` | persistent chats (owner + access scope); rename, pin, archive, delete |
-| `POST /assistant/conversations/{id}/messages` · `/messages/stream` (SSE) · `/stop` | send; stream deltas, phases, done; stop |
+| `POST /assistant/conversations/{id}/messages` · `/messages/stream` (SSE) · `/stop` | send, with `attachment_ids`; stream deltas, phases, done; stop |
+| `POST /assistant/conversations/{id}/attachments` · `GET /assistant/attachments/{file_id}` | add a file to a chat; read one, through a chat you can open (ADR-049) |
+| `GET /assistant/memory` · `POST /assistant/memory` · `PATCH /assistant/memory/{id}` · `DELETE /assistant/memory/{id}` · `DELETE /assistant/memory` | read, add, change and delete memory; the last clears all of it (ADR-051) |
+| `GET /assistant/artifacts` · `GET /assistant/artifacts/{id}` | every work in your chats; one work with all its versions (ADR-050) |
+| `POST /assistant/artifacts/{id}/versions/{n}/restore` | bring an old version back as the next number (ADR-050) |
 | `GET /mcp` (405) · `POST /mcp` | Streamable HTTP JSON-RPC: initialize, ping, tools/list, tools/call over the same read-only tools |
 
 ## Operations

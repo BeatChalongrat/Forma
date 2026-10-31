@@ -26,6 +26,10 @@
 | **Breaker / route / backup key** | เบรกเกอร์ / เส้นทาง / คีย์สำรอง | Provider resilience: a route is a provider+model+key; each has a circuit breaker; backups are tried in order. |
 | **Simulation** | จำลอง | Running a mapping on a bounded sample to get rows, findings and sample records. |
 | **Sandbox** | แซนด์บ็อกซ์ | Running the new mapping next to the approved one on the same files and comparing. |
+| **Memory** | ความจำ | Short topics the assistant keeps about the person it works with, across chats. Background only, never evidence (ADR-051). |
+| **Incognito chat** | แชตไม่บันทึก | A chat in no history or search that uses no memory and is deleted after a day (ADR-051). |
+| **Work** | ผลงาน | Something the assistant made in a chat: a flow or a file. It opens beside the chat and keeps every version (ADR-050). |
+| **Code sandbox** | ห้องทดลอง | The assistant's separate container: Python on copies of the data, no network, no secrets. Its results reach the chat, never a record (ADR-048). |
 | **Field review / data check** | ตรวจรายฟิลด์กับข้อมูล | Per changed field, comparing values on the same SKUs with last round's published data: same, vat_added, vat_removed, scaled, different, no_data. |
 | **Policy** | กฎอนุมัติ | `approval.yaml` + web edits: thresholds that produce auto_approve / review / block with reasons; sandbox, anomaly, publish and verdict sections. |
 | **Policy overrides** | กฎเฉพาะลูกค้า | Sections of the policy a customer overrides (from calibration proposals). |
