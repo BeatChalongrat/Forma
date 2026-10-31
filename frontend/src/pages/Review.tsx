@@ -1,7 +1,8 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link, useSearchParams } from 'react-router-dom'
-import { ArrowRight, Sparkles } from 'lucide-react'
+import { ArrowRight } from 'lucide-react'
 import { api, type ReviewTask } from '../lib/api'
+import { AssistantIcon } from '../lib/icons'
 import { usePreferences } from '../lib/preferences'
 import { Badge, Empty, PageHeader, Spinner } from '../components/ui'
 import { Workflow } from '../components/Workflow'
@@ -22,7 +23,7 @@ export function ReviewCenter() {
   const active = params.get('mapping') || (round ? items.find(i => i.mapping_version_id)?.mapping_version_id ?? null : null)
   if (active) return <ReviewWorkspace key={active} id={active} onSaved={id => { choose({ mapping: id }) }} onDone={() => { choose({ mapping: '', round: '' }) }} />
   return <>
-    <PageHeader title={t('Questions & issues', 'คำถามและปัญหา')} subtitle={t('Start with one file. Answer what you know, inspect the evidence, and preview before saving.', 'เริ่มทีละไฟล์ ตอบสิ่งที่ทราบ ตรวจหลักฐาน แล้วดูตัวอย่างก่อนบันทึก')} actions={<Link className="btn" to={round ? `/assistant?round=${round}` : '/assistant'}><Sparkles size={16} />{t('Ask the assistant', 'ถามผู้ช่วย')}</Link>} />
+    <PageHeader title={t('Questions & issues', 'คำถามและปัญหา')} subtitle={t('Start with one file. Answer what you know, inspect the evidence, and preview before saving.', 'เริ่มทีละไฟล์ ตอบสิ่งที่ทราบ ตรวจหลักฐาน แล้วดูตัวอย่างก่อนบันทึก')} actions={<Link className="btn" to={round ? `/assistant?round=${round}` : '/assistant'}><AssistantIcon size={16} />{t('Ask the assistant', 'ถามผู้ช่วย')}</Link>} />
     <Workflow status="review" />
     <div className="flex flex-wrap gap-2 mb-4">{[['open', t('Needs your attention', 'รอคุณตรวจ')], ['approved', t('Approved', 'อนุมัติแล้ว')], ['rejected', t('Rejected', 'ไม่อนุมัติ')], ['dismissed', t('Replaced by a newer version', 'มีเวอร์ชันใหม่แล้ว')]].map(([id, label]) => <button key={id} className={`btn btn-sm ${tab === id ? 'bg-signal-soft text-navy border-signal/30' : 'btn-ghost'}`} onClick={() => { choose({ status: id, round: '' }) }}>{label}</button>)}{round && <button className="btn btn-sm" onClick={() => { choose({ round: '' }) }}>{t('Show all files', 'ดูทุกไฟล์')}</button>}</div>
     {query.isPending && <div className="p-6 flex gap-2 text-muted"><Spinner />{t('Loading questions…', 'กำลังโหลดคำถาม…')}</div>}

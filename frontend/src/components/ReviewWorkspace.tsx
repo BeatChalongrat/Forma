@@ -1,8 +1,9 @@
 import { useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate } from 'react-router-dom'
-import { ArrowLeft, ArrowRight, Check, ChevronDown, CircleHelp, FileText, Sparkles, TriangleAlert } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Check, ChevronDown, CircleHelp, FileText, TriangleAlert } from 'lucide-react'
 import { api, type AnswerPreview, type Expr, type FieldSpec, type ReviewQuestions } from '../lib/api'
+import { AssistantIcon } from '../lib/icons'
 import { usePreferences } from '../lib/preferences'
 import { Badge, Spinner } from './ui'
 import { VerdictCard } from './VerdictCard'
@@ -78,7 +79,7 @@ export function ReviewWorkspace({ id, onSaved, onDone }: { id: string; onSaved: 
     <button className="btn btn-ghost btn-sm" onClick={onDone} disabled={busy}><ArrowLeft size={15} />{t('Review queue', 'กลับรายการที่รอตรวจ')}</button>
     <header className="flex flex-wrap justify-between gap-4 items-start">
       <div className="min-w-0"><div className="flex gap-3 items-center flex-wrap"><h1 className="text-2xl font-semibold text-navy">{t('Check this file', 'ตรวจไฟล์นี้')}</h1><Badge tone={q.blocked ? 'bad' : 'warn'}>{q.blocked ? t('Source check required', 'ต้องตรวจต้นทางก่อน') : t('Waiting for review', 'รอตรวจ')}</Badge></div><p className="mt-2 break-words">{q.context.customer?.name.startsWith(q.context.customer.code) ? q.context.customer.name : `${q.context.customer?.code} · ${q.context.customer?.name}`} <span className="text-muted">/ {q.context.round_label}</span></p><p className="text-xs text-muted mt-1">{t('Mapping version', 'การจับคู่เวอร์ชัน')} {q.context.mapping_version} · {t('Answer → preview → save and recheck', 'ตอบคำถาม → ดูผลที่จะเปลี่ยน → บันทึกและตรวจอีกครั้ง')}</p></div>
-      <button className="btn btn-sm" disabled={explain.isPending} onClick={() => explain.mutate({ round_id: q.round_id, mapping_id: id })}>{explain.isPending ? <Spinner /> : <Sparkles size={16} />}{t('Explain this file', 'ให้ผู้ช่วยอธิบายไฟล์นี้')}</button>
+      <button className="btn btn-sm" disabled={explain.isPending} onClick={() => explain.mutate({ round_id: q.round_id, mapping_id: id })}>{explain.isPending ? <Spinner /> : <AssistantIcon size={16} />}{t('Explain this file', 'ให้ผู้ช่วยอธิบายไฟล์นี้')}</button>
     </header>
     {explain.isError && <p role="alert" className="text-bad text-sm">{t('Could not open the assistant. Please try again.', 'ยังเปิดผู้ช่วยไม่ได้ ลองกดอีกครั้ง')}</p>}
     <div className="flex flex-wrap gap-2">{q.context.files.map(f => <Link key={f.id} className="btn btn-sm max-w-full text-left" to={`/rounds/${q.round_id}`}><FileText size={14} className="shrink-0" /><span className="break-all">{f.name}</span></Link>)}</div>

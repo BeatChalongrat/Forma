@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { Sparkles, FileSpreadsheet, Table2 } from 'lucide-react'
+import { FileSpreadsheet, Table2 } from 'lucide-react'
 import { api, waitForJob, type SourceFile, type TableProfile } from '../lib/api'
+import { AssistantIcon } from '../lib/icons'
 import { formatLabel, fmtBytes, fmtDate, fmtInt, cn } from '../lib/utils'
 import { PageHeader, StatusBadge, Section, Badge, Confidence, Drawer, KV, Spinner, FindingRow, Empty } from '../components/ui'
 import { RoundSteps } from '../components/RoundSteps'
@@ -48,7 +49,7 @@ export function RoundPage() {
         title={<span>{r.customer?.name} <span className="text-muted font-normal">· {r.label}</span></span>}
         subtitle={<span className="flex items-center gap-2 flex-wrap"><StatusBadge status={r.status} />{drift && <Badge tone={driftTone(drift)}>format: {formatLabel(drift)}</Badge>}<span className="text-muted">{fmtDate(r.created_at)}</span></span>}
         hint="รอบนี้อยู่ขั้นไหน และต้องทำอะไรต่อ ดูที่แถบด้านล่าง"
-        actions={<Link className="btn" to={`/assistant?round=${r.id}`}><Sparkles size={16} /> Ask about this file</Link>}
+        actions={<Link className="btn" to={`/assistant?round=${r.id}`}><AssistantIcon size={16} /> Ask about this file</Link>}
       />
 
       <RoundSteps r={r} busy={runJob.isPending || doExport.isPending} onRun={(k) => runJob.mutate(k)} onExport={(id, fmt) => doExport.mutate({ id, fmt })} />

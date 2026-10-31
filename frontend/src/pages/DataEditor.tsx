@@ -3,8 +3,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useVirtualizer } from '@tanstack/react-virtual'
-import { Download, Search, Undo2, Sparkles, History, GitCompareArrows, CircleAlert, CircleCheck, Route, Trash2, Activity, X, PanelRight } from 'lucide-react'
+import { Download, Search, Undo2, History, GitCompareArrows, CircleAlert, CircleCheck, Route, Trash2, Activity, X, PanelRight } from 'lucide-react'
 import { api, ApiError, type Answer, type AnomalyReport, type FieldSpec, type Operation, type Impact, type RowsPage, type Trace } from '../lib/api'
+import { AssistantIcon } from '../lib/icons'
 import { cn, cellText, fmtInt, fmtNum, getPointer, timeAgo, describeExpr } from '../lib/utils'
 import { Badge, Drawer, HelpStrip, Modal, Spinner, StatusBadge, Tabs, FindingRow } from '../components/ui'
 import { WorkspacePanel } from '../components/WorkspacePanel'
@@ -257,7 +258,7 @@ export function DataEditor() {
         {errors > 0 && <Badge tone="bad"><CircleAlert size={12} /> {errors} other error{errors > 1 ? 's' : ''}</Badge>}
         <div className="relative min-w-0"><Search size={13} className="absolute left-2.5 top-2.5 text-muted" /><input className="input pl-7 w-52 max-w-full" placeholder="Search any field…" value={q} onChange={(e) => setQ(e.target.value)} /></div>
         <div className="ml-auto flex items-center gap-2 flex-wrap">
-          <button className="btn btn-ghost btn-sm" aria-expanded={assistantOpen} onClick={() => setAssistantOpen(!assistantOpen)}><Sparkles size={15} /> Assistant</button>
+          <button className="btn btn-ghost btn-sm" aria-expanded={assistantOpen} onClick={() => setAssistantOpen(!assistantOpen)}><AssistantIcon size={15} /> Assistant</button>
           <button className="btn btn-ghost btn-sm" aria-expanded={rightOpen} onClick={() => setRightOpen(!rightOpen)}><PanelRight size={15} /> Review{pending.length > 0 ? ` (${pending.length})` : ''}</button>
 
           {pending.length > 0 && <><button className="btn btn-sm" onClick={() => setPending([])}><Undo2 size={13} /> Discard</button><button className="btn btn-sm btn-primary" onClick={() => { preview.mutate(); setSaveOpen(true) }}>Review {pending.length} change{pending.length > 1 ? 's' : ''}</button></>}
@@ -268,7 +269,7 @@ export function DataEditor() {
       </div>
 
       {assistantOpen && <div className="px-5 py-3 border-b border-line bg-surface shrink-0">
-        <div className="flex items-center gap-2"><Sparkles size={16} className="text-muted" />
+        <div className="flex items-center gap-2"><AssistantIcon size={16} className="text-muted" />
           <input aria-label="Ask the assistant" className="input flex-1" placeholder="Ask about this data, or describe a change…" value={copilot} onChange={(e) => setCopilot(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && submitCopilot()} />
           <button className="btn btn-sm btn-primary" disabled={!copilot.trim() || ask.isPending || question.isPending} onClick={submitCopilot}>{ask.isPending || question.isPending ? <Spinner /> : isQuestion(copilot) ? 'Ask' : 'Preview'}</button>
         </div><p className="text-[12.5px] text-muted mt-2 ml-6">Try “ลดราคา 5% เฉพาะสินค้าที่มีสต็อก” — you review the changes before saving.</p>
