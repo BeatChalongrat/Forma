@@ -1,10 +1,11 @@
 import { Fragment, useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query'
-import { ChevronDown, Sparkles, Pin, Search, SquarePen } from 'lucide-react'
+import { ChevronDown, Pin, Search, SquarePen } from 'lucide-react'
 import { KIND_ICON, useKindLabel } from './ArtifactPanel'
 import { ChatMenu } from './ChatMenu'
 import { api } from '../lib/api'
+import { AssistantIcon } from '../lib/icons'
 import { chatIdentity, newChatUrl } from '../lib/chats'
 import { usePreferences } from '../lib/preferences'
 import { cn } from '../lib/utils'
@@ -23,7 +24,7 @@ export function ChatHistory({ compact, onNavigate }: { compact: boolean; onNavig
   const tab = (value: 'chats' | 'work', text: string) => <button type="button" aria-pressed={view === value} className={cn('py-1 hover:underline', view === value && 'font-semibold text-navy')} onClick={() => setView(value)}>{text}</button>
   return <div className="mb-1">
     <div className={cn('flex items-center rounded-lg hover:bg-surface-2', active && 'bg-signal-soft text-navy')}>
-      <Link to="/assistant" onClick={onNavigate} title={t('Assistant', 'ผู้ช่วย')} className={cn('flex items-center gap-3 px-3 py-2.5 min-w-0 flex-1', compact && 'justify-center')}><Sparkles size={20} className="shrink-0" aria-hidden="true" />{!compact && <span className="text-[13px] font-medium">{t('Assistant', 'ผู้ช่วย')}</span>}</Link>
+      <Link to="/assistant" onClick={onNavigate} title={t('Assistant', 'ผู้ช่วย')} className={cn('flex items-center gap-3 px-3 py-2.5 min-w-0 flex-1', compact && 'justify-center')}><AssistantIcon size={18} className="shrink-0" aria-hidden="true" />{!compact && <span className="text-[13px] font-medium">{t('Assistant', 'ผู้ช่วย')}</span>}</Link>
       {!compact && <button className="p-2 mr-1 rounded-md hover:bg-surface-2" onClick={() => setExpanded(!expanded)} aria-expanded={expanded} aria-controls="assistant-chat-history" aria-label={t('Chat history', 'ประวัติแชต')}><ChevronDown size={15} className={cn('transition-transform', !expanded && '-rotate-90')} /></button>}
     </div>
     {!compact && expanded && <div id="assistant-chat-history" className="pl-3 pr-1 py-2 space-y-2">

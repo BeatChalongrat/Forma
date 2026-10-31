@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
-import { Server, BookOpen, House, Inbox, NotebookPen, Sparkles, Search, Settings, MessageCircleQuestion, Users, WifiOff, PanelLeft, type LucideIcon } from 'lucide-react'
+import { Server, BookOpen, House, Inbox, ListChecks, NotebookPen, Search, Settings, Users, WifiOff, PanelLeft, type LucideIcon } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../lib/api'
+import { AssistantIcon } from '../lib/icons'
 import { usePreferences } from '../lib/preferences'
 import { Profile } from './Profile'
 import { ChatHistory } from './ChatHistory'
@@ -21,7 +22,7 @@ const GROUPS: { title: string; items: NavItem[]; admin?: boolean }[] = [
     items: [
       { to: '/', label: 'Home', th: 'งานที่รอคุณ', icon: House, end: true },
       { to: '/imports', label: 'Imports', th: 'ทุกไฟล์ที่ลูกค้าส่งมา', icon: Inbox },
-      { to: '/review', label: 'Review', th: 'ตอบคำถามและตรวจปัญหา', icon: MessageCircleQuestion, badge: 'review' },
+      { to: '/review', label: 'Review', th: 'ตอบคำถามและตรวจปัญหา', icon: ListChecks, badge: 'review' },
     ],
   },
   {
@@ -33,7 +34,7 @@ const GROUPS: { title: string; items: NavItem[]; admin?: boolean }[] = [
   },
   { title: 'Admin', admin: true, items: [{ to: '/ops', label: 'System health', th: 'คิวงานและ job ที่ล้มเหลว', icon: Server, badge: 'failed' }] },
   { title: 'Help', items: [{ to: '/guide', label: 'Feature guide', th: 'ฟีเจอร์อยู่ตรงไหน ใช้ทำอะไร', icon: BookOpen }] },
-  { title: 'Conversations', items: [{ to: '/memory', label: 'Memory', th: 'สิ่งที่ผู้ช่วยจำเกี่ยวกับคุณ', icon: NotebookPen }, { to: '/assistant', label: 'Assistant', th: 'ผู้ช่วย FORMA', icon: Sparkles }] },
+  { title: 'Conversations', items: [{ to: '/memory', label: 'Memory', th: 'สิ่งที่ผู้ช่วยจำเกี่ยวกับคุณ', icon: NotebookPen }, { to: '/assistant', label: 'Assistant', th: 'ผู้ช่วย FORMA', icon: AssistantIcon }] },
 ]
 
 /** Quiet API-health banner: shown only when /ready fails or reports a degraded dependency. */
