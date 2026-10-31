@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 import { Server, BookOpen, House, Inbox, ListChecks, NotebookPen, Search, Settings, Users, WifiOff, PanelLeft, type LucideIcon } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
@@ -6,6 +6,7 @@ import { api } from '../lib/api'
 import { AssistantIcon } from '../lib/icons'
 import { usePreferences } from '../lib/preferences'
 import { Profile } from './Profile'
+import { ScrollMemory } from './ScrollMemory'
 import { ChatHistory } from './ChatHistory'
 import { cn } from '../lib/utils'
 import { CommandPalette } from './CommandPalette'
@@ -55,6 +56,7 @@ export function Shell() {
   const labels: Record<string, string> = { Memory: 'ความจำ', Home: 'หน้าหลัก', Imports: 'ประวัติไฟล์', Review: 'คำถามและปัญหา', Customers: 'ลูกค้า', Settings: 'ตั้งค่าระบบ', 'System health': 'สถานะระบบ', 'Feature guide': 'คู่มือฟีเจอร์', Work: 'งานของคุณ', Setup: 'การตั้งค่า', Admin: 'ผู้ดูแล', Help: 'ช่วยเหลือ', Conversations: 'บทสนทนา' }
   const label = (s: string) => prefs.language === 'th' ? (s === 'Assistant' ? 'ผู้ช่วย' : labels[s] ?? s) : s === 'Review' ? 'Questions & issues' : s
   const loc = useLocation()
+  const scrollRef = useRef<HTMLElement>(null)
   const [search, setSearch] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
   const desktop = useMediaQuery('(min-width: 900px)')
@@ -98,7 +100,8 @@ export function Shell() {
     <a href="#main-content" className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 btn">Skip to content</a>
     {desktop && <aside className={cn('app-sidebar shrink-0 border-r border-line flex flex-col', compact ? 'w-[72px]' : 'w-[224px]')}>{navigation}</aside>}
     {!desktop && <Drawer open={mobileOpen} onClose={() => setMobileOpen(false)} title="Navigation" width="w-[300px]">{navigation}</Drawer>}
-    <main id="main-content" tabIndex={-1} className="flex-1 min-w-0 min-h-0 flex flex-col overflow-auto">
+    <main ref={scrollRef} id="main-content" tabIndex={-1} className="flex-1 min-w-0 min-h-0 flex flex-col overflow-auto">
+      <ScrollMemory scrollRef={scrollRef} />
       <HealthBanner />
       <header className="sticky top-0 z-20 min-h-14 shrink-0 bg-surface border-b border-line flex items-center gap-2 px-3 sm:px-5 py-2">
         <button className="btn btn-ghost" onClick={toggleSidebar} aria-label={desktop ? compact ? 'Expand sidebar' : 'Collapse sidebar' : 'Open navigation'} aria-expanded={desktop ? !compact : mobileOpen}><PanelLeft size={18} /></button>
