@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
-import { Server, BookOpen, Home, Inbox, MessageCircleMore, Search, Settings, ShieldCheck, Users, WifiOff, PanelLeft, type LucideIcon } from 'lucide-react'
+import { Server, BookOpen, House, Inbox, LayoutGrid, NotebookPen, Sparkles, Search, Settings, MessageCircleQuestion, Users, WifiOff, PanelLeft, type LucideIcon } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../lib/api'
 import { usePreferences } from '../lib/preferences'
@@ -10,6 +10,7 @@ import { cn } from '../lib/utils'
 import { CommandPalette } from './CommandPalette'
 import { Drawer, Empty } from './ui'
 import { useMediaQuery } from '../lib/useMediaQuery'
+import { SidebarHold } from '../lib/sidebar'
 import logo from '../assets/acommerce-logo.svg'
 
 type NavItem = { to: string; label: string; th: string; icon: LucideIcon; end?: boolean; badge?: 'review' | 'failed' }
@@ -18,9 +19,9 @@ const GROUPS: { title: string; items: NavItem[]; admin?: boolean }[] = [
   {
     title: 'Work',
     items: [
-      { to: '/', label: 'Home', th: 'งานที่รอคุณ', icon: Home, end: true },
+      { to: '/', label: 'Home', th: 'งานที่รอคุณ', icon: House, end: true },
       { to: '/imports', label: 'Imports', th: 'ทุกไฟล์ที่ลูกค้าส่งมา', icon: Inbox },
-      { to: '/review', label: 'Review', th: 'ตอบคำถามและตรวจปัญหา', icon: ShieldCheck, badge: 'review' },
+      { to: '/review', label: 'Review', th: 'ตอบคำถามและตรวจปัญหา', icon: MessageCircleQuestion, badge: 'review' },
     ],
   },
   {
@@ -32,7 +33,7 @@ const GROUPS: { title: string; items: NavItem[]; admin?: boolean }[] = [
   },
   { title: 'Admin', admin: true, items: [{ to: '/ops', label: 'System health', th: 'คิวงานและ job ที่ล้มเหลว', icon: Server, badge: 'failed' }] },
   { title: 'Help', items: [{ to: '/guide', label: 'Feature guide', th: 'ฟีเจอร์อยู่ตรงไหน ใช้ทำอะไร', icon: BookOpen }] },
-  { title: 'Conversations', items: [{ to: '/assistant', label: 'Assistant', th: 'ผู้ช่วย FORMA', icon: MessageCircleMore }] },
+  { title: 'Conversations', items: [{ to: '/artifacts', label: 'My work', th: 'ทุกอย่างที่ผู้ช่วยสร้าง', icon: LayoutGrid }, { to: '/memory', label: 'Memory', th: 'สิ่งที่ผู้ช่วยจำเกี่ยวกับคุณ', icon: NotebookPen }, { to: '/assistant', label: 'Assistant', th: 'ผู้ช่วย FORMA', icon: Sparkles }] },
 ]
 
 /** Quiet API-health banner: shown only when /ready fails or reports a degraded dependency. */
@@ -50,7 +51,7 @@ function HealthBanner() {
 
 export function Shell() {
   const { prefs, t } = usePreferences()
-  const labels: Record<string, string> = { Home: 'หน้าหลัก', Imports: 'ประวัติไฟล์', Review: 'คำถามและปัญหา', Customers: 'ลูกค้า', Settings: 'ตั้งค่าระบบ', 'System health': 'สถานะระบบ', 'Feature guide': 'คู่มือฟีเจอร์', Work: 'งานของคุณ', Setup: 'การตั้งค่า', Admin: 'ผู้ดูแล', Help: 'ช่วยเหลือ', Conversations: 'บทสนทนา' }
+  const labels: Record<string, string> = { 'My work': 'ผลงาน', Memory: 'ความจำ', Home: 'หน้าหลัก', Imports: 'ประวัติไฟล์', Review: 'คำถามและปัญหา', Customers: 'ลูกค้า', Settings: 'ตั้งค่าระบบ', 'System health': 'สถานะระบบ', 'Feature guide': 'คู่มือฟีเจอร์', Work: 'งานของคุณ', Setup: 'การตั้งค่า', Admin: 'ผู้ดูแล', Help: 'ช่วยเหลือ', Conversations: 'บทสนทนา' }
   const label = (s: string) => prefs.language === 'th' ? (s === 'Assistant' ? 'ผู้ช่วย' : labels[s] ?? s) : s === 'Review' ? 'Questions & issues' : s
   const loc = useLocation()
   const [search, setSearch] = useState(false)
@@ -72,7 +73,8 @@ export function Shell() {
     if (!desktop) { setMobileOpen(true); return }
     setCollapsed((value) => { try { localStorage.setItem('forma.sidebar', !value ? 'collapsed' : 'expanded') } catch { /* private mode */ } return !value })
   }
-  const compact = desktop && collapsed
+  const [held, setHeld] = useState(false)
+  const compact = desktop && (collapsed || held)
   const navigation = <>
     <Link to="/" onClick={() => setMobileOpen(false)} className="px-4 pt-6 pb-5 block" aria-label="FORMA home">
       {compact ? <span className="font-bold text-navy text-xl block text-center">F<span className="text-brand-green">.</span></span> : <><span className="inline-block dark:bg-white dark:rounded-md dark:px-2 dark:py-1"><img src={logo} alt="aCommerce" className="h-[22px] w-auto" /></span><div className="mt-4 flex items-center gap-2"><span className="font-semibold text-navy tracking-[0.12em] text-[13px]">FORMA</span><span className="h-1.5 w-1.5 rounded-full bg-brand-lime" /></div></>}
@@ -91,7 +93,7 @@ export function Shell() {
     </nav>
     {!compact && <div className="mx-4 py-4 border-t border-line text-[12px] text-muted">{dash ? `${dash.customers} customers` : 'Data workspace'}<div className="brand-rule mt-3" /></div>}
   </>
-  return <div className="h-full flex min-w-0">
+  return <SidebarHold.Provider value={setHeld}><div className="h-full flex min-w-0">
     <a href="#main-content" className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 btn">Skip to content</a>
     {desktop && <aside className={cn('app-sidebar shrink-0 border-r border-line flex flex-col', compact ? 'w-[72px]' : 'w-[224px]')}>{navigation}</aside>}
     {!desktop && <Drawer open={mobileOpen} onClose={() => setMobileOpen(false)} title="Navigation" width="w-[300px]">{navigation}</Drawer>}
@@ -109,5 +111,5 @@ export function Shell() {
         : wide ? <div className="flex-1 min-h-0 overflow-hidden"><Outlet /></div> : <div className="mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-8 max-w-[1440px] w-full"><Outlet /></div>}
     </main>
     <CommandPalette open={search} onClose={() => setSearch(false)} isAdmin={isAdmin} />
-  </div>
+  </div></SidebarHold.Provider>
 }

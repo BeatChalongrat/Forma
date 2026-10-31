@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useVirtualizer } from '@tanstack/react-virtual'
-import { Download, Search, Undo2, MessageSquare, History, GitCompare, AlertCircle, CheckCircle2, Route, Trash2, ShieldAlert, X, PanelRight } from 'lucide-react'
+import { Download, Search, Undo2, Sparkles, History, GitCompareArrows, CircleAlert, CircleCheck, Route, Trash2, Activity, X, PanelRight } from 'lucide-react'
 import { api, ApiError, type Answer, type AnomalyReport, type FieldSpec, type Operation, type Impact, type RowsPage, type Trace } from '../lib/api'
 import { cn, cellText, fmtInt, fmtNum, getPointer, timeAgo, describeExpr } from '../lib/utils'
 import { Badge, Drawer, HelpStrip, Modal, Spinner, StatusBadge, Tabs, FindingRow } from '../components/ui'
@@ -252,23 +252,23 @@ export function DataEditor() {
         <StatusBadge status={ds.status} />
         <span className="tnum text-muted text-[12.5px]">{fmtInt(ds.row_count)} rows</span>
         {invalid > 0
-          ? <button onClick={() => setRightTab('findings')} title="These records do not match the target format: approval and export wait until they are fixed or removed"><Badge tone="bad"><AlertCircle size={12} /> {fmtInt(invalid)} record{invalid > 1 ? 's' : ''} need correction</Badge></button>
-          : <Badge tone="ok"><CheckCircle2 size={12} /> Format checked</Badge>}
-        {errors > 0 && <Badge tone="bad"><AlertCircle size={12} /> {errors} other error{errors > 1 ? 's' : ''}</Badge>}
+          ? <button onClick={() => setRightTab('findings')} title="These records do not match the target format: approval and export wait until they are fixed or removed"><Badge tone="bad"><CircleAlert size={12} /> {fmtInt(invalid)} record{invalid > 1 ? 's' : ''} need correction</Badge></button>
+          : <Badge tone="ok"><CircleCheck size={12} /> Format checked</Badge>}
+        {errors > 0 && <Badge tone="bad"><CircleAlert size={12} /> {errors} other error{errors > 1 ? 's' : ''}</Badge>}
         <div className="relative min-w-0"><Search size={13} className="absolute left-2.5 top-2.5 text-muted" /><input className="input pl-7 w-52 max-w-full" placeholder="Search any field…" value={q} onChange={(e) => setQ(e.target.value)} /></div>
         <div className="ml-auto flex items-center gap-2 flex-wrap">
-          <button className="btn btn-ghost btn-sm" aria-expanded={assistantOpen} onClick={() => setAssistantOpen(!assistantOpen)}><MessageSquare size={15} /> Assistant</button>
+          <button className="btn btn-ghost btn-sm" aria-expanded={assistantOpen} onClick={() => setAssistantOpen(!assistantOpen)}><Sparkles size={15} /> Assistant</button>
           <button className="btn btn-ghost btn-sm" aria-expanded={rightOpen} onClick={() => setRightOpen(!rightOpen)}><PanelRight size={15} /> Review{pending.length > 0 ? ` (${pending.length})` : ''}</button>
 
           {pending.length > 0 && <><button className="btn btn-sm" onClick={() => setPending([])}><Undo2 size={13} /> Discard</button><button className="btn btn-sm btn-primary" onClick={() => { preview.mutate(); setSaveOpen(true) }}>Review {pending.length} change{pending.length > 1 ? 's' : ''}</button></>}
-          {!pending.length && ds.status === 'draft' && <button className="btn btn-sm" disabled={approve.isPending || invalid > 0} title={invalid ? `Fix or remove the ${invalid} record${invalid > 1 ? 's' : ''} that do not match the target format first` : undefined} onClick={() => approve.mutate({})}><CheckCircle2 size={13} /> Approve data</button>}
+          {!pending.length && ds.status === 'draft' && <button className="btn btn-sm" disabled={approve.isPending || invalid > 0} title={invalid ? `Fix or remove the ${invalid} record${invalid > 1 ? 's' : ''} that do not match the target format first` : undefined} onClick={() => approve.mutate({})}><CircleCheck size={13} /> Approve data</button>}
           {!pending.length && ds.parent_id && <button className="btn btn-sm" onClick={() => rollback.mutate()} title="New version with the parent's content"><History size={13} /> Roll back</button>}
           {!pending.length && (ds.status === 'approved' || ds.status === 'published') && <div className="flex items-center rounded-[var(--radius-md)] border border-line overflow-hidden">{['json', 'jsonl', 'csv'].map((f) => <button key={f} className="h-8 px-2.5 text-[12.5px] font-medium hover:bg-surface-2 border-r border-line last:border-0 flex items-center gap-1" onClick={() => doExport.mutate(f)}><Download size={12} /> {f.toUpperCase()}</button>)}</div>}
         </div>
       </div>
 
       {assistantOpen && <div className="px-5 py-3 border-b border-line bg-surface shrink-0">
-        <div className="flex items-center gap-2"><MessageSquare size={16} className="text-muted" />
+        <div className="flex items-center gap-2"><Sparkles size={16} className="text-muted" />
           <input aria-label="Ask the assistant" className="input flex-1" placeholder="Ask about this data, or describe a change…" value={copilot} onChange={(e) => setCopilot(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && submitCopilot()} />
           <button className="btn btn-sm btn-primary" disabled={!copilot.trim() || ask.isPending || question.isPending} onClick={submitCopilot}>{ask.isPending || question.isPending ? <Spinner /> : isQuestion(copilot) ? 'Ask' : 'Preview'}</button>
         </div><p className="text-[12.5px] text-muted mt-2 ml-6">Try “ลดราคา 5% เฉพาะสินค้าที่มีสต็อก” — you review the changes before saving.</p>
@@ -351,7 +351,7 @@ export function DataEditor() {
 
         {/* right rail */}
         <WorkspacePanel open={rightOpen} onClose={() => setRightOpen(false)} title="Review data">
-          <Tabs menu value={rightTab} onChange={setRightTab} items={[{ id: 'changes', label: 'Unsaved', count: pending.length, hint: 'การแก้ที่ยังไม่บันทึก' }, { id: 'diff', labelText: 'Changes & anomalies', hint: 'เทียบกับรอบก่อน และของที่ดูผิดปกติ', label: <span className="flex items-center gap-1">Changes &amp; anomalies{ack && <ShieldAlert size={12} className="text-bad" />}</span> }, { id: 'copilot', label: 'Assistant', hint: 'คำตอบจาก Copilot' }, { id: 'findings', label: 'Problems', count: ds.findings.length, hint: 'record ที่ไม่ตรง format และปัญหาอื่น' }, { id: 'versions', label: 'Versions', count: ds.history?.length, hint: 'ทุกเวอร์ชัน ย้อนกลับได้' }]} />
+          <Tabs menu value={rightTab} onChange={setRightTab} items={[{ id: 'changes', label: 'Unsaved', count: pending.length, hint: 'การแก้ที่ยังไม่บันทึก' }, { id: 'diff', labelText: 'Changes & anomalies', hint: 'เทียบกับรอบก่อน และของที่ดูผิดปกติ', label: <span className="flex items-center gap-1">Changes &amp; anomalies{ack && <Activity size={12} className="text-bad" />}</span> }, { id: 'copilot', label: 'Assistant', hint: 'คำตอบจาก Copilot' }, { id: 'findings', label: 'Problems', count: ds.findings.length, hint: 'record ที่ไม่ตรง format และปัญหาอื่น' }, { id: 'versions', label: 'Versions', count: ds.history?.length, hint: 'ทุกเวอร์ชัน ย้อนกลับได้' }]} />
           <div className="flex-1 overflow-auto p-3 text-[12.5px]">
             {rightTab === 'changes' && (pending.length ? (
               <ul className="flex flex-col gap-1">{pending.map((p, i) => <li key={i} className="flex items-start gap-2 py-1 border-b border-line/70"><Badge tone={p.kind.startsWith('delete') ? 'bad' : 'signal'} className="min-h-6 px-1.5 text-[12px] shrink-0">{p.kind.replace('_', ' ')}</Badge><span className="flex-1 break-words">{p.label}</span><button className="text-muted hover:text-bad" onClick={() => setPending((xs) => xs.filter((_, j) => j !== i))}>×</button></li>)}</ul>
@@ -509,14 +509,14 @@ function DiffPanel({ report, ack, acking, onAcknowledge, onTrace }: { report?: i
     <div className="flex flex-col gap-3">
       {ack && (
         <div className="card p-3 border-bad/40 flex flex-col gap-2">
-          <div className="font-medium text-bad flex items-center gap-1.5"><ShieldAlert size={14} /> {ack.high} high-severity anomalies hold this approval</div>
+          <div className="font-medium text-bad flex items-center gap-1.5"><Activity size={14} /> {ack.high} high-severity anomalies hold this approval</div>
           <div className="text-ink-2">Check the list below. Approving anyway is recorded in the audit log with your note.</div>
           <input className="input" placeholder="Why is this data correct? (e.g. price list update confirmed by the buyer)" value={comment} onChange={(e) => setComment(e.target.value)} />
-          <button className="btn btn-sm btn-danger self-start" disabled={!comment.trim() || acking} onClick={() => onAcknowledge(comment)}><CheckCircle2 size={13} /> I reviewed them — approve</button>
+          <button className="btn btn-sm btn-danger self-start" disabled={!comment.trim() || acking} onClick={() => onAcknowledge(comment)}><CircleCheck size={13} /> I reviewed them — approve</button>
         </div>
       )}
       {report.anomalies && <AnomalyView an={report.anomalies} onTrace={onTrace} />}
-      {!report.has_previous ? <div className="text-muted"><GitCompare size={14} className="inline mr-1" /> No previous published dataset for this customer yet. From the next round on, this panel also shows SKUs added/removed and every price or promotion change.</div> : (
+      {!report.has_previous ? <div className="text-muted"><GitCompareArrows size={14} className="inline mr-1" /> No previous published dataset for this customer yet. From the next round on, this panel also shows SKUs added/removed and every price or promotion change.</div> : (
         <>
           <div className="font-medium mt-1">vs last published round</div>
           <div className="grid grid-cols-3 gap-2">

@@ -5,7 +5,7 @@ const TH: Record<string, string> = {
   'Usage tips': 'คำแนะนำการใช้งาน',
   'Settings': 'ตั้งค่าระบบ', 'Customers': 'ลูกค้า', 'New customer': 'เพิ่มลูกค้า', 'New import': 'นำเข้าไฟล์',
   'Feature guide': 'คู่มือฟีเจอร์', 'System health': 'สถานะระบบ', 'Options': 'ตัวเลือก',
-  'Target formats': 'รูปแบบปลายทาง', 'Approval policy': 'กฎการอนุมัติ', 'Audit log': 'ประวัติการทำงาน', 'System': 'ระบบ',
+  'What FORMA learned': 'สิ่งที่ FORMA เรียนรู้', 'Target formats': 'รูปแบบปลายทาง', 'Approval policy': 'กฎการอนุมัติ', 'Audit log': 'ประวัติการทำงาน', 'System': 'ระบบ',
   'Connect AI': 'เชื่อมต่อ AI', 'Backup keys': 'คีย์สำรอง', 'Advanced settings': 'การตั้งค่าเพิ่มเติม',
   'Files': 'ไฟล์', 'Source files': 'ไฟล์ต้นทาง', 'Mapping versions': 'เวอร์ชันการจับคู่', 'Dataset versions': 'เวอร์ชันข้อมูล',
   'What changed': 'สิ่งที่เปลี่ยน', 'Compare': 'เปรียบเทียบ', 'Preview': 'ตัวอย่าง', 'Fields': 'ฟิลด์',

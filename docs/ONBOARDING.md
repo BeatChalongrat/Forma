@@ -17,7 +17,7 @@
 
 1. The twelve non-negotiable rules: [SYSTEM_ARCHITECTURE.md §10](SYSTEM_ARCHITECTURE.md#10-design-principles-in-one-place-the-non-negotiable-rules).
 2. The vocabulary: [GLOSSARY.md](GLOSSARY.md).
-3. The ADRs that shape everything: 001 (schema as config), 002 (DSL, AI never executes code), 005 (immutability),
+3. The ADRs that shape everything: 001 (schema as config), 002 (DSL, AI never executes code in the data path), 005 (immutability),
    006 (fingerprints), 007 (Thai rules), 008 (policy decides), 013 (security), 017 (semantics), 018 (sandbox),
    026 (contract gate), 027 (bulk), 036 (verdict), 038 (learning), 037 (calibration), 043 (input fidelity).
    Index: [TEAM_LEAD_HANDBOOK.md](TEAM_LEAD_HANDBOOK.md#5-decision-log-adr-index).

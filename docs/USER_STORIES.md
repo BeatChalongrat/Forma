@@ -375,6 +375,56 @@ the ordinary endpoint.
 Tests: `test_workspace.py`, `test_workspace_tools.py`, `test_assistant_navigation.py`, `test_assistant_reports.py`,
 `test_conversations.py`, `test_chat_stream.py`.
 
+### E7. Let the assistant work out what the tools cannot
+**ฉันอยาก**ถามเรื่องที่ระบบไม่มีรายงานให้ เช่น "วิเคราะห์ราคาทั้งชุดแล้วทำกราฟให้หน่อย" แล้วให้ผู้ช่วยเขียนโค้ด รันเอง แก้เองถ้าพลาด และส่งกราฟกับไฟล์กลับมา **เพื่อ**ได้คำตอบโดยไม่ต้องรอใครเขียนฟีเจอร์ใหม่
+
+AC: the code, its output, charts and files of every run are shown in the chat, failed runs included; the run has no
+network and no secrets, works on copies and cannot change FORMA data; a dataset or source file outside my access is
+refused before anything runs; a run that fails is read and tried again; files saved by a run can be used by the next;
+each run is audited; with the sandbox off the assistant has no such tool and says so.
+
+Technique: Python in a separate container reached through one Unix socket (ADR-048).
+
+Tests: `test_code_sandbox.py`.
+
+### E8. Send the assistant a picture or a file
+**ฉันอยาก**แนบ วาง หรือลากรูปหน้าจอ เอกสาร สไลด์ อีเมล หรือไฟล์ข้อมูลเข้าแชตแล้วถามได้เลย **เพื่อ**ไม่ต้องพิมพ์สิ่งที่ลูกค้าส่งมาใหม่
+
+AC: images go only to a model that passed the image test, tested per model in Settings; when no connected model reads
+images the page says so and the assistant does not guess; what an image shows is reported as read from it, never as
+confirmed; a file is reachable only through its chat and is deleted with it; a wrong type or a too-large file is
+refused with a plain reason.
+
+Technique: type taken from the bytes, per-model test with random colours, route filtering in `LLMClient` (ADR-049).
+
+Tests: `test_chat_images.py`.
+
+### E9. See and change what the assistant makes
+**ฉันอยาก**ให้สิ่งที่ผู้ช่วยสร้างเปิดข้างแชต เลือกจุดที่อยากแก้แล้วสั่งได้เลย **เพื่อ**ไม่ต้องดาวน์โหลดทุกครั้งหรืออธิบายว่าหมายถึงตรงไหน
+
+AC: a flow, document, deck, sheet or web page opens beside the chat by itself; picking a box, page, slide or cell tells
+the assistant what to change; a change is a new version and every version stays; an old version comes back as the next
+number; a work says what data it rests on and warns when that data has changed, without rewriting itself; a file that
+cannot be previewed can still be downloaded; everything is listed on one page across chats.
+
+Technique: append-only versions, one version per message, previews made in the sandbox, a flow stored as data and drawn
+by the page, a web page in a frame with no origin and no network (ADR-050).
+
+Tests: `test_artifacts.py`.
+
+### E10. Let the assistant remember me
+**ฉันอยาก**ให้ผู้ช่วยจำว่าฉันเป็นใคร ทำงานแบบไหน และเคยคุยอะไรไว้ **เพื่อ**ไม่ต้องบอกซ้ำทุกแชต
+
+AC: what I say is kept as topics during the chat, and I can say remember, change or forget; a new chat knows them;
+earlier chats can be searched and the answer links to them; I can read, edit, delete, add, export and reset; I can pause
+memory or turn off chat search; a chat can start with memory off or incognito; a file can never plant a memory; ID and
+account numbers and passwords are never kept; memory never changes a mapping, a value or an approval.
+
+Technique: topics owned by one person, a server rule that a message reading others' words saves nothing unasked, notes
+sent as data with live data winning (ADR-051).
+
+Tests: `test_memory.py`.
+
 ### E6. Operate the system
 **ฉันอยาก**เห็นคิว worker งานที่ล้มเหลวพร้อมปุ่มลองใหม่ สถานะ breaker และค่าใช้จ่ายในหน้าเดียว และมีคู่มือสำหรับเหตุขัดข้องทุกแบบ **เพื่อ**รับมือได้ทันทีเมื่อเกิดปัญหา
 
@@ -412,7 +462,7 @@ AC: `SYSTEM_BASE` states it; the guard enforces it; tools mark truncation; tests
 | B Meaning | 001, 002, 006, 007, 008, 015, 017, 018, 019, 021, 025, 036, 038, 046 |
 | C Data | 020, 022, 023, 024, 026 |
 | D Verdict & review | 029, 035, 036, 042 |
-| E Governance | 016, 017, 025, 032, 037, 039, 040, 041, 045 |
+| E Governance | 016, 017, 025, 032, 037, 039, 040, 041, 045, 048, 049, 050, 051 |
 | F Security | 013, 029, 030, 040 |
 
 ## เมื่อมีคนใช้เพิ่ม

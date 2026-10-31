@@ -12,7 +12,8 @@ from __future__ import annotations
 
 import json
 import time
-from collections.abc import Callable
+from base64 import b64encode
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
@@ -87,11 +88,30 @@ class LLMError(RuntimeError):
     pass
 
 
+@dataclass(frozen=True)
+class ImagePart:
+    """One picture for a model to look at (ADR-049). What it shows is data, never instructions."""
+
+    media_type: str
+    data: bytes
+
+    @property
+    def base64(self) -> str:
+        return b64encode(self.data).decode("ascii")
+
+
 class Provider(Protocol):
     name: str
 
     def complete_json(
-        self, *, system: str, user: str, schema: dict[str, Any], model: str, temperature: float
+        self,
+        *,
+        system: str,
+        user: str,
+        schema: dict[str, Any],
+        model: str,
+        temperature: float,
+        images: Sequence[ImagePart] = (),
     ) -> tuple[str, Usage]: ...
 
 
@@ -106,9 +126,16 @@ class MockProvider:
         self.calls: list[dict[str, Any]] = []
 
     def complete_json(
-        self, *, system: str, user: str, schema: dict[str, Any], model: str, temperature: float
+        self,
+        *,
+        system: str,
+        user: str,
+        schema: dict[str, Any],
+        model: str,
+        temperature: float,
+        images: Sequence[ImagePart] = (),
     ) -> tuple[str, Usage]:
-        self.calls.append({"system": system, "user": user})
+        self.calls.append({"system": system, "user": user, **({"images": list(images)} if images else {})})
         data = self.responder(system, user, schema) if self.responder else {}
         text = json.dumps(data, ensure_ascii=False)
         return text, Usage(len(system + user) // 4, len(text) // 4, 1, 1.0, model)
@@ -123,7 +150,14 @@ class OpenAICompatibleProvider:
         self.timeout = timeout
 
     def complete_json(
-        self, *, system: str, user: str, schema: dict[str, Any], model: str, temperature: float
+        self,
+        *,
+        system: str,
+        user: str,
+        schema: dict[str, Any],
+        model: str,
+        temperature: float,
+        images: Sequence[ImagePart] = (),
     ) -> tuple[str, Usage]:
         headers = {"Content-Type": "application/json"}
         if self.api_key:
@@ -134,7 +168,7 @@ class OpenAICompatibleProvider:
             "response_format": {"type": "json_object"},
             "messages": [
                 {"role": "system", "content": system + _json_instruction(schema)},
-                {"role": "user", "content": user},
+                {"role": "user", "content": _openai_content(user, images)},
             ],
         }
         t0 = time.perf_counter()
@@ -164,7 +198,14 @@ class AnthropicProvider:
         self.timeout = timeout
 
     def complete_json(
-        self, *, system: str, user: str, schema: dict[str, Any], model: str, temperature: float
+        self,
+        *,
+        system: str,
+        user: str,
+        schema: dict[str, Any],
+        model: str,
+        temperature: float,
+        images: Sequence[ImagePart] = (),
     ) -> tuple[str, Usage]:
         headers = {
             "x-api-key": self.api_key,
@@ -178,7 +219,7 @@ class AnthropicProvider:
             "model": model,
             "max_tokens": 16000,
             "system": system + _json_instruction(schema),
-            "messages": [{"role": "user", "content": user}],
+            "messages": [{"role": "user", "content": _anthropic_content(user, images)}],
         }
         t0 = time.perf_counter()
         with httpx.Client(timeout=self.timeout) as client:
@@ -202,6 +243,25 @@ class AnthropicProvider:
             model,
         )
         return text, usage
+
+
+def _openai_content(user: str, images: Sequence[ImagePart]) -> Any:
+    if not images:
+        return user
+    pictures = [
+        {"type": "image_url", "image_url": {"url": f"data:{i.media_type};base64,{i.base64}"}} for i in images
+    ]
+    return [{"type": "text", "text": user}, *pictures]
+
+
+def _anthropic_content(user: str, images: Sequence[ImagePart]) -> Any:
+    if not images:
+        return user
+    pictures = [
+        {"type": "image", "source": {"type": "base64", "media_type": i.media_type, "data": i.base64}}
+        for i in images
+    ]
+    return [*pictures, {"type": "text", "text": user}]
 
 
 def _json_instruction(schema: dict[str, Any]) -> str:
@@ -232,6 +292,7 @@ class Route:
     name: str
     provider: Provider
     model: str
+    vision: bool | None = None  # can it read images? None until tested (ADR-049)
 
 
 # --------------------------------------------------------------------------------------------
@@ -245,6 +306,7 @@ class LLMClient:
     fallbacks: list[Route] = field(default_factory=list)  # tried in order when the primary fails
     primary_name: str = "primary"
     last_route: str | None = None  # the route that answered the last call
+    primary_vision: bool | None = None  # can the primary read images? None until tested (ADR-049)
 
     @classmethod
     def from_settings(cls, settings: Settings | None = None) -> LLMClient:
@@ -258,15 +320,28 @@ class LLMClient:
 
     @property
     def routes(self) -> list[Route]:
-        return [Route(self.primary_name, self.provider, self.model), *self.fallbacks]
+        return [Route(self.primary_name, self.provider, self.model, self.primary_vision), *self.fallbacks]
 
-    def _call_provider(self, system: str, user: str, schema: dict[str, Any]) -> tuple[str, Usage]:
+    @property
+    def supports_vision(self) -> bool:
+        return any(r.vision for r in self.routes)
+
+    def _call_provider(
+        self, system: str, user: str, schema: dict[str, Any], images: Sequence[ImagePart] = ()
+    ) -> tuple[str, Usage]:
         """One provider round-trip with transport retries + the circuit breaker (ADR-015), falling over
         to the backup routes in order (ADR-025). The mock provider is never wrapped so unit tests stay
-        deterministic."""
+        deterministic. A call with images only goes to routes tested to read them (ADR-049): a backup that
+        cannot see them must not answer as if it had."""
+        pictures: dict[str, Any] = {"images": images} if images else {}
         if self.is_mock:
             return self.provider.complete_json(
-                system=system, user=user, schema=schema, model=self.model, temperature=self.temperature
+                system=system,
+                user=user,
+                schema=schema,
+                model=self.model,
+                temperature=self.temperature,
+                **pictures,
             )
         from forma.ai.breaker import CircuitOpen, get_breaker, guarded_call
         from forma.core.logging import get_logger
@@ -274,13 +349,20 @@ class LLMClient:
 
         log = get_logger(__name__)
         s = get_settings()
-        routes = self.routes
+        routes = [r for r in self.routes if r.vision] if images else self.routes
+        if not routes:
+            raise LLMError("no connected model can read images")
         failures: list[str] = []
         for route in routes:
 
             def call(r: Route = route) -> tuple[str, Usage]:
                 return r.provider.complete_json(
-                    system=system, user=user, schema=schema, model=r.model, temperature=self.temperature
+                    system=system,
+                    user=user,
+                    schema=schema,
+                    model=r.model,
+                    temperature=self.temperature,
+                    **pictures,
                 )
 
             try:
@@ -312,6 +394,7 @@ class LLMClient:
         user: str,
         schema: dict[str, Any],
         validate: Callable[[dict[str, Any]], list[str]] | None = None,
+        images: Sequence[ImagePart] = (),
     ) -> StructuredResult:
         """Call the model until the JSON parses and passes ``validate`` (returns error strings)."""
         from forma.core import metrics
@@ -322,7 +405,7 @@ class LLMClient:
         text = ""
         with span("llm.structured", model=self.model, provider=self.provider.name) as sp:
             try:
-                res = self._structured(system, user, schema, validate, usage, errors, text)
+                res = self._structured(system, user, schema, validate, usage, errors, text, images)
             except LLMError:
                 usage.model = usage.model or self.model
                 set_attrs(sp, attempts=usage.calls, input_tokens=usage.input_tokens, outcome="error")
@@ -349,6 +432,7 @@ class LLMClient:
         usage: Usage,
         errors: list[str],
         text: str,
+        images: Sequence[ImagePart] = (),
     ) -> StructuredResult:
         for attempt in range(1, self.max_retries + 2):
             prompt = (
@@ -358,7 +442,7 @@ class LLMClient:
                 + "\n\nYour previous answer had these problems, fix them:\n- "
                 + "\n- ".join(errors[:12])
             )
-            text, u = self._call_provider(system, prompt, schema)
+            text, u = self._call_provider(system, prompt, schema, images)
             usage.add(u)
             try:
                 data = _parse_json(text)

@@ -44,6 +44,10 @@ Job · AuditLog · LLMCall · AppSetting · StoredSchema   (operational ledgers 
 | `target_schemas` | `StoredSchema` | target formats registered in the web app |
 | `assistant_conversations` | `AssistantConversation` | chats with owner key, access key, optional round and mapping context, pin, archive, lease (ADR-030, ADR-042) |
 | `assistant_turns` | `AssistantTurn` | ordered question and reply with status (ADR-030) |
+| `assistant_attachments` | `AssistantAttachment` | a file in a chat: an upload, what a code run produced, or a preview page (ADR-048, ADR-049, ADR-050) |
+| `assistant_memories` | `AssistantMemory` | one topic the assistant remembers about a person, read and changed by them (ADR-051) |
+| `assistant_artifacts` | `AssistantArtifact` | a work the assistant made in a chat: a flow or a file (ADR-050) |
+| `assistant_artifact_versions` | `AssistantArtifactVersion` | one version of a work; append-only (ADR-050) |
 
 ## Versioning rules (ADR-005)
 

@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react'
-import { CheckCircle2, AlertTriangle, Info, X } from 'lucide-react'
+import { CircleCheck, TriangleAlert, Info, X } from 'lucide-react'
 import { cn } from './utils'
 
 type Toast = { id: number; kind: 'ok' | 'bad' | 'info'; title: string; detail?: string }
@@ -19,7 +19,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2 w-[360px] max-w-[calc(100vw-2rem)]">
         {items.map((t) => (
           <div key={t.id} className={cn('card p-3 flex gap-2.5 items-start', t.kind === 'bad' && 'border-bad/40', t.kind === 'ok' && 'border-ok/40')}>
-            {t.kind === 'ok' ? <CheckCircle2 size={16} className="text-ok mt-0.5 shrink-0" /> : t.kind === 'bad' ? <AlertTriangle size={16} className="text-bad mt-0.5 shrink-0" /> : <Info size={16} className="text-info mt-0.5 shrink-0" />}
+            {t.kind === 'ok' ? <CircleCheck size={16} className="text-ok mt-0.5 shrink-0" /> : t.kind === 'bad' ? <TriangleAlert size={16} className="text-bad mt-0.5 shrink-0" /> : <Info size={16} className="text-info mt-0.5 shrink-0" />}
             <div className="min-w-0 flex-1">
               <div className="font-medium">{t.title}</div>
               {t.detail && <div className="text-muted text-[12.5px] mt-0.5 break-words">{t.detail}</div>}

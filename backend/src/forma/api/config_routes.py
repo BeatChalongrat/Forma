@@ -118,6 +118,20 @@ def test_ai(
     return result
 
 
+@router.post("/settings/ai/vision-test")
+def test_vision(
+    session: Session = Depends(get_session),
+    ctx: ServiceContext = Depends(ctx_dep),
+    p: Principal = Depends(require_role("admin")),
+    _rl: Principal = Depends(llm_rate_limited),
+) -> dict[str, Any]:
+    """Which connected models can read images: each is shown one small test picture (ADR-049)."""
+    result = cfg.test_vision(session, ctx.settings, p.actor)
+    session.commit()
+    ctx.refresh()
+    return {**result, "ai": cfg.ai_view(session, ctx.settings)}
+
+
 @router.post("/settings/ai/backups")
 def add_backup(
     body: BackupKeyIn,

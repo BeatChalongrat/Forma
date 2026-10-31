@@ -20,10 +20,12 @@ from forma.db.models import AssistantConversation as Chat
 from forma.db.models import AssistantTurn as Turn
 from forma.db.models import DatasetVersion, ImportRound, MappingVersion, utcnow
 from forma.db.session import session_scope
+from forma.services import artifacts, attachments, memory
 from forma.services.context import ServiceContext
 from forma.services.rounds import audit
 
 ACTIVE_STREAMS: dict[tuple[str, str], AnswerStream] = {}
+INCOGNITO_DAYS = 1
 
 
 def stop(session: Session, p: Principal, chat_id: str, request_id: str) -> dict[str, Any]:
@@ -78,6 +80,8 @@ def summary(chat: Chat) -> dict[str, Any]:
         "mapping_id": chat.mapping_id,
         "archived": chat.archived,
         "pinned": chat.pinned,
+        "memory_off": chat.memory_off,
+        "incognito": chat.incognito,
         "created_at": chat.created_at,
         "updated_at": chat.updated_at,
         "busy": bool(chat.busy_until and chat.busy_until > utcnow()),
@@ -94,6 +98,7 @@ def turn_view(turn: Turn, chat: Chat) -> dict[str, Any]:
         "sequence": turn.sequence,
         "question": turn.question,
         "reply": turn.reply,
+        "attachments": turn.attachments or [],
         "status": state,
         "created_at": turn.created_at,
     }
@@ -106,6 +111,8 @@ def create(
     round_id: str | None,
     dataset_id: str | None,
     mapping_id: str | None = None,
+    memory_off: bool = False,
+    incognito: bool = False,
 ) -> Chat:
     if mapping_id:
         mapping = session.get(MappingVersion, mapping_id)
@@ -135,6 +142,8 @@ def create(
         round_id=round_id,
         dataset_id=dataset_id,
         mapping_id=mapping_id,
+        memory_off=memory_off or incognito,
+        incognito=incognito,
     )
     session.add(chat)
     session.flush()
@@ -142,10 +151,34 @@ def create(
     return chat
 
 
+def visible(p: Principal) -> Select[Chat]:
+    """Chats that count as history: an incognito chat is in no list and no search."""
+    return owned(p).where(Chat.incognito.is_(False))
+
+
+def sweep_incognito(session: Session, p: Principal) -> list[str]:
+    """Incognito chats last a day. Returns the storage keys of their files, for after the commit."""
+    stale = session.scalars(
+        owned(p).where(
+            Chat.incognito.is_(True),
+            Chat.updated_at < utcnow() - timedelta(days=INCOGNITO_DAYS),
+            or_(Chat.busy_until.is_(None), Chat.busy_until <= utcnow()),
+        )
+    ).all()
+    keys: list[str] = []
+    for chat in stale:
+        artifacts.delete_rows(session, chat.id)
+        keys += attachments.delete_rows(session, chat.id)
+        session.execute(delete(Turn).where(Turn.conversation_id == chat.id))
+        session.execute(delete(Chat).where(Chat.id == chat.id))
+        audit(session, "assistant.delete", "conversation", chat.id, actor=p.actor, reason="incognito")
+    return keys
+
+
 def list_chats(
     session: Session, p: Principal, search: str = "", offset: int = 0, archived: bool = False
 ) -> dict[str, Any]:
-    q = owned(p).where(Chat.archived == archived)
+    q = visible(p).where(Chat.archived == archived)
     if search.strip():
         q = q.where(
             or_(
@@ -170,7 +203,8 @@ def list_chats(
     }
 
 
-def remove(session: Session, p: Principal, chat_id: str) -> None:
+def remove(session: Session, p: Principal, chat_id: str) -> list[str]:
+    """Returns the storage keys of the chat's files: the caller deletes them once this has committed."""
     # Serialize with send's lease acquisition. SQLite serializes the write transaction;
     # PostgreSQL rechecks this predicate after a concurrent lease update finishes.
     owner, access = identity(p)
@@ -187,9 +221,12 @@ def remove(session: Session, p: Principal, chat_id: str) -> None:
     if not removed.rowcount:  # type: ignore[attr-defined]
         get_chat(session, p, chat_id)  # 404 for another account; never reveal its busy state.
         raise Conflict("Wait for the current reply before deleting this conversation")
+    artifacts.delete_rows(session, chat_id)
+    keys = attachments.delete_rows(session, chat_id)
     session.execute(delete(Turn).where(Turn.conversation_id == chat_id))
     session.execute(delete(Chat).where(Chat.id == chat_id))
     audit(session, "assistant.delete", "conversation", chat_id, actor=p.actor)
+    return keys
 
 
 def detail(session: Session, p: Principal, chat_id: str, before: int | None = None) -> dict[str, Any]:
@@ -292,12 +329,16 @@ def send(
     language: str,
     timezone: str,
     stream: AnswerStream | None = None,
+    attachment_ids: list[str] | None = None,
+    artifact_id: str | None = None,
+    target: str = "",
 ) -> dict[str, Any]:
-    from forma.services import workspace_assistant
+    from forma.services import config, workspace_assistant
 
     chat = get_chat(session, p, chat_id)
     if chat.archived:
         raise Conflict("Restore this conversation before sending a message")
+    file_ids = attachment_ids or []
     existing = session.scalar(
         select(Turn).where(Turn.conversation_id == chat.id, Turn.request_id == request_id)
     )
@@ -305,6 +346,8 @@ def send(
         raise Conflict("This request ID belongs to another question")
     if existing and existing.status in ("complete", "stopped"):
         return turn_view(existing, chat)
+    attachments.check(session, chat.id, file_ids, existing.id if existing else None)
+    open_work = artifacts.working_on(session, chat.id, artifact_id, target) if artifact_id else None
     run_id, now = uuid4().hex, utcnow()
     locked = session.execute(
         update(Chat)
@@ -344,6 +387,8 @@ def send(
     turn.answer, turn.reply = "", None
     session.flush()
     turn_id = turn.id
+    if file_ids:
+        turn.attachments = attachments.claim(session, chat.id, turn_id, file_ids)
     audit(session, "assistant.message", "conversation", chat.id, actor=p.actor, turn_id=turn_id)
     session.commit()  # The question survives disconnects/restarts before the provider is called.
     if stream:
@@ -420,6 +465,19 @@ def send(
             extra["mapping_id"] = chat.mapping_id
         if stream:
             extra["stream"] = stream
+        uploads = attachments.listing(session, chat.id, "upload")
+        outputs = attachments.listing(session, chat.id, "output")
+        if uploads or outputs:
+            extra["attachments"] = [attachments.view(row) for row in [*uploads, *outputs]]
+        if uploads and ctx.llm.supports_vision:
+            extra["images"] = attachments.recent_images(ctx, session, chat.id)
+        extra["turn_id"] = turn_id
+        if open_work:
+            extra["working_on"] = open_work
+        prefs = config.personal_preferences(session, p.subject, p.mode)
+        extra["recall"] = memory.recall_for(
+            session, identity(p)[0], prefs, chat, visible(p), str(prefs.get("display_name", ""))
+        )
         reply = workspace_assistant.ask(
             ctx,
             session,
@@ -459,6 +517,8 @@ def send(
     finally:
         if stream and ACTIVE_STREAMS.get((chat_id, request_id)) is stream:
             ACTIVE_STREAMS.pop((chat_id, request_id), None)
+    if state != "stopped":
+        reply["artifacts"] = artifacts.settle_turn(ctx, session, p, chat.id, turn_id, reply)
     finished = session.execute(
         update(Chat)
         .where(Chat.id == chat.id, Chat.active_run == run_id)

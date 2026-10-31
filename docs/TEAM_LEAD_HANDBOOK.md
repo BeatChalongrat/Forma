@@ -112,6 +112,10 @@ login reachable from the network), R30 (a customer-scoped admin can change share
 | 045 | Server-computed reports (tables, charts) in assistant conversations |
 | 046 | Approved mapping library across a customer's ERP layouts |
 | 047 | Verdict decisions, accounts with no role, and tenant scope beyond owned rows |
+| 048 | The assistant runs code in an isolated sandbox |
+| 049 | Images and files in an assistant chat |
+| 050 | What the assistant makes opens beside the chat, with its versions kept |
+| 051 | The assistant remembers a person across chats |
 
 ## 6. Numbers to quote (and where they come from)
 
@@ -119,7 +123,7 @@ login reachable from the network), R30 (a customer-scoped admin can change share
 |---|---|---|
 | Field accuracy on the synthetic corpus, no AI | 0.996 (30/30 variants ≥ 0.99); identity 1.00; critical 1.00; drift 9/9 | `make eval-gate`, `data/eval_baseline.json` |
 | A 300-file night | 17 min, 8 worker processes, 12-core node, 30M rows | PERFORMANCE.md (pre-ADR-043; re-measure) |
-| Tests | 512 passed, 3 skipped locally, coverage 91 % (gate 85 % in CI) | `pytest`, CI |
+| Tests | 623 passed, 5 skipped locally, coverage 91 % (gate 85 % in CI) | `pytest`, CI |
 | Endpoints / tables / ADRs | ~110 / 19 / 46 | API_OVERVIEW.md, DATA_MODEL.md, adr/ |
 
 Anything else — accuracy on real files, provider accuracy, production throughput — is not yet measured and

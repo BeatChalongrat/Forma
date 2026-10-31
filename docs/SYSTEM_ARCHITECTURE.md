@@ -153,6 +153,9 @@ saved configuration) and a SQLAlchemy `Session`; decisions and edits record the 
 | `review_questions.py`, `review_evidence.py`, `review_explanations.py` | questions from uncertain fields, answers as new versions, evidence traced to cells, bilingual explanations of policy reasons | 029, 035, 042 |
 | `assistant.py` | data-repair copilot: instruction → operations, "why" answers from evidence | 023 |
 | `workspace_assistant.py`, `workspace_tools.py`, `assistant_navigation.py`, `assistant_reports.py`, `conversations.py` | the workspace assistant: bounded tool loop over ~20 read-only tenant-scoped tools, citations, server-built navigation and confirmable actions, server-computed reports, clarification questions, persistent conversations with leases and streaming | 029, 030, 031, 034, 040, 042, 045 |
+| `code_sandbox.py`, `attachments.py` | the assistant's code runs: inputs checked against access, results stored in the chat; files in a chat | 048, 049 |
+| `memory.py` | topics kept across chats, the rule that a message reading others' words saves nothing unasked, search of earlier chats | 051 |
+| `artifacts.py` | works beside the chat: flows, files, versions, previews made in the sandbox, restore, staleness | 050 |
 | `config.py` | runtime configuration edited in the web app: AI connection and backups, policy, formats, defaults, personal preferences; encrypted secrets; audited; revision bump | 017, 025 |
 | `context.py` | `ServiceContext`; rebuilds registry, policy and LLM client when the configuration revision changes | 017 |
 | `retention.py`, `backup.py` | retention policy (dry-run default), backup and restore | 015 |
@@ -202,7 +205,7 @@ themes). Pages are self-contained; API types live in `lib/api.ts`.
 | DataEditor | grid, bulk edits, copilot, trace, changes/anomalies, findings, versions | datasets/* |
 | Customers | list with next expected, detail with formats, overrides, policy overrides | customers |
 | Settings | AI (connection, models, backups), formats, policy (+ calibration), learning, DSL, audit, system | settings/*, calibration, learning, schemas, audit |
-| Assistant | Assistant, AssistantResponse, AssistantReport, ConfirmAction, ChatHistory, ChatMenu | assistant/*, conversations, stream |
+| Assistant | Assistant, AssistantResponse, AssistantReport, ChatFiles, ConfirmAction, ChatHistory, ChatMenu | assistant/*, conversations, stream |
 | Ops | queue, workers, failed jobs, breaker, spend | ops, jobs |
 | Guide, CommandPalette | feature catalogue (`lib/features.ts`) in English and Thai | — |
 
@@ -227,6 +230,9 @@ themes). Pages are self-contained; API types live in `lib/api.ts`.
 | `corrections` | alias / constant / accepted / promoted, per customer, uses | ADR-038 |
 | `app_settings`, `target_schemas` | runtime configuration (encrypted secrets), registered formats | ADR-017 |
 | `assistant_conversations`, `assistant_turns` | chats with owner and access scope, leases, turns with reply JSON | ADR-030 |
+| `assistant_attachments` | files in a chat: uploads, what code runs produced, preview pages | ADR-048, ADR-049, ADR-050 |
+| `assistant_artifacts`, `assistant_artifact_versions` | works the assistant made, with every version | ADR-050 |
+| `assistant_memories` | what the assistant remembers about a person | ADR-051 |
 
 Every datetime is UTC-aware; JSON columns are JSONB on Postgres; every model change ships an Alembic
 migration and CI checks models against migrations (ADR-011).
@@ -246,8 +252,10 @@ formats, defaults, preferences). A revision row tells every process when to relo
 
 ## 6. Security
 
-* AI never executes code; the DSL is whitelisted; the guard checks every model output; cell contents are
-  data, never instructions, in every prompt and tool.
+* AI never executes code in the data path; the DSL is whitelisted; the guard checks every model output; cell
+  contents are data, never instructions, in every prompt and tool. The assistant's code sandbox is the one
+  exception: a separate container with no network and no secrets, whose results reach a person, never a record
+  (ADR-048).
 * Uploads sniffed by content, names sanitised, sizes capped; formulas never recalculated, macros never run.
 * Roles on every write, an authenticated principal on reads, tenant scoping on customer-owned data, AI endpoints
   rate-limited and samples capped. Known gaps are listed in [RBAC_AND_SECURITY.md](RBAC_AND_SECURITY.md).
@@ -268,9 +276,11 @@ browser ──▶ nginx (web image: SPA + /api proxy, SSE unbuffered) ──▶ 
                                                             PostgreSQL (JSONB, Alembic) ◀┘──▶ S3 / MinIO
 ```
 
-One backend image (`forma serve` / `forma worker`), one web image, `docker-compose.prod.yml` with a
-`migrate` service, generated `.env.production.example`, CI building both images and validating the compose
-file (ADR-016). Dev stays SQLite + local disk + no auth + no external service.
+One backend image (`forma serve` / `forma worker`), one web image, a sandbox image for the assistant's code runs,
+`docker-compose.prod.yml` with a `migrate` service, generated `.env.production.example`, CI building the images and
+validating the compose file (ADR-016, ADR-048). The sandbox service has no network: the API reaches it through one
+Unix socket on a shared volume. Dev stays SQLite + local disk + no auth + no external service, and without the
+sandbox.
 
 ## 8. Observability and reliability
 
@@ -294,7 +304,7 @@ ADR-043's full OOXML scan postdates these numbers; re-measure before quoting the
 ## 10. Design principles in one place (the non-negotiable rules)
 
 1. Never hard-code a target field name; go through the registry.
-2. AI never executes code; it emits the DSL.
+2. AI never executes code in the data path; it emits the DSL. The assistant's sandbox (ADR-048) is the one exception.
 3. Immutable sources, append-only versions.
 4. Deterministic engine.
 5. Thai rules are explicit operations.

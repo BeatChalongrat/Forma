@@ -126,6 +126,22 @@ class Settings(BaseSettings):
         description="Encrypts secrets saved in the web app (AI API key). Required in prod to save them; "
         "changing it makes saved secrets unreadable until they are entered again.",
     )
+    code_sandbox_socket: str | None = Field(
+        default=None,
+        description="Unix socket of the assistant's code sandbox (ADR-048). Empty: it cannot run code.",
+    )
+    code_sandbox_timeout_s: float = Field(
+        default=60.0, description="Longest one code run may take, in seconds."
+    )
+    code_sandbox_max_input_mb: int = Field(
+        default=200, description="Most data one code run may receive, in MB."
+    )
+    assistant_max_image_mb: int = Field(
+        default=5, description="Largest image accepted in an assistant chat, in MB."
+    )
+    assistant_max_file_mb: int = Field(
+        default=25, description="Largest data file accepted in an assistant chat, in MB."
+    )
     sandbox_max_rows: int = Field(
         default=50_000,
         description="Rows per source the mapping sandbox runs the new and the approved mapping on (0 = all).",

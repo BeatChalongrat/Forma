@@ -2,7 +2,7 @@ import { Localized } from '../lib/locale'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { FileSpreadsheet, UploadCloud, X, Plus } from 'lucide-react'
+import { FileSpreadsheet, Upload, X, Plus } from 'lucide-react'
 import { api, waitForJob, type Job } from '../lib/api'
 import { fmtBytes, cn } from '../lib/utils'
 import { PageHeader, Section, Spinner, Modal } from '../components/ui'
@@ -38,7 +38,7 @@ export function Imports() {
   const statuses = [['', t('All statuses', 'ทุกสถานะ')], ['review', t('Needs answers', 'รอตอบคำถาม')], ['blocked', t('Check file', 'ต้องตรวจไฟล์')], ['transformed', t('Check results', 'ตรวจผลลัพธ์')], ['approved_data', t('Ready to download', 'พร้อมดาวน์โหลด')], ['published', t('Downloaded', 'ส่งออกแล้ว')], ['failed', t('Processing failed', 'ประมวลผลไม่สำเร็จ')], ['uploaded', t('Reading files', 'กำลังอ่านไฟล์')], ['profiled', t('Matching fields', 'กำลังจับคู่ข้อมูล')], ['approved', t('Ready to create results', 'พร้อมสร้างผลลัพธ์')], ['auto_approved', t('Matched automatically', 'จับคู่ผ่านอัตโนมัติ')], ['rejected', t('Needs correction', 'ต้องแก้ไข')]]
   if (!filesView) return <WorkRounds />
   return <>
-    <PageHeader title={t('Upload history', 'ประวัติไฟล์')} subtitle={t('Find past deliveries by the date the files were received.', 'ค้นหาไฟล์ย้อนหลังตามวันที่รับไฟล์เข้าระบบ')} actions={<Link to="/imports/new" className="btn btn-primary"><UploadCloud size={16} />{t('Upload files', 'อัปโหลดไฟล์')}</Link>} />
+    <PageHeader title={t('Upload history', 'ประวัติไฟล์')} subtitle={t('Find past deliveries by the date the files were received.', 'ค้นหาไฟล์ย้อนหลังตามวันที่รับไฟล์เข้าระบบ')} actions={<Link to="/imports/new" className="btn btn-primary"><Upload size={16} />{t('Upload files', 'อัปโหลดไฟล์')}</Link>} />
     <div className="flex gap-2 mb-4"><Link className="btn btn-ghost" to="/imports">{t('Work rounds', 'ตามรอบงาน')}</Link><span className="btn bg-signal-soft" aria-current="page">{t('All files', 'ไฟล์ทั้งหมด')}</span></div>
     <div className="card p-4 mb-5 space-y-4">
       <div className="flex flex-wrap gap-2">{[[0, t('Today', 'วันนี้')], [6, t('Last 7 days', '7 วันล่าสุด')], [29, t('Last 30 days', '30 วันล่าสุด')]].map(([days, label]) => <button key={days} className="btn btn-sm" onClick={() => change({ start: dateInZone(timezone, Number(days)), end: dateInZone(timezone) })}>{label}</button>)}<button className="btn btn-ghost btn-sm" onClick={() => { setSearchText(''); setParams({ view: 'files' }) }}>{t('Clear filters', 'ล้างตัวกรอง')}</button></div>
@@ -121,7 +121,7 @@ export function NewImport() {
             className={cn('card border-dashed p-10 text-center cursor-pointer hover:border-signal/50 transition-colors', files.length && 'py-6')}
           >
             <input ref={inputRef} type="file" multiple accept=".xlsx,.xlsm,.csv,.txt,.tsv" className="hidden" onChange={(e) => setFiles((xs) => [...xs, ...Array.from(e.target.files ?? [])])} />
-            <UploadCloud className="mx-auto text-muted" size={28} />
+            <Upload className="mx-auto text-muted" size={28} />
             <div className="mt-2 font-medium"><Localized>Drop Excel or CSV files here</Localized></div>
             <div className="text-muted text-[12.5px]">.xlsx · .xlsm · .csv — several files per round are fine (products, prices, stock, promotions)</div>
           </div>

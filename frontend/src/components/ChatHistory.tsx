@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query'
-import { ChevronDown, MessageCircleMore, Pin, Search, SquarePen } from 'lucide-react'
+import { ChevronDown, Sparkles, Pin, Search, SquarePen } from 'lucide-react'
 import { ChatMenu } from './ChatMenu'
 import { api } from '../lib/api'
 import { chatIdentity, newChatUrl } from '../lib/chats'
@@ -17,7 +17,7 @@ export function ChatHistory({ compact, onNavigate }: { compact: boolean; onNavig
   const history = useInfiniteQuery({ queryKey: ['assistant-chats', me ? chatIdentity(me) : '', term, archived], queryFn: ({ pageParam }) => api.chats(term, pageParam, archived), initialPageParam: 0, getNextPageParam: page => page.next_offset ?? undefined, enabled: !!me && expanded && !compact, refetchInterval: active ? 10000 : false })
   return <div className="mb-1">
     <div className={cn('flex items-center rounded-lg hover:bg-surface-2', active && 'bg-signal-soft text-navy')}>
-      <Link to="/assistant" onClick={onNavigate} title={t('Assistant', 'ผู้ช่วย')} className={cn('flex items-center gap-3 px-3 py-2.5 min-w-0 flex-1', compact && 'justify-center')}><MessageCircleMore size={20} strokeWidth={1.75} className="shrink-0" aria-hidden="true" />{!compact && <span className="text-[13px] font-medium">{t('Assistant', 'ผู้ช่วย')}</span>}</Link>
+      <Link to="/assistant" onClick={onNavigate} title={t('Assistant', 'ผู้ช่วย')} className={cn('flex items-center gap-3 px-3 py-2.5 min-w-0 flex-1', compact && 'justify-center')}><Sparkles size={20} className="shrink-0" aria-hidden="true" />{!compact && <span className="text-[13px] font-medium">{t('Assistant', 'ผู้ช่วย')}</span>}</Link>
       {!compact && <button className="p-2 mr-1 rounded-md hover:bg-surface-2" onClick={() => setExpanded(!expanded)} aria-expanded={expanded} aria-controls="assistant-chat-history" aria-label={t('Chat history', 'ประวัติแชต')}><ChevronDown size={15} className={cn('transition-transform', !expanded && '-rotate-90')} /></button>}
     </div>
     {!compact && expanded && <div id="assistant-chat-history" className="pl-3 pr-1 py-2 space-y-2">

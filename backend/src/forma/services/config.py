@@ -22,7 +22,7 @@ from forma.core import secrets
 from forma.core.errors import NotFound, ValidationFailed
 from forma.core.ids import new_id
 from forma.core.settings import Settings
-from forma.db.models import AppSetting, LLMCall, StoredSchema
+from forma.db.models import AppSetting, LLMCall, StoredSchema, utcnow
 from forma.db.session import session_scope
 from forma.schema_registry import SchemaRegistry, TargetSchema
 from forma.services.rounds import audit
@@ -160,17 +160,36 @@ def build_client(base: Settings, ai: dict[str, Any]) -> LLMClient:
 
     eff = llm_settings(base, ai)
     client = LLMClient.from_settings(eff)
+    client.primary_vision = _vision(ai.get("vision"), eff.llm_provider, eff.llm_base_url, eff.llm_model)
     routes: list[Route] = []
     for b in ai.get("backups") or []:
         key = secrets.decrypt(base, b["api_key_enc"]) if b.get("api_key_enc") else None
         provider = make_provider(b["provider"], key, b.get("base_url"), eff.llm_timeout_s)
         if not isinstance(provider, MockProvider):
-            routes.append(Route(b["id"], provider, b["model"]))
+            vision = _vision(b.get("vision"), b["provider"], b.get("base_url"), b["model"])
+            routes.append(Route(b["id"], provider, b["model"], vision))
     if client.is_mock and routes:
         first = routes.pop(0)
-        client = LLMClient(first.provider, first.model, eff.llm_max_retries, primary_name=first.name)
+        client = LLMClient(
+            first.provider,
+            first.model,
+            eff.llm_max_retries,
+            primary_name=first.name,
+            primary_vision=first.vision,
+        )
     client.fallbacks = routes
     return client
+
+
+def _route_id(provider: str, base_url: str | None, model: str) -> str:
+    return f"{provider}|{base_url or ''}|{model}"
+
+
+def _vision(result: dict[str, Any] | None, provider: str, base_url: str | None, model: str) -> bool | None:
+    """The saved image test (ADR-049), for exactly this model: changing any of the three voids it."""
+    if not result or result.get("route") != _route_id(provider, base_url, model):
+        return None
+    return bool(result.get("ok"))
 
 
 def _backup_view(base: Settings, b: dict[str, Any], usable: set[str]) -> dict[str, Any]:
@@ -186,6 +205,7 @@ def _backup_view(base: Settings, b: dict[str, Any], usable: set[str]) -> dict[st
         "usable": b["id"] in usable,
         "circuit_open": is_open(b["id"]),
         "warning": None if key or not b.get("api_key_enc") else "the key cannot be decrypted: add it again",
+        "vision": _vision(b.get("vision"), b["provider"], b.get("base_url"), b["model"]),
         "added_by": b.get("added_by"),
         "added_at": b.get("added_at"),
     }
@@ -226,6 +246,8 @@ def ai_view(session: Session, base: Settings) -> dict[str, Any]:
         "active_provider": active,
         "active_model": client.model,
         "active_route": client.primary_name if not client.is_mock else None,
+        "vision": client.primary_vision,
+        "supports_vision": client.supports_vision,
         "offline": client.is_mock,
         "warning": warning,
         "providers": list(PROVIDERS),
@@ -493,6 +515,46 @@ def connect_ai(
 # --------------------------------------------------------------------------------------------
 # backup keys (ADR-025): tried in order when the primary provider fails
 # --------------------------------------------------------------------------------------------
+def test_vision(session: Session, base: Settings, actor: str) -> dict[str, Any]:
+    """Show every connected model a small test picture and keep each answer (ADR-049). An unreachable
+    model keeps whatever it had: that says nothing about images."""
+    from forma.ai import vision
+
+    ai, backups = _backups(session)
+    client = build_client(base, ai)
+    if client.is_mock:
+        return {"results": [], "message": "AI is offline: no provider key"}
+    eff = llm_settings(base, ai)
+    now = utcnow().isoformat()
+    results: list[dict[str, Any]] = []
+    for route in client.routes:
+        result = {"id": route.name, **vision.probe(route.provider, route.model, client.temperature)}
+        results.append(result)
+        if result.get("usage"):
+            _ledger(session, "settings.vision_test", route.model, result)
+        if result["vision"] is None:
+            continue
+        saved = {"ok": result["vision"], "tested_at": now}
+        if route.name == "primary":
+            ai["vision"] = {
+                **saved,
+                "route": _route_id(eff.llm_provider, eff.llm_base_url, eff.llm_model),
+            }
+        else:
+            b = next(x for x in backups if x["id"] == route.name)
+            b["vision"] = {**saved, "route": _route_id(b["provider"], b.get("base_url"), b["model"])}
+    _put(session, AI_KEY, {**ai, "backups": backups}, actor)
+    audit(
+        session,
+        "settings.ai.vision_test",
+        "settings",
+        AI_KEY,
+        actor=actor,
+        results={r["id"]: r["vision"] for r in results},
+    )
+    return {"results": results}
+
+
 def _ledger(session: Session, agent: str, model: str, result: dict[str, Any]) -> None:
     session.add(
         LLMCall(

@@ -6,9 +6,10 @@ import asyncio
 import json
 from datetime import date
 from typing import Any, Literal
+from urllib.parse import quote
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends, File, Query, Request, UploadFile
 from fastapi.responses import JSONResponse, Response, StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy.orm import Session
@@ -16,17 +17,22 @@ from starlette.concurrency import run_in_threadpool
 
 from forma.ai.text_stream import AnswerStream
 from forma.api import serialize as ser
-from forma.api.routes import _mapping_scoped, _round_scoped, ctx_dep
+from forma.api.routes import _mapping_scoped, _round_scoped, ctx_dep, read_upload
 from forma.auth import Principal, ensure_all_customers, ensure_customer, llm_rate_limited, require_role
-from forma.core.errors import FormaError, ValidationFailed
+from forma.core.errors import FormaError, NotFound, ValidationFailed
+from forma.db.models import AssistantAttachment
 from forma.db.session import get_session, session_scope
 from forma.jobs import runner
 from forma.services import (
+    artifacts,
+    attachments,
     calibration,
+    code_sandbox,
     config,
     conversations,
     foresight,
     learning,
+    memory,
     review_evidence,
     review_questions,
     verdict_flow,
@@ -316,6 +322,9 @@ def assistant_status(
 ) -> dict[str, Any]:
     result = connection_status(ctx, session)
     result["tools"] = [t["name"] for t in assistant.TOOLS]
+    result["vision"] = ctx.llm.supports_vision
+    result["code_sandbox"] = code_sandbox.healthy(ctx)
+    result["file_types"] = sorted(attachments.DATA_TYPES)
     return result
 
 
@@ -346,6 +355,20 @@ class ConversationIn(BaseModel):
     round_id: str | None = Field(default=None, max_length=40)
     dataset_id: str | None = Field(default=None, max_length=40)
     mapping_id: str | None = Field(default=None, max_length=40)
+    memory_off: bool = False
+    incognito: bool = False
+
+
+class MemoryIn(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    topic: str = Field(min_length=1, max_length=120)
+    content: str = Field(min_length=1, max_length=1000)
+
+
+class MemoryEdit(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    topic: str | None = Field(default=None, min_length=1, max_length=120)
+    content: str | None = Field(default=None, min_length=1, max_length=1000)
 
 
 class ConversationEdit(BaseModel):
@@ -361,6 +384,9 @@ class TurnIn(BaseModel):
     request_id: str = Field(pattern=r"^[a-zA-Z0-9_-]{8,64}$")
     language: Literal["th", "en"] = "th"
     timezone: str = Field(default="Asia/Bangkok", max_length=80)
+    attachment_ids: list[str] = Field(default_factory=list, max_length=attachments.MAX_PER_MESSAGE)
+    artifact_id: str | None = Field(default=None, max_length=40)
+    target: str = Field(default="", max_length=160)
 
     @field_validator("timezone")
     @classmethod
@@ -392,11 +418,23 @@ def list_conversations(
 def create_conversation(
     body: ConversationIn,
     session: Session = Depends(get_session),
+    ctx: ServiceContext = Depends(ctx_dep),
     p: Principal = Depends(require_role("importer")),
 ) -> dict[str, Any]:
-    return conversations.summary(
-        conversations.create(session, p, body.title, body.round_id, body.dataset_id, body.mapping_id)
+    keys = conversations.sweep_incognito(session, p)
+    chat = conversations.create(
+        session,
+        p,
+        body.title,
+        body.round_id,
+        body.dataset_id,
+        body.mapping_id,
+        memory_off=body.memory_off,
+        incognito=body.incognito,
     )
+    session.commit()  # files follow right after this reply, before the session would commit on its own
+    attachments.delete_objects(ctx, keys)
+    return conversations.summary(chat)
 
 
 @router.post("/assistant/conversations/import", status_code=201)
@@ -454,10 +492,135 @@ def edit_conversation(
 def delete_conversation(
     chat_id: str,
     session: Session = Depends(get_session),
+    ctx: ServiceContext = Depends(ctx_dep),
     p: Principal = Depends(require_role("importer")),
 ) -> Response:
-    conversations.remove(session, p, chat_id)
+    keys = conversations.remove(session, p, chat_id)
+    session.commit()
+    attachments.delete_objects(ctx, keys)
     return Response(status_code=204)
+
+
+@router.post("/assistant/conversations/{chat_id}/attachments")
+async def attach_file(
+    chat_id: str,
+    file: UploadFile = File(...),
+    ctx: ServiceContext = Depends(ctx_dep),
+    p: Principal = Depends(require_role("importer")),
+) -> dict[str, Any]:
+    limit = max(ctx.settings.assistant_max_image_mb, ctx.settings.assistant_max_file_mb)
+    data = await read_upload(file, limit)
+
+    def store() -> dict[str, Any]:
+        with session_scope() as session:
+            conversations.get_chat(session, p, chat_id)
+            return attachments.add_upload(ctx, session, p, chat_id, file.filename or "file", data)
+
+    return await run_in_threadpool(store)
+
+
+@router.get("/assistant/attachments/{file_id}")
+def get_attachment(
+    file_id: str,
+    session: Session = Depends(get_session),
+    ctx: ServiceContext = Depends(ctx_dep),
+    p: Principal = Depends(require_role("importer")),
+) -> Response:
+    row = session.get(AssistantAttachment, file_id)
+    if row is None:
+        raise NotFound("File not found")
+    conversations.get_chat(session, p, row.conversation_id)  # 404 unless this account can open the chat
+    show = "inline" if row.media_type in attachments.VIEWABLE else "attachment"
+    return Response(
+        ctx.storage.get(row.storage_key),
+        media_type=row.media_type,
+        headers={
+            "Content-Disposition": f"{show}; filename*=UTF-8''{quote(row.name)}",
+            "X-Content-Type-Options": "nosniff",
+            "Content-Security-Policy": "default-src 'none'; sandbox",
+            "Cache-Control": "private, max-age=3600",
+        },
+    )
+
+
+@router.get("/assistant/artifacts")
+def list_artifacts(
+    session: Session = Depends(get_session), p: Principal = Depends(require_role("importer"))
+) -> dict[str, Any]:
+    return {"items": artifacts.library(session, conversations.visible(p))}
+
+
+def _owner(p: Principal) -> str:
+    return conversations.identity(p)[0]
+
+
+@router.get("/assistant/memory")
+def list_memory(
+    session: Session = Depends(get_session), p: Principal = Depends(require_role("importer"))
+) -> dict[str, Any]:
+    return {"items": [memory.view(row) for row in memory.rows_for(session, _owner(p))]}
+
+
+@router.post("/assistant/memory", status_code=201)
+def add_memory(
+    body: MemoryIn,
+    session: Session = Depends(get_session),
+    p: Principal = Depends(require_role("importer")),
+) -> dict[str, Any]:
+    return memory.view(memory.add(session, p, _owner(p), body.topic, body.content, "user"))
+
+
+@router.patch("/assistant/memory/{memory_id}")
+def edit_memory(
+    memory_id: str,
+    body: MemoryEdit,
+    session: Session = Depends(get_session),
+    p: Principal = Depends(require_role("importer")),
+) -> dict[str, Any]:
+    return memory.view(memory.update(session, p, _owner(p), memory_id, body.topic, body.content))
+
+
+@router.delete("/assistant/memory/{memory_id}", status_code=204)
+def delete_memory(
+    memory_id: str,
+    session: Session = Depends(get_session),
+    p: Principal = Depends(require_role("importer")),
+) -> Response:
+    memory.remove(session, p, _owner(p), memory_id)
+    return Response(status_code=204)
+
+
+@router.delete("/assistant/memory")
+def reset_memory(
+    session: Session = Depends(get_session), p: Principal = Depends(require_role("importer"))
+) -> dict[str, Any]:
+    return {"deleted": memory.reset(session, p, _owner(p))}
+
+
+def _artifact(session: Session, p: Principal, artifact_id: str) -> Any:
+    row = artifacts.find(session, artifact_id)
+    conversations.get_chat(session, p, row.conversation_id)  # 404 unless this account can open the chat
+    return row
+
+
+@router.get("/assistant/artifacts/{artifact_id}")
+def get_artifact(
+    artifact_id: str,
+    session: Session = Depends(get_session),
+    p: Principal = Depends(require_role("importer")),
+) -> dict[str, Any]:
+    return artifacts.detail(session, p, _artifact(session, p, artifact_id))
+
+
+@router.post("/assistant/artifacts/{artifact_id}/versions/{number}/restore")
+def restore_artifact_version(
+    artifact_id: str,
+    number: int,
+    session: Session = Depends(get_session),
+    ctx: ServiceContext = Depends(ctx_dep),
+    p: Principal = Depends(require_role("importer")),
+) -> dict[str, Any]:
+    return artifacts.restore(ctx, session, p, _artifact(session, p, artifact_id), number)
 
 
 @router.post("/assistant/conversations/{chat_id}/messages")
@@ -470,7 +633,17 @@ def send_message(
     _limit: Principal = Depends(llm_rate_limited),
 ) -> dict[str, Any]:
     return conversations.send(
-        ctx, session, p, chat_id, body.question, body.request_id, body.language, body.timezone
+        ctx,
+        session,
+        p,
+        chat_id,
+        body.question,
+        body.request_id,
+        body.language,
+        body.timezone,
+        attachment_ids=body.attachment_ids,
+        artifact_id=body.artifact_id,
+        target=body.target,
     )
 
 
@@ -524,6 +697,9 @@ async def stream_message(
                     body.language,
                     body.timezone,
                     stream=control,
+                    attachment_ids=body.attachment_ids,
+                    artifact_id=body.artifact_id,
+                    target=body.target,
                 )
             control.emit({"type": "done", "turn": result})
         except Exception:

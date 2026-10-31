@@ -26,6 +26,9 @@ class Preferences(BaseModel):
     theme: Literal["light", "dark", "system"] = "light"
     timezone: str = "Asia/Bangkok"
     date_format: Literal["day-first", "iso"] = "day-first"
+    memory_enabled: bool = True
+    chat_search: bool = True
+    memory_sensitive: bool = False
 
     @field_validator("avatar")
     @classmethod

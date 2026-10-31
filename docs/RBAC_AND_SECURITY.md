@@ -41,7 +41,7 @@ Roles nest: a higher role has every lower role's permissions.
 | GET | /history, /foresight, /learning, /rounds/{id}/verdict, /mappings/{id}/questions[/evidence], /assistant/*, /mcp | importer |
 | POST | /rounds, /rounds/{id}/files, /rounds/{id}/profile, /propose, /run, /transform, /rounds/batch-run, /batches, /batches/{id}/files, /assign, /resume, PATCH /batches/{id} | importer |
 | POST | /rounds/{id}/mapping-preview, /source-preview, /relationships, /mappings/{id}/compare, /datasets/{id}/ask | any |
-| POST | /assistant/ask RL, /assistant/conversations[/import], /{chat}/messages RL, /messages/stream RL, /stop, PATCH/DELETE /{chat}, /mcp RL | importer |
+| POST | /assistant/ask RL, /assistant/conversations[/import], /{chat}/attachments, /{chat}/messages RL, /messages/stream RL, /stop, PATCH/DELETE /{chat}, /mcp RL | importer |
 | POST | /mappings/{id}/approve, /reject, /edit, /answers/preview, /answers/apply, /diagnose RL, /rounds/{id}/verdict/accept | reviewer |
 | POST | /datasets/{id}/changes, /preview-changes, /approve, /rollback, /copilot RL | reviewer |
 | POST | /datasets/{id}/export, /schemas, /schemas/preview · DELETE /customers/{id}/overrides/{oid}, /learning/{id} | approver |
@@ -102,13 +102,28 @@ Tests: `test_tenant_scope.py`, `test_auth.py`, `test_workspace.py`,
 
 ## 6. AI security
 
-* **AI never executes code.** Models emit a declarative Mapping DSL of whitelisted operations, or structured
-  analyses. The engine compiles the DSL; nothing generated runs (ADR-002).
+* **AI never executes code in the data path.** Models emit a declarative Mapping DSL of whitelisted operations, or
+  structured analyses. The engine compiles the DSL; nothing generated runs there (ADR-002).
+* **The assistant's sandbox is the one exception (ADR-048).** Code the model writes runs in a separate container with
+  no network, no secrets and a read-only file system, as an unprivileged user with limits on time, memory, processes
+  and files. It works on copies and keeps nothing between runs; its results go to the chat, never to a record.
+  Datasets and source files are checked with `ensure_customer` first. Every run is shown in the chat and audited as
+  `assistant.code_run`. It shares the host's kernel (R32).
+* **Memory (ADR-051).** Topics belong to one person and are reached only by them. A message that read files or data
+  saves nothing unless the person asked in that message. ID, bank and card numbers, passwords and keys are refused by
+  the server. Memory is never evidence and nothing but the assistant reads it. A deleted topic leaves no text in the
+  audit log. An incognito chat is in no list or search and is deleted after a day.
+* **Works beside the chat (ADR-050).** A work is reached only through a chat you can open. Previews are made in the
+  sandbox, never in the API. A flow is checked as data and runs nothing. A web page runs in a frame with no origin and
+  no network.
+* **Images and files in a chat (ADR-049).** Types come from the bytes; only PNG, JPEG and WEBP display, the rest
+  download. A file is reachable only through a chat its owner can open. Images go only to models that passed the
+  image test, and what they show is data, never instructions.
 * **Cell contents are data, never instructions.** Every agent prompt and every assistant prompt states it;
   the output guard rejects instruction-like text and pointers outside the schema; truncated evidence is
   marked (rule 7, ADR-013).
 * **Bounded inputs.** Sample rows and characters sent to a model are capped (`FORMA_LLM_MAX_SAMPLE_*`);
-  evidence items are capped at 18 000 characters; the assistant loop is bounded (6 turns, 2 tool calls each).
+  evidence items are capped at 18 000 characters; the assistant loop is bounded (6 turns, 12 with the sandbox on, 2 tool calls each).
 * **Rate limits.** Copilot, diagnosis, the assistant, MCP and the AI settings probes are rate-limited per
   principal (`FORMA_LLM_RATE_LIMIT_PER_MIN`), in memory per API process. `/propose`, `/run`, `/rounds/batch-run`,
   `/batches` and `/batches/{id}/files` apply the limit only when the request sets `use_llm: true`; leaving it unset

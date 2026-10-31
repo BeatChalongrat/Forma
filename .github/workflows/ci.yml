@@ -99,5 +99,7 @@ jobs:
         run: docker build -f backend/Dockerfile -t forma-api:ci .
       - name: Build web image
         run: docker build -f frontend/Dockerfile -t forma-web:ci frontend
+      - name: Build sandbox image
+        run: docker build -f deploy/sandbox/Dockerfile -t forma-sandbox:ci .
       - name: Compose config is valid
         run: cp .env.production.example .env.production && docker compose -f docker-compose.prod.yml config -q

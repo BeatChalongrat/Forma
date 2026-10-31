@@ -1,11 +1,14 @@
 import { Fragment, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowRight, Check, Copy, FileSpreadsheet } from 'lucide-react'
-import { type Me, type WorkspaceAnswer } from '../lib/api'
+import { useMutation } from '@tanstack/react-query'
+import { ArrowRight, Check, Copy, FileSpreadsheet, History, NotebookPen } from 'lucide-react'
+import { api, type Me, type MemoryChange, type WorkspaceAnswer } from '../lib/api'
 import { usePreferences } from '../lib/preferences'
 import { ConfirmAction } from './ConfirmAction'
 import { ClarificationCard } from './ClarificationCard'
 import { AssistantReport } from './AssistantReport'
+import { CodeRunCard } from './ChatFiles'
+import { ArtifactCard } from './ArtifactPanel'
 function ReplyText({ text }: { text: string }) {
   return <div className="assistant-prose">{text.split('\n').map((line, i) => {
     if (!line.trim()) return <div key={i} className="h-3" />
@@ -15,11 +18,23 @@ function ReplyText({ text }: { text: string }) {
   })}</div>
 }
 
-export function AssistantResponse({ reply, me, onClarify, disabled }: { reply: WorkspaceAnswer; me: Me; onClarify?: (text: string) => void; disabled?: boolean }) {
+function MemoryNote({ change }: { change: MemoryChange }) {
+  const { t } = usePreferences()
+  const undo = useMutation({ mutationFn: () => api.deleteMemory(change.id) })
+  const said = change.action === 'forget' ? t('Forgotten', 'ลืมแล้ว') : change.action === 'change' ? t('Memory changed', 'แก้ความจำแล้ว') : t('Remembered', 'จำแล้ว')
+  return <p className="assistant-memory"><NotebookPen size={14} className="shrink-0" /><span className="min-w-0">{undo.isSuccess ? t('Removed from memory', 'เอาออกจากความจำแล้ว') : `${said}: ${change.topic}`}{change.sensitive && !undo.isSuccess && <span className="text-warn"> · {t('a sensitive topic', 'เรื่องอ่อนไหว')}</span>}</span>{change.action === 'save' && !undo.isSuccess && <button type="button" className="underline" disabled={undo.isPending} onClick={() => undo.mutate()}>{t('Undo', 'ยกเลิก')}</button>}<Link className="underline" to="/memory">{t('Manage', 'จัดการ')}</Link></p>
+}
+
+export function AssistantResponse({ reply, me, onClarify, disabled, openArtifact, onOpenArtifact }: { reply: WorkspaceAnswer; me: Me; onClarify?: (text: string) => void; disabled?: boolean; openArtifact?: string; onOpenArtifact?: (id: string) => void }) {
   const { t } = usePreferences()
   const [copied, setCopied] = useState(false)
+  const pastChats = reply.evidence.filter(e => e.tool === 'search_chats' || e.tool === 'recent_chats').flatMap(e => e.links ?? [])
   return <>
 <div className="flex gap-2 items-center font-medium text-navy"><span className="h-1.5 w-1.5 bg-brand-lime rounded-full" />FORMA</div><ReplyText text={reply.answer} />
+            {reply.memory_changes?.map(change => <MemoryNote key={change.id + change.action} change={change} />)}
+            {!!pastChats.length && <div className="assistant-past"><History size={14} className="shrink-0" /><span>{t('From earlier chats', 'จากแชตก่อนหน้า')}:</span>{pastChats.map(link => <Link key={link.url} className="underline" to={link.url}>{link.label}</Link>)}</div>}
+            {!!reply.artifacts?.length && <div className="space-y-2">{reply.artifacts.map(artifact => <ArtifactCard key={artifact.id + artifact.version} artifact={artifact} open={openArtifact === artifact.id} onOpen={() => onOpenArtifact?.(artifact.id)} />)}</div>}
+            {reply.code_runs?.map((run, i, runs) => <CodeRunCard key={run.id} run={run} onFix={i === runs.length - 1 && onClarify && !disabled ? () => onClarify(t('The last run failed. Fix it and try again.', 'รันล่าสุดไม่สำเร็จ ช่วยแก้แล้วลองใหม่')) : undefined} />)}
             {!reply.clarifications?.length && reply.visualizations?.filter((report, i, all) => all.findIndex(r => r.id === report.id) === i).map(report => <AssistantReport key={report.id} report={report} />)}
             {!!reply.clarifications?.length && <ClarificationCard questions={reply.clarifications} onAnswer={onClarify} disabled={disabled} />}
             {!reply.ai && reply.reason !== 'imported_history' && <p className="text-sm text-warn">{t('AI could not answer this time. You can open the evidence below.', 'ครั้งนี้ AI ยังตอบไม่ได้ เปิดข้อมูลอ้างอิงด้านล่างเพื่อตรวจต่อได้')}{me.effective_roles.includes('admin') && <Link className="underline ml-2" to="/settings?tab=ai">{t('Check connection', 'ตรวจการเชื่อมต่อ')}</Link>}</p>}
