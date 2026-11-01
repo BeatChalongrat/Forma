@@ -6,6 +6,7 @@ import { ArrowRightLeft, Ellipsis, FileUp, Undo2, XCircle } from 'lucide-react'
 import { api, waitForJob, type ImportRound } from '../lib/api'
 import { usePreferences } from '../lib/preferences'
 import { useToast } from '../lib/toast'
+import { UPLOAD_ACCEPT } from '../lib/uploads'
 import { Modal, Spinner } from './ui'
 
 export const CLOSED_STATUSES = ['cancelled', 'moved', 'superseded']
@@ -89,7 +90,7 @@ export function RoundMenu({ round, compact, moveRequest }: { round: Round; compa
 
     <Modal open={dialog === 'replace'} onClose={close} title={t('Replace with a new file', 'แทนที่ด้วยไฟล์ใหม่')} width="max-w-md" footer={<><button className="btn" disabled={busy} onClick={close}>{t('Back', 'กลับ')}</button><button className="btn btn-primary" disabled={busy || !files.length || !reason.trim()} onClick={() => replace.mutate()}>{replace.isPending ? <Spinner /> : null}{t('Upload and replace', 'อัปโหลดและแทนที่')}</button></>}>
       <div className="grid gap-4">
-        <label className="grid gap-1 text-sm">{t('New file', 'ไฟล์ใหม่')}<input className="input py-1.5" type="file" multiple accept=".xlsx,.xlsm,.csv,.txt,.tsv" onChange={e => setFiles(Array.from(e.target.files ?? []))} /></label>
+        <label className="grid gap-1 text-sm">{t('New file', 'ไฟล์ใหม่')}<input className="input py-1.5" type="file" multiple accept={UPLOAD_ACCEPT} onChange={e => setFiles(Array.from(e.target.files ?? []))} /></label>
         <label className="grid gap-1 text-sm">{t('Round name (optional)', 'ชื่อรอบ (ไม่บังคับ)')}<input className="input" maxLength={255} placeholder={round.label ?? ''} value={label} onChange={e => setLabel(e.target.value)} /></label>
         {reasonField(t('e.g. the customer corrected two prices', 'เช่น ลูกค้าแก้ราคา 2 รายการ'))}
         {consequences([

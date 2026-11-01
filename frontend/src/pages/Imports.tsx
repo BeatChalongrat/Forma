@@ -12,6 +12,7 @@ import { dateInZone, usePreferences } from '../lib/preferences'
 import { Workflow } from '../components/Workflow'
 import { WorkRounds } from '../components/WorkRounds'
 import { CLOSED_STATUSES } from '../components/RoundMenu'
+import { refusedNames, splitReadable, UPLOAD_ACCEPT, UPLOAD_TYPES } from '../lib/uploads'
 
 export function Imports() {
   const { prefs, t, date } = usePreferences()
@@ -82,11 +83,18 @@ export function NewImport() {
   const qc = useQueryClient()
   const toast = useToast()
 
+  const add = useCallback((fs: File[]) => {
+    const { readable, refused } = splitReadable(fs)
+    if (refused.length) {
+      const { names, more } = refusedNames(refused)
+      toast.push({ kind: 'bad', title: t('FORMA cannot read these files', 'FORMA อ่านไฟล์เหล่านี้ไม่ได้'), detail: `${names}${more ? t(` and ${more} more`, ` และอีก ${more} ไฟล์`) : ''} · ${t('Accepted', 'รับ')} ${UPLOAD_TYPES.join(' ')}` })
+    }
+    setFiles((xs) => [...xs, ...readable])
+  }, [t, toast])
   const onDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault()
-    const fs = Array.from(e.dataTransfer.files).filter((f) => /\.(xlsx|xlsm|csv|txt|tsv)$/i.test(f.name))
-    setFiles((xs) => [...xs, ...fs])
-  }, [])
+    add(Array.from(e.dataTransfer.files))
+  }, [add])
 
   const createCustomer = useMutation({
     mutationFn: () => api.createCustomer({ code: form.code, name: form.name || form.code, erp_type: form.erp_type || undefined }),
@@ -129,7 +137,7 @@ export function NewImport() {
             onDragOver={(e) => e.preventDefault()} onDrop={onDrop} onClick={() => inputRef.current?.click()} role="button" tabIndex={0} aria-label="Choose files" onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); inputRef.current?.click() } }}
             className={cn('card border-dashed p-10 text-center cursor-pointer hover:border-signal/50 transition-colors', files.length && 'py-6')}
           >
-            <input ref={inputRef} type="file" multiple accept=".xlsx,.xlsm,.csv,.txt,.tsv" className="hidden" onChange={(e) => setFiles((xs) => [...xs, ...Array.from(e.target.files ?? [])])} />
+            <input ref={inputRef} type="file" multiple accept={UPLOAD_ACCEPT} className="hidden" onChange={(e) => { add(Array.from(e.target.files ?? [])); e.target.value = '' }} />
             <Upload className="mx-auto text-muted" size={28} />
             <div className="mt-2 font-medium"><Localized>Drop Excel or CSV files here</Localized></div>
             <div className="text-muted text-[12.5px]">{t('Excel or CSV · e.g. products.xlsx + prices.csv + stock.csv for the same customer', 'Excel หรือ CSV · เช่น products.xlsx + prices.csv + stock.csv ของลูกค้ารายเดียว')}</div>
