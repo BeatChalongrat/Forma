@@ -14,7 +14,7 @@ from typing import Any
 from forma.ai import guard
 from forma.ai.heuristics import HeuristicProposal
 from forma.ai.llm import LLMClient, LLMError, Usage, set_agent
-from forma.mapping_dsl.models import MappingDocument, Op
+from forma.mapping_dsl.models import OP_ARITY, OP_PARAMS, MappingDocument, Op
 from forma.mapping_dsl.validate import validate_mapping
 from forma.profiling.profile import WorkbookProfile
 from forma.schema_registry import TargetSchema
@@ -49,7 +49,55 @@ Rules you must follow:
 
 
 def _ops_list() -> str:
-    return ", ".join(o.value for o in Op)
+    """One line per op: name(arity; params) — the shape the model must write, not just the name (ADR-057)."""
+    lines = []
+    for o in Op:
+        if o in (Op.COL, Op.CONST):
+            continue
+        lo, hi = OP_ARITY.get(o, (1, 1))
+        arity = f"{lo}" if hi == lo else f"{lo}+" if hi is None else f"{lo}-{hi}"
+        params = OP_PARAMS.get(o)
+        ps = "; params: " + ", ".join(f"{k} ({v})" for k, v in params.items()) if params else ""
+        lines.append(f"  {o.value}(args: {arity}{ps})")
+    return (
+        "\n".join(lines)
+        + "\n  Every call node is {op, args: [child nodes], params: {literal options}}; a column is"
+        ' {"op":"col","name":...}; a literal is {"op":"const","value":...}. Options go in params, never in args.'
+    )
+
+
+def dsl_problems(exc: Exception, *, limit: int = 10) -> list[str]:
+    """Pydantic's union errors repeat every branch; the model only needs the failing node and what was
+    wrong with it (ADR-057)."""
+    errors = getattr(exc, "errors", None)
+    if not callable(errors):
+        return [f"mapping does not match the DSL: {str(exc)[:800]}"]
+    call_branch: dict[str, list[str]] = {}
+    leaf_branch: dict[str, list[str]] = {}
+    for err in errors():
+        loc = [str(x) for x in err.get("loc", ())]
+        # an expression is a union; pydantic reports every branch. Keep the path up to the branch name and
+        # remember which branch spoke: the call branch names the real mistake when the node has an op
+        branch = next((x for x in loc if x in ("ColExpr", "ConstExpr") or x.startswith("function-")), None)
+        path = "/".join(x for x in loc if not (x in ("ColExpr", "ConstExpr") or x.startswith("function-")))
+        msg = str(err.get("msg", ""))
+        if msg.startswith("Input should be 'col'") or msg.startswith("Input should be 'const'"):
+            continue
+        node = err.get("input")
+        op = node.get("op") if isinstance(node, dict) else None
+        line = f"{msg} (op {op!r})" if op else msg
+        target = leaf_branch if branch in ("ColExpr", "ConstExpr") else call_branch
+        target.setdefault(path, [])
+        if line not in target[path]:
+            target[path].append(line)
+    # a leaf-branch complaint only matters when no call-branch error covers the same expression
+    for path in list(leaf_branch):
+        expr = path.rsplit("/", 1)[0]
+        if any(c == expr or c.startswith(expr + "/") for c in call_branch):
+            leaf_branch.pop(path)
+    merged = {**leaf_branch, **call_branch}
+    out = [f"mapping does not match the DSL at {p}: " + "; ".join(m[:3]) for p, m in sorted(merged.items())]
+    return out[:limit] or [f"mapping does not match the DSL: {str(exc)[:800]}"]
 
 
 def _caps() -> tuple[int, int]:
@@ -286,7 +334,7 @@ def mapping_agent(
         try:
             doc = MappingDocument.model_validate(d.get("mapping"))
         except Exception as e:
-            return [f"mapping does not match the DSL: {str(e)[:800]}"]
+            return dsl_problems(e)
         rep = validate_mapping(doc, schema)
         return [f"{i.code} at {i.path}: {i.message}" for i in rep.issues if i.level == "error"]
 
@@ -376,7 +424,7 @@ def diagnosis_agent(
             try:
                 doc = MappingDocument.model_validate(pm)
             except Exception as e:
-                return [f"patched_mapping invalid: {str(e)[:600]}"]
+                return ["patched_mapping invalid: " + "; ".join(dsl_problems(e, limit=4))]
             rep = validate_mapping(doc, schema)
             return [f"{i.code}: {i.message}" for i in rep.issues if i.level == "error"]
         return []
@@ -428,7 +476,7 @@ def adaptation_agent(
         try:
             doc = MappingDocument.model_validate(d.get("mapping"))
         except Exception as e:
-            return [f"mapping does not match the DSL: {str(e)[:800]}"]
+            return dsl_problems(e)
         return [f"{i.code}: {i.message}" for i in validate_mapping(doc, schema).issues if i.level == "error"]
 
     set_agent("adaptation")

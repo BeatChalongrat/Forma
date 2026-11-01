@@ -128,6 +128,61 @@ def test_call_expr_rejects_col_const_ops_and_unknown_op() -> None:
         SourceSpec.model_validate({"id": "1bad"})
 
 
+def test_null_constant_survives_the_stored_form() -> None:
+    # a model answers "else null"; exclude_none drops the value, and the stored form must read back as null
+    expr = call("conditional", call("eq", col("kind"), const("promo")), col("price"), const(None))
+    stored = expr.model_dump(mode="json", exclude_none=True)
+    assert stored["args"][2] == {"op": "const"}
+    back = CallExpr.model_validate(stored)
+    assert back.args[2].value is None
+
+
+def test_param_aliases_are_repaired_and_unknown_params_are_errors(schema: TargetSchema) -> None:
+    # a model writes day_first; the engine reads dayfirst — repaired on the way in, never ignored (ADR-057)
+    e = call("parse_date_th", col("d"), day_first=False)
+    assert e.params == {"dayfirst": False}
+    assert CallExpr.model_validate(
+        {"op": "round", "args": [{"op": "col", "name": "p"}], "params": {"precision": 0}}
+    ).params == {"decimals": 0}
+    doc = _doc(
+        fields=[
+            FieldMapping(target="/sku", expr=call("parse_date_th", col("d"), dayfirst=False, assume_be=True))
+        ]
+    )
+    rep = validate_mapping(doc, schema)
+    bad = [i for i in rep.issues if i.code == "unknown_param"]
+    assert len(bad) == 1 and "assume_be" in bad[0].message and "dayfirst" in bad[0].message
+
+
+def test_dsl_problems_name_the_failing_node() -> None:
+    from pydantic import ValidationError as VE
+
+    from forma.ai.agents import dsl_problems
+
+    bad = {
+        "meta": {"customer_id": "c", "target_schema": "product", "version": 1},
+        "sources": [{"id": "s", "role": "products"}],
+        "record": {"root_source": "s"},
+        "fields": [
+            {"target": "/sku", "expr": {"op": "col", "name": "a"}},
+            {
+                "target": "/status",
+                "expr": {
+                    "op": "contains",
+                    "args": [{"op": "col", "name": "x"}, {"op": "const", "value": "y"}],
+                    "params": {},
+                },
+            },
+        ],
+    }
+    with pytest.raises(VE) as info:
+        MappingDocument.model_validate(bad)
+    lines = dsl_problems(info.value)
+    assert 1 <= len(lines) <= 3
+    assert "fields/1/expr" in lines[0] and "contains" in lines[0]
+    assert "Input should be 'col'" not in " ".join(lines)
+
+
 def test_sheet_select_requires_exactly_one() -> None:
     with pytest.raises(ValidationError):
         SheetSelect()

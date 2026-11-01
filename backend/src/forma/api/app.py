@@ -10,6 +10,7 @@ import structlog
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
+from starlette.concurrency import run_in_threadpool
 
 from forma import __version__
 from forma.api.batch_routes import router as batch_router
@@ -22,7 +23,7 @@ from forma.core.errors import FormaError
 from forma.core.ids import new_id
 from forma.core.logging import configure_logging
 from forma.core.settings import get_settings
-from forma.db.session import init_db
+from forma.db.session import commit_request_sessions, get_session, init_db, request_session
 from forma.jobs import handlers as _handlers  # noqa: F401  (registers job handlers)
 from forma.jobs import runner
 
@@ -82,6 +83,8 @@ def create_app() -> FastAPI:
         t0 = time.perf_counter()
         try:
             response = await call_next(request)
+            # the handler's rows are committed here, before the client sees the response (ADR-057)
+            await run_in_threadpool(commit_request_sessions, request, ok=response.status_code < 400)
         finally:
             structlog.contextvars.unbind_contextvars("request_id", "path")
         response.headers["X-Request-Id"] = rid
@@ -123,6 +126,7 @@ def create_app() -> FastAPI:
     app.include_router(config_router)
     app.include_router(batch_router)
     app.include_router(workspace_router)
+    app.dependency_overrides[get_session] = request_session  # committed before the response (ADR-057)
     return app
 
 

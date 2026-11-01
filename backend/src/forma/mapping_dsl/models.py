@@ -81,7 +81,9 @@ class ColExpr(Strict):
 
 class ConstExpr(Strict):
     op: Literal["const"] = "const"
-    value: Any
+    # A null constant ("else null" in a conditional) is dropped by ``model_dump(exclude_none=True)``, so the
+    # stored form is ``{"op": "const"}`` and must read back as the same null (ADR-056 follow-up).
+    value: Any = None
 
 
 class CallExpr(Strict):
@@ -90,6 +92,19 @@ class CallExpr(Strict):
     op: Op
     args: list[Expr] = Field(default_factory=list)
     params: dict[str, Any] = Field(default_factory=dict)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _alias_params(cls, data: Any) -> Any:
+        """A model writes ``day_first`` for ``dayfirst`` and the date silently reads the wrong way round
+        (ADR-057). Known spellings are repaired here, deterministically; anything else is an error in
+        ``validate_mapping`` so the author is told instead of ignored."""
+        if isinstance(data, dict) and isinstance(data.get("params"), dict):
+            params = data["params"]
+            fixed = {PARAM_ALIASES.get(str(k), str(k)): v for k, v in params.items()}
+            if fixed != params:
+                data = {**data, "params": fixed}
+        return data
 
     @model_validator(mode="after")
     def _check_arity(self) -> CallExpr:
@@ -151,6 +166,56 @@ OP_ARITY: dict[Op, tuple[int, int | None]] = {
     Op.CONTAINS: (1, 1),
     Op.IN: (1, 1),
     Op.STARTS_WITH: (1, 1),
+}
+
+# Every literal option an op reads (engine/ops.py), with the one-line meaning the prompt shows. An op
+# missing here takes no params; a param missing here is an error (ADR-057).
+OP_PARAMS: dict[Op, dict[str, str]] = {
+    Op.CONCAT: {"separator": "string between the parts, default ''"},
+    Op.CAST: {"to": "string | int | float | bool | date"},
+    Op.REGEX_EXTRACT: {"pattern": "regex", "group": "capture group, default 1"},
+    Op.REGEX_REPLACE: {"pattern": "regex", "replacement": "string, default ''"},
+    Op.SPLIT: {"separator": "default ','", "index": "0-based element; omit for the whole list"},
+    Op.MAP_VALUES: {
+        "mapping": "dict source value → target value (case-insensitive)",
+        "default": "value when unmapped (omit to keep null)",
+        "keep_unmapped": "true keeps the source value when unmapped",
+        "fuzzy": "true matches when the source contains the key",
+    },
+    Op.LOOKUP: {"table": "dict", "source": "joined source id", "default": "value when missing"},
+    Op.PARSE_NUMBER_TH: {"percent_to_fraction": "true turns 15% into 0.15"},
+    Op.PARSE_DATE_TH: {
+        "formats": "list of strptime formats tried first",
+        "assume_year": "auto | be | ce",
+        "dayfirst": "false for month/day/year (US) dates; default true",
+    },
+    Op.VAT_ADJUST: {"mode": "add | remove", "rate": "default 0.07"},
+    Op.UNIT_NORMALIZE: {"default": "unit when unknown", "synonyms": "dict extra source word → unit"},
+    Op.ROUND: {"decimals": "default 2"},
+    Op.DEFAULT: {"value": "fills nulls"},
+    Op.NULL_IF: {"values": "list of placeholders that mean null"},
+    Op.CONTAINS: {"pattern": "regex, or text with literal=true", "literal": "true for plain text"},
+    Op.STARTS_WITH: {"pattern": "prefix"},
+    Op.IN: {"values": "list"},
+}
+
+# Spellings models and people reach for; repaired on the way in (ADR-057).
+PARAM_ALIASES: dict[str, str] = {
+    "day_first": "dayfirst",
+    "dayFirst": "dayfirst",
+    "assume": "assume_year",
+    "year": "assume_year",
+    "sep": "separator",
+    "delimiter": "separator",
+    "format": "formats",
+    "map": "mapping",
+    "to_type": "to",
+    "type": "to",
+    "precision": "decimals",
+    "digits": "decimals",
+    "vat_rate": "rate",
+    "regex": "pattern",
+    "prefix": "pattern",
 }
 
 

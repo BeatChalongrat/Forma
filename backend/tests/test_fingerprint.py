@@ -175,6 +175,18 @@ def test_columns_added_removed_and_header_moved() -> None:
     assert rep4.similarity == 1.0
 
 
+def test_column_moved_to_another_sheet_is_drift() -> None:
+    # the price leaves the item sheet for the price sheet: the header union is unchanged, the mapping is not
+    prev = fingerprint_profile(_profile({"Item": PRODUCTS, "Price": STOCK}))
+    without = [c for c in PRODUCTS if c[0] != "ราคาขาย"]
+    cur = fingerprint_profile(_profile({"Item": without, "Price": [*STOCK, ("ราคาขาย", "float")]}))
+    rep = compare(prev, cur)
+    assert rep.classification == "columns_moved"
+    assert {"kind": "columns_moved", "header": "ราคาขาย", "from": "item", "to": "price"} in rep.changes
+    assert rep.removed == [] and rep.added == []
+    assert not rep.is_identical
+
+
 def test_types_changed_and_sheets() -> None:
     prev = fingerprint_profile(_profile({"สินค้า": PRODUCTS, "Stock": STOCK}))
     retyped = [(c, "string" if c == "ราคาขาย" else t) for c, t in PRODUCTS]

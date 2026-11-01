@@ -164,12 +164,17 @@ def vat_adjust_py(amount: float | None, mode: str, rate: float = VAT_RATE) -> fl
 # --------------------------------------------------------------------------------------------
 # Dates
 # --------------------------------------------------------------------------------------------
+OPEN_ENDED_YEAR = 9000  # years from here on mean "no end date" and read as null
+
+
 def _normalize_year(y: int, assume: str) -> int:
     """Convert 2-digit / BE years to a CE 4-digit year.
 
     assume: 'auto' | 'be' | 'ce'. Heuristic for 'auto': >2400 → BE; 2-digit ≥ 40 → BE 25xx
     (e.g. 69 → 2569 → 2026) because Thai forms rarely use 2-digit CE for business dates.
     """
+    if y >= OPEN_ENDED_YEAR:
+        return y  # SAP's 31.12.9999: a sentinel, never a Buddhist year (ADR-057)
     if y >= 2400:
         return y - 543
     if y >= 1000:
@@ -198,13 +203,13 @@ def parse_date_th_py(
     for f in formats or []:
         try:
             parsed = dt.datetime.strptime(s, f).date()
-            return (
-                parsed.replace(year=_normalize_year(parsed.year, assume_year))
-                if parsed.year >= 2400
-                else parsed
-            )
         except ValueError:
             continue
+        if parsed.year >= OPEN_ENDED_YEAR:
+            return None
+        if parsed.year >= 2400:
+            return parsed.replace(year=_normalize_year(parsed.year, assume_year))
+        return parsed
     m = _ISO_RE.match(s)
     if m:
         y, mo, d = int(m.group(1)), int(m.group(2)), int(m.group(3))
@@ -236,6 +241,8 @@ def parse_date_th_py(
 
 
 def _safe_date(y: int, m: int, d: int) -> dt.date | None:
+    if y >= OPEN_ENDED_YEAR:
+        return None
     try:
         return dt.date(y, m, d)
     except ValueError:

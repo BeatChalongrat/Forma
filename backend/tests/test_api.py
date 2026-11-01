@@ -51,6 +51,15 @@ def make_workbook(path: Path, *, rename_qty: bool = False, n_products: int = 12)
     return path
 
 
+def test_api_sessions_commit_before_the_response() -> None:
+    # FastAPI runs a yield-dependency's exit after the response; the API binds the request session so the
+    # http middleware commits first (ADR-057)
+    from forma.api.app import create_app
+    from forma.db.session import get_session, request_session
+
+    assert create_app().dependency_overrides[get_session] is request_session
+
+
 @pytest.fixture
 def client(isolated_env: Path) -> Iterator[TestClient]:
     from forma.api.app import create_app

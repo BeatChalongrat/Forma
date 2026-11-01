@@ -10,6 +10,7 @@ them from column hints; the AI is told to use them.
 | `15 ต.ค. 69`, `15 ตุลาคม 2569` | 2026-10-15 | Thai month names/abbreviations; 2-digit year ≥ 40 → 25xx BE |
 | `2026-10-01`, `2026-10-01 00:00:00` | 2026-10-01 | ISO, time ignored |
 | `21-Oct-2026`, `21 Oct 2026` | 2026-10-21 | English month names |
+| `31.12.9999`, `9999-12-31` | null | a year from 9000 on is "valid forever", never a Buddhist year (ADR-057) |
 | `02/10/2026` | 2026-10-02 | day-first by default (`dayfirst: false` for US files) |
 | `46000` | 2025-12-09 | Excel serial (bounded 20000–80000) |
 | `assume_year: be` | | force BE for files known to use 2-digit BE years < 40 |

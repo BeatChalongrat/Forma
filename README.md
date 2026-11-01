@@ -271,7 +271,7 @@ target_schema/            product.v1.json — a DRAFT contract; register the rea
 policies/                 approval.yaml (auto-approve / review / block, sandbox, anomaly, publish, verdict)
 data/                     runtime data (git-ignored) · synthetic/ corpus with ground truth (committed) · real/ (local only)
 docs/                     architecture, flows, user stories, handbook, DSL, data model, Thai rules, evaluation,
-                          performance, runbook, ADRs 001–056
+                          performance, runbook, ADRs 001–057
 ```
 
 ---
@@ -300,7 +300,7 @@ compose config. Details: [docs/TESTING_STRATEGY.md](docs/TESTING_STRATEGY.md).
 | QA | [docs/TESTING_STRATEGY.md](docs/TESTING_STRATEGY.md) · [docs/EVALUATION.md](docs/EVALUATION.md) · [manual_test_files/README.md](manual_test_files/README.md) |
 | Operations | [docs/RUNBOOK.md](docs/RUNBOOK.md) · [docs/PERFORMANCE.md](docs/PERFORMANCE.md) |
 | New team members | [docs/ONBOARDING.md](docs/ONBOARDING.md) |
-| Decisions | [docs/adr/](docs/adr/) — 56 architecture decision records, binding unless superseded |
+| Decisions | [docs/adr/](docs/adr/) — 57 architecture decision records, binding unless superseded |
 | Status | [docs/ROADMAP_STATUS.md](docs/ROADMAP_STATUS.md) · [docs/RISK_REGISTER.md](docs/RISK_REGISTER.md) · [docs/KPIS_AND_METRICS.md](docs/KPIS_AND_METRICS.md) |
 
 ---
