@@ -144,10 +144,27 @@ services:
     expose: ["4318"]
     restart: unless-stopped
 
-  backup:
-    # nightly backups: `docker compose -f docker-compose.prod.yml run --rm backup`
+  backup-nightly:
+    # a database dump every 24 hours, keeping 14 days; the System health page shows the age of the last one
     build: { context: ., dockerfile: backend/Dockerfile }
     <<: *forma-env
+    user: root  # the backups volume belongs to root
+    command:
+      - sh
+      - -c
+      - while true; do forma backup --out /backups --archive --no-objects; find /backups -name 'forma-backup-*' -mtime +14 -delete; sleep 86400; done
+    volumes: ["formadata:/data", "backups:/backups"]
+    depends_on:
+      postgres: { condition: service_healthy }
+      migrate: { condition: service_completed_successfully }
+    healthcheck: { disable: true }  # the image's check asks for an API port this service does not open
+    restart: unless-stopped
+
+  backup:
+    # one backup now: `docker compose -f docker-compose.prod.yml run --rm backup`
+    build: { context: ., dockerfile: backend/Dockerfile }
+    <<: *forma-env
+    user: root  # the backups volume belongs to root
     profiles: ["ops"]
     command: ["forma", "backup", "--out", "/backups", "--archive", "--no-objects"]
     volumes: ["formadata:/data", "backups:/backups"]

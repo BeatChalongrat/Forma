@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowRight, Check, ChevronDown } from 'lucide-react'
+import { ArrowRight, Check } from 'lucide-react'
 import type { Verdict, VerdictBrief, VerdictDecision } from '../lib/api'
 import { usePreferences } from '../lib/preferences'
 import { cn } from '../lib/utils'
@@ -51,7 +51,6 @@ export function VerdictCard({ v, editable, busy, onAccept, onOpenDecision, onMov
   const { prefs, t } = usePreferences()
   const lang = prefs.language
   const [decisions, setDecisions] = useState<Record<string, boolean | number | string | null>>({})
-  const [showEvidence, setShowEvidence] = useState(!compact)
   const o = OUTCOME[v.outcome]
   const oneClick = ['accept', 'answer', 'check_data'].includes(v.outcome)
   const needed = v.must_decide.filter((d) => d.kind !== 'confirm' || v.outcome === 'answer')
@@ -87,8 +86,8 @@ export function VerdictCard({ v, editable, busy, onAccept, onOpenDecision, onMov
 
       {v.evidence.length > 0 && (
         <div className="mt-2 border-t border-line pt-2">
-          <button className="w-full flex items-center justify-between gap-3 py-3 text-sm text-ink-2 hover:text-ink rounded focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal" onClick={() => setShowEvidence((x) => !x)} aria-expanded={showEvidence}><span>{t('Supporting evidence', 'หลักฐานประกอบ')} <span className="text-muted ml-1">({v.evidence.length})</span></span><ChevronDown size={16} className={cn('shrink-0 transition-transform', showEvidence && 'rotate-180')} /></button>
-          {showEvidence && <ul className="mt-2 space-y-1.5 text-sm">{v.evidence.map((e) => <li key={e.id} className="flex gap-2"><span className="text-muted tnum shrink-0">{e.id}.</span>{e.link ? <Link className="text-signal hover:underline break-words" to={e.link}>{e.text[lang]}</Link> : <span className="break-words">{e.text[lang]}</span>}</li>)}</ul>}
+          <p className="py-3 m-0 text-sm text-ink-2">{t('Supporting evidence', 'หลักฐานประกอบ')} <span className="text-muted ml-1">({v.evidence.length})</span></p>
+          <ul className="mt-2 space-y-1.5 text-sm">{v.evidence.map((e) => <li key={e.id} className="flex gap-2"><span className="text-muted tnum shrink-0">{e.id}.</span>{e.link ? <Link className="text-signal hover:underline break-words" to={e.link}>{e.text[lang]}</Link> : <span className="break-words">{e.text[lang]}</span>}</li>)}</ul>
         </div>
       )}
 

@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom'
 import { RotateCcw } from 'lucide-react'
 import { api, type OpsSummary } from '../lib/api'
 import { PageHeader, Stat, Section, Badge, Empty, Spinner } from '../components/ui'
-import { fmtInt, timeAgo } from '../lib/utils'
+import { fmtBytes, fmtInt, timeAgo } from '../lib/utils'
 import { useToast } from '../lib/toast'
 import { usePreferences } from '../lib/preferences'
 
@@ -29,6 +29,9 @@ export function OpsPage() {
   if (isError) return <Empty title="Ops is for admins" body={(error as Error).message} />
   const q = ops?.queue
   const ready = ops?.ready
+  const house = ops?.housekeeping
+  const purged = house?.retention.last_counts ? Object.values(house.retention.last_counts).reduce((a, n) => a + n, 0) : 0
+  const backupLate = !house?.backup.age_hours && house?.backup.age_hours !== 0 ? true : house.backup.age_hours > 24
   return (
     <>
       <PageHeader
@@ -43,6 +46,12 @@ export function OpsPage() {
         <Stat label={t('Estimated AI cost (7 d)', 'ค่า AI โดยประมาณ (7 วัน)')} value={ops ? `$${ops.llm_spend_by_day.reduce((a, d) => a + d.cost_usd, 0).toFixed(2)}` : '–'} hint={ops?.breaker?.open ? 'circuit breaker OPEN — heuristic fallback' : `${fmtInt(ops?.llm_spend_by_day.reduce((a, d) => a + d.calls, 0))} ${t('usage records · not provider billing', 'รายการที่บันทึก · ไม่ใช่ยอดเรียกเก็บ')}`} tone={ops?.breaker?.open ? 'warn' : undefined} />
         <Stat label="Open reviews" value={fmtInt(ops?.review?.open)} hint={ops?.review?.oldest_age_s ? `oldest waiting ${Math.round(ops.review.oldest_age_s / 3600)} h` : 'queue is empty'} />
       </div>
+
+      {house && <div className="grid sm:grid-cols-3 gap-3 mb-5">
+        <Stat label={t('Storage used', 'พื้นที่ที่ใช้')} value={house.storage.known ? fmtBytes(house.storage.bytes ?? 0) : '–'} hint={house.storage.known ? t(`${fmtInt(house.storage.objects)} files`, `${fmtInt(house.storage.objects)} ไฟล์`) : t('Storage did not answer', 'เช็กพื้นที่ไม่ได้')} />
+        <Stat label={t('Retention', 'ลบข้อมูลเก่า')} tone={house.retention.schedule_h ? undefined : 'warn'} value={house.retention.last_at ? timeAgo(house.retention.last_at) : t('Not yet', 'ยังไม่เคยรัน')} hint={!house.retention.schedule_h ? t('No schedule set', 'ยังไม่ได้ตั้งเวลา') : house.retention.last_at ? (house.retention.last_applied ? t(`Removed ${fmtInt(purged)} items`, `ลบไป ${fmtInt(purged)} รายการ`) : t(`Plan only: ${fmtInt(purged)} items would go`, `แค่วางแผน: จะลบ ${fmtInt(purged)} รายการ`)) : t(`Every ${house.retention.schedule_h} h`, `ทุก ${house.retention.schedule_h} ชม.`)} />
+        <Stat label={t('Last backup', 'backup ล่าสุด')} tone={backupLate ? 'warn' : undefined} value={house.backup.last_at ? timeAgo(house.backup.last_at) : t('Never', 'ยังไม่เคย')} hint={backupLate ? t('Older than a day', 'เก่ากว่า 1 วัน') : t('Within a day', 'ภายใน 1 วัน')} />
+      </div>}
 
       <div className="grid lg:grid-cols-[1.3fr_1fr] gap-4">
         <Section title="Failed jobs" actions={<span className="text-[12px] text-muted">{ops?.failed_jobs.length ?? 0} shown</span>}>

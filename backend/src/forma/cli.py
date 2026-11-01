@@ -356,8 +356,7 @@ def retention_run(apply: bool = False, out: Path | None = None) -> None:
     with session_scope() as s:
         plan = retention.plan(ctx, s)
         result: dict[str, object] = {"dry_run": not apply, "summary": plan["summary"]}
-        if apply:
-            result["applied"] = retention.apply(ctx, s, plan, actor="retention.cli")
+        result["run"] = retention.run(ctx, s, apply_=apply, actor="retention.cli")
     if out:
         out.write_text(json.dumps(plan, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
         result["plan_written"] = str(out)
@@ -367,16 +366,16 @@ def retention_run(apply: bool = False, out: Path | None = None) -> None:
 @app.command()
 def backup(out: Path = Path("../data/backups"), objects: bool = True, archive: bool = False) -> None:
     """DB dump + storage manifest (+ objects) into OUT (docs/RUNBOOK.md)."""
-    from forma.db.session import init_db
+    from forma.db.session import init_db, session_scope
     from forma.services.backup import create_backup
     from forma.services.context import get_context
+    from forma.services.rounds import audit
 
     init_db()
-    typer.echo(
-        json.dumps(
-            create_backup(get_context(), out.resolve(), include_objects=objects, archive=archive), indent=2
-        )
-    )
+    done = create_backup(get_context(), out.resolve(), include_objects=objects, archive=archive)
+    with session_scope() as s:  # the System health page reads the age of the last backup from here
+        audit(s, "backup.create", "backup", "run", actor="backup", path=done["path"], objects=done["objects"])
+    typer.echo(json.dumps(done, indent=2))
 
 
 @app.command()

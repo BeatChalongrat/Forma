@@ -2,7 +2,6 @@ import type { ReactNode } from 'react'
 import { usePreferences } from './preferences'
 
 const TH: Record<string, string> = {
-  'Usage tips': 'คำแนะนำการใช้งาน',
   'Settings': 'ตั้งค่าระบบ', 'Customers': 'ลูกค้า', 'New customer': 'เพิ่มลูกค้า', 'New import': 'นำเข้าไฟล์',
   'Feature guide': 'คู่มือฟีเจอร์', 'System health': 'สถานะระบบ', 'Options': 'ตัวเลือก',
   'What FORMA learned': 'สิ่งที่ FORMA เรียนรู้', 'Target formats': 'รูปแบบปลายทาง', 'Approval policy': 'กฎการอนุมัติ', 'Audit log': 'ประวัติการทำงาน', 'System': 'ระบบ',
@@ -26,7 +25,7 @@ const TH: Record<string, string> = {
   'Approve and export automatically': 'อนุมัติและสร้างไฟล์อัตโนมัติเมื่อผ่านการตรวจ',
   'What happens after upload?': 'หลังอัปโหลด ระบบทำอะไรต่อ?', 'Customer / delivery': 'ลูกค้า / รอบนำเข้า',
   'Next action': 'ขั้นตอนถัดไป', 'Records': 'รายการ', 'Updated': 'อัปเดตล่าสุด',
-  'Workspace statistics': 'สถิติการใช้งาน', 'Nothing needs your attention': 'ไม่มีงานที่ต้องตรวจเพิ่ม',
+  'Nothing needs your attention': 'ไม่มีงานที่ต้องตรวจเพิ่ม',
   'You can upload another batch or open a recent file below.': 'อัปโหลดชุดใหม่หรือเปิดไฟล์ล่าสุดด้านล่างได้เลย',
   'Drop Excel or CSV files here': 'ลากไฟล์ Excel หรือ CSV มาวางที่นี่', 'Customer': 'ลูกค้า',
   'Label': 'ชื่อรอบ', 'Open round': 'เปิดรอบนำเข้า', 'Choose customer': 'เลือกลูกค้า', 'Resume upload': 'ทำต่อ',

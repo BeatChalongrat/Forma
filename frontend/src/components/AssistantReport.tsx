@@ -84,7 +84,7 @@ export function AssistantReport({ report }: { report: Report }) {
         </svg>
       </div><div className="report-inspection" aria-live="polite">{hover || t('Hover or focus a mark to inspect its value. Exact values are available in Table.', 'ชี้หรือโฟกัสที่กราฟเพื่อดูค่า เปิดตารางเพื่อดูตัวเลขทั้งหมด')}</div>
     </>}
-    <footer className="assistant-report-footer"><p className="report-note">{report.notes[0]?.[lang]}</p><details><summary>{t('Scope & calculation notes', 'ขอบเขตและวิธีนับ')}</summary><ul>{report.notes.map((note, i) => <li key={i}>{note[lang]}</li>)}</ul></details>
+    <footer className="assistant-report-footer"><ul className="report-note">{report.notes.map((note, i) => <li key={i}>{note[lang]}</li>)}</ul>
       <div className="report-sources">{report.links.filter(link => safeLink(link.url)).map((link, i) => <Link key={i} to={link.url}>{link.label}<ArrowUpRight size={13} /></Link>)}</div>
       <p className="report-snapshot">{t('Saved snapshot', 'ข้อมูล ณ เวลาที่ตอบ')} · {new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short', timeZone: prefs.timezone }).format(new Date(report.generated_at))} · {prefs.timezone}</p>
     </footer>

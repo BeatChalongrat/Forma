@@ -2,13 +2,13 @@ import { Localized } from '../lib/locale'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { Check, X, Save, SearchCheck, ChevronDown, ChevronRight, Braces, Plus, Trash2, Pencil, ShieldAlert, Network, PanelLeft, PanelRight } from 'lucide-react'
+import { Check, X, Save, SearchCheck, Plus, Trash2, Pencil, ShieldAlert } from 'lucide-react'
 import { api, type SandboxItem, type SandboxReport, type Expr, type FieldChange, type FieldMapping, type FieldSpec, type MappingDocument, type TableProfile } from '../lib/api'
 import { cn, describeExpr, fmtInt, pyRegex } from '../lib/utils'
 import { Badge, Confidence, HelpStrip, RiskDot, RiskLevel, Spinner, StatusBadge, Tabs, FindingRow, Modal } from '../components/ui'
 import { useToast } from '../lib/toast'
-import { useMediaQuery } from '../lib/useMediaQuery'
-import { WorkspacePanel } from '../components/WorkspacePanel'
+import { usePreferences } from '../lib/preferences'
+import { WorkspaceTabs } from '../components/WorkspaceTabs'
 import { RelationshipMap } from './RelationshipMap'
 
 type Group = { title: string; pointer: string | null; source: string; fields: FieldSpec[] }
@@ -67,17 +67,13 @@ export function MappingStudio() {
   const [selectedSource, setSelectedSource] = useState<string | null>(null)
   const [params] = useSearchParams() // ?tab= and ?view= open a tool directly (links from the round page, the guide, Ctrl+K)
   const [rightTab, setActiveTab] = useState<StudioTab>(() => (STUDIO_TABS as readonly string[]).includes(params.get('tab') ?? '') ? (params.get('tab') as StudioTab) : 'json')
-  const dockPanels = useMediaQuery('(min-width: 1440px)')
-  const [rightOpen, setRightOpen] = useState(() => !!params.get('tab'))
-  const [sourcesOpen, setSourcesOpen] = useState(() => window.matchMedia('(min-width: 1440px)').matches)
-  const setRightTab = (tab: StudioTab) => { setActiveTab(tab); setRightOpen(true); if (!window.matchMedia('(min-width: 1440px)').matches) setSourcesOpen(false) }
-  const [toolsOpen, setToolsOpen] = useState(false)
-  const [showRaw, setShowRaw] = useState(false)
+  const { t } = usePreferences()
+  const [view, setView] = useState<'fields' | 'results' | 'relationships' | 'json'>(() => (params.get('view') === 'relationships' ? 'relationships' : params.get('tab') ? 'results' : 'fields'))
+  const setRightTab = (tab: StudioTab) => { setActiveTab(tab); setView('results') }
   const [rawText, setRawText] = useState('')
   const [comment, setComment] = useState('')
   const [reject, setReject] = useState(false)
   const [overrideOpen, setOverrideOpen] = useState(false)
-  const [view, setView] = useState<'fields' | 'relationships'>(() => (params.get('view') === 'relationships' ? 'relationships' : 'fields'))
   const [dropOn, setDropOn] = useState<string | null>(null) // target field a column is dragged over
 
   useEffect(() => {
@@ -220,12 +216,7 @@ export function MappingStudio() {
           {dirty && <Badge tone="warn">unsaved edits</Badge>}
         </div>
         <div className="ml-auto flex items-center gap-2 flex-wrap">
-          {view === 'fields' && <><button className="btn btn-sm btn-ghost" aria-expanded={sourcesOpen && (dockPanels || !rightOpen)} onClick={() => { setSourcesOpen(!sourcesOpen); if (!window.matchMedia('(min-width: 1440px)').matches) setRightOpen(false) }}><PanelLeft size={15} /> Sources</button><button className="btn btn-sm btn-ghost" aria-expanded={rightOpen} onClick={() => { setRightOpen(!rightOpen); if (!window.matchMedia('(min-width: 1440px)').matches) setSourcesOpen(false) }}><PanelRight size={15} /> Inspect results</button></>}
-
-          <button className={cn('btn btn-sm', view === 'relationships' && 'bg-signal-soft text-signal border-signal/30')} title="แผนภาพว่าชีต/ตารางเชื่อมกันยังไง" onClick={() => setView(view === 'relationships' ? 'fields' : 'relationships')}><Network size={13} /> {view === 'relationships' ? 'Back to fields' : 'Relationships'}</button>
-          <button className="btn btn-sm btn-ghost" aria-expanded={toolsOpen} onClick={() => setToolsOpen(!toolsOpen)}>More tools <ChevronDown size={14} /></button>
-          {toolsOpen && <><button className={cn('btn btn-sm', showRaw && 'bg-signal-soft text-signal border-signal/30')} onClick={() => { setRawText(JSON.stringify(doc, null, 2)); setShowRaw(true) }}><Braces size={13} /> JSON</button>
-          <button className="btn btn-sm" title="ให้ระบบหาสาเหตุของปัญหาที่พบ" onClick={() => { setRightTab('diagnosis'); diagnose.mutate() }}><SearchCheck size={13} /> Explain issues</button></>}
+          <button className="btn btn-sm" title="ให้ระบบหาสาเหตุของปัญหาที่พบ" onClick={() => { setRightTab('diagnosis'); diagnose.mutate() }}><SearchCheck size={13} /> Explain issues</button>
           {dirty && <button className="btn btn-sm btn-primary" disabled={save.isPending} onClick={() => save.mutate()}><Save size={13} /> Save as new version</button>}
           {!dirty && !locked && (
             <>
@@ -239,45 +230,49 @@ export function MappingStudio() {
         </div>
       </div>
 
-      <details className="px-5 py-3 border-b border-line bg-surface shrink-0 max-h-[30dvh] overflow-auto">
-        <summary className="text-[13px] text-ink-2"><span className="inline-flex items-center gap-2 flex-wrap ml-2"><RiskLevel level={mv.policy.risk_level} factors={mv.policy.risk_factors} /><span>{mv.policy.decision === 'block' ? 'Approval is blocked. Review the reasons before continuing.' : mv.policy.decision === 'review' ? 'Review the suggested fields before approving.' : 'Fields checked. Inspect the output before continuing.'}</span><span className="text-muted">Details</span></span></summary>
+      <div className="px-5 py-3 border-b border-line bg-surface shrink-0 max-h-[30dvh] overflow-auto">
+        <p className="text-[13px] text-ink-2 m-0 inline-flex items-center gap-2 flex-wrap"><RiskLevel level={mv.policy.risk_level} factors={mv.policy.risk_factors} /><span>{mv.policy.decision === 'block' ? 'Approval is blocked. Review the reasons before continuing.' : mv.policy.decision === 'review' ? 'Review the suggested fields before approving.' : 'Fields checked. Inspect the output before continuing.'}</span></p>
         <div className="mt-3 space-y-2 text-[13px]">
           {mv.policy.impact?.affected_records !== undefined && !mv.policy.impact.high && <p className="font-medium">{fmtInt(mv.policy.impact.affected_records)} of {fmtInt(mv.policy.impact.of_records)} records change compared with the approved version.</p>}
           {mv.policy.reasons.map((reason, i) => <p key={i}>{reason}</p>)}
           {mv.policy.risk_factors?.map((reason, i) => <p key={i} className="text-warn">{reason}</p>)}
           {!!mv.open_questions.length && <p className="text-warn">{mv.open_questions.length} questions need review in the field list.</p>}
         </div>
-      </details>
+      </div>
+
+      <WorkspaceTabs label={t('Views', 'มุมมอง')} value={view} onChange={next => { if (next === 'json') setRawText(JSON.stringify(doc, null, 2)); setView(next) }} items={[{ id: 'fields', label: t('Fields', 'ฟิลด์') }, { id: 'results', label: t('Results', 'ผลตรวจ'), count: pv?.findings.length }, { id: 'relationships', label: t('Relationships', 'ความสัมพันธ์') }, { id: 'json', label: 'JSON' }]} />
 
       <div className="px-5 py-2 border-b border-line bg-surface shrink-0">
-        <HelpStrip id="studio">
+        <HelpStrip>
           {view === 'relationships'
             ? <>Each box is a table found in the files; lines are links measured on the real rows. Click a line for its numbers, drag between two columns to connect tables. <span className="text-muted">— กล่องคือตารางในไฟล์ เส้นคือการเชื่อมที่วัดจากข้อมูลจริง ลากระหว่างคอลัมน์เพื่อเชื่อมเอง</span></>
-            : <><b>Left</b>: columns found in the files · <b>Middle</b>: fields of the target format — drag a column onto a field to map it · <b>Right</b>: the JSON you will get, problems, and what changed. Approve when it looks right. <span className="text-muted">— ซ้าย: คอลัมน์ในไฟล์ · กลาง: field ปลายทาง ลากคอลัมน์มาวางเพื่อจับคู่ · ขวา: ผลลัพธ์และสิ่งที่เปลี่ยน แล้วกด Approve</span></>}
+            : <><b>Left</b>: columns found in the files · <b>Middle</b>: fields of the target format — drag a column onto a field to map it · <b>Results</b> tab: the JSON you will get, problems, and what changed. Approve when it looks right. <span className="text-muted">— ซ้าย: คอลัมน์ในไฟล์ · กลาง: field ปลายทาง ลากคอลัมน์มาวางเพื่อจับคู่ · แท็บผลตรวจ: ผลลัพธ์และสิ่งที่เปลี่ยน แล้วกด Approve</span></>}
         </HelpStrip>
       </div>
 
-      {view === 'relationships' ? <RelationshipMap roundId={roundId} doc={doc} schemaFields={schema.fields ?? []} locked={locked} onChange={update} /> : (
+      {view === 'relationships' ? <RelationshipMap roundId={roundId} doc={doc} schemaFields={schema.fields ?? []} locked={locked} onChange={update} /> : view === 'json' ? (
+      <div className="flex-1 min-h-0 flex flex-col gap-3 p-4">
+        <textarea className="input mono flex-1 h-auto py-2 resize-none" aria-label="Mapping document (JSON)" value={rawText} readOnly={locked} onChange={(e) => setRawText(e.target.value)} spellCheck={false} />
+        {!locked && <div><button className="btn btn-primary btn-sm" onClick={() => { try { const d = JSON.parse(rawText) as MappingDocument; setDoc(d); setDirty(true); setView('fields') } catch (e) { toast.push({ kind: 'bad', title: 'Invalid JSON', detail: (e as Error).message }) } }}>Apply</button></div>}
+      </div>
+      ) : (
       <div className="workspace-body">
         {/* LEFT: sources */}
-        <WorkspacePanel open={sourcesOpen && (dockPanels || !rightOpen)} onClose={() => setSourcesOpen(false)} title="Source columns" side="left">
+        {view === 'fields' && <><aside className="workspace-panel workspace-panel-left" aria-label="Source columns"><div className="flex flex-col min-h-0 flex-1 overflow-auto">
           <div className="px-4 pt-4 pb-2 text-[12px] text-muted">Sources — {doc.sources.length} table{doc.sources.length > 1 ? 's' : ''} from {round?.files?.length} file{(round?.files?.length ?? 0) > 1 ? 's' : ''}</div>
           {doc.sources.map((s) => {
             const cols = columnsFor(s.id)
-            const open = selectedSource === s.id
             const used = new Set<string>()
             doc.fields.forEach((f) => collectCols(f.expr, doc.record.root_source).forEach((c) => c.startsWith(s.id + '.') && used.add(c.slice(s.id.length + 1))))
             doc.collections.forEach((c) => { c.fields.forEach((f) => collectCols(f.expr, c.source).forEach((x) => x.startsWith(s.id + '.') && used.add(x.slice(s.id.length + 1)))); if (c.source === s.id) c.link.forEach((l) => used.add(l.right)); if (doc.record.root_source === s.id) c.link.forEach((l) => used.add(l.left)) })
             return (
               <div key={s.id} className="border-b border-line">
-                <button className="w-full flex items-center gap-2 px-4 py-2.5 hover:bg-surface-2 text-left" onClick={() => { setSelectedSource(open ? null : s.id); if (!open) setRightTab('source') }}>
-                  {open ? <ChevronDown size={14} className="text-muted" /> : <ChevronRight size={14} className="text-muted" />}
+                <div className="flex items-center gap-2 px-4 py-2.5">
                   <span className="font-medium truncate">{s.id}</span>
                   <Badge tone={s.id === doc.record.root_source ? 'signal' : 'neutral'} className="ml-auto min-h-6 text-[12px]">{s.id === doc.record.root_source ? 'root' : s.role}</Badge>
-                </button>
+                </div>
                 <div className="px-4 pb-2 -mt-1 text-[11.5px] text-muted truncate">{s.sheet?.name ? `sheet “${s.sheet.name}”` : 'CSV'}{' · '}header row {String((s.table as { header_row?: number | string }).header_row ?? 'auto')}</div>
-                {open && (
-                  <ul className="pb-2">
+                <ul className="pb-1">
                     {cols.map((c) => (
                       <li key={c} draggable={!locked} onDragStart={(e) => { e.dataTransfer.setData(DRAG_TYPE, JSON.stringify({ source: s.id, column: c })); e.dataTransfer.effectAllowed = 'copy' }} onDragEnd={() => setDropOn(null)}
                         className={cn('flex items-center gap-2 px-4 py-1 text-[12.5px]', !locked && 'cursor-grab active:cursor-grabbing hover:bg-surface-2', used.has(c) ? 'text-ink' : 'text-muted')}>
@@ -287,13 +282,13 @@ export function MappingStudio() {
                       </li>
                     ))}
                     {!cols.length && <li className="px-4 py-1 text-[12px] text-muted">columns unavailable (profile missing)</li>}
-                  </ul>
-                )}
+                </ul>
+                <button className="btn btn-ghost btn-sm mx-2 mb-2" onClick={() => { setSelectedSource(s.id); setRightTab('source') }}>{t('Source rows', 'แถวต้นทาง')}</button>
               </div>
             )
           })}
           <div className="p-4 text-[11.5px] text-muted leading-relaxed">Drag a column onto a target field — or select a field, then click <span className="text-signal">use</span> on a column. <span className="text-signal">Relationships</span> shows how the tables connect.</div>
-        </WorkspacePanel>
+        </div></aside>
 
         {/* CENTER: target fields */}
         <section className="overflow-auto min-w-0 flex-1" aria-label="Target fields">
@@ -346,10 +341,10 @@ export function MappingStudio() {
             <ul className="flex flex-col gap-0.5">{doc.meta.evidence.map((e, i) => <li key={i}>• {e}</li>)}</ul>
             {mv.open_questions.length > 0 && <><div className="font-medium text-warn mt-3 mb-1">Open questions</div><ul className="flex flex-col gap-0.5">{mv.open_questions.map((q, i) => <li key={i}>? {q}</li>)}</ul></>}
           </div>
-        </section>
+        </section></>}
 
-        {/* RIGHT: preview */}
-        <WorkspacePanel open={rightOpen} onClose={() => { setRightOpen(false); if (!dockPanels) setSourcesOpen(false) }} title="Inspect results">
+        {/* results */}
+        {view === 'results' && <section className="min-w-0 flex-1 flex flex-col overflow-hidden" aria-label="Inspect results">
           <Tabs menu value={rightTab} onChange={setRightTab} items={[{ id: 'json', label: 'Output preview', count: pv?.records.length, hint: 'ตัวอย่าง JSON ที่จะได้จากไฟล์นี้' }, { id: 'source', label: 'Source rows', hint: 'แถวต้นทางจากไฟล์' }, { id: 'findings', label: 'Problems', count: pv?.findings.length, hint: 'ปัญหาที่พบตอนลองรัน mapping' }, { id: 'changes', labelText: 'What changed', hint: 'field ไหนเปลี่ยนจาก mapping ที่ approve แล้ว ตรวจกับข้อมูลจริง', label: <span className="flex items-center gap-1">What changed{(mv.policy.field_review?.needs_decision?.length ?? 0) > 0 && <span className="w-1.5 h-1.5 rounded-full bg-warn" />}</span> }, { id: 'diagnosis', label: 'Diagnosis', hint: 'สาเหตุของปัญหาและวิธีแก้' }, { id: 'compare', labelText: 'Compare outputs', hint: 'รันคู่กับ mapping เดิม ดูว่า record/ราคาไหนเปลี่ยน', label: <span className="flex items-center gap-1">Compare outputs{mv.policy.sandbox?.verdict === 'fail' && <span className="w-1.5 h-1.5 rounded-full bg-bad" />}</span> }]} />
           <div className="flex-1 overflow-auto p-3">
             {rightTab === 'json' && (
@@ -392,13 +387,10 @@ export function MappingStudio() {
               ) : <div className="text-muted text-[12.5px]">Choose Explain issues to see the cause and suggested fixes.</div>
             )}
           </div>
-        </WorkspacePanel>
+        </section>}
       </div>
       )}
 
-      <Modal open={showRaw} onClose={() => setShowRaw(false)} title="Mapping document (JSON)" width="max-w-4xl" footer={<><button className="btn" onClick={() => setShowRaw(false)}><Localized>Close</Localized></button>{!locked && <button className="btn btn-primary" onClick={() => { try { const d = JSON.parse(rawText) as MappingDocument; setDoc(d); setDirty(true); setShowRaw(false) } catch (e) { toast.push({ kind: 'bad', title: 'Invalid JSON', detail: (e as Error).message }) } }}>Apply</button>}</>}>
-        <textarea className="input mono h-[60vh] py-2 resize-none" value={rawText} onChange={(e) => setRawText(e.target.value)} spellCheck={false} />
-      </Modal>
       <Modal open={reject} onClose={() => setReject(false)} title="Reject this mapping" width="max-w-md" footer={<><button className="btn" onClick={() => setReject(false)}><Localized>Cancel</Localized></button><button className="btn btn-danger" onClick={() => rejectM.mutate()}>Reject</button></>}>
         <textarea className="input h-24 py-2" placeholder="Why? (kept in the audit log and shown to the AI on the next proposal)" value={comment} onChange={(e) => setComment(e.target.value)} />
       </Modal>
@@ -519,7 +511,7 @@ function ChangeCard({ c, onRevert }: { c: FieldChange; onRevert: ((c: FieldChang
         <div className="rounded-lg bg-surface-2 p-3 min-w-0"><div className="text-muted mb-1">Previously approved</div><div className="break-words">{side(c.before)}</div></div>
         <div className="rounded-lg border border-line p-3 min-w-0"><div className="text-muted mb-1">Proposed</div><div className="break-words">{c.status === 'removed' ? 'Not mapped' : side(c.after)}</div></div>
       </div>
-      {c.before && c.after && describeExpr(c.before.expr) !== describeExpr(c.after.expr) && <details className="text-muted text-[12px] mt-2"><summary>Transformation details</summary><div className="mono break-words mt-1">{describeExpr(c.before.expr)} → {describeExpr(c.after.expr)}</div></details>}
+      {c.before && c.after && describeExpr(c.before.expr) !== describeExpr(c.after.expr) && <div className="mono break-words text-muted text-[12px] mt-2">{describeExpr(c.before.expr)} → {describeExpr(c.after.expr)}</div>}
       {c.check && (
         <div className={cn('mt-1.5 rounded-[var(--radius-sm)] px-2 py-1', CHECK_TONE[c.check.verdict] ?? 'bg-surface-2')}>
           {c.check.summary}

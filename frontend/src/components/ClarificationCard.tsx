@@ -11,7 +11,7 @@ export function ClarificationCard({ questions, onAnswer, disabled }: { questions
   const unsure = t('I do not know yet; leave this unresolved', 'ยังไม่ทราบ ขอเว้นเรื่องนี้ไว้ก่อน')
   const selected = choice === '__custom' ? custom[step]?.trim() : choice
   const answer = (index: number) => answers[index] === '__custom' ? custom[index]?.trim() : answers[index]
-  if (!onAnswer) return <details className="rounded-2xl border border-line p-4 text-sm text-muted"><summary>{t('Clarification requested', 'ข้อมูลที่ผู้ช่วยขอเพิ่มเติม')} ({questions.length})</summary><ul className="mt-3 space-y-2">{questions.map(q => <li key={q.question}>{q.question}</li>)}</ul></details>
+  if (!onAnswer) return <div className="rounded-2xl border border-line p-4 text-sm text-ink-2"><p className="text-xs text-muted m-0">{t('Clarification requested', 'ข้อมูลที่ผู้ช่วยขอเพิ่มเติม')}</p><ul className="mt-2 space-y-2">{questions.map(q => <li key={q.question}>{q.question}</li>)}</ul></div>
   function advance(value: string) {
     const next = { ...answers, [step]: value }
     setAnswers(next)

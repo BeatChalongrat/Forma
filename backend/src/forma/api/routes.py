@@ -30,6 +30,7 @@ from forma.api.schemas import (
     RoundIn,
     SchemaIn,
     SourcePreviewIn,
+    WaitIn,
 )
 from forma.auth import (
     Principal,
@@ -65,6 +66,7 @@ from forma.services import lineage as lin
 from forma.services import mapping as ms
 from forma.services import publishing as pub
 from forma.services import relationships as rel
+from forma.services import review_queue as rq
 from forma.services import round_lifecycle as lifecycle
 from forma.services import rounds as rs
 from forma.services.context import ServiceContext, get_context
@@ -733,6 +735,32 @@ def dsl_reference(p: Principal = Depends(current_principal)) -> dict[str, Any]:
 # ============================================================================================
 # Review
 # ============================================================================================
+def _task_scoped(session: Session, p: Principal, task_id: str) -> ReviewTask:
+    t = session.get(ReviewTask, task_id)
+    if t is None:
+        raise NotFound(f"review task {task_id} not found")
+    ensure_customer(p, t.customer_id)
+    return t
+
+
+@api.post("/review/{task_id}/wait")
+def wait_for_customer(
+    task_id: str,
+    body: WaitIn,
+    session: Session = Depends(get_session),
+    p: Principal = Depends(require_role("reviewer")),
+) -> dict[str, Any]:
+    """Park a question while the customer answers; it comes back on the day chosen (ADR-053)."""
+    return ser.review_task(rq.wait(session, p, _task_scoped(session, p, task_id), body.until, body.note))
+
+
+@api.post("/review/{task_id}/resume")
+def resume_review(
+    task_id: str, session: Session = Depends(get_session), p: Principal = Depends(require_role("reviewer"))
+) -> dict[str, Any]:
+    return ser.review_task(rq.resume(session, p, _task_scoped(session, p, task_id)))
+
+
 @api.get("/review")
 def review_queue(
     status: str = "open",
@@ -744,6 +772,7 @@ def review_queue(
 ) -> list[dict[str, Any]]:
     from forma.services.review_explanations import explain
 
+    rq.wake_due(session)
     q = _scoped(p, select(ReviewTask), ReviewTask.customer_id)
     if round_id:
         q = q.where(ReviewTask.round_id == round_id)
@@ -1245,6 +1274,7 @@ def dashboard(
     ctx: ServiceContext = Depends(ctx_dep),
     p: Principal = Depends(current_principal),
 ) -> dict[str, Any]:
+    rq.wake_due(session)
     by_status = dict(
         session.execute(
             _scoped(p, select(ImportRound.status, func.count()), ImportRound.customer_id).group_by(
@@ -1303,6 +1333,7 @@ def dashboard(
         "customers": customers,
         "rounds_by_status": by_status,
         "open_reviews": open_reviews,
+        "review": rq.counts(session, lambda q, col: _scoped(p, q, col)),
         "approved_mappings": approved_mappings,
         "auto_approved_mappings": auto,
         "mapping_versions": total_mv,

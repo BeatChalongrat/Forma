@@ -18,7 +18,15 @@ from forma.ai.policy import PolicyDecision
 from forma.core.errors import Conflict, NotFound, PolicyBlocked, ValidationFailed
 from forma.core.hashing import stable_hash
 from forma.core.ids import new_id
-from forma.db.models import ImportRound, LLMCall, MappingVersion, Override, ReviewTask, SourceFile
+from forma.db.models import (
+    REVIEW_UNRESOLVED,
+    ImportRound,
+    LLMCall,
+    MappingVersion,
+    Override,
+    ReviewTask,
+    SourceFile,
+)
 from forma.engine.transform import BoundSource, TransformEngine, TransformResult
 from forma.mapping_dsl.models import MappingDocument, SourceSpec
 from forma.mapping_dsl.validate import validate_mapping
@@ -627,7 +635,9 @@ def approve_mapping(
     m.comment = comment
     _supersede_others(session, m.customer_id, m.id)
     for t in session.scalars(
-        select(ReviewTask).where(ReviewTask.mapping_version_id == m.id, ReviewTask.status == "open")
+        select(ReviewTask).where(
+            ReviewTask.mapping_version_id == m.id, ReviewTask.status.in_(REVIEW_UNRESOLVED)
+        )
     ):
         t.status = "approved"
         t.resolver = actor
@@ -663,7 +673,9 @@ def reject_mapping(
     m.status = "rejected"
     m.comment = comment
     for t in session.scalars(
-        select(ReviewTask).where(ReviewTask.mapping_version_id == m.id, ReviewTask.status == "open")
+        select(ReviewTask).where(
+            ReviewTask.mapping_version_id == m.id, ReviewTask.status.in_(REVIEW_UNRESOLVED)
+        )
     ):
         t.status = "rejected"
         t.resolver = actor
@@ -769,7 +781,9 @@ def save_mapping_edit(
     if parent.status == "proposed":
         parent.status = "superseded"
         for t in session.scalars(
-            select(ReviewTask).where(ReviewTask.mapping_version_id == parent.id, ReviewTask.status == "open")
+            select(ReviewTask).where(
+                ReviewTask.mapping_version_id == parent.id, ReviewTask.status.in_(REVIEW_UNRESOLVED)
+            )
         ):
             t.mapping_version_id = None  # will be re-created below
             t.status = "dismissed"

@@ -74,6 +74,9 @@ export function NewImport() {
   const [job, setJob] = useState<Job | null>(null)
   const [newCust, setNewCust] = useState(false)
   const [form, setForm] = useState({ code: '', name: '', erp_type: '' })
+  const [replaces, setReplaces] = useState('')
+  const [weekAgo] = useState(() => new Date(Date.now() - 7 * 86400000).toISOString())
+  const { data: customerRounds } = useQuery({ queryKey: ['rounds', 'customer', customerId], queryFn: () => api.rounds({ customer_id: customerId }), enabled: !!customerId })
   const inputRef = useRef<HTMLInputElement>(null)
   const nav = useNavigate()
   const qc = useQueryClient()
@@ -93,6 +96,10 @@ export function NewImport() {
 
   const run = useMutation({
     mutationFn: async () => {
+      if (replaces) {
+        const r = await api.replaceRound(replaces, files, t('A corrected delivery from the customer', 'ไฟล์แก้ไขจากลูกค้า'), label || undefined)
+        return { round: r, job: await waitForJob(r.job_id, setJob) }
+      }
       const r = await api.createRound({ customer_id: customerId, label: label || undefined })
       await api.uploadFiles(r.id, files)
       const { job_id } = await api.runPipeline(r.id, { actor: 'operator' })
@@ -109,12 +116,13 @@ export function NewImport() {
 
   const selected = useMemo(() => customers?.find((c) => c.id === customerId), [customers, customerId])
   const canRun = customerId && files.length > 0 && !run.isPending
+  const recent = useMemo(() => (customerRounds ?? []).filter(r => !CLOSED_STATUSES.includes(r.status) && r.created_at.localeCompare(weekAgo) > 0).slice(0, 3), [customerRounds, weekAgo])
 
   return (
     <>
-      <PageHeader title="New import" subtitle="Drop the files a customer sent. FORMA profiles them, finds or proposes a mapping, and tells you whether anything needs a decision." hint="1) ลากไฟล์มาวาง  2) เลือกลูกค้า  3) กด Upload and run — ระบบจะพาไปหน้ารอบนั้นและบอกขั้นต่อไป" />
+      <PageHeader title={t('Combine files for one customer', 'รวมไฟล์ของลูกค้ารายเดียว')} subtitle={t('Use related files together in one import, such as products, prices and stock. FORMA matches their fields and relationships to produce one dataset for review.', 'ใช้ไฟล์ที่เกี่ยวข้องกันในงานนำเข้าเดียว เช่น สินค้า ราคา และสต็อก ระบบจับคู่คอลัมน์และความสัมพันธ์เพื่อสร้างข้อมูลชุดเดียวให้ตรวจ')} />
       <Workflow />
-      <p className="text-muted mb-4">{t("Files → field matching → checks. Only questions that need your decision will stop the process.", "รับไฟล์ → จับคู่คอลัมน์ → ตรวจข้อมูล ระบบจะหยุดถามเฉพาะจุดที่ต้องให้คุณตัดสินใจ")}</p>
+      <p className="text-muted mb-4">{t('Use only files for the same customer and delivery. If each file should produce its own result,', 'ใช้เฉพาะไฟล์ของลูกค้ารายเดียวและข้อมูลชุดเดียวกัน หากแต่ละไฟล์ต้องมีผลลัพธ์แยกกัน ให้')} <Link to="/imports/new" className="text-signal underline underline-offset-4">{t('upload files separately', 'อัปโหลดแบบแยกไฟล์')}</Link></p>
       <div className="grid lg:grid-cols-[1fr_360px] gap-4">
         <div className="flex flex-col gap-4">
           <div
@@ -124,7 +132,7 @@ export function NewImport() {
             <input ref={inputRef} type="file" multiple accept=".xlsx,.xlsm,.csv,.txt,.tsv" className="hidden" onChange={(e) => setFiles((xs) => [...xs, ...Array.from(e.target.files ?? [])])} />
             <Upload className="mx-auto text-muted" size={28} />
             <div className="mt-2 font-medium"><Localized>Drop Excel or CSV files here</Localized></div>
-            <div className="text-muted text-[12.5px]">.xlsx · .xlsm · .csv — several files per round are fine (products, prices, stock, promotions)</div>
+            <div className="text-muted text-[12.5px]">{t('Excel or CSV · e.g. products.xlsx + prices.csv + stock.csv for the same customer', 'Excel หรือ CSV · เช่น products.xlsx + prices.csv + stock.csv ของลูกค้ารายเดียว')}</div>
           </div>
           {files.length > 0 && (
             <Section title={`${files.length} file${files.length > 1 ? 's' : ''}`}>
@@ -144,21 +152,26 @@ export function NewImport() {
         <div className="flex flex-col gap-4">
           <Section title="Customer">
             <div className="p-4 flex flex-col gap-3">
-              <select className="input" value={customerId} onChange={(e) => setCustomerId(e.target.value)}>
-                <option value="">Select a customer…</option>
+              <select className="input" value={customerId} onChange={(e) => { setCustomerId(e.target.value); setReplaces('') }}>
+                <option value="">{t('Select a customer…', 'เลือกลูกค้า…')}</option>
                 {customers?.map((c) => <option key={c.id} value={c.id}>{c.code} — {c.name}</option>)}
               </select>
-              <button className="btn btn-ghost btn-sm self-start" onClick={() => setNewCust(true)}><Plus size={13} /> New customer</button>
+              <button className="btn btn-ghost btn-sm self-start" onClick={() => setNewCust(true)}><Plus size={13} />{t('New customer', 'เพิ่มลูกค้า')}</button>
               {selected && (
                 <div className="text-[12.5px] text-muted border-t border-line pt-3">
-                  {selected.has_approved_mapping ? <span className="text-ok">Has an approved mapping — unchanged formats are approved automatically.</span> : <span>First import for this customer — the proposed mapping will go to review.</span>}
+                  {selected.has_approved_mapping ? <span className="text-ok">{t('An approved mapping is available. FORMA checks compatibility and validates the new data before applying the approval policy.', 'มีการจับคู่ที่เคยอนุมัติแล้ว ระบบจะตรวจรูปแบบและข้อมูลใหม่ก่อนพิจารณาตามกฎอนุมัติ')}</span> : <span>{t('No approved mapping yet. Review the proposed field matching before using the results.', 'ยังไม่มีการจับคู่ที่อนุมัติ ต้องตรวจการจับคู่คอลัมน์ก่อนนำผลลัพธ์ไปใช้')}</span>}
                 </div>
               )}
-              <input className="input" placeholder="Round label (optional, e.g. Oct 2026 wave 2)" value={label} onChange={(e) => setLabel(e.target.value)} />
+              {recent.length > 0 && <fieldset className="grid gap-2 text-[13px] border-t border-line pt-3">
+                <legend className="font-medium">{t(`${selected?.code} had a round in the last 7 days. This file is:`, `${selected?.code} เพิ่งมีรอบใน 7 วันที่ผ่านมา ไฟล์นี้คือ?`)}</legend>
+                <label className="flex items-start gap-2"><input type="radio" className="mt-1" name="replaces" checked={!replaces} onChange={() => setReplaces('')} /><span>{t('A new round', 'รอบใหม่')}<small className="block text-muted">{t('A new delivery, unrelated to the earlier one', 'ส่งของใหม่ ไม่เกี่ยวกับรอบเดิม')}</small></span></label>
+                {recent.map(r => <label key={r.id} className="flex items-start gap-2"><input type="radio" className="mt-1" name="replaces" checked={replaces === r.id} onChange={() => setReplaces(r.id)} /><span className="min-w-0 break-words">{t(`Replaces ${r.label ?? r.id}`, `แทน ${r.label ?? r.id}`)}<small className="block text-muted">{t('A correction; its old JSON is withdrawn', 'ไฟล์แก้ไขของรอบเดิม JSON เก่าจะถูกถอน')}</small></span></label>)}
+              </fieldset>}
+              <label className="grid gap-1 text-[13px]">{t('Import name (optional)', 'ชื่อชุดนำเข้า (ไม่บังคับ)')}<input className="input" placeholder={t('e.g. Products, prices and stock — October', 'เช่น สินค้า ราคา และสต็อก เดือนตุลาคม')} value={label} onChange={(e) => setLabel(e.target.value)} /></label>
             </div>
           </Section>
           <button className="btn btn-primary h-10 justify-center text-[14px]" disabled={!canRun} onClick={() => run.mutate()}>
-            {run.isPending ? <><Spinner className="border-t-white" /> {job?.message ?? 'Uploading…'}</> : 'Upload and run'}
+            {run.isPending ? <><Spinner className="border-t-white" /> {job?.message ?? t('Uploading…', 'กำลังอัปโหลด…')}</> : t('Upload and process together', 'อัปโหลดและประมวลผลร่วมกัน')}
           </button>
           {run.isPending && job && (
             <div className="card p-3 text-[12.5px]">
@@ -167,11 +180,11 @@ export function NewImport() {
             </div>
           )}
           <div className="card p-3.5 text-[12.5px] leading-relaxed">
-            <div className="heading text-[13px]">What happens next</div>
+            <div className="heading text-[13px]">{t('What happens next', 'หลังอัปโหลด ระบบทำอะไรต่อ')}</div>
             <ol className="mt-1.5 flex flex-col gap-1 text-ink-2 list-decimal pl-4">
-              <li>Every sheet is read and compared with this customer's approved format <span className="text-muted">— อ่านทุกชีตและเทียบกับ format เดิม</span></li>
-              <li>A mapping is reused, repaired or proposed <span className="text-muted">— ใช้ mapping เดิม ซ่อม หรือเสนอใหม่</span></li>
-              <li>Policy approves it, or asks you to check it <span className="text-muted">— ผ่านอัตโนมัติ หรือส่งให้คนตรวจ</span></li>
+              <li>{t('Read the source files and check their structure against approved formats.', 'อ่านไฟล์ต้นทางและตรวจโครงสร้างกับรูปแบบที่เคยอนุมัติ')}</li>
+              <li>{t('Match fields and link related tables using the mapping rules, such as matching prices to products by SKU.', 'จับคู่คอลัมน์และเชื่อมตารางตามกฎการจับคู่ เช่น เชื่อมราคากับสินค้าด้วยรหัสสินค้า')}</li>
+              <li>{t('Validate the combined dataset. If information is unclear, ask you to review before using the results.', 'ตรวจข้อมูลชุดที่สร้างขึ้น หากข้อมูลไม่ชัดเจน จะให้คุณตรวจและตอบคำถามก่อนนำผลลัพธ์ไปใช้')}</li>
             </ol>
           </div>
         </div>

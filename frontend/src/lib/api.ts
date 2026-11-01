@@ -131,7 +131,7 @@ export type Proposal = { id: string; digest: string; scope: 'policy' | 'customer
 export type Cadence = { status: 'overdue' | 'due' | 'ahead' | 'unknown'; rounds: number; every_days?: number; last?: string | null; expected?: string; late_days?: number; grace_days?: number }
 export type ExpectedDelivery = Cadence & { customer_id: string; code: string; name: string; text: Bilingual }
 export type WatchItem = { customer_id: string; code: string; name: string; reasons: Bilingual[]; text: Bilingual; last_round_id: string }
-export type Foresight = { generated_at: string; expected: ExpectedDelivery[]; counts: Record<Cadence['status'], number>; watchlist: WatchItem[] }
+export type Foresight = { generated_at: string; attention: { kind: 'stale_question' | 'customer_due'; task_id: string; round_id: string; customer_code: string; days: number; text: { en: string; th: string } }[]; idle_rounds: { round_id: string; customer_code: string; label: string | null; status: string; idle_days: number }[]; expected: ExpectedDelivery[]; counts: Record<Cadence['status'], number>; watchlist: WatchItem[] }
 export type VerdictAccepted = { did: 'approve_mapping' | 'apply_answers' | 'approve_dataset'; mapping_id?: string; dataset_id?: string; auto_publish?: boolean; verdict: Verdict }
 export type BatchMatch = { kind: 'known' | 'unknown'; how?: 'exact' | 'same_columns' | 'similar' | 'file_name'; named?: boolean; customer_id?: string; customer_code?: string | null; similarity?: number | null; classification?: string; reason?: string; candidates?: { customer_id: string; customer_code: string | null; similarity: number | null }[] }
 export type BatchItemState = 'processing' | 'needs_customer' | 'needs_review' | 'needs_data_check' | 'ready' | 'failed' | 'closed'
@@ -189,6 +189,7 @@ export type MappingVersion = {
 }
 export type ReviewTask = {
   explanations?: { en: string; th: string }[]
+  age_days: number; waiting_until: string | null; waiting_note: string | null
   id: string; round_id: string; customer_id: string; mapping_version_id: string | null; dataset_version_id: string | null; kind: string; priority: number; status: string
   reasons: string[]; details: { decision?: string; risk_level?: RiskLevel; risk_factors?: string[]; impact?: PolicyDecision['impact']; open_questions?: string[]; findings?: Finding[]; verdict?: VerdictBrief }; resolver: string | null; comment: string | null; created_at: string; resolved_at: string | null
   customer?: { id: string; code: string; name: string } | null; round?: { id: string; label: string | null; status: string } | null
@@ -217,6 +218,11 @@ export type OpsSummary = {
   slowest_rounds: { job_id: string; kind: string; round_id: string; customer_code: string | null; label: string | null; duration_ms: number | null; stages: { profile?: number | null; propose?: number | null; transform?: number | null } }[]
   breaker: { open: boolean; failures: number; opened_at?: string | null; backups?: Record<string, boolean> } | null
   storage: string; database: string; auth: string; tracing: boolean; schema_revision: string | null
+  housekeeping: {
+    storage: { objects: number | null; bytes: number | null; known: boolean }
+    retention: { schedule_h: number; deletes: boolean; last_at: string | null; last_applied: boolean | null; last_counts: Record<string, number> | null; last_errors: number | null }
+    backup: { last_at: string | null; age_hours: number | null; path: string | null }
+  }
 }
 export type FieldSpec = { pointer: string; name: string; json_type: string[]; semantic: string | null; risk: 'critical' | 'high' | 'medium' | 'low'; required: boolean; nullable: boolean; enum: unknown[] | null; format: string | null; synonyms_en: string[]; synonyms_th: string[]; description: string | null; description_th: string | null; in_collection: string | null; is_collection: boolean; system: boolean; default: unknown }
 export type SchemaSummary = { schema_id: string; version: number; ref: string; entity: string; status: string; title: string; description: string; identity_keys: string[]; field_count: number; fields?: FieldSpec[]; document?: unknown; source?: 'ui' | 'file'; is_latest?: boolean; is_default?: boolean }
@@ -253,6 +259,7 @@ export type Impact = { rows_affected: number; cells_changed: number; rows_delete
 export type RowsPage = { total: number; offset: number; limit: number; identity_keys: string[]; rows: Record<string, unknown>[]; columns: FieldSpec[]; findings: Finding[] }
 export type Dashboard = {
   customers: number; rounds_by_status: Record<string, number>; open_reviews: number; approved_mappings: number; auto_approved_mappings: number; mapping_versions: number; reused_mappings: number
+  review?: { open: number; stale: number; waiting: number; oldest_days: number | null; stale_after_days: number }
   published_rows: number; failed_jobs: number; llm: { calls: number; cost_usd: number; tokens: number; provider: string; model: string }; recent_rounds: ImportRound[]; automation_rate: number | null; learning?: { aliases: number; constants: number; uses: number; corrections_per_approval: number | null }
 }
 export type ChangeReport = {
@@ -423,6 +430,8 @@ export const api = {
   dsl: () => get<{ ops: string[]; json_schema: unknown }>('/api/dsl'),
 
   review: (status = 'open', round_id = '', offset = 0) => get<ReviewTask[]>('/api/review' + qs({ status, round_id: round_id || undefined, offset, limit: 50 })),
+  waitForCustomer: (id: string, b: { until: string; note: string }) => post<ReviewTask>(`/api/review/${encodeURIComponent(id)}/wait`, b),
+  resumeReview: (id: string) => post<ReviewTask>(`/api/review/${encodeURIComponent(id)}/resume`, {}),
 
   dataset: (id: string) => get<DatasetVersion>(`/api/datasets/${id}`),
   rows: (id: string, q: { offset?: number; limit?: number; q?: string; sort?: string; desc?: boolean }) => get<RowsPage>(`/api/datasets/${id}/rows` + qs(q)),

@@ -293,15 +293,17 @@ _RETENTION_THREAD: threading.Thread | None = None
 def _retention_loop(interval_s: float, apply: bool) -> None:
     from forma.services import retention
 
-    while not _RETENTION_STOP.wait(interval_s):
+    # The first pass comes soon after start, so a restart does not push it a whole interval away.
+    wait_s = min(60.0, interval_s)
+    while not _RETENTION_STOP.wait(wait_s):
+        wait_s = interval_s
         try:
             ctx = get_context()
             with session_scope() as s:
-                plan = retention.plan(ctx, s)
-                summary = plan["summary"]
-                if apply:
-                    summary = retention.apply(ctx, s, plan, actor="retention.scheduler")
-            log.info("retention run", apply=apply, **{k: v for k, v in summary.items() if k != "errors"})
+                if retention.ran_within(s, interval_s * 0.5):
+                    continue
+                result = retention.run(ctx, s, apply_=apply, actor="retention.scheduler")
+            log.info("retention run", apply=apply, **result["counts"])
         except Exception as e:
             log.error("retention run failed", error=str(e)[:300])
 

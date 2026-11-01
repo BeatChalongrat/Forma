@@ -117,6 +117,7 @@ login reachable from the network), R30 (a customer-scoped admin can change share
 | 050 | What the assistant makes opens beside the chat, with its versions kept |
 | 051 | The assistant remembers a person across chats |
 | 052 | Closing a round without deleting it: cancel, move, replace |
+| 053 | Housekeeping you can see, and a review queue with a clock |
 
 ## 6. Numbers to quote (and where they come from)
 
@@ -124,7 +125,7 @@ login reachable from the network), R30 (a customer-scoped admin can change share
 |---|---|---|
 | Field accuracy on the synthetic corpus, no AI | 0.996 (30/30 variants ≥ 0.99); identity 1.00; critical 1.00; drift 9/9 | `make eval-gate`, `data/eval_baseline.json` |
 | A 300-file night | 17 min, 8 worker processes, 12-core node, 30M rows | PERFORMANCE.md (pre-ADR-043; re-measure) |
-| Tests | 623 passed, 5 skipped locally, coverage 91 % (gate 85 % in CI) | `pytest`, CI |
+| Tests | 639 passed, 5 skipped locally, coverage 91 % (gate 85 % in CI) | `pytest`, CI |
 | Endpoints / tables / ADRs | ~110 / 19 / 46 | API_OVERVIEW.md, DATA_MODEL.md, adr/ |
 
 Anything else — accuracy on real files, provider accuracy, production throughput — is not yet measured and

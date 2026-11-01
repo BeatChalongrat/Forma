@@ -155,13 +155,6 @@ button, input, select, textarea { font-family: inherit; }
 /* primitives — in the components layer so Tailwind utilities can override them */
 @layer components {
 .card { @apply bg-surface border border-line rounded-[var(--radius-lg)]; box-shadow: var(--shadow-soft); }
-.review-disclosure { @apply bg-surface border border-line rounded-xl overflow-hidden; }
-.review-disclosure > summary { @apply flex items-center justify-between gap-4 px-5 py-4 text-sm transition-colors hover:bg-surface-2; list-style: none; }
-.review-disclosure > summary::-webkit-details-marker { display: none; }
-.review-disclosure > summary::marker { content: ''; }
-.review-disclosure > summary:focus-visible { outline: 2px solid var(--color-signal); outline-offset: -3px; }
-.review-disclosure-chevron { transition: transform .15s; }
-.review-disclosure[open] > summary .review-disclosure-chevron { transform: rotate(180deg); }
 .btn { @apply inline-flex items-center gap-2 min-h-9 py-1.5 px-3 rounded-[var(--radius-sm)] border border-line-2 bg-surface text-ink text-[13px] font-medium whitespace-nowrap select-none transition-colors hover:bg-surface-2 hover:border-signal/40 disabled:opacity-50 disabled:pointer-events-none; }
 .btn-primary { @apply border-transparent; background: var(--color-action); color: var(--color-on-action); }
 .btn-primary:hover { background: #2c538d; color: white; }
@@ -208,6 +201,15 @@ svg.lucide { flex-shrink: 0; stroke-width: 1.7; }
 .workspace-body { display: flex; flex: 1; min-height: 0; min-width: 0; overflow: hidden; }
 .workspace-panel { width: clamp(300px, 25vw, 400px); min-width: 0; flex-shrink: 0; display: flex; flex-direction: column; background: var(--color-surface); border-left: 1px solid var(--color-line); }
 .workspace-panel-left { width: 230px; border-left: 0; border-right: 1px solid var(--color-line); }
+.workspace-tabs { display: flex; gap: 4px; padding: 0 16px; border-bottom: 1px solid var(--color-line); background: var(--color-surface); overflow-x: auto; flex-shrink: 0; }
+.workspace-tabs button { padding: 10px 12px; font-size: 13px; color: var(--color-ink-2); border-bottom: 2px solid transparent; margin-bottom: -1px; white-space: nowrap; }
+.workspace-tabs button:hover { color: var(--color-navy); }
+.workspace-tabs button.is-on { color: var(--color-navy); font-weight: 600; border-bottom-color: var(--color-navy); }
+.workspace-tab-count { margin-left: 6px; font-size: 11.5px; font-weight: 400; color: var(--color-muted); }
+@media (max-width: 899px) {
+  .workspace-body { flex-direction: column; overflow: auto; }
+  .workspace-panel-left { width: 100%; max-height: 40dvh; border-right: 0; border-bottom: 1px solid var(--color-line); }
+}
 .workspace-drawer-content { display: flex; flex-direction: column; min-width: 0; }
 .mapping-field { display: grid; grid-template-columns: minmax(100px, 1fr) minmax(100px, 1.4fr) 90px 50px; align-items: center; gap: 12px; width: 100%; padding: 12px 0; text-align: left; }
 .editor-footer { min-height: 42px; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 6px 16px; border-top: 1px solid var(--color-line); background: var(--color-surface); flex-shrink: 0; }

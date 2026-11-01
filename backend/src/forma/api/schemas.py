@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import date
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -36,6 +37,11 @@ class CloseIn(BaseModel):
 
 class MoveIn(CloseIn):
     customer_id: str
+
+
+class WaitIn(BaseModel):
+    until: date
+    note: str = Field(min_length=1, max_length=500)
 
 
 class AskIn(BaseModel):

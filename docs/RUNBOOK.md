@@ -113,7 +113,7 @@ previous revision. Fix the migration, re-run. On SQLite (dev) delete the DB and 
 ## Backup and restore
 
 ```bash
-# nightly (cron / scheduled job on the api container)
+# the compose stack's `backup-nightly` service dumps the database every 24 hours and keeps 14 days
 forma backup --out /backups --archive            # DB dump + manifest.json + objects/ → forma-backup-<stamp>.tar.gz
 forma backup --out /backups --no-objects         # when the bucket is versioned/replicated: manifest only
 
@@ -134,8 +134,10 @@ forma retention run --apply        # deletes; every deletion is an audit row (re
 ```
 
 Scheduled: `FORMA_RETENTION_INTERVAL_H=24` (and `FORMA_RETENTION_APPLY=true` to actually delete) runs it
-inside the API/worker process. Approved/published versions, rollback parents and open rounds are never
-touched.
+inside the API/worker process. The first pass comes a minute after start, and a pass is skipped when one ran in
+the last half interval. Approved/published versions, rollback parents and open rounds are never touched; a round
+with no activity for 60 days is flagged on the home page and left alone. System health shows storage used, the
+last pass and what it did, and the age of the last backup, amber past a day (ADR-053).
 
 ## Capacity
 

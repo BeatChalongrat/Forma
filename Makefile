@@ -38,7 +38,10 @@ typecheck:
 test:
 	cd $(BACKEND) && .venv/bin/pytest --cov=forma --cov-report=term-missing:skip-covered
 
-check: lint typecheck test   ## everything CI runs
+test-web:
+	cd frontend && npm test
+
+check: lint typecheck test test-web   ## everything CI runs
 
 synth:               ## regenerate the synthetic ERP corpus (30 variants, ground truth)
 	cd $(BACKEND) && .venv/bin/forma synth --out ../data/synthetic --seed 42 --variants 30

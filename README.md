@@ -267,7 +267,7 @@ target_schema/            product.v1.json — a DRAFT contract; register the rea
 policies/                 approval.yaml (auto-approve / review / block, sandbox, anomaly, publish, verdict)
 data/                     runtime data (git-ignored) · synthetic/ corpus with ground truth (committed) · real/ (local only)
 docs/                     architecture, flows, user stories, handbook, DSL, data model, Thai rules, evaluation,
-                          performance, runbook, ADRs 001–052
+                          performance, runbook, ADRs 001–053
 ```
 
 ---

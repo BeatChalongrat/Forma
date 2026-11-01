@@ -28,6 +28,7 @@
 | **Sandbox** | แซนด์บ็อกซ์ | Running the new mapping next to the approved one on the same files and comparing. |
 | **Memory** | ความจำ | Short topics the assistant keeps about the person it works with, across chats. Background only, never evidence (ADR-051). |
 | **Incognito chat** | แชตไม่บันทึก | A chat in no history or search that uses no memory and is deleted after a day (ADR-051). |
+| **Waiting question** | คำถามที่รอลูกค้าตอบ | A review question parked with a note and a date. It leaves the queue and returns by itself on that day (ADR-053). |
 | **Closed round** | รอบที่ปิดแล้ว | A round that was cancelled, moved to another customer or replaced by a newer file. Nothing is deleted; it leaves every queue and the zip (ADR-052). |
 | **Work** | ผลงาน | Something the assistant made in a chat: a flow or a file. It opens beside the chat and keeps every version (ADR-050). |
 | **Code sandbox** | ห้องทดลอง | The assistant's separate container: Python on copies of the data, no network, no secrets. Its results reach the chat, never a record (ADR-048). |
