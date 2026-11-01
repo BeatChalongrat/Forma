@@ -1,6 +1,6 @@
 import { Localized } from '../lib/locale'
-import { type ReactNode, useId, useState } from 'react'
-import { CircleHelp, X } from 'lucide-react'
+import { type ReactNode, useId } from 'react'
+import { X } from 'lucide-react'
 import { useDialog } from '../lib/useDialog'
 import { cn, STATUS_LABEL, STATUS_TONE } from '../lib/utils'
 
@@ -11,8 +11,7 @@ export function PageHeader({ title, subtitle, hint, actions, crumbs }: { title: 
       <div className="min-w-0">
         {crumbs && <div className="text-muted text-[12.5px] mb-1.5 flex items-center gap-1.5">{crumbs}</div>}
         <h1 className="heading text-[26px] leading-tight break-words"><Localized>{title}</Localized></h1>
-        {subtitle && <div className="text-ink-2 mt-1.5"><Localized>{subtitle}</Localized></div>}
-        {hint && <details className="mt-2 text-[13px] text-muted"><summary className="hover:text-signal"><Localized>Usage tips</Localized></summary><div className="hint-th mt-2">{hint}</div></details>}
+        {(subtitle ?? hint) && <div className="text-ink-2 mt-1.5"><Localized>{subtitle ?? hint}</Localized></div>}
       </div>
       {actions && <div className="flex items-center gap-2 flex-wrap max-w-full">{actions}</div>}
     </div>
@@ -173,17 +172,7 @@ export function FindingRow({ f }: { f: { severity: string; kind: string; message
   )
 }
 
-/** "How this page works" — a short guide at the top of a complex page; hidden once dismissed (per browser). */
-export function HelpStrip({ id, title = 'How this page works', children }: { id: string; title?: string; children: ReactNode }) {
-  const key = `forma.help.${id}`
-  const [hidden, setHidden] = useState(() => { try { return localStorage.getItem(key) !== 'shown' } catch { return true } })
-  const set = (v: boolean) => { setHidden(v); try { localStorage.setItem(key, v ? 'hidden' : 'shown') } catch { /* private mode */ } }
-  if (hidden) return <button className="text-[12.5px] text-muted hover:text-signal flex items-center gap-1.5 py-1" onClick={() => set(false)} aria-expanded={false}><CircleHelp size={14} /> {title}</button>
-  return (
-    <div className="flex items-start gap-3 rounded-[10px] bg-signal-soft/70 border border-signal/15 px-3.5 py-2.5 text-[12.5px]">
-      <CircleHelp size={15} className="text-muted mt-0.5 shrink-0" />
-      <div className="flex-1 min-w-0"><div className="font-semibold text-navy">{title}</div><div className="text-ink-2 mt-0.5">{children}</div></div>
-      <button className="btn btn-ghost btn-sm" onClick={() => set(true)} aria-label="Hide this guide"><X size={13} /></button>
-    </div>
-  )
+/** One line under the toolbar of a complex page: what is where. */
+export function HelpStrip({ children }: { children: ReactNode }) {
+  return <p className="text-[12.5px] text-ink-2 leading-relaxed m-0">{children}</p>
 }

@@ -117,6 +117,8 @@ def mapping_version(m: MappingVersion, *, document: bool = True) -> dict[str, An
 
 
 def review_task(t: ReviewTask, **extra: Any) -> dict[str, Any]:
+    from forma.services.review_queue import age_days
+
     return {
         "id": t.id,
         "round_id": t.round_id,
@@ -132,6 +134,9 @@ def review_task(t: ReviewTask, **extra: Any) -> dict[str, Any]:
         "comment": t.comment,
         "created_at": _dt(t.created_at),
         "resolved_at": _dt(t.resolved_at),
+        "age_days": age_days(t),
+        "waiting_until": t.waiting_until.isoformat() if t.waiting_until else None,
+        "waiting_note": t.waiting_note,
         **extra,
     }
 

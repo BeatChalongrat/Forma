@@ -71,7 +71,7 @@ export function RoundPage() {
         </div>
         {memory.mapping_id && <Link className="btn btn-outline btn-sm" to={`/review?mapping=${memory.mapping_id}`}>{t('View saved mapping', 'ดูกฎที่เคยอนุมัติ')}</Link>}
       </div>}
-      <details className="mt-6" open={r.status === 'blocked' || r.status === 'failed'}><summary className="text-[14px] font-medium text-ink-2 mb-4">Files, issues &amp; version history</summary>
+      <div className="mt-6">
       <div className="grid lg:grid-cols-[1fr_380px] gap-4">
         <div className="flex flex-col gap-4">
           <Section title="Files">
@@ -169,7 +169,7 @@ export function RoundPage() {
         </div>
       </div>
 
-      </details>
+      </div>
       <FileDrawer roundId={roundId} file={fileOpen} onClose={() => setFileOpen(null)} />
     </>
   )

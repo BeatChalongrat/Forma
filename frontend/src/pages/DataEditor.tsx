@@ -3,12 +3,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useVirtualizer } from '@tanstack/react-virtual'
-import { Download, Search, Undo2, History, GitCompareArrows, CircleAlert, CircleCheck, Route, Trash2, Activity, X, PanelRight } from 'lucide-react'
+import { Download, Search, Undo2, History, GitCompareArrows, CircleAlert, CircleCheck, Route, Trash2, Activity, X } from 'lucide-react'
 import { api, ApiError, type Answer, type AnomalyReport, type FieldSpec, type Operation, type Impact, type RowsPage, type Trace } from '../lib/api'
 import { AssistantIcon } from '../lib/icons'
 import { cn, cellText, fmtInt, fmtNum, getPointer, timeAgo, describeExpr } from '../lib/utils'
 import { Badge, Drawer, HelpStrip, Modal, Spinner, StatusBadge, Tabs, FindingRow } from '../components/ui'
-import { WorkspacePanel } from '../components/WorkspacePanel'
+import { WorkspaceTabs } from '../components/WorkspaceTabs'
+import { usePreferences } from '../lib/preferences'
 import { useToast } from '../lib/toast'
 
 const ROW_H = 32
@@ -60,9 +61,9 @@ export function DataEditor() {
   const [saveOpen, setSaveOpen] = useState(false)
   const [params] = useSearchParams() // ?tab= opens a panel, ?tool=trace explains tracing (links from the round page, the guide, Ctrl+K)
   const [rightTab, setActiveTab] = useState<EditorTab>(() => (EDITOR_TABS as readonly string[]).includes(params.get('tab') ?? '') ? (params.get('tab') as EditorTab) : 'changes')
-  const [rightOpen, setRightOpen] = useState(() => !!params.get('tab'))
-  const [assistantOpen, setAssistantOpen] = useState(false)
-  const setRightTab = (tab: EditorTab) => { setActiveTab(tab); setRightOpen(true) }
+  const { t } = usePreferences()
+  const [view, setView] = useState<'grid' | 'assistant' | 'review'>(() => { const tab = params.get('tab'); return tab === 'copilot' ? 'assistant' : tab ? 'review' : 'grid' })
+  const setRightTab = (tab: EditorTab) => { setActiveTab(tab); setView(tab === 'copilot' ? 'assistant' : 'review') }
   const [traceTip, setTraceTip] = useState(() => params.get('tool') === 'trace')
   const [copilot, setCopilot] = useState('')
   const [answer, setAnswer] = useState<Answer | null>(null)
@@ -258,8 +259,6 @@ export function DataEditor() {
         {errors > 0 && <Badge tone="bad"><CircleAlert size={12} /> {errors} other error{errors > 1 ? 's' : ''}</Badge>}
         <div className="relative min-w-0"><Search size={13} className="absolute left-2.5 top-2.5 text-muted" /><input className="input pl-7 w-52 max-w-full" placeholder="Search any field…" value={q} onChange={(e) => setQ(e.target.value)} /></div>
         <div className="ml-auto flex items-center gap-2 flex-wrap">
-          <button className="btn btn-ghost btn-sm" aria-expanded={assistantOpen} onClick={() => setAssistantOpen(!assistantOpen)}><AssistantIcon size={15} /> Assistant</button>
-          <button className="btn btn-ghost btn-sm" aria-expanded={rightOpen} onClick={() => setRightOpen(!rightOpen)}><PanelRight size={15} /> Review{pending.length > 0 ? ` (${pending.length})` : ''}</button>
 
           {pending.length > 0 && <><button className="btn btn-sm" onClick={() => setPending([])}><Undo2 size={13} /> Discard</button><button className="btn btn-sm btn-primary" onClick={() => { preview.mutate(); setSaveOpen(true) }}>Review {pending.length} change{pending.length > 1 ? 's' : ''}</button></>}
           {!pending.length && ds.status === 'draft' && <button className="btn btn-sm" disabled={approve.isPending || invalid > 0} title={invalid ? `Fix or remove the ${invalid} record${invalid > 1 ? 's' : ''} that do not match the target format first` : undefined} onClick={() => approve.mutate({})}><CircleCheck size={13} /> Approve data</button>}
@@ -268,12 +267,7 @@ export function DataEditor() {
         </div>
       </div>
 
-      {assistantOpen && <div className="px-5 py-3 border-b border-line bg-surface shrink-0">
-        <div className="flex items-center gap-2"><AssistantIcon size={16} className="text-muted" />
-          <input aria-label="Ask the assistant" className="input flex-1" placeholder="Ask about this data, or describe a change…" value={copilot} onChange={(e) => setCopilot(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && submitCopilot()} />
-          <button className="btn btn-sm btn-primary" disabled={!copilot.trim() || ask.isPending || question.isPending} onClick={submitCopilot}>{ask.isPending || question.isPending ? <Spinner /> : isQuestion(copilot) ? 'Ask' : 'Preview'}</button>
-        </div><p className="text-[12.5px] text-muted mt-2 ml-6">Try “ลดราคา 5% เฉพาะสินค้าที่มีสต็อก” — you review the changes before saving.</p>
-      </div>}
+      <WorkspaceTabs label={t('Views', 'มุมมอง')} value={view} onChange={setView} items={[{ id: 'grid', label: t('Data', 'ตารางข้อมูล') }, { id: 'assistant', label: t('Assistant', 'ผู้ช่วย') }, { id: 'review', label: t('Review', 'ตรวจข้อมูล'), count: pending.length }]} />
 
       <div className="px-5 py-2 border-b border-line bg-surface shrink-0 flex flex-col gap-2">
         {traceTip && (
@@ -283,14 +277,14 @@ export function DataEditor() {
             <button className="btn btn-ghost btn-sm" onClick={() => setTraceTip(false)} aria-label="Hide"><X size={13} /></button>
           </div>
         )}
-        <HelpStrip id="editor">
+        <HelpStrip>
           Edit like Excel: double-click or <span className="kbd">↵</span> to edit, paste a block from Excel, tick rows to change many at once. Every change waits in <b>Pending</b> until you review its impact and save it as a new version. Use <b>Changes &amp; anomalies</b> before approving. <span className="text-muted">— แก้เหมือน Excel ทุกการแก้รออยู่ใน Pending จนกว่าจะกดบันทึก ดู Changes &amp; anomalies ก่อนกด Approve data</span>
         </HelpStrip>
       </div>
 
       <div className="workspace-body">
         {/* grid */}
-        <div className="min-w-0 flex-1 flex flex-col">
+        <div className={cn('min-w-0 flex-1 flex flex-col', view !== 'grid' && 'hidden')}>
           {picked.size > 0 && ds.status !== 'published' && (
             <BulkBar count={picked.size} fields={columns.filter((c) => !c.is_collection && !c.system)} pricePointer={pricePointer}
               onSet={(fld, text) => { const v = parseValue(fld, text); if (!v.ok) { toast.push({ kind: 'bad', title: v.error }); return } stageBulk({ kind: 'set_field', target: fld.pointer, value: v.value }, `set ${fld.name} = ${cellText(v.value) || '∅'} on ${picked.size} rows`) }}
@@ -350,9 +344,17 @@ export function DataEditor() {
           </div>
         </div>
 
-        {/* right rail */}
-        <WorkspacePanel open={rightOpen} onClose={() => setRightOpen(false)} title="Review data">
-          <Tabs menu value={rightTab} onChange={setRightTab} items={[{ id: 'changes', label: 'Unsaved', count: pending.length, hint: 'การแก้ที่ยังไม่บันทึก' }, { id: 'diff', labelText: 'Changes & anomalies', hint: 'เทียบกับรอบก่อน และของที่ดูผิดปกติ', label: <span className="flex items-center gap-1">Changes &amp; anomalies{ack && <Activity size={12} className="text-bad" />}</span> }, { id: 'copilot', label: 'Assistant', hint: 'คำตอบจาก Copilot' }, { id: 'findings', label: 'Problems', count: ds.findings.length, hint: 'record ที่ไม่ตรง format และปัญหาอื่น' }, { id: 'versions', label: 'Versions', count: ds.history?.length, hint: 'ทุกเวอร์ชัน ย้อนกลับได้' }]} />
+        {view === 'assistant' && <section className="min-w-0 flex-1 flex flex-col overflow-auto p-5 gap-3" aria-label="Ask the assistant">
+          <div className="flex items-center gap-2 max-w-3xl w-full"><AssistantIcon size={16} className="text-muted" />
+            <input aria-label="Ask the assistant" className="input flex-1" placeholder="Ask about this data, or describe a change…" value={copilot} onChange={(e) => setCopilot(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && submitCopilot()} />
+            <button className="btn btn-sm btn-primary" disabled={!copilot.trim() || ask.isPending || question.isPending} onClick={submitCopilot}>{ask.isPending || question.isPending ? <Spinner /> : isQuestion(copilot) ? 'Ask' : 'Preview'}</button>
+          </div>
+          <p className="text-[12.5px] text-muted ml-6 m-0">Try “ลดราคา 5% เฉพาะสินค้าที่มีสต็อก” — you review the changes before saving.</p>
+          <div className="max-w-3xl text-[12.5px]"><AnswerPanel answer={answer} pending={question.isPending} onTrace={(identity, pointer) => setDrawer({ kind: 'lineage', identity, pointer })} /></div>
+        </section>}
+
+        {view === 'review' && <section className="min-w-0 flex-1 flex flex-col overflow-hidden" aria-label="Review data">
+          <Tabs menu value={rightTab} onChange={setRightTab} items={[{ id: 'changes', label: 'Unsaved', count: pending.length, hint: 'การแก้ที่ยังไม่บันทึก' }, { id: 'diff', labelText: 'Changes & anomalies', hint: 'เทียบกับรอบก่อน และของที่ดูผิดปกติ', label: <span className="flex items-center gap-1">Changes &amp; anomalies{ack && <Activity size={12} className="text-bad" />}</span> }, { id: 'findings', label: 'Problems', count: ds.findings.length, hint: 'record ที่ไม่ตรง format และปัญหาอื่น' }, { id: 'versions', label: 'Versions', count: ds.history?.length, hint: 'ทุกเวอร์ชัน ย้อนกลับได้' }]} />
           <div className="flex-1 overflow-auto p-3 text-[12.5px]">
             {rightTab === 'changes' && (pending.length ? (
               <ul className="flex flex-col gap-1">{pending.map((p, i) => <li key={i} className="flex items-start gap-2 py-1 border-b border-line/70"><Badge tone={p.kind.startsWith('delete') ? 'bad' : 'signal'} className="min-h-6 px-1.5 text-[12px] shrink-0">{p.kind.replace('_', ' ')}</Badge><span className="flex-1 break-words">{p.label}</span><button className="text-muted hover:text-bad" onClick={() => setPending((xs) => xs.filter((_, j) => j !== i))}>×</button></li>)}</ul>
@@ -364,10 +366,9 @@ export function DataEditor() {
               </div>
             )}
             {rightTab === 'findings' && (ds.findings.length ? ds.findings.map((f, i) => (f.kind === 'validation' && f.identity
-              ? <button key={i} className="block w-full text-left hover:bg-surface-2 rounded" title="Show this row" onClick={() => setQ(f.identity ?? '')}><FindingRow f={{ ...f, message: `${f.identity} · ${f.message}` }} /></button>
+              ? <button key={i} className="block w-full text-left hover:bg-surface-2 rounded" title="Show this row" onClick={() => { setQ(f.identity ?? ''); setView('grid') }}><FindingRow f={{ ...f, message: `${f.identity} · ${f.message}` }} /></button>
               : <FindingRow key={i} f={f} />)) : <div className="text-muted">No findings. Every record passed the schema and quality rules.</div>)}
             {rightTab === 'diff' && <DiffPanel report={report} ack={ack} acking={approve.isPending} onAcknowledge={(comment) => approve.mutate({ acknowledge_anomalies: true, comment })} onTrace={(identity, kind) => setDrawer({ kind: 'lineage', identity, pointer: /price|discount|promo/.test(kind) && pricePointer ? pricePointer.replace('/*/', '/0/') : undefined })} />}
-            {rightTab === 'copilot' && <AnswerPanel answer={answer} pending={question.isPending} onTrace={(identity, pointer) => setDrawer({ kind: 'lineage', identity, pointer })} />}
             {rightTab === 'versions' && (
               <ul className="flex flex-col gap-1">
                 {ds.history?.slice().reverse().map((v) => (
@@ -380,7 +381,7 @@ export function DataEditor() {
               </ul>
             )}
           </div>
-        </WorkspacePanel>
+        </section>}
       </div>
 
       <RecordDrawer open={drawer?.kind === 'record'} identity={drawer?.identity ?? ''} rows={rows} identityOf={identityOf} columns={page?.columns ?? []} onClose={() => setDrawer(null)} onLineage={() => setDrawer({ kind: 'lineage', identity: drawer!.identity })} onEdit={(target, value, label) => setPending((p) => [...p, { kind: 'set_item', identity: drawer!.identity, target, value, label }])} />

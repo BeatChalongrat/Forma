@@ -203,3 +203,127 @@ def test_backup_cli(client: TestClient, isolated_env: Path) -> None:
         and manifest["config"]["llm_provider"] == "mock"
     )
     assert ("database_url" in manifest["config"] and "***" in str(manifest["config"]["database_url"])) or True
+
+
+def test_a_pass_is_recorded_and_the_health_page_reads_it(client: TestClient, isolated_env: Path) -> None:
+    from forma.db.session import session_scope
+    from forma.services import retention
+    from forma.services.context import get_context
+    from forma.services.rounds import audit
+
+    retention._USAGE = None
+    health = client.get("/api/ops").json()["housekeeping"]
+    assert health["retention"]["last_at"] is None and health["backup"]["last_at"] is None
+    assert health["storage"]["known"] is True
+
+    _published_round(client, isolated_env)
+    with session_scope() as s:
+        out = retention.run(get_context(), s, apply_=False, actor="test")
+        assert out["applied"] is False
+    with session_scope() as s:
+        assert retention.ran_within(s, 3600) is True
+        audit(s, "backup.create", "backup", "run", actor="backup", path="/backups/x.tar.gz", objects=1)
+    retention._USAGE = None
+    health = client.get("/api/ops").json()["housekeeping"]
+    assert health["retention"]["last_at"] and health["retention"]["last_applied"] is False
+    assert "source_files" in health["retention"]["last_counts"]
+    assert health["backup"]["age_hours"] == 0 and health["backup"]["path"] == "/backups/x.tar.gz"
+    assert health["storage"]["objects"] > 0 and health["storage"]["bytes"] > 0
+
+
+def test_retention_clears_unassigned_uploads_and_old_answers(
+    client: TestClient, isolated_env: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from forma.db.models import BatchItem, ImportRound, ReviewTask
+    from forma.db.session import session_scope
+    from forma.services import retention
+    from forma.services.context import get_context
+
+    batch = client.post(
+        "/api/batches",
+        params={"sync": "true"},
+        files=[("files", ("mystery.csv", b"alpha,beta\n1,2\n", "text/csv"))],
+    ).json()
+    item = batch["items"][0]
+    assert item["state"] == "needs_customer"
+    _published_round(client, isolated_env)
+    ctx = get_context()
+    with session_scope() as s:
+        row = s.get(BatchItem, item["id"])
+        assert row is not None
+        key = row.storage_key
+        assert ctx.storage.exists(key)
+        plan = retention.plan(ctx, s)
+    assert plan["summary"]["batch_items"] == 0 and plan["summary"]["review_tasks"] == 0
+
+    monkeypatch.setattr(
+        retention,
+        "load_policy",
+        lambda _d: {"batch_items": {"keep_days_unassigned": 30}, "review_tasks": {"keep_days_resolved": 30}},
+    )
+    old = dt.datetime.now(dt.UTC) - dt.timedelta(days=60)
+    with session_scope() as s:
+        row = s.get(BatchItem, item["id"])
+        assert row is not None
+        row.created_at = old
+        tasks = list(s.scalars(select(ReviewTask)))
+        assert tasks and all(t.status != "open" for t in tasks)
+        for t in tasks:
+            t.resolved_at = old
+        round_id, kept = tasks[0].round_id, len(tasks)
+        # a cancelled round's answers come back with it, so they stay
+        r = s.get(ImportRound, round_id)
+        assert r is not None
+        r.status = "cancelled"
+    with session_scope() as s:
+        plan = retention.plan(ctx, s)
+        assert plan["summary"]["batch_items"] == 1 and plan["summary"]["review_tasks"] == 0
+        done = retention.apply(ctx, s, plan, actor="test")
+        assert done["batch_items"] == 1 and not done["errors"]
+    assert not ctx.storage.exists(key)
+    view = client.get(f"/api/batches/{batch['id']}").json()
+    assert view["items"][0]["state"] == "closed" and view["items"][0]["closed_as"] == "purged"
+    assert view["done"] is True
+    with session_scope() as s:
+        r = s.get(ImportRound, round_id)
+        assert r is not None
+        r.status = "published"
+    with session_scope() as s:
+        plan = retention.plan(ctx, s)
+        assert plan["summary"]["review_tasks"] == kept
+        assert retention.apply(ctx, s, plan, actor="test")["review_tasks"] == kept
+        assert list(s.scalars(select(ReviewTask))) == []
+
+
+def test_a_file_waiting_for_a_customer_keeps_its_bytes(
+    client: TestClient, isolated_env: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from forma.db.models import Batch, BatchItem, SourceFile
+    from forma.db.session import session_scope
+    from forma.services import retention
+    from forma.services.context import get_context
+
+    _published_round(client, isolated_env)
+    with session_scope() as s:
+        key = next(iter(s.scalars(select(SourceFile)))).storage_key
+        b = Batch(label="x", created_by="t")
+        s.add(b)
+        s.flush()
+        s.add(
+            BatchItem(
+                batch_id=b.id,
+                file_name="x.xlsx",
+                sha256="0",
+                size=1,
+                kind="excel",
+                storage_key=key,
+                status="needs_customer",
+            )
+        )
+    monkeypatch.setattr(
+        retention, "load_policy", lambda _d: {"source_files": {"keep_days_after_publish": 30}}
+    )
+    _age_everything(60)
+    with session_scope() as s:
+        plan = retention.plan(get_context(), s)
+    assert key not in [x["key"] for x in plan["source_files"]]

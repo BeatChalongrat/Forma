@@ -112,6 +112,18 @@ Technique: three closed statuses with `closed_from/by/at/reason` and successor/p
 
 Tests: `test_round_lifecycle.py`.
 
+### A6. Know whose turn a question is
+**ฉันอยาก**เห็นว่าคำถามแต่ละข้อรอมานานแค่ไหน และพักเรื่องที่รอลูกค้าตอบไว้ได้ **เพื่อ**ให้คิวเหลือแต่งานที่ฉันทำได้จริง
+
+AC: every open question shows its age, and those past seven days are called out on the home page; a question can wait
+for the customer with a note and a date, leaves the queue and its counts, and comes back on that day or sooner by hand;
+an approval, a rejection or a closed round settles it; foresight says when a customer's answer is due; a round with no
+activity for 60 days is flagged and never closed.
+
+Technique: status `waiting` woken when the queue is read, so there is no timer to fail (ADR-053).
+
+Tests: `test_review_queue.py`.
+
 ## Epic B — Deciding what a file means
 
 ### B1. A returning customer with an unchanged layout
@@ -474,7 +486,7 @@ AC: `SYSTEM_BASE` states it; the guard enforces it; tools mark truncation; tests
 
 | Epic | ADRs |
 |---|---|
-| A Receiving | 003, 005, 012, 013, 027, 033, 034, 043, 044, 052 |
+| A Receiving | 003, 005, 012, 013, 027, 033, 034, 043, 044, 052, 053 |
 | B Meaning | 001, 002, 006, 007, 008, 015, 017, 018, 019, 021, 025, 036, 038, 046 |
 | C Data | 020, 022, 023, 024, 026 |
 | D Verdict & review | 029, 035, 036, 042 |

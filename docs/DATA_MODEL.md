@@ -26,6 +26,7 @@ Job · AuditLog · LLMCall · AppSetting · StoredSchema   (operational ledgers 
 | Table | Model | Purpose |
 |---|---|---|
 | `customers` | `Customer` | code, name, ERP type, default target schema, `policy_overrides` (ADR-037) |
+| `review_tasks` waiting | `ReviewTask` | status `waiting` with `waiting_until` and `waiting_note`: a question parked for the customer (ADR-053) |
 | `import_rounds` | `ImportRound` | one delivery: status (closed states `cancelled`, `moved`, `superseded` keep `closed_from/by/at/reason`, `successor_id`, `predecessor_id`, ADR-052), label, target schema, `summary` (drift, decision, verdict, publish, anomaly summary) |
 | `source_files` | `SourceFile` | immutable uploaded file: sha256, storage key, profile, fingerprint, drift |
 | `batches` | `Batch` | a bulk upload or work round: label, `work_date`, `expected_files`, `auto_publish` |

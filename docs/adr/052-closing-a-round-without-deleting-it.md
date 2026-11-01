@@ -42,8 +42,8 @@ retention never touches an open round, so none of these ever went away.
   gets a review, and a known layout passes on its own.
 * Replacing a published round withdraws its JSON from the zip immediately, before the new JSON exists. The
   work round's counts say so.
-* The single-file import page does not yet ask "does this replace an earlier round?"; the replace action on
-  the old round covers that case.
+* The combine-files page asks whether a file replaces a round from the last seven days. Bulk upload does not,
+  because one upload spans many customers; the replace action on the old round covers that case.
 
 ## How it was checked
 

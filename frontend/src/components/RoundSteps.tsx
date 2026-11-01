@@ -40,14 +40,14 @@ export function RoundSteps({ r, busy, onRun, onExport, onMove }: Props) {
                   : <Link className="btn btn-primary" to={`/review?round=${r.id}`}>{t('Answer questions', 'ตอบคำถามและตรวจปัญหา')} <ArrowRight size={15} /></Link>}
         </div>
       </div>
-      <details className="mt-4 pt-3 border-t border-line text-sm"><summary className="text-muted">{t('Processing details & advanced tools', 'รายละเอียดการประมวลผลและเครื่องมือเพิ่มเติม')}</summary>
+      <div className="mt-4 pt-3 border-t border-line text-sm"><p className="text-muted m-0">{t('Processing details & advanced tools', 'รายละเอียดการประมวลผลและเครื่องมือเพิ่มเติม')}</p>
         <p className="text-muted mt-3 leading-6">{t('Read files → match source columns to target fields → validate sample data → review uncertain points → create full results → approve and download.', 'อ่านไฟล์ → จับคู่คอลัมน์ต้นทางกับข้อมูลปลายทาง → ทดลองและตรวจตัวอย่าง → ให้คนยืนยันจุดที่ไม่แน่ใจ → สร้างผลลัพธ์ทั้งหมด → อนุมัติและดาวน์โหลด')}</p>
         <div className="flex flex-wrap gap-2 mt-3">
           {mapping && <Link className="btn btn-sm" to={`/rounds/${r.id}/mapping/${mapping.id}?tab=changes`}>{t('Edit field matching', 'แก้การจับคู่คอลัมน์')}</Link>}
           {dataset && <Link className="btn btn-sm" to={`/datasets/${dataset.id}`}>{t('Open data editor', 'เปิดตารางข้อมูล')}</Link>}
           <button className="btn btn-sm" disabled={busy} onClick={() => onRun('propose')}>{t('Recheck field matching', 'ตรวจการจับคู่ใหม่')}</button>
         </div>
-      </details>
+      </div>
     </div>
   </div>
 }

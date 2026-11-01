@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 
 from forma.auth import Principal
 from forma.db.models import Customer, ImportRound
+from forma.services import review_queue
 from forma.services.round_lifecycle import CLOSED
 
 MIN_ROUNDS = 2  # rounds before a cadence can be estimated
@@ -165,6 +166,8 @@ def view(session: Session, p: Principal, *, today: dt.date | None = None) -> dic
     exp = expected_deliveries(session, p, today=today)
     return {
         "generated_at": dt.datetime.now(dt.UTC).isoformat(),
+        "attention": review_queue.attention(session, p)[:50],
+        "idle_rounds": review_queue.idle_rounds(session, p)[:50],
         "expected": exp["items"][:50],
         "counts": exp["counts"],
         "watchlist": watchlist(session, p)[:50],

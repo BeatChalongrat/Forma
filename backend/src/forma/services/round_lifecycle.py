@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 
 from forma.auth import Principal
 from forma.core.errors import Conflict, ValidationFailed
-from forma.db.models import BatchItem, ImportRound, ReviewTask, SourceFile, utcnow
+from forma.db.models import REVIEW_UNRESOLVED, BatchItem, ImportRound, ReviewTask, SourceFile, utcnow
 from forma.services import rounds as rs
 from forma.services.context import ServiceContext
 
@@ -39,10 +39,14 @@ def _close(session: Session, p: Principal, r: ImportRound, kind: str, reason: st
     if is_closed(r):
         raise Conflict(f"This round is already {r.status}", details={"status": r.status})
     tasks = list(
-        session.scalars(select(ReviewTask).where(ReviewTask.round_id == r.id, ReviewTask.status == "open"))
+        session.scalars(
+            select(ReviewTask).where(ReviewTask.round_id == r.id, ReviewTask.status.in_(REVIEW_UNRESOLVED))
+        )
     )
     for t in tasks:
         t.status = "dismissed"
+        t.waiting_until = None
+        t.waiting_note = None
         t.resolver = p.actor
         t.comment = f"{kind}: {reason}"
         t.resolved_at = utcnow()
@@ -68,6 +72,8 @@ def reopen(session: Session, p: Principal, r: ImportRound) -> ImportRound:
     """Only a cancelled round comes back: a moved or replaced one has a successor that took its place."""
     if r.status != "cancelled":
         raise Conflict("Only a cancelled round can be reopened", details={"status": r.status})
+    if any(f.status == "purged" for f in r.files):
+        raise Conflict("Retention has removed this round's files. Upload them again as a new round.")
     was = r.closed_from or "uploaded"
     for tid in (r.summary or {}).get("closed_tasks", []):
         t = session.get(ReviewTask, tid)

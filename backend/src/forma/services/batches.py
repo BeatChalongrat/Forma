@@ -316,6 +316,8 @@ def json_name(file_name: str) -> str:
 
 def item_state(item: BatchItem, r: ImportRound | None) -> dict[str, Any]:
     """step 1 identify · 2 mapping · 3 create data · 4 check data · 5 JSON; state: what is happening."""
+    if item.status == "purged":
+        return {"state": "closed", "step": 1, "message": "Removed by retention", "closed_as": "purged"}
     if item.status == "failed":
         return {"state": "failed", "step": 1, "message": item.error or "the file could not be read"}
     if item.status in ("received", "identified") and r is None:

@@ -28,12 +28,23 @@ export function Overview() {
   return <>
     <PageHeader title={t("Your workspace", "งานของคุณ")} subtitle={t("Upload files. Answer questions. Download the results.", "อัปโหลดไฟล์ ตอบคำถามที่จำเป็น แล้วดาวน์โหลดผลลัพธ์")}
       actions={<Link to="/imports/new" className="btn btn-primary btn-lg"><Upload size={16} /> {t("Upload files", "อัปโหลดไฟล์")}</Link>} />
+    <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3 mb-6">
+      <Stat label="Handled automatically" value={d?.automation_rate != null ? fmtPct(d.automation_rate) : '–'} hint="Mappings approved by policy" />
+      <Stat label="Records exported" value={fmtInt(d?.published_rows)} />
+      <Stat label="Customers" value={fmtInt(d?.customers)} />
+      <Stat label={t('Learned from you', 'เรียนจากคุณ')} value={d?.learning ? fmtInt(d.learning.aliases + d.learning.constants) : '–'} hint={d?.learning ? t(`${fmtInt(d.learning.uses)} uses · corrections per approval ${d.learning.corrections_per_approval ?? '–'}`, `ใช้แล้ว ${fmtInt(d.learning.uses)} ครั้ง · การแก้ต่อการอนุมัติ ${d.learning.corrections_per_approval ?? '–'}`) : ''} />
+      <Stat label={t('Estimated AI cost', 'ค่า AI โดยประมาณ')} value={d ? `$${d.llm.cost_usd.toFixed(2)}` : '–'} hint={d ? `${fmtInt(d.llm.calls)} ${t('usage records · not provider billing', 'รายการที่บันทึก · ไม่ใช่ยอดเรียกเก็บ')}` : ''} />
+    </div>
     {error && <div role="alert" className="card p-4 mb-5 text-bad">Some tasks could not be loaded. <button className="btn btn-sm ml-2" onClick={() => { void roundsQuery.refetch(); void uploadsQuery.refetch(); void dashboard.refetch() }}>Try again</button></div>}
     <Workflow />
     <WorkRoundDashboard />
     <Foresight />
     <Section title={t("Needs your attention", "งานที่รอคุณตรวจ")} className="mb-7" actions={<Link to="/review" className="btn btn-ghost btn-sm">{t("Questions & issues", "คำถามและปัญหา")} <ArrowRight size={14} /></Link>}>
       {loading && <div className="p-5 flex gap-2 items-center text-muted"><Spinner /> Loading tasks…</div>}
+      {!!(d?.review?.stale || d?.review?.waiting) && <div className="flex flex-wrap gap-x-5 gap-y-1 px-5 py-3 border-b border-line text-sm">
+        {!!d.review.stale && <Link to="/review" className="text-warn font-medium hover:underline">{t(`${d.review.stale} questions have waited over ${d.review.stale_after_days} days`, `มี ${d.review.stale} เรื่องรอคุณเกิน ${d.review.stale_after_days} วัน`)}{d.review.oldest_days != null && <span className="font-normal"> · {t(`oldest ${d.review.oldest_days} days`, `นานสุด ${d.review.oldest_days} วัน`)}</span>}</Link>}
+        {!!d.review.waiting && <Link to="/review?status=waiting" className="text-ink-2 hover:underline">{t(`${d.review.waiting} waiting for the customer`, `รอลูกค้าตอบ ${d.review.waiting} เรื่อง`)}</Link>}
+      </div>}
       {unknown.map((u) => <Link key={u.id} to={`/uploads/${u.id}`} className="flex flex-wrap items-center gap-3 px-5 py-4 border-b border-line hover:bg-surface-2">
         <span className="flex-1 min-w-[180px]"><span className="block font-medium break-words">{u.label}</span><span className="block text-muted text-[13px] mt-1">{u.stuck ? `${u.stuck} files paused. Resume processing to continue.` : `${u.counts.needs_customer} files need a customer before processing can continue.`}</span></span>
         <span className="btn btn-sm">{u.stuck ? 'Resume upload' : 'Choose customer'} <ArrowRight size={14} /></span>
@@ -58,13 +69,6 @@ export function Overview() {
         </tr>)}
       </tbody></table> : <div className="p-4"><Empty title={dashboard.isPending ? 'Loading files…' : 'Your first file starts here'} body="Upload an Excel or CSV file to create your first delivery." /></div>}
     </Section>
-    <details className="mt-6 group"><summary className="text-[13px] text-muted py-2 hover:text-ink"><Localized>Workspace statistics</Localized></summary><div className="grid sm:grid-cols-2 xl:grid-cols-4 gap-3 mt-3">
-      <Stat label="Handled automatically" value={d?.automation_rate != null ? fmtPct(d.automation_rate) : '–'} hint="Mappings approved by policy" />
-      <Stat label="Records exported" value={fmtInt(d?.published_rows)} />
-      <Stat label="Customers" value={fmtInt(d?.customers)} />
-      <Stat label={t('Learned from you', 'เรียนจากคุณ')} value={d?.learning ? fmtInt(d.learning.aliases + d.learning.constants) : '–'} hint={d?.learning ? t(`${fmtInt(d.learning.uses)} uses · corrections per approval ${d.learning.corrections_per_approval ?? '–'}`, `ใช้แล้ว ${fmtInt(d.learning.uses)} ครั้ง · การแก้ต่อการอนุมัติ ${d.learning.corrections_per_approval ?? '–'}`) : ''} />
-      <Stat label={t('Estimated AI cost', 'ค่า AI โดยประมาณ')} value={d ? `$${d.llm.cost_usd.toFixed(2)}` : '–'} hint={d ? `${fmtInt(d.llm.calls)} ${t('usage records · not provider billing', 'รายการที่บันทึก · ไม่ใช่ยอดเรียกเก็บ')}` : ''} />
-    </div></details>
     <div className="mt-5 flex items-center gap-2 text-[13px] text-muted"><span>New to FORMA?</span><Link to="/guide" className="text-signal hover:underline">See how importing works →</Link></div>
   </>
 }

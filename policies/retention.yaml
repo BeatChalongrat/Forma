@@ -14,6 +14,14 @@ dataset_versions:
   # row is marked `purged` (history stays visible, the data does not).
   keep_last_versions: 5
 
+batch_items:
+  # A file in a work round that never became a round (no customer chosen, or unreadable), this many days
+  # after it was uploaded. The row stays as `purged`.
+  keep_days_unassigned: 90
+review_tasks:
+  # Resolved questions (approved, rejected, dismissed) older than this. The audit log keeps the decision.
+  # Those of a cancelled round stay, because reopening the round brings them back.
+  keep_days_resolved: 365
 exports:
   # Export artifacts older than this are deleted (the dataset version can be re-exported).
   keep_days: 180

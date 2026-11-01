@@ -196,6 +196,9 @@ Index("ix_mapping_customer_fp", MappingVersion.customer_id, MappingVersion.finge
 Index("ix_mapping_customer_status", MappingVersion.customer_id, MappingVersion.status)
 
 
+REVIEW_UNRESOLVED = ("open", "waiting")  # a question that still needs an answer, from somebody
+
+
 class ReviewTask(Base):
     __tablename__ = "review_tasks"
     id: Mapped[str] = mapped_column(String(40), primary_key=True, default=lambda: new_id("rev"))
@@ -207,7 +210,9 @@ class ReviewTask(Base):
     priority: Mapped[int] = mapped_column(Integer, default=0, index=True)
     status: Mapped[str] = mapped_column(
         String(32), default="open", index=True
-    )  # open | approved | rejected | dismissed
+    )  # open | waiting (for the customer, ADR-053) | approved | rejected | dismissed
+    waiting_until: Mapped[dt.date | None] = mapped_column(Date)
+    waiting_note: Mapped[str | None] = mapped_column(Text)
     reasons: Mapped[list[Any]] = mapped_column(JSONType, default=list)
     details: Mapped[dict[str, Any]] = mapped_column(JSONType, default=dict)
     resolver: Mapped[str | None] = mapped_column(String(128))

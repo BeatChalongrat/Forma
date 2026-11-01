@@ -61,13 +61,11 @@ type AIForm = { provider: string; model: string; base_url: string; timeout_s: st
 const formOf = (ai: AISettings): AIForm => ({ provider: ai.provider, model: ai.model, base_url: ai.base_url ?? '', timeout_s: String(ai.timeout_s), max_retries: String(ai.max_retries) })
 
 function AITab() {
-  const { t } = usePreferences()
   const qc = useQueryClient()
   const toast = useToast()
   const { data: ai } = useQuery({ queryKey: ['ai-settings'], queryFn: api.aiSettings })
   const [draft, setDraft] = useState<AIForm | null>(null)
   const [key, setKey] = useState('')
-  const [advanced, setAdvanced] = useState(false)
   const f = draft ?? (ai ? formOf(ai) : null)
   const set = (k: keyof AIForm, v: string) => f && setDraft({ ...f, [k]: v })
   const save = useMutation({
@@ -84,8 +82,6 @@ function AITab() {
       <ConnectCard key={`${ai.provider}:${ai.base_url}:${ai.model}:${ai.updated_at}`} ai={ai} />
       <AssistantAbilities ai={ai} />
       <BackupKeysCard ai={ai} />
-      <div><button className="btn btn-ghost btn-sm whitespace-normal text-left h-auto max-w-full" onClick={() => setAdvanced(!advanced)}>{advanced ? t('Hide advanced settings', 'ซ่อนการตั้งค่าขั้นสูง') : t('Show advanced settings — provider, model, gateway URL, timeout', 'การตั้งค่าขั้นสูง — ผู้ให้บริการ โมเดล Gateway และเวลารอ')}</button></div>
-      {advanced && (
     <div className="grid lg:grid-cols-[1fr_340px] gap-4">
       <Section title="Advanced settings" actions={ai.offline ? <Badge tone="warn">offline · deterministic mapper only</Badge> : <Badge tone="ok"><Plug size={12} /> {ai.active_provider} · {ai.model}</Badge>}>
         <div className="p-4 grid sm:grid-cols-2 gap-4 text-[13px]">
@@ -116,7 +112,6 @@ function AITab() {
         {ai.updated_at && <p className="text-muted">Last changed by {ai.updated_by} · {fmtDate(ai.updated_at)}</p>}
       </div></Section>
     </div>
-      )}
     </div>
   )
 }

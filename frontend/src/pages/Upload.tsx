@@ -55,7 +55,7 @@ export function BulkUpload() {
   const total = files.reduce((a, f) => a + f.size, 0)
   return (
     <>
-      <PageHeader title={t("Upload files", "อัปโหลดไฟล์")} subtitle={t("Choose a work round, then add files. You can return later and add more to the same round.", "เลือกรอบงานแล้วเพิ่มไฟล์ กลับมาอัปโหลดเพิ่มเข้ารอบเดิมได้จนไฟล์ครบ")} />
+      <PageHeader title={t("Upload files", "อัปโหลดไฟล์")} subtitle={t("Process each file separately, from one or several customers. Choose a work round and add more files to it later.", "ประมวลผลแยกทีละไฟล์ อัปโหลดของลูกค้ารายเดียวหรือหลายรายได้ เลือกรอบงานและทยอยเพิ่มไฟล์เข้ารอบเดิมได้")} />
       <Workflow />
       <div className="grid lg:grid-cols-[1fr_360px] gap-5">
         <div className="flex flex-col gap-4" inert={upload.isPending}>
@@ -115,8 +115,8 @@ export function BulkUpload() {
             <p className="text-xs text-muted">{t('Keep this page open until every file is sent.', 'อย่าปิดหน้านี้จนกว่าจะส่งครบ')}</p>
           </div>}
           {upload.isError && <p role="alert" className="text-sm text-bad">{t('Upload interrupted. Retry to continue; identical files in this round will be skipped.', 'อัปโหลดหยุดกลางทาง กดอัปโหลดอีกครั้งเพื่อทำต่อ ระบบข้ามไฟล์ที่มีแล้วในรอบนี้')}</p>}
-          <details className="text-[13px] text-muted px-1">
-            <summary className="hover:text-ink"><Localized>What happens after upload?</Localized></summary>
+          <div className="text-[13px] text-muted px-1">
+            <p className="heading text-[13px] m-0"><Localized>What happens after upload?</Localized></p>
             <ol className="mt-2 flex flex-col gap-2">
               {[
                 ['Identify the customer', 'Identify the customer first, then check approved mappings for this layout and target format.', 'ระบุลูกค้าก่อน แล้วตรวจว่ามีกฎที่เคยอนุมัติสำหรับไฟล์และรูปแบบปลายทางนี้หรือไม่'],
@@ -130,8 +130,12 @@ export function BulkUpload() {
                 </li>
               ))}
             </ol>
-          </details>
-          <Link to="/imports/new/single" className="text-[12.5px] text-signal font-semibold hover:underline">{t("Several files that belong to one delivery? Combine them here →", "หลายไฟล์ที่ต้องรวมเป็นชุดเดียวกัน? อัปโหลดแบบรวมไฟล์ที่นี่ →")}</Link>
+          </div>
+          <div className="border-t border-line pt-4 text-[13px] leading-relaxed">
+            <p className="text-ink-2 mb-2">{t('Products, prices and stock in separate files for the same customer? Process them together as one dataset instead.', 'ถ้าลูกค้ารายเดียวส่งไฟล์สินค้า ราคา และสต็อกแยกกัน และต้องใช้ข้อมูลร่วมกัน ให้เลือกประมวลผลเป็นชุดเดียว')}</p>
+            <Link to="/imports/new/single" className="btn btn-sm">{t('Combine files for one customer', 'รวมไฟล์ของลูกค้ารายเดียว')} <ArrowRight size={14} /></Link>
+            <p className="text-muted text-xs mt-2">{t('A work round groups uploads for tracking; it does not merge their data.', 'รอบงานใช้จัดกลุ่มเพื่อติดตามงาน ไม่ได้รวมข้อมูลของไฟล์เข้าด้วยกัน')}</p>
+          </div>
         </div>
       </div>
     </>
@@ -284,7 +288,7 @@ function ItemRow({ i }: { i: BatchItem }) {
           })}
         </div>
         <div className="text-[11.5px] text-muted mt-1">{i.state === 'ready' ? t('Ready to download', 'พร้อมดาวน์โหลด') : `${stage}/3 · ${stages[stage - 1]}`}
-        <details className="text-xs text-muted mt-2"><summary>{t('What is happening?', 'ระบบกำลังทำอะไร?')}</summary><p className="mt-1">{i.message}</p></details></div>
+        <p className="text-xs text-muted mt-1 m-0">{i.message}</p></div>
       </td>
       <td>
         <Badge tone={st.tone}>{i.state === 'processing' ? <LoaderCircle size={11} className="animate-spin" /> : i.state === 'ready' ? <CircleCheck size={11} /> : null}{st.label}</Badge>
