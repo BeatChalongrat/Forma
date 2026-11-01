@@ -1,7 +1,7 @@
 # FORMA — Team lead handbook
 
 > **สรุปภาษาไทย** — จุดเริ่มต้นสำหรับหัวหน้าทีม: ระบบคืออะไรในหนึ่งหน้า, เอกสารแต่ละฉบับอยู่ไหนและใช้ตอนไหน,
-> ตัวชี้วัดที่ต้องดู, ความเสี่ยงที่เปิดอยู่, สิ่งที่ต้องตัดสินใจ, และสารบัญ ADR ทั้ง 54 ฉบับแบบบรรทัดเดียว
+> ตัวชี้วัดที่ต้องดู, ความเสี่ยงที่เปิดอยู่, สิ่งที่ต้องตัดสินใจ, และสารบัญ ADR ทั้ง 56 ฉบับแบบบรรทัดเดียว
 
 ## 1. One page
 
@@ -120,6 +120,8 @@ Before any production use, the open items in the risk register need a decision, 
 | 052 | Closing a round without deleting it: cancel, move, replace |
 | 053 | Housekeeping you can see, and a review queue with a clock |
 | 054 | A backup holds everything, and has been restored |
+| 055 | Four files that went wrong quietly: printed reports, a second price sheet, currency, date order |
+| 056 | Six values that changed quietly: reused mappings checked, conflicting duplicates, enum defaults, number forms, the exported version |
 
 ## 6. Numbers to quote (and where they come from)
 
@@ -127,8 +129,8 @@ Before any production use, the open items in the risk register need a decision, 
 |---|---|---|
 | Field accuracy on the synthetic corpus, no AI | 0.996 (30/30 variants ≥ 0.99); identity 1.00; critical 1.00; drift 9/9 | `make eval-gate`, `data/eval_baseline.json` |
 | A 300-file night | 17 min, 8 worker processes, 12-core node, 30M rows | PERFORMANCE.md (pre-ADR-043; re-measure) |
-| Tests | 649 passed, 5 skipped locally, coverage 91 % (gate 85 % in CI) | `pytest`, CI |
-| Endpoints / tables / ADRs | ~126 / 23 / 54 | API_OVERVIEW.md, DATA_MODEL.md, adr/ |
+| Tests | 707 passed, 5 skipped locally, coverage 91 % (gate 85 % in CI) | `pytest`, CI |
+| Endpoints / tables / ADRs | ~126 / 23 / 56 | API_OVERVIEW.md, DATA_MODEL.md, adr/ |
 
 Anything else — accuracy on real files, provider accuracy, production throughput — is not yet measured and
 should be said so.

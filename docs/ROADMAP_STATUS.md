@@ -31,6 +31,8 @@
 | 8 Durable queue reconciliation | on startup, queued jobs are checked against durable results before recovery and resubmission | **done** | ADR-044 |
 | 12 Housekeeping and the review clock | retention on a schedule and visible, nightly backups, question age, waiting for the customer, idle rounds | **done** | ADR-053 |
 | 13 Backups that restore | every file in the nightly backup, restore proven on this stack, health page says what a backup holds | **done** | ADR-054 |
+| 14 Files that went wrong quietly | printed reports keep every page, a second price sheet is a question, currency columns are read, one date order per delivery | **done** | ADR-055 |
+| 15 Values that changed quietly | a reused mapping is checked on the data, conflicting duplicates are errors, no default on enum fields, four more number forms, publishing exports the approved version | **done** | ADR-056 |
 | 11 Closing a round | cancel with reopen, move to the right customer, replace with a corrected file; nothing deleted | **done** | ADR-052 |
 | 10 Memory across chats | topics kept while talking, search of earlier chats, pause, reset, memory-off and incognito chats | **done** | ADR-051 |
 | 9 Work beside the chat | flows, documents, slides, sheets and web pages open in a panel beside the chat, with versions, restore and previews | **done** | ADR-050 |

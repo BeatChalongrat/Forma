@@ -19,13 +19,18 @@ ACTOR = "policy"
 FORMAT = "json"
 
 
-def latest_export(session: Session, round_id: str, fmt: str = FORMAT) -> ExportArtifact | None:
-    return session.scalar(
+def latest_export(
+    session: Session, round_id: str, fmt: str = FORMAT, *, dataset_version_id: str | None = None
+) -> ExportArtifact | None:
+    """The newest export of the round's newest exported version, or of one version when asked (ADR-056)."""
+    q = (
         select(ExportArtifact)
         .join(DatasetVersion, DatasetVersion.id == ExportArtifact.dataset_version_id)
         .where(DatasetVersion.round_id == round_id, ExportArtifact.fmt == fmt)
-        .order_by(ExportArtifact.created_at.desc())
     )
+    if dataset_version_id is not None:
+        q = q.where(ExportArtifact.dataset_version_id == dataset_version_id)
+    return session.scalar(q.order_by(DatasetVersion.version.desc(), ExportArtifact.created_at.desc()))
 
 
 def auto_publish(ctx: ServiceContext, session: Session, round_id: str) -> dict[str, Any]:
@@ -37,7 +42,9 @@ def auto_publish(ctx: ServiceContext, session: Session, round_id: str) -> dict[s
     if dv is None:
         return {"decision": "review", "reasons": ["no data has been created yet"]}
     if dv.status in ("approved", "published"):
-        art = latest_export(session, r.id) or ds.export_dataset(ctx, session, dv.id, FORMAT, ACTOR)
+        art = latest_export(session, r.id, dataset_version_id=dv.id) or ds.export_dataset(
+            ctx, session, dv.id, FORMAT, ACTOR
+        )
         approved = {
             "decision": "publish",
             "reasons": ["the data was approved by a person"],

@@ -127,8 +127,12 @@ def validate_mapping(doc: MappingDocument, schema: TargetSchema) -> ValidationRe
         _check_expr(fm.expr, path, rep, source_ids)
 
     # collections ------------------------------------------------------------------------------
+    targets: set[str] = set()
     for i, c in enumerate(doc.collections):
         path = f"/collections/{i}"
+        if c.target in targets:
+            rep.error("duplicate_collection", f"collection {c.target!r} is mapped twice", path)
+        targets.add(c.target)
         _check_collection(c, path, rep, schema, schema_pointers, collection_pointers, source_ids)
 
     # required root fields ---------------------------------------------------------------------

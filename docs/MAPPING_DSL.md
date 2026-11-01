@@ -20,6 +20,7 @@ sources:                      # one per table that is read
       header_row: 2           # 0-based; or "auto"
       header_rows: 1          # multi-row headers are merged
       stop_at_blank_rows: 2
+      drop_repeated_headers: true   # a header printed again on each page, and the one-cell lines above it
       drop_total_rows: true   # label "รวม"/"Total:"/"ยอดรวม…" with only numbers beside it ("SUM-01", "รวมมิตร" stay)
       fill_down: ["หมวด"]     # merged-cell groups
       unpivot: { id_columns: ["Item Code"], value_columns_regex: "^[A-Z][a-z]{2}-\\d{2}$", variable_name: period, value_name: value }

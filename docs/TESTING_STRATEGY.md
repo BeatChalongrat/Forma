@@ -48,6 +48,9 @@ Details: [EVALUATION.md](EVALUATION.md), [adr/041](adr/041-evaluation-on-real-fi
 
 ## 4. Manual / exploratory checks before a release
 
+[manual_test_files/](../manual_test_files/README.md) holds ERP-style files for every failure the system should catch, with
+the JSON each should produce and what a person should see.
+
 1. Seeded demo: Home lists C900–C902 sequences; C902 round 4 shows the wrong-customer verdict; a renamed-layout
    round shows the one-click accept; accepting it approves and audits.
 2. Bulk upload of 5 mixed files: known customers publish, an unknown layout waits, assign continues it, the

@@ -330,5 +330,5 @@ These are the project's rules. Where the code does not yet meet one, the gap is 
 
 ## 11. Decision records
 
-ADRs 001–054 in [adr/](adr/) are binding unless superseded by a newer ADR. The index with one line each is in
+ADRs 001–056 in [adr/](adr/) are binding unless superseded by a newer ADR. The index with one line each is in
 [TEAM_LEAD_HANDBOOK.md](TEAM_LEAD_HANDBOOK.md#5-decision-log-adr-index).

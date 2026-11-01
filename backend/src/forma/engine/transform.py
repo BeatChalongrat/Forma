@@ -137,6 +137,7 @@ def load_source_frame(
                         "fill_down": spec.table.fill_down,
                         "unpivot": spec.table.unpivot,
                         "drop_total_rows": spec.table.drop_total_rows,
+                        "drop_repeated_headers": spec.table.drop_repeated_headers,
                     }
                 )
                 frame = extract_table(raw, alt, rename=spec.rename)
@@ -469,13 +470,31 @@ class TransformEngine:
         findings: list[Finding] = []
         if dups.height:
             sample = [",".join(str(x) for x in r[: len(keys)]) for r in dups.head(10).rows()]
-            sev = "error" if keep == "error" else "warning"
+            # the same row twice is noise; two rows of one identity that disagree are a decision nobody made
+            others = [c for c in out.columns if c not in keys and not c.endswith(ROW_COL)]
+            disagree = (
+                out.filter(pl.all_horizontal([pl.col(k).is_not_null() for k in keys]))
+                .group_by(keys)
+                .agg([pl.col(c).n_unique().alias(c) for c in others])
+                .filter(pl.any_horizontal([pl.col(c) > 1 for c in others]) if others else pl.lit(False))
+            )
+            conflicts = [c for c in others if disagree.height and (disagree[c] > 1).any()]
+            sev = "error" if keep == "error" or conflicts else "warning"
+            what = (
+                f"{disagree.height} of them with different values in {', '.join(_short(c) for c in conflicts[:4])}"
+                if conflicts
+                else "identical rows"
+            )
             findings.append(
                 Finding(
                     "dedupe",
                     sev,
-                    f"{dups.height} duplicate identities on {keys} (keep={keep})",
-                    details={"sample": sample, "count": int(dups.height)},
+                    f"{dups.height} duplicate identities on {keys} ({what}; keep={keep})",
+                    details={
+                        "sample": sample,
+                        "count": int(dups.height),
+                        "conflicting": int(disagree.height),
+                    },
                 )
             )
             if keep in ("first", "last", "review"):
@@ -817,6 +836,11 @@ def _observe_engine(rows_in: int, rows_out: int, seconds: float, *, errors: int)
         return
 
 
+def _short(column: str) -> str:
+    """A frame column as a person reads it: the target pointer, or the source column without its prefix."""
+    return column if column.startswith("/") else column.split(".", 1)[-1]
+
+
 def ROW_COL_OF(frame: pl.DataFrame) -> str:
     for c in frame.columns:
         if c.endswith(f".{ROW_COL}") or c == ROW_COL:
@@ -825,11 +849,10 @@ def ROW_COL_OF(frame: pl.DataFrame) -> str:
 
 
 def _num(col: pl.Expr) -> pl.Expr:
-    """Thai-aware numeric coercion used for type casting of mapped values."""
-    s = col.cast(pl.String, strict=False).str.strip_chars()
-    s = s.str.replace_many(list("๐๑๒๓๔๕๖๗๘๙"), list("0123456789"))
-    s = s.str.replace_all(r"(?i)[,\s฿$€£]|บาท|thb|baht", "").str.strip_chars_end("%")
-    return s.cast(pl.Float64, strict=False)
+    """Thai-aware numeric coercion used for type casting of mapped values (the same forms as parse_number_th)."""
+    from forma.engine.ops import number_text_expr
+
+    return number_text_expr(col).cast(pl.Float64, strict=False)
 
 
 def _py_norm(v: Any, ops: Sequence[str]) -> str:

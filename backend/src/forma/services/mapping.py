@@ -198,6 +198,8 @@ def _field_review(
     after: list[dict[str, Any]] | None,
     customer_id: str,
     round_id: str | None,
+    *,
+    check_unchanged: bool = False,
 ) -> dict[str, Any]:
     """Field-by-field changes vs the approved mapping, each checked on the data (ADR-021)."""
     from forma.services.datasets import iter_records, previous_published
@@ -215,6 +217,7 @@ def _field_review(
         before,
         after,
         risk_of=lambda p: ctx.policy.risk_of(schema, p),
+        check_unchanged=check_unchanged,
     )
     out.update(
         baseline_id=baseline.id,
@@ -401,13 +404,24 @@ def propose_for_round(
         if rep.ok and source_kind != "memory"
         else None
     )
-    # 7) self-healing review: what changed per field vs the approved mapping, checked on the data
+    # 7) self-healing review: what changed per field vs the approved mapping, checked on the data. A reused
+    #    mapping is checked too (ADR-056): the layout did not move, but the values may have.
     review = (
-        _field_review(ctx, session, schema, previous, doc, sim.records if sim else None, r.customer_id, r.id)
-        if previous is not None and rep.ok and source_kind != "memory"
+        _field_review(
+            ctx,
+            session,
+            schema,
+            previous,
+            doc,
+            sim.records if sim else None,
+            r.customer_id,
+            r.id,
+            check_unchanged=source_kind == "memory",
+        )
+        if previous is not None and rep.ok
         else None
     )
-    if review is not None and previous is not None:
+    if review is not None and previous is not None and source_kind != "memory":
         _inherit_confidence(doc, review, previous)  # a person approved these exact field mappings before
     decision = ctx.policy.for_customer(r.customer.policy_overrides if r.customer else None).evaluate(
         doc,

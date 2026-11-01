@@ -194,17 +194,18 @@ def test_end_to_end(schema: TargetSchema, workbook: Path) -> None:
     assert res.stats["rows_out"] == 4  # duplicate A003 collapsed
     assert res.stats["identity_keys"] == ["/sku"]
     kinds = {(f.kind, f.severity) for f in res.findings}
-    assert ("dedupe", "warning") in kinds
+    # the two A003 rows disagree (active vs inactive): a decision FORMA must not make on its own (ADR-056)
+    assert ("dedupe", "error") in kinds
     assert ("join", "warning") in kinds
     assert not [f for f in res.findings if f.kind == "validation"], [f.message for f in res.findings]
-    assert res.errors == []
-    dedupe = next(f for f in res.findings if f.kind == "dedupe" and f.severity == "warning")
-    assert dedupe.details["sample"] == ["A003"]
+    assert [f.kind for f in res.errors] == ["dedupe"]
+    dedupe = next(f for f in res.findings if f.kind == "dedupe" and f.severity == "error")
+    assert dedupe.details["sample"] == ["A003"] and dedupe.details["conflicting"] == 1
     orphan = next(f for f in res.findings if f.kind == "join" and f.target == "/inventory")
     assert orphan.details["orphans"] == 1
     quality = next(f for f in res.findings if f.kind == "quality")
     assert quality.target == "/product_name" and quality.details["rule"] == "max_length"
-    assert res.summary()["findings"]["error"] == 0
+    assert res.summary()["findings"]["error"] == 1  # the conflicting duplicate, nothing else
 
     by_sku = {r["sku"]: r for r in res.records}
     assert set(by_sku) == {"123", "A002", "A003", "A004"}  # leading zeros stripped
