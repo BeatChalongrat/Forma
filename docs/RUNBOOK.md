@@ -139,6 +139,15 @@ the last half interval. Approved/published versions, rollback parents and open r
 with no activity for 60 days is flagged on the home page and left alone. System health shows storage used, the
 last pass and what it did, and the age of the last backup, amber past a day (ADR-053).
 
+## Who can reach the stack
+
+The web port and MinIO are published on 127.0.0.1, so only the machine running the stack can open them. FORMA runs
+on one machine with `FORMA_AUTH=dev`, which has no login, and this is what makes that safe. Set `FORMA_BIND_HOST`
+only behind OIDC or a VPN, never with `FORMA_AUTH=dev`.
+
+On one machine a backup shares the machine's fate. Copy the `backups` volume somewhere else from time to time, and
+keep the code on a remote.
+
 ## Capacity
 
 * One worker process ≈ 1 GB RAM at 100K-row files; `FORMA_WORKERS` ≤ cores − 2.

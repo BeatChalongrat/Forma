@@ -58,7 +58,7 @@ services:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-forma}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-forma12345}
     volumes: ["minio:/data"]
-    ports: ["${FORMA_S3_PORT:-9000}:9000", "9001:9001"]   # :9000 for pre-signed downloads, :9001 console
+    ports: ["${FORMA_BIND_HOST:-127.0.0.1}:${FORMA_S3_PORT:-9000}:9000", "${FORMA_BIND_HOST:-127.0.0.1}:9001:9001"]   # :9000 for pre-signed downloads, :9001 console
     healthcheck:
       test: ["CMD", "mc", "ready", "local"]
       interval: 10s
@@ -133,7 +133,7 @@ services:
   web:
     build: { context: ./frontend, dockerfile: Dockerfile }
     depends_on: [api]
-    ports: ["${FORMA_WEB_PORT:-80}:80"]
+    ports: ["${FORMA_BIND_HOST:-127.0.0.1}:${FORMA_WEB_PORT:-80}:80"]
     restart: unless-stopped
 
   otel-collector:
