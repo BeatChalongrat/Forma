@@ -108,7 +108,11 @@ export function BulkUpload() {
           <button className="btn btn-primary btn-lg justify-center" disabled={!files.length || upload.isPending || (!batchId && !workDate) || (!!batchId && !existing.data)} onClick={() => upload.mutate()}>
             {upload.isPending ? <><Spinner className="border-t-white" /> {t(`Uploading ${files.length} files…`, `กำลังอัปโหลด ${files.length} ไฟล์…`)}</> : <><Upload size={16} /> {t(`Upload ${files.length || ""} files`, `อัปโหลด ${files.length || ""} ไฟล์`)}</>}
           </button>
-          {upload.isPending && <p role="status" className="text-sm text-muted">{t(`Uploaded ${progress} / ${files.length} files`, `ส่งแล้ว ${progress} / ${files.length} ไฟล์`)}</p>}
+          {upload.isPending && <div className="card p-3.5 space-y-2.5">
+            <p role="status" className="flex justify-between gap-3 text-sm font-medium"><span>{t('Sending files', 'กำลังส่งไฟล์เข้าระบบ')}</span><span className="tnum">{t(`${fmtInt(progress)} / ${fmtInt(files.length)} files`, `${fmtInt(progress)} / ${fmtInt(files.length)} ไฟล์`)}</span></p>
+            <div className="h-1 bg-surface-2 rounded-full overflow-hidden" role="progressbar" aria-label={t('Files sent', 'ไฟล์ที่ส่งแล้ว')} aria-valuemin={0} aria-valuemax={files.length} aria-valuenow={progress}><div className="h-full bg-signal transition-[width] duration-300" style={{ width: `${files.length ? progress / files.length * 100 : 0}%` }} /></div>
+            <p className="text-xs text-muted">{t('Keep this page open until every file is sent.', 'อย่าปิดหน้านี้จนกว่าจะส่งครบ')}</p>
+          </div>}
           {upload.isError && <p role="alert" className="text-sm text-bad">{t('Upload interrupted. Retry to continue; identical files in this round will be skipped.', 'อัปโหลดหยุดกลางทาง กดอัปโหลดอีกครั้งเพื่อทำต่อ ระบบข้ามไฟล์ที่มีแล้วในรอบนี้')}</p>}
           <details className="text-[13px] text-muted px-1">
             <summary className="hover:text-ink"><Localized>What happens after upload?</Localized></summary>

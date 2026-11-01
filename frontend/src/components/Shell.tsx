@@ -7,6 +7,7 @@ import { AssistantIcon } from '../lib/icons'
 import { usePreferences } from '../lib/preferences'
 import { Profile } from './Profile'
 import { ScrollMemory } from './ScrollMemory'
+import { UploadCard } from './UploadCard'
 import { ChatHistory } from './ChatHistory'
 import { cn } from '../lib/utils'
 import { CommandPalette } from './CommandPalette'
@@ -114,6 +115,7 @@ export function Shell() {
         ? <div className="mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-8 max-w-[1440px] w-full"><Empty title={t('This account has no FORMA role', 'บัญชีนี้ยังไม่มีบทบาทใน FORMA')} body={t('Ask your administrator to give you access.', 'ขอให้ผู้ดูแลระบบเพิ่มสิทธิ์ให้')} /></div>
         : wide ? <div className="flex-1 min-h-0 overflow-hidden"><Outlet /></div> : <div className="mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-8 max-w-[1440px] w-full"><Outlet /></div>}
     </main>
+    <UploadCard />
     <CommandPalette open={search} onClose={() => setSearch(false)} isAdmin={isAdmin} />
   </div></SidebarHold.Provider>
 }

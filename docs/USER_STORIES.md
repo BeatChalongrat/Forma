@@ -59,7 +59,9 @@ AC: each file becomes a batch item; a known layout is matched to its customer (e
 similar ≥ 0.75 with a margin over the runner-up); a customer code in the file name confirms the match, names
 the customer when the layout is unknown, or contradicts (then the file waits for a person); files pass through
 mapping, data creation and publishing automatically when every check passes; one JSON per input file; all in
-one zip.
+one zip; sending shows how many files have gone; while a round works, a card shows files finished, mapped, ready,
+waiting and with problems on every page; on the round's page it disappears when the round is done, elsewhere it stays
+until read; a stopped queue says so and leads to Resume.
 
 Edge cases: two customers with the same ERP layout (ambiguous → person) · a customer with two historical
 layouts (not ambiguous: one customer) · the queue is full at upload time (items marked stuck, Resume) · the
