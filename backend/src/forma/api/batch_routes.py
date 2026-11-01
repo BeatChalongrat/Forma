@@ -140,6 +140,14 @@ def get_batch(
     return bs.batch_view(session, bs.get_batch(session, batch_id))
 
 
+@router.get("/batches/{batch_id}/summary")
+def get_batch_summary(
+    batch_id: str, session: Session = Depends(get_session), p: Principal = Depends(current_principal)
+) -> dict[str, Any]:
+    _all_customers(p)
+    return bs.batch_summary(session, bs.get_batch(session, batch_id))
+
+
 @router.patch("/batches/{batch_id}")
 def edit_label(
     batch_id: str,

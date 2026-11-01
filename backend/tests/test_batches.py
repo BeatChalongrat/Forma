@@ -239,6 +239,20 @@ def test_unknown_file_gets_a_customer_then_finishes_after_review(
     assert any("mapping approved by" in r for r in done["publish"]["reasons"])
 
 
+def test_the_summary_counts_what_the_full_view_counts(client: TestClient, isolated_env: Path) -> None:
+    _known_customer(client, isolated_env, "K1")
+    same = make_workbook(isolated_env / "same.xlsx").read_bytes()
+    view = _batch(client, [("K1 oct.xlsx", same), ("mystery.csv", _unrelated_csv())])
+    brief = client.get(f"/api/batches/{view['id']}/summary").json()
+    assert "items" not in brief
+    assert {k: brief[k] for k in ("counts", "total", "done", "stuck", "mapped")} == {
+        k: view[k] for k in ("counts", "total", "done", "stuck", "mapped")
+    }
+    assert brief["mapped"] == 1
+    assert next(b for b in client.get("/api/batches").json() if b["id"] == view["id"])["mapped"] == 1
+    assert client.get("/api/batches/nope/summary").status_code == 404
+
+
 def test_the_policy_holds_data_back_and_a_person_finishes_it(client: TestClient, isolated_env: Path) -> None:
     c = client
     _known_customer(c, isolated_env, "K3")

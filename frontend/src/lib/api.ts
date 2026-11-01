@@ -140,7 +140,7 @@ export type BatchItem = {
   state: BatchItemState; step: number; message: string; reasons?: string[]; verdict?: VerdictBrief | null
   format_memory?: FormatMemory | null
 }
-export type BatchSummary = { id: string; label: string | null; work_date: string | null; expected_files: number | null; complete: boolean; auto_publish: boolean; created_by: string; created_at: string; total: number; counts: Partial<Record<BatchItemState, number>>; done: boolean; stuck: number }
+export type BatchSummary = { id: string; label: string | null; work_date: string | null; expected_files: number | null; complete: boolean; auto_publish: boolean; created_by: string; created_at: string; total: number; counts: Partial<Record<BatchItemState, number>>; mapped: number; done: boolean; stuck: number }
 export type Batch = BatchSummary & { items: BatchItem[] }
 export type SimSummary = { rows_in: number; rows_out: number; findings: { error: number; warning: number; info: number }; duration_ms?: number }
 export type Finding = { kind: string; severity: 'error' | 'warning' | 'info'; message: string; target: string | null; row: number | null; identity: string | null; details: Record<string, unknown> }
@@ -376,6 +376,7 @@ export const api = {
     return request<Batch & { added: number; skipped: number }>(`/api/batches/${id}/files`, { method: 'POST', body: fd })
   },
   upload: (id: string) => get<Batch>(`/api/batches/${id}`),
+  uploadSummary: (id: string) => get<BatchSummary>(`/api/batches/${encodeURIComponent(id)}/summary`),
   editUpload: (id: string, body: { label?: string; work_date?: string; expected_files?: number | null }) => patch<Batch>(`/api/batches/${id}`, body),
   assignUpload: (id: string, b: { item_ids: string[]; customer_id?: string; new_customer?: { code: string; name: string; erp_type?: string } }) => post<Batch>(`/api/batches/${id}/assign`, b),
   resumeUpload: (id: string) => post<Batch>(`/api/batches/${id}/resume`, {}),

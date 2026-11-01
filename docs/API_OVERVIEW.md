@@ -30,7 +30,7 @@ Long operations run as jobs: `POST …/run`, `/profile`, `/propose` and `/transf
 
 | Endpoint | Purpose |
 |---|---|
-| `POST /batches` (multipart, label, work_date, expected_files, auto_publish) · `GET /batches` · `GET /batches/{id}` | create with files, list, read with items, counts, stuck count |
+| `POST /batches` (multipart, label, work_date, expected_files, auto_publish) · `GET /batches` · `GET /batches/{id}` · `GET /batches/{id}/summary` (no items, for polling) | create with files, list, read with items, counts, stuck count |
 | `PATCH /batches/{id}` · `POST /batches/{id}/files` | rename / date / target; append files (dedupe by name + sha256) |
 | `POST /batches/{id}/assign` | give unknown-layout items a customer (existing or new) |
 | `POST /batches/{id}/resume` | re-enqueue items whose jobs were lost |

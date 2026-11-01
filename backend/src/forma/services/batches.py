@@ -385,6 +385,23 @@ def _brief_verdict(v: dict[str, Any] | None) -> dict[str, Any] | None:
     }
 
 
+SUMMARY_KEYS = (
+    "id",
+    "label",
+    "work_date",
+    "expected_files",
+    "complete",
+    "auto_publish",
+    "created_by",
+    "created_at",
+    "total",
+    "counts",
+    "mapped",
+    "stuck",
+    "done",
+)
+
+
 def batch_view(session: Session, b: Batch) -> dict[str, Any]:
     items = list(b.items)
     rounds = {
@@ -401,10 +418,12 @@ def batch_view(session: Session, b: Batch) -> dict[str, Any]:
     }
     out_items: list[dict[str, Any]] = []
     counts: dict[str, int] = {}
+    mapped = 0
     for it in items:
         r = rounds.get(it.round_id or "")
         st = item_state(it, r)
         counts[st["state"]] = counts.get(st["state"], 0) + 1
+        mapped += st["step"] >= 3
         art = latest_export(session, r.id) if r is not None and r.status == "published" else None
         code, name = codes.get(it.customer_id or "", (None, None))
         out_items.append(
@@ -438,6 +457,7 @@ def batch_view(session: Session, b: Batch) -> dict[str, Any]:
         "created_at": b.created_at.isoformat() if b.created_at else None,
         "total": len(items),
         "counts": counts,
+        "mapped": mapped,
         "stuck": len(stuck_items(session, b)),
         "done": all(
             i["state"] in ("ready", "failed", "needs_customer", "needs_review", "needs_data_check")
@@ -445,6 +465,12 @@ def batch_view(session: Session, b: Batch) -> dict[str, Any]:
         ),
         "items": out_items,
     }
+
+
+def batch_summary(session: Session, b: Batch) -> dict[str, Any]:
+    """A batch without its items: light enough to poll from any page."""
+    view = batch_view(session, b)
+    return {k: view[k] for k in SUMMARY_KEYS}
 
 
 def list_batches(
@@ -468,26 +494,7 @@ def list_batches(
     for b in session.scalars(
         q.order_by(Batch.created_at.desc(), Batch.id.desc()).offset(offset).limit(limit)
     ):
-        v = batch_view(session, b)
-        out.append(
-            {
-                k: v[k]
-                for k in (
-                    "id",
-                    "label",
-                    "work_date",
-                    "expected_files",
-                    "complete",
-                    "auto_publish",
-                    "created_by",
-                    "created_at",
-                    "total",
-                    "counts",
-                    "stuck",
-                    "done",
-                )
-            }
-        )
+        out.append(batch_summary(session, b))
     return out
 
 
