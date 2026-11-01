@@ -6,12 +6,16 @@
 ## Day 1 — run it and watch a file go through
 
 1. [README.md](../README.md) Quick start: install, synth, seed, api, web.
-2. Open Home. Find C902 round 4 (the wrong-file case): read the verdict, open the evidence, see what was
-   folded away. Find a renamed-layout round (C900–C902 round 3): accept it with one click; look at the audit.
-3. Upload files: drop two files from `data/synthetic/*/files`; watch the batch rows; download the zip.
+2. Open Home. Find C902 round 4 (the wrong-file case): read the verdict and the evidence under it, and see what
+   the verdict set aside. Find a renamed-layout round (C900–C902 round 3): accept it with one click; look at the audit.
+3. Upload files: drop two files from `data/synthetic/*/files`; watch the navy card follow you across pages and the
+   batch rows; download the zip.
 4. Review a first-time customer: answer the VAT question, preview, save; open the Studio from the evidence.
 5. Data Editor: edit a cell, see the impact, roll back; trace a value to its Excel cell.
 6. Settings: look at the policy, the calibration report, what FORMA learned, the DSL reference.
+7. Round menu: cancel a round and reopen it; park a question for the customer and bring it back.
+8. Assistant: attach a file, ask for a chart, open what it makes beside the chat; then read the Memory page.
+9. System health: storage used, the last retention pass, the last backup.
 
 ## Day 2 — the rules and the decisions
 
@@ -19,7 +23,9 @@
 2. The vocabulary: [GLOSSARY.md](GLOSSARY.md).
 3. The ADRs that shape everything: 001 (schema as config), 002 (DSL, AI never executes code in the data path), 005 (immutability),
    006 (fingerprints), 007 (Thai rules), 008 (policy decides), 013 (security), 017 (semantics), 018 (sandbox),
-   026 (contract gate), 027 (bulk), 036 (verdict), 038 (learning), 037 (calibration), 043 (input fidelity).
+   026 (contract gate), 027 (bulk), 036 (verdict), 038 (learning), 037 (calibration), 043 (input fidelity),
+   048–051 (the assistant's sandbox, files, works and memory), 052 (closing a round), 053 (housekeeping and the
+   review clock).
    Index: [TEAM_LEAD_HANDBOOK.md](TEAM_LEAD_HANDBOOK.md#5-decision-log-adr-index).
 4. The flows as diagrams: [SYSTEM_FLOWS.md](SYSTEM_FLOWS.md).
 
@@ -50,10 +56,13 @@ Then the web: `pages/Round.tsx` → `components/RoundSteps.tsx` → `components/
 1. `cp .env.production.example .env.production`, fill the secrets, `docker compose … up -d --build`.
 2. `curl /ready`; open Ops; kill the worker, watch stale recovery; stop Redis during an upload, use Resume.
 3. Read [RUNBOOK.md](RUNBOOK.md) procedures end to end; try backup and restore on the local stack.
+4. FORMA runs like this for real: one machine, ports on 127.0.0.1, no login. Do not set `FORMA_BIND_HOST` while
+   `FORMA_AUTH=dev` (R31).
 
 ## Working agreements
 
-* Never hard-code a target field name. Never let a model execute anything. Never mutate a source, a mapping
+* Never hard-code a target field name. Never let a model execute anything in the data path (the assistant's sandbox
+  is the one exception, and its results stop at the chat). Never mutate a source, a mapping
   document or a dataset version in place.
 * Every write goes through a service with a `Principal` and declares a role.
 * Tests before fixes; docs in the same commit; `make check` before every commit.
@@ -62,6 +71,8 @@ Then the web: `pages/Round.tsx` → `components/RoundSteps.tsx` → `components/
   `PYTHONIOENCODING=utf-8` when a command prints Thai.
 
 ## Who to ask
+
+FORMA has one user today, who holds every role. When more people join, these are the owners.
 
 | Topic | Owner (role) |
 |---|---|

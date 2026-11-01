@@ -19,7 +19,7 @@
 | Configuration drift | `.env.production.example` regenerated and compared | identical | CI |
 | Performance | `forma bench --files 6 --rows 2000` in CI; full 300 × 100K locally | reported; the full run is documented in PERFORMANCE.md | CI, `make bench` |
 | Build | both Docker images, compose config | build | CI |
-| Frontend | tsc, oxlint, vite build | zero errors (warnings tracked) | CI |
+| Frontend | tsc, oxlint, vite build, `npm test` (navigation rules in `frontend/tests/`) | zero errors (warnings tracked) | `make check`, CI |
 
 ## 2. Conventions
 
@@ -57,11 +57,15 @@ Details: [EVALUATION.md](EVALUATION.md), [adr/041](adr/041-evaluation-on-real-fi
 5. Settings: paste a key, test it, add a backup, break the primary, see the backup take over; edit the policy;
    apply a calibration proposal; promote a learned alias.
 6. Assistant: ask about a file, get cited evidence; ask for a work-round comparison chart; ask to accept a
-   verdict and confirm the card.
-7. Both themes, 390 px width, Thai and English.
+   verdict and confirm the card; attach a picture and a file; have code make a chart and a document, pick part of it
+   and change it, bring back the old version; tell it something to remember, then find it in a new chat.
+7. A round's life: upload and watch the navy card across pages; cancel a round and reopen it; move one to another
+   customer; replace one with a corrected file and check the zip; park a question and bring it back.
+8. System health: storage used, last retention pass and last backup show real values.
+9. Both themes, 390 px width, Thai and English.
 
 ## 5. Definition of done (per change)
 
 `make check` green · `make eval-gate` green · tests added for new behaviour · docs/ADR updated in the same
 commit · `.env.production.example` regenerated when a setting changed · migration shipped when a model
-changed · frontend `tsc` + `oxlint` + `build` green · conventional commit message.
+changed · frontend `tsc` + `oxlint` + `npm test` + `build` green · conventional commit message.

@@ -19,14 +19,23 @@ FORMA มีผู้ใช้คนเดียว คือคนที่ร�
 
 จากนั้นทุก 14 วันที่ได้ไฟล์ Excel หรือ CSV จากลูกค้า:
 
-1. เปิด Home ดูว่าลูกค้ารายไหนส่งช้าหรือน่าจะต้องตรวจ (E4)
+1. เปิด Home ดูว่าลูกค้ารายไหนส่งช้าหรือน่าจะต้องตรวจ (E4) และมีคำถามค้างมานานแค่ไหน (A6)
 2. อัปโหลดไฟล์ทั้งหมดทีเดียว แล้ว FORMA จับคู่แต่ละไฟล์กับลูกค้า (A2) ไฟล์ที่จับคู่ไม่ได้ ฉันเลือกลูกค้าให้ (A3)
-3. ไฟล์ที่ผ่านทุกด่านเดินต่อจนได้ JSON เอง ฉันไม่ต้องเปิดดู (A2, B1)
-4. ไฟล์ที่ต้องดู FORMA เปิดมาด้วยข้อสรุปและคำถามเท่าที่จำเป็น (D1) ถ้าชัดเจนฉันกดยอมรับได้ในคลิกเดียว (D2)
-5. ไฟล์ที่มีปัญหาจะบอกเหตุผล เช่น คอลัมน์เปลี่ยนความหมาย (B3), เรื่อง VAT (B4) หรือไฟล์ผิดลูกค้า (B5)
-6. ถ้า mapping ผิด ฉันแก้ใน Studio (B10) แล้วรอบหน้าระบบจำได้ (B11)
-7. ตรวจข้อมูลจากรายงานสิ่งที่เปลี่ยน (C1) และแก้รายการที่ผิด (C2, C3)
-8. อนุมัติแล้วดาวน์โหลด JSON (C6) ถ้าพบภายหลังว่าผิด ฉันย้อนกลับได้ (C7)
+3. ระหว่างรอ การ์ดสีกรมท่าบอกความคืบหน้าในทุกหน้า ฉันจึงไปทำอย่างอื่นก่อนได้ (A7)
+4. ไฟล์ที่ผ่านทุกด่านเดินต่อจนได้ JSON เอง ฉันไม่ต้องเปิดดู (A2, B1)
+5. ไฟล์ที่ต้องดู FORMA เปิดมาด้วยข้อสรุปและคำถามเท่าที่จำเป็น (D1) ถ้าชัดเจนฉันกดยอมรับได้ในคลิกเดียว (D2)
+6. ไฟล์ที่มีปัญหาจะบอกเหตุผล เช่น คอลัมน์เปลี่ยนความหมาย (B3), เรื่อง VAT (B4) หรือไฟล์ผิดลูกค้า (B5)
+7. ถ้าอัปโหลดผิด ผิดลูกค้า หรือลูกค้าส่งไฟล์แก้มาใหม่ ฉันยกเลิก ย้าย หรือแทนรอบนั้นได้โดยประวัติไม่หาย (A5)
+8. เรื่องที่ต้องรอลูกค้าตอบ ฉันพักคำถามไว้พร้อมวันที่ แล้วมันจะกลับมาเองในวันนั้น (A6)
+9. ถ้า mapping ผิด ฉันแก้ใน Studio (B10) แล้วรอบหน้าระบบจำได้ (B11)
+10. ตรวจข้อมูลจากรายงานสิ่งที่เปลี่ยน (C1) และแก้รายการที่ผิด (C2, C3)
+11. อนุมัติแล้วดาวน์โหลด JSON (C6) ถ้าพบภายหลังว่าผิด ฉันย้อนกลับได้ (C7)
+
+ระหว่างทาง ฉันถามผู้ช่วยได้ทุกเมื่อ (E5) ส่งรูปหรือไฟล์ที่ลูกค้าส่งมาให้มันอ่าน (E8) ให้มันเขียนโค้ดวิเคราะห์ ทำกราฟ
+เอกสาร หรือสไลด์ (E7) เปิดดูและแก้งานนั้นข้างแชต (E9) และมันจำวิธีทำงานของฉันข้ามแชตได้ (E10)
+
+นาน ๆ ครั้ง ฉันดูหน้า System health ว่าทุกอย่างปกติ (E6) ระบบล้างข้อมูลเก่าและสำรองข้อมูลเอง (E11)
+และฉันปรับ policy จากผลที่เกิดขึ้นจริง (E3)
 
 ---
 
@@ -59,9 +68,7 @@ AC: each file becomes a batch item; a known layout is matched to its customer (e
 similar ≥ 0.75 with a margin over the runner-up); a customer code in the file name confirms the match, names
 the customer when the layout is unknown, or contradicts (then the file waits for a person); files pass through
 mapping, data creation and publishing automatically when every check passes; one JSON per input file; all in
-one zip; sending shows how many files have gone; while a round works, a card shows files finished, mapped, ready,
-waiting and with problems on every page; on the round's page it disappears when the round is done, elsewhere it stays
-until read; a stopped queue says so and leads to Resume.
+one zip.
 
 Edge cases: two customers with the same ERP layout (ambiguous → person) · a customer with two historical
 layouts (not ambiguous: one customer) · the queue is full at upload time (items marked stuck, Resume) · the
@@ -123,6 +130,19 @@ activity for 60 days is flagged and never closed.
 Technique: status `waiting` woken when the queue is read, so there is no timer to fail (ADR-053).
 
 Tests: `test_review_queue.py`.
+
+### A7. See how an upload is going
+**ฉันอยาก**เห็นว่าไฟล์ที่อัปโหลดไปถึงไหนแล้วโดยไม่ต้องเฝ้าหน้าเดียว **เพื่อ**ไปทำงานอื่นระหว่างรอ และรู้ทันทีเมื่อมีไฟล์รอฉันหรือระบบหยุด
+
+AC: sending shows how many files have gone; while a round works, a card shows files finished, mapped, ready, waiting
+and with problems on every page; on the round's page it disappears when the round is done, elsewhere it stays until
+read; closing it while files are moving hides it until the end; a stopped queue says so, says nothing is lost, leads
+to Resume and cannot be closed.
+
+Technique: a small summary endpoint polled every few seconds, with the round kept in the browser's session so the card
+follows across pages (`components/UploadCard.tsx`).
+
+Tests: `test_batches.py::test_the_summary_counts_what_the_full_view_counts`.
 
 ## Epic B — Deciding what a file means
 
@@ -403,6 +423,13 @@ the ordinary endpoint.
 Tests: `test_workspace.py`, `test_workspace_tools.py`, `test_assistant_navigation.py`, `test_assistant_reports.py`,
 `test_conversations.py`, `test_chat_stream.py`.
 
+### E6. Operate the system
+**ฉันอยาก**เห็นคิว worker งานที่ล้มเหลวพร้อมปุ่มลองใหม่ สถานะ breaker และค่าใช้จ่ายในหน้าเดียว และมีคู่มือสำหรับเหตุขัดข้องทุกแบบ **เพื่อ**รับมือได้ทันทีเมื่อเกิดปัญหา
+
+Note: breakers live in each process's memory, so the Ops page does not show worker failures yet (R27).
+
+Tests: `test_jobs.py`, `test_failure_injection.py`, `test_postgres.py`, `test_minio.py`, `test_migrations.py`.
+
 ### E7. Let the assistant work out what the tools cannot
 **ฉันอยาก**ถามเรื่องที่ระบบไม่มีรายงานให้ เช่น "วิเคราะห์ราคาทั้งชุดแล้วทำกราฟให้หน่อย" แล้วให้ผู้ช่วยเขียนโค้ด รันเอง แก้เองถ้าพลาด และส่งกราฟกับไฟล์กลับมา **เพื่อ**ได้คำตอบโดยไม่ต้องรอใครเขียนฟีเจอร์ใหม่
 
@@ -453,12 +480,18 @@ sent as data with live data winning (ADR-051).
 
 Tests: `test_memory.py`.
 
-### E6. Operate the system
-**ฉันอยาก**เห็นคิว worker งานที่ล้มเหลวพร้อมปุ่มลองใหม่ สถานะ breaker และค่าใช้จ่ายในหน้าเดียว และมีคู่มือสำหรับเหตุขัดข้องทุกแบบ **เพื่อ**รับมือได้ทันทีเมื่อเกิดปัญหา
+### E11. Let the system tidy up after itself
+**ฉันอยาก**ให้ระบบล้างข้อมูลเก่าและสำรองฐานข้อมูลเอง พร้อมบอกว่าทำไปเมื่อไร **เพื่อ**ไม่ต้องคอยจำ และรู้ตัวทันทีถ้ามันหยุดทำ
 
-Note: breakers live in each process's memory, so the Ops page does not show worker failures yet (R27).
+AC: every pass is recorded with its counts, whether scheduled or run by hand; System health shows the storage used, the
+last pass and the age of the last backup, amber past a day; a dry run deletes nothing, and `FORMA_RETENTION_APPLY`
+switches deletion on; retention never closes a round; bytes that a round or a file waiting for a customer still uses
+stay; the questions of a cancelled round stay, because reopening brings them back; the nightly backup keeps 14 days.
 
-Tests: `test_jobs.py`, `test_failure_injection.py`, `test_postgres.py`, `test_minio.py`, `test_migrations.py`.
+Technique: one `retention.run` for the schedule and the command line, an audit row per pass, a first pass soon after
+start, and a backup container that needs no one to remember it (ADR-015, ADR-053).
+
+Tests: `test_retention_backup.py`.
 
 ---
 
@@ -479,7 +512,7 @@ AC: `SYSTEM_BASE` states it; the guard enforces it; tools mark truncation; tests
 | Accuracy never drops | identity 1.00, field 0.996, critical 1.00, drift 9/9 on the corpus | `make eval-gate`, CI |
 | Nothing partial is ever visible | object-first writes, atomic exports | `test_failure_injection.py` |
 | Decisions are auditable | approvals, edits, exports and settings have actor, action, entity, details (gaps: R21) | `/api/audit`, tests |
-| Data loss on node loss ≤ 24 h; serve again ≤ 1 h | daily `forma backup`, which must be scheduled outside the app (the compose `backup` service is a one-shot); documented restore | RUNBOOK.md |
+| Data loss on node loss ≤ 24 h; serve again ≤ 1 h | `backup-nightly` runs `forma backup` every 24 hours and keeps 14 days on the same machine; documented restore | RUNBOOK.md |
 | Every setting is documented | generated `.env.production.example`, drift-checked | CI |
 
 ## Traceability
@@ -490,7 +523,7 @@ AC: `SYSTEM_BASE` states it; the guard enforces it; tools mark truncation; tests
 | B Meaning | 001, 002, 006, 007, 008, 015, 017, 018, 019, 021, 025, 036, 038, 046 |
 | C Data | 020, 022, 023, 024, 026 |
 | D Verdict & review | 029, 035, 036, 042 |
-| E Governance | 016, 017, 025, 032, 037, 039, 040, 041, 045, 048, 049, 050, 051 |
+| E Governance | 015, 016, 017, 025, 032, 037, 039, 040, 041, 045, 048, 049, 050, 051, 053 |
 | F Security | 013, 029, 030, 040 |
 
 ## เมื่อมีคนใช้เพิ่ม
