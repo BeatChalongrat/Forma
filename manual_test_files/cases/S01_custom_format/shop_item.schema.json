@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Shop item",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "item_id",
+    "label",
+    "selling_price",
+    "includes_tax"
+  ],
+  "x-forma": {
+    "schema_id": "shop_item",
+    "version": 1,
+    "entity": "shop item",
+    "identity_keys": [
+      "/item_id"
+    ]
+  },
+  "properties": {
+    "item_id": {
+      "type": "string",
+      "x-forma": {
+        "semantic": "sku",
+        "risk": "critical",
+        "synonyms_th": [
+          "รหัสสินค้า"
+        ],
+        "synonyms_en": [
+          "SKU"
+        ]
+      }
+    },
+    "label": {
+      "type": "string",
+      "x-forma": {
+        "semantic": "product_name",
+        "risk": "high",
+        "synonyms_th": [
+          "ชื่อสินค้า"
+        ],
+        "synonyms_en": [
+          "Name"
+        ]
+      }
+    },
+    "selling_price": {
+      "type": "number",
+      "minimum": 0,
+      "x-forma": {
+        "semantic": "price.amount",
+        "risk": "critical",
+        "synonyms_th": [
+          "ราคาขาย"
+        ],
+        "synonyms_en": [
+          "Sales Price"
+        ]
+      }
+    },
+    "includes_tax": {
+      "type": "boolean",
+      "x-forma": {
+        "semantic": "price.vat_included",
+        "risk": "critical"
+      }
+    }
+  }
+}

@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Shop item",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "item_id",
+    "label",
+    "selling_price",
+    "includes_tax"
+  ],
+  "x-forma": {
+    "schema_id": "bad_item",
+    "version": 1,
+    "entity": "shop item",
+    "identity_keys": [
+      "/item_id"
+    ]
+  },
+  "properties": {
+    "item_id": {
+      "type": "string",
+      "x-forma": {
+        "semantic": "sku",
+        "risk": "critical",
+        "synonyms_th": [
+          "\u0e23\u0e2b\u0e31\u0e2a\u0e2a\u0e34\u0e19\u0e04\u0e49\u0e32"
+        ],
+        "synonyms_en": [
+          "SKU"
+        ]
+      }
+    },
+    "label": {
+      "type": "string",
+      "x-forma": {
+        "semantic": "product_name",
+        "risk": "high",
+        "synonyms_th": [
+          "\u0e0a\u0e37\u0e48\u0e2d\u0e2a\u0e34\u0e19\u0e04\u0e49\u0e32"
+        ],
+        "synonyms_en": [
+          "Name"
+        ]
+      }
+    },
+    "selling_price": {
+      "type": "number",
+      "minimum": 0,
+      "x-forma": {
+        "semantic": "price.amount",
+        "risk": "critical",
+        "synonyms_th": [
+          "\u0e23\u0e32\u0e04\u0e32\u0e02\u0e32\u0e22"
+        ],
+        "synonyms_en": [
+          "Sales Price"
+        ]
+      }
+    },
+    "includes_tax": {
+      "type": "boolean",
+      "x-forma": {
+        "semantic": "price.vat_included",
+        "risk": "critical"
+      }
+    },
+    "extra": {
+      "oneOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "number"
+        }
+      ]
+    }
+  }
+}

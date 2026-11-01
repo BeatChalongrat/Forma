@@ -1,0 +1,1918 @@
+[
+  {
+    "id": "A01",
+    "folder": "A01_text_renamed_xlsx",
+    "group": "A",
+    "title": "ไฟล์ข้อความที่เปลี่ยนนามสกุลเป็น .xlsx",
+    "why": "ลูกค้าเปลี่ยนชื่อไฟล์ report.txt เป็น .xlsx เอง",
+    "should": [
+      "ถูกปฏิเสธตอนอัปโหลด พร้อมบอกว่าเนื้อไฟล์ไม่ใช่ Excel",
+      "ไม่มีรอบที่ค้างเงียบ ๆ และไม่มีข้อมูลว่างเปล่าเข้าระบบ"
+    ],
+    "expect": {
+      "upload": "rejected",
+      "message": "content is not an Excel workbook"
+    },
+    "customer": "MTFILE",
+    "baseline": null,
+    "files": [
+      "สินค้า.xlsx"
+    ],
+    "has_json": false,
+    "steps": ""
+  },
+  {
+    "id": "A02",
+    "folder": "A02_truncated_xlsx",
+    "group": "A",
+    "title": "ไฟล์ Excel ที่ดาวน์โหลดมาไม่ครบ",
+    "why": "ไฟล์แนบอีเมลขาดกลางทาง",
+    "should": [
+      "ถูกปฏิเสธตอนอัปโหลด และบอกว่าไม่ใช่ workbook ที่ถูกต้อง",
+      "ไม่มีรอบที่ค้างเงียบ ๆ และไม่มีข้อมูลว่างเปล่าเข้าระบบ"
+    ],
+    "expect": {
+      "upload": "rejected",
+      "message": "not a valid Excel workbook"
+    },
+    "customer": "MTFILE",
+    "baseline": null,
+    "files": [
+      "สินค้า.xlsx"
+    ],
+    "has_json": false,
+    "steps": ""
+  },
+  {
+    "id": "A03",
+    "folder": "A03_zip_not_excel",
+    "group": "A",
+    "title": "ไฟล์ zip ที่ตั้งชื่อเป็น .xlsx",
+    "why": "ลูกค้าส่งไฟล์บีบอัดมาโดยเปลี่ยนนามสกุล",
+    "should": [
+      "ถูกปฏิเสธ และบอกว่าเป็น zip ที่ไม่ใช่ Excel",
+      "ไม่มีรอบที่ค้างเงียบ ๆ และไม่มีข้อมูลว่างเปล่าเข้าระบบ"
+    ],
+    "expect": {
+      "upload": "rejected",
+      "message": "zip container is not an Excel workbook"
+    },
+    "customer": "MTFILE",
+    "baseline": null,
+    "files": [
+      "สินค้า.xlsx"
+    ],
+    "has_json": false,
+    "steps": ""
+  },
+  {
+    "id": "A04",
+    "folder": "A04_empty_file",
+    "group": "A",
+    "title": "ไฟล์ขนาด 0 ไบต์",
+    "why": "ระบบของลูกค้า export ไม่สำเร็จ ได้ไฟล์เปล่า",
+    "should": [
+      "ถูกปฏิเสธตอนอัปโหลด",
+      "ไม่มีรอบที่ค้างเงียบ ๆ และไม่มีข้อมูลว่างเปล่าเข้าระบบ"
+    ],
+    "expect": {
+      "upload": "rejected",
+      "message": ""
+    },
+    "customer": "MTFILE",
+    "baseline": null,
+    "files": [
+      "สินค้า.xlsx"
+    ],
+    "has_json": false,
+    "steps": ""
+  },
+  {
+    "id": "A05",
+    "folder": "A05_pdf_named_csv",
+    "group": "A",
+    "title": "ไฟล์ PDF ที่ตั้งชื่อเป็น .csv",
+    "why": "เปลี่ยนนามสกุลผิด",
+    "should": [
+      "ถูกปฏิเสธ ไม่กลายเป็นตัวอักษรเพี้ยนในระบบ",
+      "ไม่มีรอบที่ค้างเงียบ ๆ และไม่มีข้อมูลว่างเปล่าเข้าระบบ"
+    ],
+    "expect": {
+      "upload": "rejected",
+      "message": "binary content in a text file"
+    },
+    "customer": "MTFILE",
+    "baseline": null,
+    "files": [
+      "export.csv"
+    ],
+    "has_json": false,
+    "steps": ""
+  },
+  {
+    "id": "A06",
+    "folder": "A06_xlsx_named_csv",
+    "group": "A",
+    "title": "ไฟล์ Excel ที่ตั้งชื่อเป็น .csv",
+    "why": "เปลี่ยนนามสกุลผิดอีกทาง",
+    "should": [
+      "ถูกปฏิเสธ และบอกว่าเป็นไฟล์ workbook",
+      "ไม่มีรอบที่ค้างเงียบ ๆ และไม่มีข้อมูลว่างเปล่าเข้าระบบ"
+    ],
+    "expect": {
+      "upload": "rejected",
+      "message": "not a CSV"
+    },
+    "customer": "MTFILE",
+    "baseline": null,
+    "files": [
+      "export.csv"
+    ],
+    "has_json": false,
+    "steps": ""
+  },
+  {
+    "id": "A07",
+    "folder": "A07_pdf_file",
+    "group": "A",
+    "title": "ไฟล์ PDF ตรง ๆ",
+    "why": "ลูกค้าส่งใบรายการเป็น PDF",
+    "should": [
+      "หน้าเว็บบอกทันทีว่าอ่านไฟล์นี้ไม่ได้ และไม่เพิ่มไฟล์เข้ารายการ",
+      "ไม่มีรอบที่ค้างเงียบ ๆ และไม่มีข้อมูลว่างเปล่าเข้าระบบ"
+    ],
+    "expect": {
+      "upload": "rejected",
+      "message": "Unsupported file type"
+    },
+    "customer": "MTFILE",
+    "baseline": null,
+    "files": [
+      "ราคาสินค้า.pdf"
+    ],
+    "has_json": false,
+    "steps": ""
+  },
+  {
+    "id": "A08",
+    "folder": "A08_encrypted_xlsx",
+    "group": "A",
+    "title": "ไฟล์ Excel ที่ใส่รหัสผ่าน",
+    "why": "ลูกค้าตั้งรหัสผ่านก่อนส่ง (รหัสคือ forma1234)",
+    "should": [
+      "รอบล้มเหลวอย่างชัดเจน และบอกว่าอาจมีการเข้ารหัส",
+      "ไม่มี JSON ออกมา"
+    ],
+    "expect": {
+      "upload": "accepted",
+      "stage": "failed",
+      "message": "encryption"
+    },
+    "customer": "MTFILE",
+    "baseline": null,
+    "files": [
+      "สินค้า_ใส่รหัสผ่าน.xlsx"
+    ],
+    "has_json": false,
+    "steps": ""
+  },
+  {
+    "id": "A09",
+    "folder": "A09_csv_broken_quote",
+    "group": "A",
+    "title": "CSV ที่เครื่องหมายคำพูดไม่ปิด",
+    "why": "ชื่อสินค้ามีเครื่องหมาย \" แล้ว ERP ไม่ escape ทำให้ข้อมูลหลังจากนั้นถูกรวมเป็นช่องเดียว",
+    "should": [
+      "รอบล้มเหลวอย่างชัดเจน ไม่ใช่ได้ข้อมูลครึ่งเดียว",
+      "ไม่มี JSON ออกมา"
+    ],
+    "expect": {
+      "upload": "accepted",
+      "stage": "failed"
+    },
+    "customer": "MTFILE",
+    "baseline": null,
+    "files": [
+      "export.csv"
+    ],
+    "has_json": false,
+    "steps": ""
+  },
+  {
+    "id": "A10",
+    "folder": "A10_blank_workbook",
+    "group": "A",
+    "title": "Excel ที่ไม่มีข้อมูลเลย",
+    "why": "export ออกมาแต่ไม่มีแถวใดเลย",
+    "should": [
+      "ไม่มีตารางให้จับคู่ ระบบต้องบอกว่าไม่มีข้อมูล",
+      "ไม่มี JSON ออกมา"
+    ],
+    "expect": {
+      "upload": "accepted",
+      "stage": "failed"
+    },
+    "customer": "MTFILE",
+    "baseline": null,
+    "files": [
+      "ว่าง.xlsx"
+    ],
+    "has_json": false,
+    "steps": ""
+  },
+  {
+    "id": "L01",
+    "folder": "L01_express_thai",
+    "group": "L",
+    "title": "Express (โปรแกรมบัญชีไทย) หัวตารางภาษาไทย",
+    "why": "รูปแบบที่พบบ่อยที่สุด: ชื่อชีตไทย รหัสอยู่คนละชีตกับสต็อก",
+    "should": [
+      "ระบบถามว่าไฟล์แรกของลูกค้ารายนี้ถูกต้องไหม (ลูกค้าใหม่ต้องให้คนดูทุกครั้ง)",
+      "จับคู่คอลัมน์ได้ครบ และได้ 12 รายการ",
+      "เมื่ออนุมัติแล้ว JSON ตรงกับ expected.json"
+    ],
+    "expect": {
+      "stage": "review",
+      "decision": "review",
+      "records": 12,
+      "invalid": 0,
+      "json": true
+    },
+    "customer": "MTL01",
+    "baseline": null,
+    "files": [
+      "สินค้า_ต.ค.69_MTL01.xlsx"
+    ],
+    "has_json": true,
+    "steps": ""
+  },
+  {
+    "id": "L02",
+    "folder": "L02_sap",
+    "group": "L",
+    "title": "SAP หัวตารางเป็นรหัสฟิลด์ (MATNR, KBETR, LABST)",
+    "why": "ชื่อคอลัมน์เป็นรหัสที่คนอ่านไม่ออก และราคาแยกชีต",
+    "should": [
+      "ระบบถามว่าไฟล์แรกของลูกค้ารายนี้ถูกต้องไหม (ลูกค้าใหม่ต้องให้คนดูทุกครั้ง)",
+      "จับคู่คอลัมน์ได้ครบ และได้ 12 รายการ",
+      "เมื่ออนุมัติแล้ว JSON ตรงกับ expected.json"
+    ],
+    "expect": {
+      "stage": "review",
+      "decision": "review",
+      "records": 12,
+      "invalid": 0,
+      "json": true
+    },
+    "customer": "MTL02",
+    "baseline": null,
+    "files": [
+      "SAP_EXPORT_MTL02_20261001.xlsx"
+    ],
+    "has_json": true,
+    "steps": ""
+  },
+  {
+    "id": "L03",
+    "folder": "L03_odoo",
+    "group": "L",
+    "title": "Odoo ภาษาอังกฤษ",
+    "why": "สถานะเป็น TRUE/FALSE",
+    "should": [
+      "ระบบถามว่าไฟล์แรกของลูกค้ารายนี้ถูกต้องไหม (ลูกค้าใหม่ต้องให้คนดูทุกครั้ง)",
+      "จับคู่คอลัมน์ได้ครบ และได้ 12 รายการ",
+      "เมื่ออนุมัติแล้ว JSON ตรงกับ expected.json"
+    ],
+    "expect": {
+      "stage": "review",
+      "decision": "review",
+      "records": 12,
+      "invalid": 0,
+      "json": true
+    },
+    "customer": "MTL03",
+    "baseline": null,
+    "files": [
+      "export_MTL03_20261001.xlsx"
+    ],
+    "has_json": true,
+    "steps": ""
+  },
+  {
+    "id": "L04",
+    "folder": "L04_dynamics",
+    "group": "L",
+    "title": "Dynamics 365 Business Central",
+    "why": "คอลัมน์ Blocked กลับความหมาย: Yes คือหยุดขาย",
+    "should": [
+      "ระบบถามว่าไฟล์แรกของลูกค้ารายนี้ถูกต้องไหม (ลูกค้าใหม่ต้องให้คนดูทุกครั้ง)",
+      "จับคู่คอลัมน์ได้ครบ และได้ 12 รายการ",
+      "เมื่ออนุมัติแล้ว JSON ตรงกับ expected.json"
+    ],
+    "expect": {
+      "stage": "review",
+      "decision": "review",
+      "records": 12,
+      "invalid": 0,
+      "json": true
+    },
+    "customer": "MTL04",
+    "baseline": null,
+    "files": [
+      "export_MTL04_20261001.xlsx"
+    ],
+    "has_json": true,
+    "steps": ""
+  },
+  {
+    "id": "L05",
+    "folder": "L05_handmade_excel",
+    "group": "L",
+    "title": "Excel ที่คนทำเอง มีหัวรายงานรวมเซลล์ แถววาง และแถวรวม",
+    "why": "ไฟล์ที่พนักงานจัดเอง",
+    "should": [
+      "ระบบถามว่าไฟล์แรกของลูกค้ารายนี้ถูกต้องไหม (ลูกค้าใหม่ต้องให้คนดูทุกครั้ง)",
+      "จับคู่คอลัมน์ได้ครบ และได้ 12 รายการ",
+      "เมื่ออนุมัติแล้ว JSON ตรงกับ expected.json"
+    ],
+    "expect": {
+      "stage": "review",
+      "decision": "review",
+      "records": 12,
+      "invalid": 0,
+      "json": true
+    },
+    "customer": "MTL05",
+    "baseline": null,
+    "files": [
+      "สินค้า_ต.ค.69_MTL05.xlsx"
+    ],
+    "has_json": true,
+    "steps": ""
+  },
+  {
+    "id": "L06",
+    "folder": "L06_crosstab_months",
+    "group": "L",
+    "title": "ราคาแยกคอลัมน์ตามเดือน",
+    "why": "ERP บางตัว export ราคาเป็นคอลัมน์ Oct-26, Nov-26, Dec-26",
+    "should": [
+      "ระบบถามว่าไฟล์แรกของลูกค้ารายนี้ถูกต้องไหม (ลูกค้าใหม่ต้องให้คนดูทุกครั้ง)",
+      "จับคู่คอลัมน์ได้ครบ และได้ 12 รายการ",
+      "เมื่ออนุมัติแล้ว JSON ตรงกับ expected.json"
+    ],
+    "expect": {
+      "stage": "review",
+      "decision": "review",
+      "records": 12,
+      "invalid": 0,
+      "json": true
+    },
+    "customer": "MTL06",
+    "baseline": null,
+    "files": [
+      "export_MTL06_20261001.xlsx"
+    ],
+    "has_json": true,
+    "steps": ""
+  },
+  {
+    "id": "L07",
+    "folder": "L07_promo_heavy",
+    "group": "L",
+    "title": "ไฟล์ที่เน้นโปรโมชั่น",
+    "why": "ลด %, ลดบาท, ซื้อแถม และราคาพิเศษในชีตเดียว",
+    "should": [
+      "ระบบถามว่าไฟล์แรกของลูกค้ารายนี้ถูกต้องไหม (ลูกค้าใหม่ต้องให้คนดูทุกครั้ง)",
+      "จับคู่คอลัมน์ได้ครบ และได้ 12 รายการ",
+      "เมื่ออนุมัติแล้ว JSON ตรงกับ expected.json"
+    ],
+    "expect": {
+      "stage": "review",
+      "decision": "review",
+      "records": 12,
+      "invalid": 0,
+      "json": true
+    },
+    "customer": "MTL07",
+    "baseline": null,
+    "files": [
+      "สินค้า_ต.ค.69_MTL07.xlsx"
+    ],
+    "has_json": true,
+    "steps": ""
+  },
+  {
+    "id": "L08",
+    "folder": "L08_csv_vendor",
+    "group": "L",
+    "title": "CSV หลายไฟล์ หลาย encoding",
+    "why": "สินค้า สต็อก และโปรโมชั่นแยกไฟล์ และ encoding ไม่เหมือนกัน",
+    "should": [
+      "ระบบถามว่าไฟล์แรกของลูกค้ารายนี้ถูกต้องไหม (ลูกค้าใหม่ต้องให้คนดูทุกครั้ง)",
+      "จับคู่คอลัมน์ได้ครบ และได้ 12 รายการ",
+      "เมื่ออนุมัติแล้ว JSON ตรงกับ expected.json"
+    ],
+    "expect": {
+      "stage": "review",
+      "decision": "review",
+      "records": 12,
+      "invalid": 0,
+      "json": true
+    },
+    "customer": "MTL08",
+    "baseline": null,
+    "files": [
+      "products_20261001.csv",
+      "stock_20261001.csv",
+      "promotions_20261001.csv"
+    ],
+    "has_json": true,
+    "steps": ""
+  },
+  {
+    "id": "P01",
+    "folder": "P01_number_formats",
+    "group": "P",
+    "title": "ตัวเลขหลายรูปแบบในคอลัมน์เดียว",
+    "why": "฿ 1,284.00, 89 บาท, ตัวเลขไทย ๑๒๐, 165.-, 59.5 THB ปนกันในคอลัมน์ราคา",
+    "should": [
+      "ราคาทุกแถวเป็นตัวเลขถูกต้อง ไม่มีแถวหาย",
+      "JSON ตรงกับ expected.json"
+    ],
+    "expect": {
+      "stage": "review",
+      "records": 12,
+      "invalid": 0,
+      "json": true
+    },
+    "customer": "MTP01",
+    "baseline": null,
+    "files": [
+      "สินค้า_MTEXP_ต.ค.69.xlsx"
+    ],
+    "has_json": true,
+    "steps": ""
+  },
+  {
+    "id": "P02",
+    "folder": "P02_thai_dates",
+    "group": "P",
+    "title": "วันที่ พ.ศ. และรูปแบบไทยปนกัน",
+    "why": "1/10/2569, 1 ต.ค. 69, 1 ตุลาคม 2569 และ 2026-10-01 ในคอลัมน์เดียว",
+    "should": [
+      "วันที่ทุกแถวแปลงเป็น ค.ศ. ถูกต้อง",
+      "JSON ตรงกับ expected.json"
+    ],
+    "expect": {
+      "stage": "review",
+      "records": 12,
+      "invalid": 0,
+      "json": true
+    },
+    "customer": "MTP02",
+    "baseline": null,
+    "files": [
+      "สินค้า_MTEXP_ต.ค.69.xlsx"
+    ],
+    "has_json": true,
+    "steps": ""
+  },
+  {
+    "id": "P03",
+    "folder": "P03_us_dates",
+    "group": "P",
+    "title": "วันที่แบบอเมริกัน (เดือนขึ้นก่อน)",
+    "why": "ERP ต่างประเทศใช้ MM/DD/YYYY เช่น 10/31/2026 ซึ่งอ่านแบบวัน/เดือนไม่ได้",
+    "should": [
+      "ต้องไม่สลับวันกับเดือนเงียบ ๆ",
+      "ถ้าอ่านไม่ได้ ต้องบอกและให้คนตรวจ",
+      "วันที่ 10/01/2026 เสี่ยงกลายเป็น 10 มกราคม"
+    ],
+    "expect": {
+      "stage": "review",
+      "records": 12,
+      "json": true
+    },
+    "customer": "MTP03",
+    "baseline": null,
+    "files": [
+      "สินค้า_MTEXP_ต.ค.69.xlsx"
+    ],
+    "has_json": true,
+    "steps": ""
+  },
+  {
+    "id": "P04",
+    "folder": "P04_unit_formats",
+    "group": "P",
+    "title": "หน่วยหลายแบบ (EA, pk6, 1x24, โหล, DZ)",
+    "why": "แต่ละสาขาคีย์หน่วยไม่เหมือนกัน",
+    "should": [
+      "หน่วยแปลงเป็นรหัสมาตรฐาน และเก็บขนาดแพ็คถูกต้อง",
+      "JSON ตรงกับ expected.json"
+    ],
+    "expect": {
+      "stage": "review",
+      "records": 12,
+      "invalid": 0,
+      "json": true
+    },
+    "customer": "MTP04",
+    "baseline": null,
+    "files": [
+      "สินค้า_MTEXP_ต.ค.69.xlsx"
+    ],
+    "has_json": true,
+    "steps": ""
+  },
+  {
+    "id": "P05",
+    "folder": "P05_zero_padded_codes",
+    "group": "P",
+    "title": "รหัสสินค้าขึ้นต้นด้วย 0 และบาร์โค้ดเก็บเป็นตัวเลข",
+    "why": "Excel เก็บรหัส 001001 เป็นเลข 1001 แล้วแสดงด้วยรูปแบบ 000000 และเก็บบาร์โค้ดเป็นเลข 13 หลัก",
+    "should": [
+      "รหัสต้องยังมีเลข 0 นำหน้าตรงกับที่ตาเห็นใน Excel",
+      "ต้องจับคู่กับชีตสต็อกและโปรโมชั่นได้",
+      "บาร์โค้ดไม่กลายเป็น 8.85E+12"
+    ],
+    "expect": {
+      "stage": "review",
+      "records": 12,
+      "invalid": 0,
+      "json": true
+    },
+    "customer": "MTP05",
+    "baseline": null,
+    "files": [
+      "สินค้า_MTEXP_ต.ค.69.xlsx"
+    ],
+    "has_json": true,
+    "steps": ""
+  },
+  {
+    "id": "P06",
+    "folder": "P06_invisible_characters",
+    "group": "P",
+    "title": "ช่องว่างและอักขระมองไม่เห็นในรหัส",
+    "why": "copy จากเว็บมีช่องว่างแบบ NBSP และ zero-width ติดมากับรหัสสินค้า",
+    "should": [
+      "รหัสถูกทำความสะอาด และจับคู่ข้ามชีตได้ครบ",
+      "JSON ตรงกับ expected.json"
+    ],
+    "expect": {
+      "stage": "review",
+      "records": 12,
+      "invalid": 0,
+      "json": true
+    },
+    "customer": "MTP06",
+    "baseline": null,
+    "files": [
+      "สินค้า_MTEXP_ต.ค.69.xlsx"
+    ],
+    "has_json": true,
+    "steps": ""
+  },
+  {
+    "id": "P07",
+    "folder": "P07_csv_tis620",
+    "group": "P",
+    "title": "CSV ภาษาไทยแบบ TIS-620",
+    "why": "ERP ไทยรุ่นเก่า export เป็น Windows-874",
+    "should": [
+      "ภาษาไทยอ่านถูกทุกแถว ไม่มีตัวอักษรเพี้ยน",
+      "ได้ 12 รายการ และ JSON ตรงกับ expected.json"
+    ],
+    "expect": {
+      "stage": "review",
+      "records": 12,
+      "invalid": 0,
+      "json": true
+    },
+    "customer": "MTP07",
+    "baseline": null,
+    "files": [
+      "สินค้า.csv"
+    ],
+    "has_json": true,
+    "steps": ""
+  },
+  {
+    "id": "P08",
+    "folder": "P08_tsv_utf16",
+    "group": "P",
+    "title": "ไฟล์ Tab คั่นแบบ UTF-16",
+    "why": "Excel 'Unicode Text' ให้ไฟล์แบบนี้",
+    "should": [
+      "ภาษาไทยอ่านถูกทุกแถว ไม่มีตัวอักษรเพี้ยน",
+      "ได้ 12 รายการ และ JSON ตรงกับ expected.json"
+    ],
+    "expect": {
+      "stage": "review",
+      "records": 12,
+      "invalid": 0,
+      "json": true
+    },
+    "customer": "MTP08",
+    "baseline": null,
+    "files": [
+      "สินค้า.txt"
+    ],
+    "has_json": true,
+    "steps": ""
+  },
+  {
+    "id": "P09",
+    "folder": "P09_csv_semicolon",
+    "group": "P",
+    "title": "CSV คั่นด้วย ;",
+    "why": "เครื่องที่ตั้งภาษายุโรป",
+    "should": [
+      "ภาษาไทยอ่านถูกทุกแถว ไม่มีตัวอักษรเพี้ยน",
+      "ได้ 12 รายการ และ JSON ตรงกับ expected.json"
+    ],
+    "expect": {
+      "stage": "review",
+      "records": 12,
+      "invalid": 0,
+      "json": true
+    },
+    "customer": "MTP09",
+    "baseline": null,
+    "files": [
+      "สินค้า.csv"
+    ],
+    "has_json": true,
+    "steps": ""
+  },
+  {
+    "id": "P10",
+    "folder": "P10_txt_pipe",
+    "group": "P",
+    "title": "ไฟล์ .txt คั่นด้วย |",
+    "why": "ERP รุ่นเก่า",
+    "should": [
+      "ภาษาไทยอ่านถูกทุกแถว ไม่มีตัวอักษรเพี้ยน",
+      "ได้ 12 รายการ และ JSON ตรงกับ expected.json"
+    ],
+    "expect": {
+      "stage": "review",
+      "records": 12,
+      "invalid": 0,
+      "json": true
+    },
+    "customer": "MTP10",
+    "baseline": null,
+    "files": [
+      "สินค้า.txt"
+    ],
+    "has_json": true,
+    "steps": ""
+  },
+  {
+    "id": "P11",
+    "folder": "P11_report_header_footer",
+    "group": "P",
+    "title": "หัวรายงาน 7 แถว และท้ายรายงาน",
+    "why": "รายงานจาก ERP มีชื่อบริษัท ผู้พิมพ์ และเลขหน้า ก่อนถึงหัวตารางจริง",
+    "should": [
+      "หาหัวตารางเจอ",
+      "แถวรวมและแถวท้ายรายงานไม่กลายเป็นสินค้า",
+      "ได้ 12 รายการ"
+    ],
+    "expect": {
+      "stage": "review",
+      "records": 12,
+      "invalid": 0,
+      "json": true
+    },
+    "customer": "MTP11",
+    "baseline": null,
+    "files": [
+      "สินค้า_MTEXP_ต.ค.69.xlsx"
+    ],
+    "has_json": true,
+    "steps": ""
+  },
+  {
+    "id": "P12",
+    "folder": "P12_repeated_page_headers",
+    "group": "P",
+    "title": "หัวตารางซ้ำกลางไฟล์ทุกหน้า",
+    "why": "รายงานจาก ERP แบบพิมพ์หน้า มีหัวบริษัทและหัวตารางซ้ำทุกหน้า",
+    "should": [
+      "หัวตารางที่ซ้ำต้องไม่กลายเป็นสินค้าชื่อ 'ชื่อสินค้า'",
+      "ได้ 12 รายการ และไม่มีแถวหาย"
+    ],
+    "expect": {
+      "stage": "review",
+      "records": 12,
+      "invalid": 0,
+      "json": true
+    },
+    "customer": "MTP12",
+    "baseline": null,
+    "files": [
+      "สินค้า_MTEXP_ต.ค.69.xlsx"
+    ],
+    "has_json": true,
+    "steps": ""
+  },
+  {
+    "id": "P13",
+    "folder": "P13_section_rows",
+    "group": "P",
+    "title": "รายงานแบ่งหมวดด้วยแถวคั่น",
+    "why": "ERP พิมพ์ 'หมวด: เครื่องดื่ม' เป็นแถวคั่น และมีแถวรวมท้ายทุกหมวด",
+    "should": [
+      "แถวคั่นและแถวรวมหมวดต้องไม่กลายเป็นสินค้า",
+      "ถ้าทำไม่ได้ ต้องให้คนตรวจ ไม่ใช่ผ่านเงียบ ๆ"
+    ],
+    "expect": {
+      "stage": "review",
+      "records": 12,
+      "invalid": 0,
+      "json": true
+    },
+    "customer": "MTP13",
+    "baseline": null,
+    "files": [
+      "สินค้า_MTEXP_ต.ค.69.xlsx"
+    ],
+    "has_json": true,
+    "steps": ""
+  },
+  {
+    "id": "P14",
+    "folder": "P14_two_row_header",
+    "group": "P",
+    "title": "หัวตาราง 2 ชั้น และราคา 2 คอลัมน์",
+    "why": "ช่อง 'ราคาขาย' รวมเซลล์คร่อม 'ปลีก' กับ 'ส่ง' ซึ่งเป็นราคาคนละแบบ",
+    "should": [
+      "ต้องไม่ใช้ราคาส่งแทนราคาปลีกเงียบ ๆ",
+      "ต้องถามคนว่าคอลัมน์ไหนคือราคาอะไร"
+    ],
+    "expect": {
+      "stage": "review",
+      "records": 12,
+      "json": true
+    },
+    "customer": "MTP14",
+    "baseline": null,
+    "files": [
+      "สินค้า_MTEXP_ต.ค.69.xlsx"
+    ],
+    "has_json": true,
+    "steps": ""
+  },
+  {
+    "id": "P15",
+    "folder": "P15_two_tables_one_sheet",
+    "group": "P",
+    "title": "สองตารางในชีตเดียว",
+    "why": "มีตารางรายชื่อสาขาต่อท้ายตารางสินค้า",
+    "should": [
+      "แยกเป็นสองตาราง",
+      "แถวสาขาไม่กลายเป็นสินค้า",
+      "ได้ 12 รายการ"
+    ],
+    "expect": {
+      "stage": "review",
+      "records": 12,
+      "invalid": 0,
+      "json": true
+    },
+    "customer": "MTP15",
+    "baseline": null,
+    "files": [
+      "สินค้า_MTEXP_ต.ค.69.xlsx"
+    ],
+    "has_json": true,
+    "steps": ""
+  },
+  {
+    "id": "P16",
+    "folder": "P16_vat_not_stated",
+    "group": "P",
+    "title": "ไม่ได้บอกว่าราคารวม VAT หรือไม่",
+    "why": "หัวคอลัมน์เขียนแค่ 'ราคาขาย'",
+    "should": [
+      "ระบบต้องถามว่าราคารวม VAT หรือไม่ ห้ามเดาเงียบ ๆ",
+      "คำถามอยู่ในหน้าตรวจ"
+    ],
+    "expect": {
+      "stage": "review",
+      "questions": "price.vat_included",
+      "records": 12
+    },
+    "customer": "MTP16",
+    "baseline": null,
+    "files": [
+      "สินค้า_MTEXP_ต.ค.69.xlsx"
+    ],
+    "has_json": false,
+    "steps": ""
+  },
+  {
+    "id": "P17",
+    "folder": "P17_vat_excluded",
+    "group": "P",
+    "title": "ราคาไม่รวม VAT",
+    "why": "หัวคอลัมน์บอกชัดว่าไม่รวม VAT",
+    "should": [
+      "vat_included เป็น false",
+      "ตัวเลขราคาไม่ถูกบวก VAT เพิ่ม",
+      "JSON ตรงกับ expected.json"
+    ],
+    "expect": {
+      "stage": "review",
+      "records": 12,
+      "invalid": 0,
+      "json": true
+    },
+    "customer": "MTP17",
+    "baseline": null,
+    "files": [
+      "สินค้า_MTEXP_ต.ค.69.xlsx"
+    ],
+    "has_json": true,
+    "steps": ""
+  },
+  {
+    "id": "P18",
+    "folder": "P18_usd_prices",
+    "group": "P",
+    "title": "ราคาเป็นดอลลาร์",
+    "why": "ลูกค้าต่างประเทศมีคอลัมน์สกุลเงินเป็น USD",
+    "should": [
+      "currency ต้องเป็น USD ไม่ใช่ THB",
+      "ห้ามติดป้าย THB กับราคาดอลลาร์เงียบ ๆ"
+    ],
+    "expect": {
+      "stage": "review",
+      "records": 12,
+      "json": true
+    },
+    "customer": "MTP18",
+    "baseline": null,
+    "files": [
+      "สินค้า_MTEXP_ต.ค.69.xlsx"
+    ],
+    "has_json": true,
+    "steps": ""
+  },
+  {
+    "id": "P19",
+    "folder": "P19_formulas_cached",
+    "group": "P",
+    "title": "ราคาเป็นสูตร Excel ที่บันทึกค่าไว้แล้ว",
+    "why": "ราคา = ทุน × 1.07 และไฟล์เคยเปิดบันทึกใน Excel จึงมีค่าผลลัพธ์",
+    "should": [
+      "อ่านค่าผลลัพธ์ได้ แต่ระบบต้องแจ้งว่าไฟล์มีสูตร และให้คนตรวจ",
+      "ราคาตรงกับที่เห็นใน Excel"
+    ],
+    "expect": {
+      "stage": "review",
+      "records": 12,
+      "invalid": 0
+    },
+    "customer": "MTP19",
+    "baseline": null,
+    "files": [
+      "สินค้า_MTEXP_ต.ค.69.xlsx"
+    ],
+    "has_json": false,
+    "steps": ""
+  },
+  {
+    "id": "P20",
+    "folder": "P20_formulas_no_cache",
+    "group": "P",
+    "title": "ราคาเป็นสูตรที่ยังไม่เคยคำนวณ",
+    "why": "ไฟล์ถูกสร้างจากโปรแกรม ไม่เคยเปิดใน Excel จึงไม่มีผลลัพธ์ของสูตร",
+    "should": [
+      "ระบบต้องไม่เห็นเป็นราคาว่าง",
+      "ต้องปฏิเสธ และบอกให้เปิดบันทึกใน Excel ก่อน",
+      "ไม่มี JSON ออกมา"
+    ],
+    "expect": {
+      "stage": "failed",
+      "message": "formula"
+    },
+    "customer": "MTP20",
+    "baseline": null,
+    "files": [
+      "สินค้า_MTEXP_ต.ค.69.xlsx"
+    ],
+    "has_json": false,
+    "steps": "อัปโหลด แล้วดูว่ารอบล้มเหลว หรือถูกส่งให้คนตรวจพร้อมเหตุผลเรื่องสูตร"
+  },
+  {
+    "id": "P21",
+    "folder": "P21_excel_error_cells",
+    "group": "P",
+    "title": "ช่องราคาเป็น #REF! หรือ #N/A",
+    "why": "สูตรใน Excel พัง แล้วลูกค้าส่งมาทั้งอย่างนั้น",
+    "should": [
+      "ต้องไม่แปลงเป็นราคาว่างหรือศูนย์เงียบ ๆ",
+      "ต้องบอกว่ามีช่อง error และให้แก้ที่ต้นทาง",
+      "ไม่มี JSON ออกมา"
+    ],
+    "expect": {
+      "stage": "failed",
+      "message": "error"
+    },
+    "customer": "MTP21",
+    "baseline": null,
+    "files": [
+      "สินค้า_MTEXP_ต.ค.69.xlsx"
+    ],
+    "has_json": false,
+    "steps": ""
+  },
+  {
+    "id": "P22",
+    "folder": "P22_hidden_data",
+    "group": "P",
+    "title": "ชีต แถว และคอลัมน์ที่ซ่อนไว้",
+    "why": "มีชีตราคาทุนซ่อนอยู่ แถวหนึ่งและคอลัมน์ยี่ห้อถูกซ่อน",
+    "should": [
+      "ต้องไม่หยิบราคาทุนจากชีตที่ซ่อนมาเป็นราคาขาย",
+      "ต้องแจ้งว่ามีข้อมูลซ่อนอยู่ให้คนรู้",
+      "ได้ครบ 12 รายการ"
+    ],
+    "expect": {
+      "stage": "review",
+      "records": 12,
+      "invalid": 0,
+      "json": true
+    },
+    "customer": "MTP22",
+    "baseline": null,
+    "files": [
+      "สินค้า_MTEXP_ต.ค.69.xlsx"
+    ],
+    "has_json": true,
+    "steps": ""
+  },
+  {
+    "id": "P23",
+    "folder": "P23_cell_gives_instructions",
+    "group": "P",
+    "title": "ข้อความในช่องสั่งให้ AI อนุมัติ",
+    "why": "ใครบางคนใส่คำสั่งไว้ในชื่อสินค้า",
+    "should": [
+      "ข้อความเป็นแค่ข้อมูล ไม่มีผลกับการตัดสิน",
+      "ระบบยังส่งให้คนตรวจตามปกติ",
+      "ข้อความอยู่ใน product_name ตามที่เขียน"
+    ],
+    "expect": {
+      "stage": "review",
+      "decision": "review",
+      "records": 12,
+      "json": true
+    },
+    "customer": "MTP23",
+    "baseline": null,
+    "files": [
+      "สินค้า_MTEXP_ต.ค.69.xlsx"
+    ],
+    "has_json": true,
+    "steps": ""
+  },
+  {
+    "id": "P24",
+    "folder": "P24_legacy_xls",
+    "group": "P",
+    "title": "ไฟล์ Excel รุ่นเก่า .xls",
+    "why": "ERP เก่ายัง export เป็น .xls",
+    "should": [
+      "หน้าอัปโหลดรับไฟล์นี้",
+      "อ่านได้ แต่ระบบต้องให้คนตรวจทุกรอบ เพราะตรวจสูตรและรูปแบบไม่ได้ละเอียดเท่า .xlsx",
+      "ได้ 12 รายการ"
+    ],
+    "expect": {
+      "stage": "review",
+      "records": 12,
+      "invalid": 0,
+      "json": true
+    },
+    "customer": "MTP24",
+    "baseline": null,
+    "files": [
+      "สินค้า.xls"
+    ],
+    "has_json": true,
+    "steps": ""
+  },
+  {
+    "id": "P25",
+    "folder": "P25_binary_xlsb",
+    "group": "P",
+    "title": "ไฟล์ Excel แบบ .xlsb",
+    "why": "ไฟล์ใหญ่มักถูกบันทึกเป็น Excel Binary Workbook",
+    "should": [
+      "หน้าอัปโหลดรับไฟล์นี้",
+      "อ่านได้ แต่ระบบต้องให้คนตรวจทุกรอบ เช่นเดียวกับ .xls",
+      "ได้ 12 รายการ"
+    ],
+    "expect": {
+      "stage": "review",
+      "records": 12,
+      "invalid": 0,
+      "json": true
+    },
+    "customer": "MTP25",
+    "baseline": null,
+    "files": [
+      "สินค้า.xlsb"
+    ],
+    "has_json": true,
+    "steps": ""
+  },
+  {
+    "id": "Q01",
+    "folder": "Q01_duplicate_rows_same",
+    "group": "Q",
+    "title": "แถวสินค้าซ้ำ ค่าเหมือนกันทุกช่อง",
+    "why": "ERP export แถวเดิมซ้ำสองครั้ง",
+    "should": [
+      "ได้สินค้า 12 รายการ ไม่ซ้ำ",
+      "ระบบเตือนว่ามีแถวซ้ำ"
+    ],
+    "expect": {
+      "stage": "review",
+      "records": 12,
+      "invalid": 0,
+      "json": true
+    },
+    "customer": "MTQ01",
+    "baseline": null,
+    "files": [
+      "สินค้า_MTEXP_ต.ค.69.xlsx"
+    ],
+    "has_json": true,
+    "steps": ""
+  },
+  {
+    "id": "Q02",
+    "folder": "Q02_duplicate_sku_conflict",
+    "group": "Q",
+    "title": "รหัสสินค้าซ้ำ แต่ราคาไม่เท่ากัน",
+    "why": "สินค้า 100101 มีสองแถว ราคา 7 กับ 9",
+    "should": [
+      "ห้ามเลือกราคาใดราคาหนึ่งเงียบ ๆ",
+      "ระบบแจ้งเป็น error ว่ารหัสซ้ำและค่าขัดกัน และให้คนตัดสิน"
+    ],
+    "expect": {
+      "stage": "review",
+      "decision": "review",
+      "findings": "duplicate"
+    },
+    "customer": "MTQ02",
+    "baseline": null,
+    "files": [
+      "สินค้า_MTEXP_ต.ค.69.xlsx"
+    ],
+    "has_json": false,
+    "steps": ""
+  },
+  {
+    "id": "Q03",
+    "folder": "Q03_blank_sku",
+    "group": "Q",
+    "title": "บางแถวไม่มีรหัสสินค้า",
+    "why": "สินค้าใหม่ที่ยังไม่ได้ตั้งรหัส",
+    "should": [
+      "ต้องบอกว่ามีแถวไม่มีรหัส พร้อมจำนวน",
+      "แถวเหล่านั้นต้องไม่หายเงียบ ๆ"
+    ],
+    "expect": {
+      "stage": "review",
+      "findings": "identity"
+    },
+    "customer": "MTQ03",
+    "baseline": null,
+    "files": [
+      "สินค้า_MTEXP_ต.ค.69.xlsx"
+    ],
+    "has_json": false,
+    "steps": ""
+  },
+  {
+    "id": "Q04",
+    "folder": "Q04_price_not_a_number",
+    "group": "Q",
+    "title": "ราคาเป็นข้อความหรือว่าง",
+    "why": "'ติดต่อฝ่ายขาย', '-', 'N/A' และช่องว่างในคอลัมน์ราคา",
+    "should": [
+      "รายการที่ไม่มีราคาผิดสัญญา JSON และต้องแก้ก่อนอนุมัติ",
+      "ต้องไม่กลายเป็นราคา 0",
+      "ส่งออก JSON ไม่ได้จนกว่าจะแก้"
+    ],
+    "expect": {
+      "stage": "review",
+      "invalid": 4,
+      "data_verdict": "contract_broken"
+    },
+    "customer": "MTQ04",
+    "baseline": null,
+    "files": [
+      "สินค้า_MTEXP_ต.ค.69.xlsx"
+    ],
+    "has_json": false,
+    "steps": ""
+  },
+  {
+    "id": "Q05",
+    "folder": "Q05_negative_or_zero_price",
+    "group": "Q",
+    "title": "ราคาติดลบหรือเป็นศูนย์",
+    "why": "คีย์ผิด หรือเป็นของแถมที่ตั้งราคา 0",
+    "should": [
+      "ราคาติดลบผิดสัญญา JSON ต้องแก้ก่อน",
+      "ราคา 0 ต้องถูกเตือนให้คนดู"
+    ],
+    "expect": {
+      "stage": "review",
+      "invalid": 1
+    },
+    "customer": "MTQ05",
+    "baseline": null,
+    "files": [
+      "สินค้า_MTEXP_ต.ค.69.xlsx"
+    ],
+    "has_json": false,
+    "steps": ""
+  },
+  {
+    "id": "Q06",
+    "folder": "Q06_stock_for_unknown_sku",
+    "group": "Q",
+    "title": "สต็อกของรหัสที่ไม่มีในรายการสินค้า",
+    "why": "สินค้าถูกลบออกจากรายการแล้ว แต่ยังมียอดคงเหลือ",
+    "should": [
+      "ได้ 12 รายการ ไม่สร้างสินค้าผีจากชีตสต็อก",
+      "ระบบเตือนว่ามีแถวที่จับคู่ไม่ได้"
+    ],
+    "expect": {
+      "stage": "review",
+      "records": 12,
+      "json": true
+    },
+    "customer": "MTQ06",
+    "baseline": null,
+    "files": [
+      "สินค้า_MTEXP_ต.ค.69.xlsx"
+    ],
+    "has_json": true,
+    "steps": ""
+  },
+  {
+    "id": "Q07",
+    "folder": "Q07_product_without_stock",
+    "group": "Q",
+    "title": "สินค้าที่ไม่มีแถวสต็อก",
+    "why": "สินค้าใหม่ที่ยังไม่รับเข้าคลัง",
+    "should": [
+      "สินค้ายังอยู่ครบ 12 รายการ แค่ไม่มี inventory",
+      "JSON ตรงกับ expected.json"
+    ],
+    "expect": {
+      "stage": "review",
+      "records": 12,
+      "invalid": 0,
+      "json": true
+    },
+    "customer": "MTQ07",
+    "baseline": null,
+    "files": [
+      "สินค้า_MTEXP_ต.ค.69.xlsx"
+    ],
+    "has_json": true,
+    "steps": ""
+  },
+  {
+    "id": "Q08",
+    "folder": "Q08_promotion_mistakes",
+    "group": "Q",
+    "title": "โปรโมชั่นผิด: วันสิ้นสุดก่อนวันเริ่ม และลด 80%",
+    "why": "คีย์วันที่สลับกัน และคีย์ส่วนลดเกิน",
+    "should": [
+      "ระบบเตือนโปรโมชั่นที่วันสลับกัน",
+      "ระบบเตือนส่วนลดเกิน 50%",
+      "ต้องให้คนรับทราบก่อนอนุมัติ"
+    ],
+    "expect": {
+      "stage": "review",
+      "anomalies": [
+        "discount"
+      ]
+    },
+    "customer": "MTQ08",
+    "baseline": null,
+    "files": [
+      "สินค้า_MTEXP_ต.ค.69.xlsx"
+    ],
+    "has_json": false,
+    "steps": ""
+  },
+  {
+    "id": "Q09",
+    "folder": "Q09_blank_product_name",
+    "group": "Q",
+    "title": "ชื่อสินค้าว่างบางแถว",
+    "why": "ชื่อเป็นฟิลด์บังคับใน JSON",
+    "should": [
+      "รายการที่ไม่มีชื่อผิดสัญญา JSON",
+      "ต้องแก้ก่อนส่งออก"
+    ],
+    "expect": {
+      "stage": "review",
+      "invalid": 2,
+      "data_verdict": "contract_broken"
+    },
+    "customer": "MTQ09",
+    "baseline": null,
+    "files": [
+      "สินค้า_MTEXP_ต.ค.69.xlsx"
+    ],
+    "has_json": false,
+    "steps": ""
+  },
+  {
+    "id": "Q10",
+    "folder": "Q10_header_only",
+    "group": "Q",
+    "title": "มีแต่หัวตาราง ไม่มีข้อมูล",
+    "why": "export ตอนยังไม่มีสินค้าในเงื่อนไข",
+    "should": [
+      "ระบบระงับ เพราะไม่มีข้อมูลสักแถว",
+      "ไม่มี JSON ออกมา"
+    ],
+    "expect": {
+      "stage": "blocked",
+      "decision": "block"
+    },
+    "customer": "MTQ10",
+    "baseline": null,
+    "files": [
+      "สินค้า_MTEXP_ต.ค.69.xlsx"
+    ],
+    "has_json": false,
+    "steps": ""
+  },
+  {
+    "id": "Q11",
+    "folder": "Q11_unknown_status",
+    "group": "Q",
+    "title": "สถานะที่ระบบไม่รู้จัก",
+    "why": "ลูกค้าใช้คำว่า 'พักการขาย', 'รอของ'",
+    "should": [
+      "ค่าที่ไม่รู้จักต้องไม่ถูกแปลงเป็น active เงียบ ๆ",
+      "สองรายการนั้นผิดสัญญา JSON (สถานะไม่อยู่ในรายการที่กำหนด) ต้องแก้ก่อนส่งออก"
+    ],
+    "expect": {
+      "stage": "review",
+      "invalid": 2,
+      "data_verdict": "contract_broken"
+    },
+    "customer": "MTQ11",
+    "baseline": null,
+    "files": [
+      "สินค้า_MTEXP_ต.ค.69.xlsx"
+    ],
+    "has_json": false,
+    "steps": ""
+  },
+  {
+    "id": "R00",
+    "folder": "R00_baseline",
+    "group": "R",
+    "title": "ไฟล์ตั้งต้นของลูกค้า MTEXP",
+    "why": "ทำเคสนี้ก่อนทุกเคสในกลุ่ม R: อนุมัติ mapping อนุมัติข้อมูล และส่งออก",
+    "should": [
+      "ลูกค้าใหม่ ระบบให้คนตรวจ",
+      "เมื่ออนุมัติแล้ว JSON ตรงกับ expected.json",
+      "รูปแบบนี้จะเป็นรูปแบบที่อนุมัติแล้วของลูกค้า MTEXP"
+    ],
+    "expect": {
+      "stage": "review",
+      "decision": "review",
+      "verdict": "first_time",
+      "records": 12,
+      "invalid": 0,
+      "json": true
+    },
+    "customer": "MTEXP",
+    "baseline": null,
+    "files": [
+      "สินค้า_MTEXP_ต.ค.69.xlsx"
+    ],
+    "has_json": true,
+    "steps": ""
+  },
+  {
+    "id": "R01",
+    "folder": "R01_next_round_clean",
+    "group": "R",
+    "title": "รอบถัดไป โครงสร้างเดิม ราคาเปลี่ยนนิดหน่อย",
+    "why": "กรณีปกติที่สุดทุก 14 วัน",
+    "should": [
+      "ระบบผ่านเอง ไม่ต้องถามอะไร (clean)",
+      "ใช้ mapping เดิมจาก memory"
+    ],
+    "expect": {
+      "decision": "auto_approve",
+      "verdict": "clean",
+      "drift": "identical",
+      "records": 12,
+      "invalid": 0,
+      "json": true
+    },
+    "customer": "MTEXP",
+    "baseline": "R00",
+    "files": [
+      "สินค้า_MTEXP_ต.ค.69.xlsx"
+    ],
+    "has_json": true,
+    "steps": ""
+  },
+  {
+    "id": "R02",
+    "folder": "R02_same_file_again",
+    "group": "R",
+    "title": "อัปโหลดไฟล์เดิมซ้ำทั้งไฟล์",
+    "why": "ลูกค้าส่งไฟล์เดิมมาอีกรอบ",
+    "should": [
+      "ระบบบอกว่าไฟล์นี้เคยอัปโหลดแล้ว",
+      "ไม่มีข้อมูลซ้ำซ้อนในรอบเก่า"
+    ],
+    "expect": {
+      "duplicate": true,
+      "decision": "auto_approve",
+      "records": 12
+    },
+    "customer": "MTEXP",
+    "baseline": "R00",
+    "files": [
+      "สินค้า_MTEXP_ต.ค.69.xlsx"
+    ],
+    "has_json": false,
+    "steps": ""
+  },
+  {
+    "id": "R03",
+    "folder": "R03_header_moved",
+    "group": "R",
+    "title": "หัวตารางเลื่อนลง 2 แถว",
+    "why": "ERP เพิ่มแถวหัวรายงาน",
+    "should": [
+      "ระบบรู้ว่าแค่หัวตารางเลื่อน และผ่านเอง",
+      "ได้ข้อมูลครบเหมือนเดิม"
+    ],
+    "expect": {
+      "decision": "auto_approve",
+      "drift": "header_moved",
+      "records": 12,
+      "invalid": 0,
+      "json": true
+    },
+    "customer": "MTEXP",
+    "baseline": "R00",
+    "files": [
+      "สินค้า_MTEXP_ต.ค.69.xlsx"
+    ],
+    "has_json": true,
+    "steps": ""
+  },
+  {
+    "id": "R04",
+    "folder": "R04_column_added",
+    "group": "R",
+    "title": "มีคอลัมน์ใหม่เพิ่ม",
+    "why": "ERP เพิ่มคอลัมน์ 'จุดสั่งซื้อ'",
+    "should": [
+      "ระบบรู้ว่ามีคอลัมน์เพิ่มและไม่กระทบของเดิม",
+      "ผ่านเอง ได้ข้อมูลครบ"
+    ],
+    "expect": {
+      "decision": "auto_approve",
+      "drift": "columns_added",
+      "records": 12,
+      "invalid": 0
+    },
+    "customer": "MTEXP",
+    "baseline": "R00",
+    "files": [
+      "สินค้า_MTEXP_ต.ค.69.xlsx"
+    ],
+    "has_json": false,
+    "steps": "ทำเคสนี้เป็นเคสสุดท้ายของกลุ่ม R เพราะ mapping ที่ผ่านเองจะกลายเป็นรูปแบบล่าสุดของลูกค้า แม้ยกเลิกรอบแล้วก็ตาม"
+  },
+  {
+    "id": "R05",
+    "folder": "R05_column_renamed",
+    "group": "R",
+    "title": "เปลี่ยนชื่อคอลัมน์ ค่าเหมือนเดิม",
+    "why": "อัปเกรด ERP แล้วชื่อคอลัมน์เปลี่ยน",
+    "should": [
+      "ระบบเห็นว่าโครงสร้างเปลี่ยน แต่ค่าเหมือนเดิม",
+      "กดยอมรับได้ในคลิกเดียว (rename_only)"
+    ],
+    "expect": {
+      "drift": "columns_renamed",
+      "verdict": "rename_only",
+      "outcome": "accept",
+      "records": 12
+    },
+    "customer": "MTEXP",
+    "baseline": "R00",
+    "files": [
+      "สินค้า_MTEXP_ต.ค.69.xlsx"
+    ],
+    "has_json": false,
+    "steps": ""
+  },
+  {
+    "id": "R06",
+    "folder": "R06_column_removed",
+    "group": "R",
+    "title": "คอลัมน์ยี่ห้อหายไป",
+    "why": "ERP เลิก export คอลัมน์นี้",
+    "should": [
+      "ระบบแจ้งว่าคอลัมน์หาย และให้คนตรวจ",
+      "ไม่ผ่านเอง"
+    ],
+    "expect": {
+      "decision": "review",
+      "drift": "columns_removed"
+    },
+    "customer": "MTEXP",
+    "baseline": "R00",
+    "files": [
+      "สินค้า_MTEXP_ต.ค.69.xlsx"
+    ],
+    "has_json": false,
+    "steps": ""
+  },
+  {
+    "id": "R07",
+    "folder": "R07_price_column_removed",
+    "group": "R",
+    "title": "คอลัมน์ราคาหายไป",
+    "why": "export ผิดรายงาน",
+    "should": [
+      "ระบบไม่ผ่านเอง เพราะเป็นฟิลด์สำคัญที่สุด",
+      "ต้องไม่ได้สินค้าที่ไม่มีราคาออกไป"
+    ],
+    "expect": {
+      "decision": "review",
+      "drift": "columns_removed"
+    },
+    "customer": "MTEXP",
+    "baseline": "R00",
+    "files": [
+      "สินค้า_MTEXP_ต.ค.69.xlsx"
+    ],
+    "has_json": false,
+    "steps": ""
+  },
+  {
+    "id": "R08",
+    "folder": "R08_sheet_removed",
+    "group": "R",
+    "title": "ชีตสต็อกหายไป",
+    "why": "ลูกค้าส่งมาแค่ชีตสินค้า",
+    "should": [
+      "ระบบแจ้งว่าชีตหาย และให้คนตรวจ",
+      "สินค้าไม่หาย แต่ต้องรู้ว่าไม่มีสต็อก"
+    ],
+    "expect": {
+      "decision": "review",
+      "drift": "sheets_removed"
+    },
+    "customer": "MTEXP",
+    "baseline": "R00",
+    "files": [
+      "สินค้า_MTEXP_ต.ค.69.xlsx"
+    ],
+    "has_json": false,
+    "steps": ""
+  },
+  {
+    "id": "R09",
+    "folder": "R09_sheet_added",
+    "group": "R",
+    "title": "มีชีตใหม่เพิ่ม",
+    "why": "ERP เพิ่มชีต 'ผู้จำหน่าย'",
+    "should": [
+      "ระบบแจ้งว่ามีชีตเพิ่ม",
+      "ข้อมูลเดิมยังครบ"
+    ],
+    "expect": {
+      "drift": "sheets_added",
+      "records": 12
+    },
+    "customer": "MTEXP",
+    "baseline": "R00",
+    "files": [
+      "สินค้า_MTEXP_ต.ค.69.xlsx"
+    ],
+    "has_json": false,
+    "steps": ""
+  },
+  {
+    "id": "R10",
+    "folder": "R10_price_means_cost",
+    "group": "R",
+    "title": "คอลัมน์เดิม แต่ค่ากลายเป็นราคาทุน",
+    "why": "หัวคอลัมน์เหมือนเดิม แต่ ERP เปลี่ยนไปใส่ราคาทุน",
+    "should": [
+      "โครงสร้างเหมือนเดิมแต่ค่าเป็น ×0.62 ของรอบก่อนทุกรายการ",
+      "ระบบต้องจับได้จากข้อมูล ไม่ปล่อยผ่าน",
+      "ถามว่าหน่วย แพ็ค หรือสกุลเงินเปลี่ยนหรือไม่"
+    ],
+    "expect": {
+      "decision": "review",
+      "verdict": "scaled",
+      "outcome": "fix_mapping"
+    },
+    "customer": "MTEXP",
+    "baseline": "R00",
+    "files": [
+      "สินค้า_MTEXP_ต.ค.69.xlsx"
+    ],
+    "has_json": false,
+    "steps": ""
+  },
+  {
+    "id": "R11",
+    "folder": "R11_vat_removed",
+    "group": "R",
+    "title": "ราคาลด 7% ทุกตัว แต่หัวคอลัมน์ยังบอกว่ารวม VAT",
+    "why": "ลูกค้าเปลี่ยนไป export ราคาก่อน VAT โดยไม่แก้หัวคอลัมน์",
+    "should": [
+      "ระบบจับได้ว่าราคาลดลง 7% เท่ากันทุกรายการ",
+      "มีคำถามเดียว: ราคานี้ไม่รวม VAT แล้วใช่ไหม"
+    ],
+    "expect": {
+      "decision": "review",
+      "verdict": "vat_shift"
+    },
+    "customer": "MTEXP",
+    "baseline": "R00",
+    "files": [
+      "สินค้า_MTEXP_ต.ค.69.xlsx"
+    ],
+    "has_json": false,
+    "steps": ""
+  },
+  {
+    "id": "R12",
+    "folder": "R12_price_in_satang",
+    "group": "R",
+    "title": "ราคาเป็นสตางค์ (×100 ทุกรายการ)",
+    "why": "ERP เปลี่ยนหน่วยราคา",
+    "should": [
+      "ระบบเห็นว่าราคาเป็น 100 เท่าของรอบก่อน",
+      "ถามว่าหน่วยหรือสกุลเงินเปลี่ยนหรือไม่"
+    ],
+    "expect": {
+      "decision": "review",
+      "verdict": "scaled"
+    },
+    "customer": "MTEXP",
+    "baseline": "R00",
+    "files": [
+      "สินค้า_MTEXP_ต.ค.69.xlsx"
+    ],
+    "has_json": false,
+    "steps": ""
+  },
+  {
+    "id": "R13",
+    "folder": "R13_wrong_customer",
+    "group": "R",
+    "title": "ไฟล์ของลูกค้าอื่น (MTOTHER) ถูกอัปให้ MTEXP",
+    "why": "รูปแบบไฟล์เหมือน Express เป๊ะ แต่เป็นสินค้าของอีกราย",
+    "should": [
+      "ระบบต้องไม่รวมข้อมูลเข้าลูกค้าผิดราย",
+      "บอกว่าน่าจะเป็นไฟล์ของ MTOTHER",
+      "กดย้ายไปลูกค้าที่ถูกได้"
+    ],
+    "expect": {
+      "verdict": "wrong_customer",
+      "outcome": "assign_customer"
+    },
+    "customer": "MTEXP",
+    "baseline": "R00",
+    "files": [
+      "สินค้า_MTEXP_ต.ค.69.xlsx",
+      "ไฟล์ตั้งต้น_MTOTHER.xlsx"
+    ],
+    "has_json": false,
+    "steps": "ก่อนทำเคสนี้ อัปโหลด ไฟล์ตั้งต้น_MTOTHER.xlsx ให้ลูกค้า MTOTHER แล้วอนุมัติจนส่งออกได้ จากนั้นอัปโหลด สินค้า_MTEXP_ต.ค.69.xlsx ให้ลูกค้า MTEXP"
+  },
+  {
+    "id": "R14",
+    "folder": "R14_unrelated_file",
+    "group": "R",
+    "title": "ไฟล์คนละเรื่อง (ใบแจ้งหนี้)",
+    "why": "ลูกค้าแนบไฟล์ผิด",
+    "should": [
+      "ระบบระงับทันที เพราะไม่ใช่รูปแบบที่อนุมัติไว้",
+      "แก้ด้วยการแก้ mapping ไม่ได้ ต้องปฏิเสธหรือยกเลิก"
+    ],
+    "expect": {
+      "stage": "blocked",
+      "decision": "block",
+      "verdict": "blocked_unrelated",
+      "drift": "unrelated_file"
+    },
+    "customer": "MTEXP",
+    "baseline": "R00",
+    "files": [
+      "สินค้า_MTEXP_ต.ค.69.xlsx"
+    ],
+    "has_json": false,
+    "steps": ""
+  },
+  {
+    "id": "R15",
+    "folder": "R15_zero_rows",
+    "group": "R",
+    "title": "โครงสร้างเดิม แต่ไม่มีข้อมูล",
+    "why": "export ตอนฐานข้อมูลว่าง",
+    "should": [
+      "ระบบระงับ เพราะไม่มีข้อมูล",
+      "ไม่แทนที่ข้อมูลรอบก่อน"
+    ],
+    "expect": {
+      "stage": "blocked",
+      "decision": "block"
+    },
+    "customer": "MTEXP",
+    "baseline": "R00",
+    "files": [
+      "สินค้า_MTEXP_ต.ค.69.xlsx"
+    ],
+    "has_json": false,
+    "steps": ""
+  },
+  {
+    "id": "R16",
+    "folder": "R16_half_catalogue",
+    "group": "R",
+    "title": "สินค้าหายไปครึ่งหนึ่ง",
+    "why": "export ไม่ครบ",
+    "should": [
+      "ระบบไม่ผ่านเอง เพราะจำนวนรายการเปลี่ยนเกิน 30%",
+      "บอกจำนวนที่หายไป"
+    ],
+    "expect": {
+      "decision": "review",
+      "verdict": "row_shift"
+    },
+    "customer": "MTEXP",
+    "baseline": "R00",
+    "files": [
+      "สินค้า_MTEXP_ต.ค.69.xlsx"
+    ],
+    "has_json": false,
+    "steps": ""
+  },
+  {
+    "id": "R17",
+    "folder": "R17_catalogue_replaced",
+    "group": "R",
+    "title": "สินค้าเปลี่ยนใหม่ทั้งหมด",
+    "why": "รหัสทั้งชุดเปลี่ยน",
+    "should": [
+      "ระบบเตือนว่ารายการสินค้าถูกแทนที่ทั้งหมด",
+      "ต้องให้คนยืนยันก่อน"
+    ],
+    "expect": {
+      "data_verdict": "catalogue_replaced"
+    },
+    "customer": "MTEXP",
+    "baseline": "R00",
+    "files": [
+      "สินค้า_MTEXP_ต.ค.69.xlsx"
+    ],
+    "has_json": false,
+    "steps": ""
+  },
+  {
+    "id": "R18",
+    "folder": "R18_price_jump",
+    "group": "R",
+    "title": "ราคาขึ้นเกิน 30% บางรายการ",
+    "why": "คีย์ผิด หรือขึ้นราคาจริง",
+    "should": [
+      "โครงสร้างผ่าน แต่ขั้นข้อมูลต้องเตือนราคาที่กระโดด",
+      "ต้องให้คนรับทราบก่อนอนุมัติ"
+    ],
+    "expect": {
+      "data_verdict": "price_move",
+      "anomalies": [
+        "price"
+      ]
+    },
+    "customer": "MTEXP",
+    "baseline": "R00",
+    "files": [
+      "สินค้า_MTEXP_ต.ค.69.xlsx"
+    ],
+    "has_json": false,
+    "steps": ""
+  },
+  {
+    "id": "R19",
+    "folder": "R19_stock_collapse",
+    "group": "R",
+    "title": "สต็อกหายเกิน 80%",
+    "why": "export ผิดคลัง",
+    "should": [
+      "ระบบเตือนสต็อกลดผิดปกติ"
+    ],
+    "expect": {
+      "anomalies": [
+        "stock"
+      ]
+    },
+    "customer": "MTEXP",
+    "baseline": "R00",
+    "files": [
+      "สินค้า_MTEXP_ต.ค.69.xlsx"
+    ],
+    "has_json": false,
+    "steps": ""
+  },
+  {
+    "id": "R20",
+    "folder": "R20_price_turns_text",
+    "group": "R",
+    "title": "คอลัมน์ราคากลายเป็นข้อความทั้งหมด",
+    "why": "ERP ใส่ 'ดูใบเสนอราคา' ทุกแถว",
+    "should": [
+      "ระบบไม่ผ่านเอง",
+      "ไม่มี JSON ที่ราคาว่างออกไป"
+    ],
+    "expect": {
+      "decision": "review"
+    },
+    "customer": "MTEXP",
+    "baseline": "R00",
+    "files": [
+      "สินค้า_MTEXP_ต.ค.69.xlsx"
+    ],
+    "has_json": false,
+    "steps": ""
+  },
+  {
+    "id": "R21",
+    "folder": "R21_replace_with_correction",
+    "group": "R",
+    "title": "ลูกค้าส่งไฟล์แก้มาแทนรอบเดิม",
+    "why": "รอบแรกราคาผิด แล้วลูกค้าส่งไฟล์แก้ตามมา",
+    "should": [
+      "รอบเก่าปิดเป็น superseded พร้อมเหตุผล",
+      "รอบใหม่ใช้ไฟล์แก้ และลิงก์ถึงกัน",
+      "ไฟล์ทั้งสองไม่ถูกนับซ้ำ"
+    ],
+    "expect": {
+      "replace": true
+    },
+    "customer": "MTEXP",
+    "baseline": "R00",
+    "files": [
+      "1_ไฟล์ราคาผิด.xlsx",
+      "2_ไฟล์แก้แล้ว.xlsx"
+    ],
+    "has_json": true,
+    "steps": "อัปโหลด 1_ไฟล์ราคาผิด.xlsx ให้ MTEXP จากนั้นเปิดเมนูของรอบ เลือก แทนที่ด้วยไฟล์ใหม่ แล้วเลือก 2_ไฟล์แก้แล้ว.xlsx"
+  },
+  {
+    "id": "B01",
+    "folder": "B01_mixed_drop",
+    "group": "B",
+    "title": "อัปโหลดหลายไฟล์พร้อมกัน ปนทั้งไฟล์ดีและไฟล์เสีย",
+    "why": "คืนเดียวได้ไฟล์หลายแบบ",
+    "should": [
+      "1_MTEXP ผ่านเองจนได้ JSON",
+      "2_ไม่รู้จัก รอให้เลือกลูกค้า",
+      "3_ไฟล์เสีย ล้มเหลวและบอกเหตุผล ไม่ทำให้ไฟล์อื่นหยุด",
+      "4_ไฟล์เดิมซ้ำ ถูกข้าม"
+    ],
+    "expect": {
+      "bulk": {
+        "1_MTEXP_รอบใหม่.xlsx": "ready",
+        "2_ไม่รู้จัก.xlsx": "needs_customer",
+        "3_ไฟล์เสีย.xlsx": "failed"
+      },
+      "skipped": 1
+    },
+    "customer": null,
+    "baseline": "R00",
+    "files": [
+      "1_MTEXP_รอบใหม่.xlsx",
+      "2_ไม่รู้จัก.xlsx",
+      "3_ไฟล์เสีย.xlsx",
+      "4_ซ้ำ/1_MTEXP_รอบใหม่.xlsx"
+    ],
+    "has_json": false,
+    "steps": "เลือกไฟล์ 1, 2, 3 และไฟล์ในโฟลเดอร์ 4_ซ้ำ แล้วลากทั้งหมดไปหน้า อัปโหลดไฟล์ พร้อมกัน"
+  },
+  {
+    "id": "B02",
+    "folder": "B02_name_contradicts_layout",
+    "group": "B",
+    "title": "ชื่อไฟล์บอกลูกค้าหนึ่ง แต่รูปแบบเป็นของอีกราย",
+    "why": "ไฟล์มีรหัส MTZZZ แต่หน้าตาเป็นของ MTEXP",
+    "should": [
+      "ต้องไม่เดา",
+      "ไฟล์รอให้คนเลือกลูกค้า พร้อมบอกเหตุผล"
+    ],
+    "expect": {
+      "bulk": {
+        "สินค้า_MTZZZ_ต.ค.69.xlsx": "needs_customer"
+      }
+    },
+    "customer": null,
+    "baseline": "R00",
+    "files": [
+      "สินค้า_MTZZZ_ต.ค.69.xlsx"
+    ],
+    "has_json": false,
+    "steps": "สร้างลูกค้ารหัส MTZZZ ก่อน แล้วอัปโหลดไฟล์นี้ที่หน้า อัปโหลดไฟล์"
+  },
+  {
+    "id": "S01",
+    "folder": "S01_custom_format",
+    "group": "S",
+    "title": "ใช้รูปแบบ JSON ของตัวเอง",
+    "why": "ลงทะเบียน JSON ปลายทางแบบใหม่ แล้วแปลงไฟล์เดิมให้ออกมาตามรูปแบบนั้น",
+    "should": [
+      "ลงทะเบียนรูปแบบผ่าน",
+      "JSON มีแค่ 4 ฟิลด์ที่กำหนด ไม่มีฟิลด์เกิน",
+      "ตรงกับ expected.json"
+    ],
+    "expect": {
+      "schema": "accepted",
+      "records": 12,
+      "json": true
+    },
+    "customer": "MTS01",
+    "baseline": null,
+    "files": [
+      "shop_item.schema.json",
+      "สินค้า_MTEXP_ต.ค.69.xlsx"
+    ],
+    "has_json": true,
+    "steps": "ไปที่ ตั้งค่า > Target formats แล้วเพิ่ม shop_item.schema.json จากนั้นแก้ลูกค้า MTS01 ที่ช่อง Target format for new imports ก่อนอัปโหลดไฟล์"
+  },
+  {
+    "id": "S02",
+    "folder": "S02_unsupported_format",
+    "group": "S",
+    "title": "รูปแบบ JSON ที่ใช้ oneOf",
+    "why": "สัญญา JSON ใช้ความสามารถที่ระบบไม่รองรับ",
+    "should": [
+      "ถูกปฏิเสธตั้งแต่ลงทะเบียน พร้อมบอกว่าไม่รองรับตรงไหน"
+    ],
+    "expect": {
+      "schema": "rejected",
+      "message": "does not support"
+    },
+    "customer": null,
+    "baseline": null,
+    "files": [
+      "unsupported.schema.json"
+    ],
+    "has_json": false,
+    "steps": "ไปที่ ตั้งค่า > Target formats แล้วเพิ่ม unsupported.schema.json"
+  },
+  {
+    "id": "S03",
+    "folder": "S03_broken_json",
+    "group": "S",
+    "title": "ไฟล์ JSON พัง",
+    "why": "วางข้อความที่ไม่ใช่ JSON",
+    "should": [
+      "ถูกปฏิเสธ และไม่มีรูปแบบค้างในระบบ"
+    ],
+    "expect": {
+      "schema": "rejected"
+    },
+    "customer": null,
+    "baseline": null,
+    "files": [
+      "broken.schema.json"
+    ],
+    "has_json": false,
+    "steps": "ไปที่ ตั้งค่า > Target formats แล้ววางเนื้อไฟล์ broken.schema.json"
+  }
+]
