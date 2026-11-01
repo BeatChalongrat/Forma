@@ -21,7 +21,7 @@ const TH: Record<string, string> = {
   'Failed': 'ไม่สำเร็จ', 'Proposed': 'รอยืนยัน', 'Superseded': 'มีเวอร์ชันใหม่แล้ว', 'Ready': 'พร้อม',
   'No results': 'ไม่พบผลลัพธ์', 'No changes': 'ไม่มีการเปลี่ยนแปลง', 'No findings': 'ไม่พบปัญหา',
   'AI provider, target formats and the approval policy — edited here, checked before saving, recorded in the audit log, applied without a restart.': 'ตั้งค่า AI รูปแบบข้อมูลปลายทาง และกฎการอนุมัติ ตรวจสอบก่อนบันทึกและใช้งานได้ทันที',
-  'Drop all the files here': 'ลากไฟล์ทั้งหมดมาวางที่นี่', 'Excel (.xlsx) or CSV — any number, from any customers': 'Excel (.xlsx) หรือ CSV จากลูกค้าหลายรายพร้อมกันได้',
+  'Drop all the files here': 'ลากไฟล์ทั้งหมดมาวางที่นี่', 'Excel or CSV — any number, from any customers': 'Excel หรือ CSV จากลูกค้าหลายรายพร้อมกันได้',
   'Approve and export automatically': 'อนุมัติและสร้างไฟล์อัตโนมัติเมื่อผ่านการตรวจ',
   'What happens after upload?': 'หลังอัปโหลด ระบบทำอะไรต่อ?', 'Customer / delivery': 'ลูกค้า / รอบนำเข้า',
   'Next action': 'ขั้นตอนถัดไป', 'Records': 'รายการ', 'Updated': 'อัปเดตล่าสุด',

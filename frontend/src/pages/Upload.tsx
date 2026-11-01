@@ -12,8 +12,7 @@ import { cn, fmtBytes, fmtDate, fmtInt } from '../lib/utils'
 import { Badge, PageHeader, Section, Spinner, Modal } from '../components/ui'
 import { useToast } from '../lib/toast'
 import { RoundMenu } from '../components/RoundMenu'
-
-const ACCEPT = /\.(xlsx|xlsm|csv|txt|tsv)$/i
+import { refusedNames, splitReadable, UPLOAD_ACCEPT, UPLOAD_TYPES } from '../lib/uploads'
 
 /** Upload many files at once: each is matched to its customer by format and becomes one JSON (ADR-027). */
 export function BulkUpload() {
@@ -33,7 +32,14 @@ export function BulkUpload() {
   const input = useRef<HTMLInputElement>(null)
   const nav = useNavigate()
   const toast = useToast()
-  const add = useCallback((fs: File[]) => setFiles((xs) => [...xs, ...fs.filter((f) => ACCEPT.test(f.name) && !xs.some((x) => x.name === f.name && x.size === f.size))]), [])
+  const add = useCallback((fs: File[]) => {
+    const { readable, refused } = splitReadable(fs)
+    if (refused.length) {
+      const { names, more } = refusedNames(refused)
+      toast.push({ kind: 'bad', title: t('FORMA cannot read these files', 'FORMA อ่านไฟล์เหล่านี้ไม่ได้'), detail: `${names}${more ? t(` and ${more} more`, ` และอีก ${more} ไฟล์`) : ''} · ${t('Accepted', 'รับ')} ${UPLOAD_TYPES.join(' ')}` })
+    }
+    setFiles((xs) => [...xs, ...readable.filter((f) => !xs.some((x) => x.name === f.name && x.size === f.size))])
+  }, [t, toast])
   const qc = useQueryClient()
   const upload = useMutation({
     mutationFn: async () => {
@@ -65,10 +71,10 @@ export function BulkUpload() {
             onClick={() => input.current?.click()} role="button" tabIndex={0} aria-label="Choose files" onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); input.current?.click() } }}
             className={cn('card border-2 border-dashed p-12 text-center cursor-pointer transition-colors', over ? 'border-brand-blue bg-signal-soft' : 'border-line-2 hover:border-brand-blue/60')}
           >
-            <input ref={input} type="file" multiple accept=".xlsx,.xlsm,.csv,.txt,.tsv" className="hidden" onChange={(e) => { add(Array.from(e.target.files ?? [])); e.target.value = '' }} />
+            <input ref={input} type="file" multiple accept={UPLOAD_ACCEPT} className="hidden" onChange={(e) => { add(Array.from(e.target.files ?? [])); e.target.value = '' }} />
             <span className="w-14 h-14 mx-auto grid place-items-center text-signal"><Upload size={26} /></span>
             <div className="heading text-[17px] mt-3"><Localized>Drop all the files here</Localized></div>
-            <div className="text-ink-2 mt-1"><Localized>Excel (.xlsx) or CSV — any number, from any customers</Localized></div>
+            <div className="text-ink-2 mt-1"><Localized>Excel or CSV — any number, from any customers</Localized></div>
             <div className="hint-th mt-1">หรือคลิกเพื่อเลือกไฟล์ เลือกหลายไฟล์พร้อมกันได้</div>
           </div>
           {files.length > 0 && (
