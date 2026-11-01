@@ -155,10 +155,10 @@ mapping catalogue cannot enumerate (references, conditionals, tuple schemas) are
 | Page | What you do there |
 |---|---|
 | **Home** | Upload files; see what needs you with FORMA's conclusion per file; expected deliveries and the watchlist; work-round dashboard; statistics |
-| **Upload files** | Drop many files at once. Each is matched to its customer by layout (and the customer code in the file name), becomes its own round, and is published automatically when every check passes. Unknown layouts wait for you to pick a customer. One JSON per file, all in one zip |
+| **Upload files** | Drop many files at once. Each is matched to its customer by layout (and the customer code in the file name), becomes its own round, and is published automatically when every check passes. Unknown layouts wait for you to pick a customer. One JSON per file, all in one zip. A navy card shows how the round is going on every page |
 | **Imports** | Work rounds (named, dated, reusable) and the history of every file with filters that survive the browser's Back button |
 | **Round** | The case: the verdict card with its one-click accept, the three stages, files, mapping versions, datasets, the assistant in context; cancel, move to another customer, or replace with a corrected file |
-| **Review** | Questions and issues: the verdict first, then each uncertain field as a question answered from evidence traced to the source cell; preview the impact before saving |
+| **Review** | Questions and issues: the verdict first, then each uncertain field as a question answered from evidence traced to the source cell; preview the impact before saving; every question shows its age, and one that needs the customer can wait with a note and a date |
 | **Mapping Studio** | Field view (drag a column onto a field), *What changed* vs the approved mapping with the data check, *Compare* (sandbox), *Relationships* (how the sheets connect, measured on the data), DSL on demand |
 | **Data Editor** | Spreadsheet editing (paste, ranges, bulk on picked rows), copilot in Thai or English, lineage to the Excel cell, changes and anomalies vs last round, records that break the format, versions and rollback |
 | **Customers** | Every customer, its approved formats, overrides, next expected delivery |
@@ -207,7 +207,7 @@ curl http://localhost/ready       # db · storage · queue
 on a machine other devices cannot reach (R31 in [docs/RISK_REGISTER.md](docs/RISK_REGISTER.md)).
 
 The stack is nginx (SPA + `/api` proxy) → FastAPI (N replicas) → Redis/arq workers (N nodes) → PostgreSQL
-(JSONB) + S3/MinIO, plus the assistant's code sandbox and a nightly database backup. On start, API and workers reconcile queued jobs against durable results, recover stale
+(JSONB) + S3/MinIO, plus the assistant's code sandbox and a nightly backup of the database and every file. On start, API and workers reconcile queued jobs against durable results, recover stale
 jobs and resubmit pending ones (ADR-044). Operations are in [docs/RUNBOOK.md](docs/RUNBOOK.md): worker
 crash, stuck round, wrong file published, provider outage, schema rollout, backup and restore, retention.
 
@@ -271,7 +271,7 @@ target_schema/            product.v1.json — a DRAFT contract; register the rea
 policies/                 approval.yaml (auto-approve / review / block, sandbox, anomaly, publish, verdict)
 data/                     runtime data (git-ignored) · synthetic/ corpus with ground truth (committed) · real/ (local only)
 docs/                     architecture, flows, user stories, handbook, DSL, data model, Thai rules, evaluation,
-                          performance, runbook, ADRs 001–053
+                          performance, runbook, ADRs 001–054
 ```
 
 ---
@@ -300,7 +300,7 @@ compose config. Details: [docs/TESTING_STRATEGY.md](docs/TESTING_STRATEGY.md).
 | QA | [docs/TESTING_STRATEGY.md](docs/TESTING_STRATEGY.md) · [docs/EVALUATION.md](docs/EVALUATION.md) |
 | Operations | [docs/RUNBOOK.md](docs/RUNBOOK.md) · [docs/PERFORMANCE.md](docs/PERFORMANCE.md) |
 | New team members | [docs/ONBOARDING.md](docs/ONBOARDING.md) |
-| Decisions | [docs/adr/](docs/adr/) — 46 architecture decision records, binding unless superseded |
+| Decisions | [docs/adr/](docs/adr/) — 54 architecture decision records, binding unless superseded |
 | Status | [docs/ROADMAP_STATUS.md](docs/ROADMAP_STATUS.md) · [docs/RISK_REGISTER.md](docs/RISK_REGISTER.md) · [docs/KPIS_AND_METRICS.md](docs/KPIS_AND_METRICS.md) |
 
 ---
@@ -319,6 +319,8 @@ What is not yet established — and is said so wherever a number appears:
   files exists (`data/real/`, `forma eval --index|--llm|--replay`); the files and a baseline do not.
 * **The real downstream contract.** `target_schema/product.v1.json` is a draft example.
 * **A provider-enabled evaluation baseline in CI.**
+* **Copies off this machine.** The nightly backup holds the database and every file and has been restored, but it
+  sits on the same disk, and the code has no remote (R36).
 * **A server.** FORMA runs for one person on one machine. OIDC against a real identity provider and multi-host
   arq with pgbouncer are built but not proven, and matter only if it moves to a server.
 * **Excel semantics FORMA does not interpret:** formulas are read as cached values, never recalculated;

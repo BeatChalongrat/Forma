@@ -221,7 +221,7 @@ export type OpsSummary = {
   housekeeping: {
     storage: { objects: number | null; bytes: number | null; known: boolean }
     retention: { schedule_h: number; deletes: boolean; last_at: string | null; last_applied: boolean | null; last_counts: Record<string, number> | null; last_errors: number | null }
-    backup: { last_at: string | null; age_hours: number | null; path: string | null }
+    backup: { last_at: string | null; age_hours: number | null; path: string | null; files_included: boolean | null; bytes: number | null }
   }
 }
 export type FieldSpec = { pointer: string; name: string; json_type: string[]; semantic: string | null; risk: 'critical' | 'high' | 'medium' | 'low'; required: boolean; nullable: boolean; enum: unknown[] | null; format: string | null; synonyms_en: string[]; synonyms_th: string[]; description: string | null; description_th: string | null; in_collection: string | null; is_collection: boolean; system: boolean; default: unknown }

@@ -193,8 +193,8 @@ and OIDC below are what the design allows when it moves to a server.
   and `/ready`, an admin Ops page (queue, workers, failed jobs + retry, spend, slowest rounds).
 * **Reliability** (ADR-015). Retries with backoff and a circuit breaker for the model (fallback never
   auto-approves); backup AI keys tried in order, each with its own breaker and model (ADR-025); retention policy with audited deletions, `forma backup|restore`, `docs/RUNBOOK.md`.
-  Each retention pass is recorded, System health shows it, and `backup-nightly` dumps the database every 24 hours
-  (ADR-053).
+  Each retention pass is recorded, System health shows it, and `backup-nightly` backs up the database and every file
+  every 24 hours (ADR-053, ADR-054).
 * **Deployment** (ADR-016). One backend image (`forma serve` / `forma worker`), one web image, a sandbox image,
   `docker-compose.prod.yml`, `.env.production.example` generated from `Settings`, CI gates (lint, types,
   tests on SQLite + Postgres + MinIO, migration/config drift, eval baseline, short bench, image builds).

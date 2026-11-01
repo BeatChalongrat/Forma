@@ -145,17 +145,18 @@ services:
     restart: unless-stopped
 
   backup-nightly:
-    # a database dump every 24 hours, keeping 14 days; the System health page shows the age of the last one
+    # a full backup every 24 hours, database and files, keeping 14 days; the System health page shows the last one
     build: { context: ., dockerfile: backend/Dockerfile }
     <<: *forma-env
     user: root  # the backups volume belongs to root
     command:
       - sh
       - -c
-      - while true; do forma backup --out /backups --archive --no-objects; find /backups -name 'forma-backup-*' -mtime +14 -delete; sleep 86400; done
+      - while true; do forma backup --out /backups --archive && find /backups -name 'forma-backup-*' -mtime +14 -delete; sleep 86400; done
     volumes: ["formadata:/data", "backups:/backups"]
     depends_on:
       postgres: { condition: service_healthy }
+      minio: { condition: service_healthy }
       migrate: { condition: service_completed_successfully }
     healthcheck: { disable: true }  # the image's check asks for an API port this service does not open
     restart: unless-stopped
@@ -166,10 +167,11 @@ services:
     <<: *forma-env
     user: root  # the backups volume belongs to root
     profiles: ["ops"]
-    command: ["forma", "backup", "--out", "/backups", "--archive", "--no-objects"]
+    command: ["forma", "backup", "--out", "/backups", "--archive"]
     volumes: ["formadata:/data", "backups:/backups"]
     depends_on:
       postgres: { condition: service_healthy }
+      minio: { condition: service_healthy }
 
 volumes:
   pgdata: {}

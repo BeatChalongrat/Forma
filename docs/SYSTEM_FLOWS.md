@@ -137,15 +137,15 @@ At any status a round can leave this path: cancelled, moved to another customer,
 | 9 | Sandbox | `services/sandbox.py` | run the new and the approved mapping on the same real files; compare by schema identity | A new mapping must prove it does not lose records or break prices before it replaces the approved one; thresholds belong to the policy (ADR-018) |
 | 10 | Field review | `services/healing.py` | per changed field: equal share, steady ratio (×1.07 = VAT), scaled, different, on the same SKUs as last round's published data | A header that looks similar may mean something else; the data says whether it does (ADR-021) |
 | 11 | Field memory | `mapping.py::_inherit_confidence` | unchanged fields take confidence 1.0 from the approved mapping | A person already approved exactly this mapping of this field; asking again is noise (ADR-037) |
-| 12 | Policy | `ai/policy.py` | thresholds per risk, allowed drift, warnings budget, first-time rule, row sanity, hard blocks, sandbox limits, meaning doubts, trust-data-checks, per-customer overrides | Automation is a configuration decision owned by the team, with reasons, never a model's opinion (ADR-008, ADR-037) |
+| 12 | Policy | `ai/policy.py` | thresholds per risk, allowed drift, warnings budget, first-time rule, row sanity, hard blocks, sandbox limits, meaning doubts, trust-data-checks, per-customer overrides | Automation is a configuration decision owned by the person running FORMA, with reasons, never a model's opinion (ADR-008, ADR-037) |
 | 13 | Verdict | `services/verdict.py` | ordered hypothesis rules over the stored reports; suppression of same-rule-different-data, repeated patterns, no-data checks; confidence word; digest | A person reads one sentence and decides one to three things, with the evidence right under it (ADR-036, ADR-053) |
 | 14 | Review | `review_questions.py`, `review_evidence.py`, `review_queue.py`, `ReviewWorkspace` | questions from fields under the confidence bar; answers become a new version with evidence; evidence traced to cells through engine provenance; preview on the same sample; a clock on every question, which can wait for the customer | Decisions are bounded and auditable; the person sees the actual cell, never a guess; an old question is visible and a parked one says whose turn it is (ADR-029, ADR-035, ADR-053) |
-| 15 | Learning | `services/learning.py` | diff approved vs proposed (nearest system/ai ancestor) → aliases, constants, accepted; uses counted; suggestions ≥ 3 customers; admin promotes | A correction is made once per customer and once for everyone; the evidence on every learned field says where it came from (ADR-038) |
+| 15 | Learning | `services/learning.py` | diff approved vs proposed (nearest system/ai ancestor) → aliases, constants, accepted; uses counted; suggestions ≥ 3 customers; a person promotes | A correction is made once per customer and once for everyone; the evidence on every learned field says where it came from (ADR-038) |
 | 16 | Transform | `engine/transform.py`, `services/datasets.py` | DSL compiled to Polars expressions, vectorised records, persistent overrides re-applied, schema validation with invalid count, object-first write | Deterministic, fast, and nothing partial is visible (ADR-002, ADR-015, ADR-024, ADR-026) |
 | 17 | Change intelligence | `datasets.py::change_report`, `anomalies.py` | diff vs the last published dataset; robust outliers (median/MAD); per-kind anomalies with severity; "% normal" | Reviewers need what changed and what looks wrong, not the whole table; high anomalies need an acknowledgement (ADR-022) |
 | 18 | Edit | `datasets.py::apply_changes`, `assistant.py` | staged operations, impact preview, schema check that refuses only added errors, change set → new version; copilot plans, never applies | Fixes are reviewable and reversible; invalid records can be fixed one at a time (ADR-023, ADR-024, ADR-026) |
 | 19 | Approve and export | `datasets.py::approve_dataset/export_dataset`, `publishing.py` | contract gate (no invalid records), anomaly acknowledgement, approver role for a manual export (a bulk round set to publish automatically exports on approval), atomic artifact with sha256, exact `export_view` fields | The downstream never receives a record that breaks the contract or a field it did not ask for (ADR-017, ADR-026) |
-| 20 | Calibration | `services/calibration.py` | outcomes per decision from corrections, the version chain and change sets; precision per rule; proposals with evidence; admin applies | Thresholds are justified by what happened, and the next report shows whether a change was right (ADR-037) |
+| 20 | Calibration | `services/calibration.py` | outcomes per decision from corrections, the version chain and change sets; precision per rule; proposals with evidence; a person applies | Thresholds are justified by what happened, and the next report shows whether a change was right (ADR-037) |
 
 ## 4. Bulk upload and automatic publishing
 
@@ -291,12 +291,12 @@ flowchart LR
   A -->|approve as is| C
   C --> D[(corrections<br/>alias · constant · accepted · promoted)]
   D -->|learned_for customer| E[Next proposal reads aliases & constants first]
-  D -->|≥3 customers same header| F[Suggestion → admin promotes]
+  D -->|≥3 customers same header| F[Suggestion → a person promotes]
   E --> A
   A -->|decision + rules fired| G[calibration.outcomes<br/>accepted / corrected / rejected / auto then edited]
   G --> H[Report: precision per rule and decision]
   G --> I[Proposals: trust data checks · confidence bar ·<br/>per-customer row change · price moves]
-  I -->|admin applies| J[(policy / customer overrides)]
+  I -->|a person applies| J[(policy / customer overrides)]
   J --> A
 ```
 
@@ -619,6 +619,8 @@ cancelled comes back as `open` if the round is reopened (ADR-053).
 | A picture with no model that reads images | the assistant says it cannot read it, and no backup answers as if it had | ADR-049 |
 | A preview of a work fails | the file stays downloadable, and the panel says so | ADR-050 |
 | Retention off, or the backup is old | System health shows the last pass and the backup's age, amber past a day | ADR-053 |
+| A backup fails or is cut off | it leaves nothing with a backup's name, older backups stay, and System health turns amber after a day | ADR-054 |
+| The last backup holds no files | System health says database only, in amber | ADR-054 |
 | Schema version rollout | register the new version; assign per customer or as default; diff view; the next round has no approved mapping under that version, so it is proposed like a first-time format, with no sandbox or field review | ADR-017, ADR-046, RUNBOOK |
 
 ## 10. Keeping the system tidy: retention and the nightly backup
@@ -634,7 +636,7 @@ flowchart TD
   E -->|true| F[Delete objects, rows become purged]
   F --> G
   G --> H[System health:<br/>last pass, storage used, last backup]
-  I[backup-nightly container] -->|every 24 hours| J[forma backup: database dump]
+  I[backup-nightly container] -->|every 24 hours| J[forma backup: database and every file]
   J --> K[(backups volume, 14 days)]
   J --> L[Audit row backup.create]
   L --> H
@@ -652,7 +654,7 @@ flowchart TD
 | S3 local cache | 7 days | |
 
 Retention never closes work: a round nobody has touched for 60 days is flagged on the home page and left to the person.
-`FORMA_RETENTION_APPLY` defaults to false, so a pass only counts what it would delete until it is switched on. Chat
-files stay out of retention and leave with their chat. The nightly backup dumps the database only, and it shares the
-machine's fate: copy the `backups` volume somewhere else from time to time
-([RUNBOOK.md](RUNBOOK.md#who-can-reach-the-stack), ADR-015, ADR-053).
+`FORMA_RETENTION_APPLY` defaults to false, so a pass only counts what it would delete until it is switched on. The
+compose bucket is versioned, so a delete keeps the bytes on disk until a lifecycle rule expires them (R37). Chat files
+stay out of retention and leave with their chat. The nightly backup holds the database and every object, and a restore
+has been proven, but it stays on this machine ([RUNBOOK.md](RUNBOOK.md#who-can-reach-the-stack), R36, ADR-015, ADR-054).

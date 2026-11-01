@@ -481,15 +481,16 @@ sent as data with live data winning (ADR-051).
 Tests: `test_memory.py`.
 
 ### E11. Let the system tidy up after itself
-**ฉันอยาก**ให้ระบบล้างข้อมูลเก่าและสำรองฐานข้อมูลเอง พร้อมบอกว่าทำไปเมื่อไร **เพื่อ**ไม่ต้องคอยจำ และรู้ตัวทันทีถ้ามันหยุดทำ
+**ฉันอยาก**ให้ระบบล้างข้อมูลเก่าและสำรองทั้งฐานข้อมูลและไฟล์เอง พร้อมบอกว่าทำไปเมื่อไรและเก็บอะไรไว้ **เพื่อ**ไม่ต้องคอยจำ และรู้ตัวทันทีถ้ามันหยุดทำ
 
 AC: every pass is recorded with its counts, whether scheduled or run by hand; System health shows the storage used, the
-last pass and the age of the last backup, amber past a day; a dry run deletes nothing, and `FORMA_RETENTION_APPLY`
+last pass, and the age and contents of the last backup, amber past a day or with no files in it; a dry run deletes nothing, and `FORMA_RETENTION_APPLY`
 switches deletion on; retention never closes a round; bytes that a round or a file waiting for a customer still uses
-stay; the questions of a cancelled round stay, because reopening brings them back; the nightly backup keeps 14 days.
+stay; the questions of a cancelled round stay, because reopening brings them back; the nightly backup holds the database and every file and keeps 14 days; a failed
+backup leaves nothing behind and keeps the older ones; a backup can be restored into an empty stack.
 
 Technique: one `retention.run` for the schedule and the command line, an audit row per pass, a first pass soon after
-start, and a backup container that needs no one to remember it (ADR-015, ADR-053).
+start, and a backup container that needs no one to remember it (ADR-015, ADR-053, ADR-054).
 
 Tests: `test_retention_backup.py`.
 
@@ -512,7 +513,7 @@ AC: `SYSTEM_BASE` states it; the guard enforces it; tools mark truncation; tests
 | Accuracy never drops | identity 1.00, field 0.996, critical 1.00, drift 9/9 on the corpus | `make eval-gate`, CI |
 | Nothing partial is ever visible | object-first writes, atomic exports | `test_failure_injection.py` |
 | Decisions are auditable | approvals, edits, exports and settings have actor, action, entity, details (gaps: R21) | `/api/audit`, tests |
-| Data loss on node loss ≤ 24 h; serve again ≤ 1 h | `backup-nightly` runs `forma backup` every 24 hours and keeps 14 days on the same machine; documented restore | RUNBOOK.md |
+| Data loss on node loss ≤ 24 h; serve again ≤ 1 h | `backup-nightly` backs up the database and every file every 24 hours and keeps 14 days; restore proven on this stack. Losing the machine is not covered until a copy leaves it (R36) | RUNBOOK.md, ADR-054 |
 | Every setting is documented | generated `.env.production.example`, drift-checked | CI |
 
 ## Traceability
@@ -523,7 +524,7 @@ AC: `SYSTEM_BASE` states it; the guard enforces it; tools mark truncation; tests
 | B Meaning | 001, 002, 006, 007, 008, 015, 017, 018, 019, 021, 025, 036, 038, 046 |
 | C Data | 020, 022, 023, 024, 026 |
 | D Verdict & review | 029, 035, 036, 042 |
-| E Governance | 015, 016, 017, 025, 032, 037, 039, 040, 041, 045, 048, 049, 050, 051, 053 |
+| E Governance | 015, 016, 017, 025, 032, 037, 039, 040, 041, 045, 048, 049, 050, 051, 053, 054 |
 | F Security | 013, 029, 030, 040 |
 
 ## เมื่อมีคนใช้เพิ่ม

@@ -107,6 +107,8 @@ def status(ctx: ServiceContext, session: Session) -> dict[str, Any]:
             "last_at": backup[0].isoformat() if backup else None,
             "age_hours": round((now - backup[0]).total_seconds() / 3600, 1) if backup else None,
             "path": backup[1].get("path") if backup else None,
+            "files_included": backup[1].get("objects_included") if backup else None,
+            "bytes": backup[1].get("bytes") if backup else None,
         },
     }
 

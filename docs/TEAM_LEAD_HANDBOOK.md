@@ -1,7 +1,7 @@
 # FORMA — Team lead handbook
 
 > **สรุปภาษาไทย** — จุดเริ่มต้นสำหรับหัวหน้าทีม: ระบบคืออะไรในหนึ่งหน้า, เอกสารแต่ละฉบับอยู่ไหนและใช้ตอนไหน,
-> ตัวชี้วัดที่ต้องดู, ความเสี่ยงที่เปิดอยู่, สิ่งที่ต้องตัดสินใจ, และสารบัญ ADR ทั้ง 46 ฉบับแบบบรรทัดเดียว
+> ตัวชี้วัดที่ต้องดู, ความเสี่ยงที่เปิดอยู่, สิ่งที่ต้องตัดสินใจ, และสารบัญ ADR ทั้ง 54 ฉบับแบบบรรทัดเดียว
 
 ## 1. One page
 
@@ -46,11 +46,12 @@ server. Not yet established: accuracy on real files and the real downstream cont
    thresholds), and the review cadence for the precision report.
 4. **AI provider and budget** — provider, model, backup keys and monthly cap.
 5. **Retention** — how long source files, datasets and exports are kept; when to switch retention from dry-run
-   to apply.
+   to apply, which needs R37 settled first.
 6. **Copies off this machine** — the repository has no remote and the backups sit on the same disk, so losing the
-   machine loses both. A private remote and a copy of the `backups` volume elsewhere cover that.
+   machine loses all of it (R36). It takes a private remote, and a copy of the newest backup and `.env.production`
+   somewhere else.
 
-Before any production use, the open items in the risk register need a decision, first R30 (a customer-scoped admin can change shared settings) and R20–R22.
+Before any production use, the open items in the risk register need a decision, first R36 (losing this machine loses the code, the data and the backups), then R30 (a customer-scoped admin can change shared settings) and R20–R22.
 
 ## 4. Operating rhythm
 
@@ -118,6 +119,7 @@ Before any production use, the open items in the risk register need a decision, 
 | 051 | The assistant remembers a person across chats |
 | 052 | Closing a round without deleting it: cancel, move, replace |
 | 053 | Housekeeping you can see, and a review queue with a clock |
+| 054 | A backup holds everything, and has been restored |
 
 ## 6. Numbers to quote (and where they come from)
 
@@ -125,8 +127,8 @@ Before any production use, the open items in the risk register need a decision, 
 |---|---|---|
 | Field accuracy on the synthetic corpus, no AI | 0.996 (30/30 variants ≥ 0.99); identity 1.00; critical 1.00; drift 9/9 | `make eval-gate`, `data/eval_baseline.json` |
 | A 300-file night | 17 min, 8 worker processes, 12-core node, 30M rows | PERFORMANCE.md (pre-ADR-043; re-measure) |
-| Tests | 639 passed, 5 skipped locally, coverage 91 % (gate 85 % in CI) | `pytest`, CI |
-| Endpoints / tables / ADRs | ~126 / 23 / 53 | API_OVERVIEW.md, DATA_MODEL.md, adr/ |
+| Tests | 649 passed, 5 skipped locally, coverage 91 % (gate 85 % in CI) | `pytest`, CI |
+| Endpoints / tables / ADRs | ~126 / 23 / 54 | API_OVERVIEW.md, DATA_MODEL.md, adr/ |
 
 Anything else — accuracy on real files, provider accuracy, production throughput — is not yet measured and
 should be said so.
