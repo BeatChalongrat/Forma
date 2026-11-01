@@ -85,7 +85,8 @@ export function pyRegex(pattern: string | null | undefined): RegExp | null {
 
 export const FORMAT_LABEL: Record<string, string> = {
   identical: 'Same format', header_moved: 'Header moved', columns_added: 'Columns added',
-  columns_renamed: 'Columns renamed', columns_removed: 'Missing columns', types_changed: 'Data types changed',
+  columns_renamed: 'Columns renamed', columns_removed: 'Missing columns', columns_moved: 'Columns moved to another sheet',
+  types_changed: 'Data types changed',
   sheets_added: 'Sheets added', sheets_removed: 'Missing sheets', unrelated_file: 'Check customer',
 }
 export const formatLabel = (value: string) => FORMAT_LABEL[value] ?? value.replace(/_/g, ' ')

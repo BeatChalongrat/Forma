@@ -115,6 +115,7 @@ DRIFT_KINDS = (
     "columns_renamed",
     "columns_added",
     "columns_removed",
+    "columns_moved",
     "types_changed",
     "sheets_added",
     "sheets_removed",
@@ -211,6 +212,19 @@ def compare(previous: Fingerprint, current: Fingerprint, *, unrelated_threshold:
         changes.append({"kind": "columns_added", "header": h})
     for h in removed:
         changes.append({"kind": "columns_removed", "header": h})
+    # the union of headers hides a column that left one table for another (a price moving from the item
+    # sheet to the price sheet): the mapping that read it where it was must not be reused (ADR-057)
+    cur_tables = {t.sheet: set(t.headers) for t in current.tables}
+    for prev_t in previous.tables:
+        there = cur_tables.get(prev_t.sheet)
+        if there is None:
+            continue
+        for h in sorted(set(prev_t.headers) - there):
+            if h in renamed or h in removed:
+                continue
+            landed = sorted(sh for sh, hs in cur_tables.items() if sh != prev_t.sheet and h in hs)
+            if landed:
+                changes.append({"kind": "columns_moved", "header": h, "from": prev_t.sheet, "to": landed[0]})
     # header position / types for tables on the same sheet
     prev_by_sheet = {t.sheet: t for t in previous.tables}
     for t in current.tables:
@@ -255,6 +269,7 @@ def compare(previous: Fingerprint, current: Fingerprint, *, unrelated_threshold:
     priority = [
         "sheets_removed",
         "columns_removed",
+        "columns_moved",
         "columns_renamed",
         "types_changed",
         "sheets_added",

@@ -416,7 +416,7 @@ function NewFormatModal({ open, onClose, onRegistered }: { open: boolean; onClos
 // ---------------------------------------------------------------------------------------------
 // Approval policy
 // ---------------------------------------------------------------------------------------------
-const DRIFT = ['identical', 'header_moved', 'columns_added', 'columns_renamed', 'columns_removed', 'types_changed', 'sheets_added', 'sheets_removed']
+const DRIFT = ['identical', 'header_moved', 'columns_added', 'columns_renamed', 'columns_removed', 'columns_moved', 'types_changed', 'sheets_added', 'sheets_removed']
 const RISKS = ['critical', 'high', 'medium', 'low']
 
 function CalibrationSection() {

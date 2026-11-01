@@ -82,11 +82,16 @@ the collection's source for its `fields`); `source: other_id` reaches a joined f
 | `to_list` | 1+ | | list of strings |
 | `eq` `neq` `gt` `gte` `lt` `lte` `is_null` `not_null` `and` `or` `not` `contains` `starts_with` `in` | | `pattern`, `values` | boolean |
 
-Adding an op means: add it to `Op`, give it an arity in `OP_ARITY`, one compiler branch in
-`engine/ops.py`, and a test. The LLM prompt lists the ops automatically.
+Adding an op means: add it to `Op`, give it an arity in `OP_ARITY`, its params in `OP_PARAMS`, one compiler
+branch in `engine/ops.py`, and a test. The LLM prompt lists every op with its arity and params from those two
+tables. A param that is not in `OP_PARAMS` is a validation error (`unknown_param`); a few spellings a model or a
+person reaches for are repaired on the way in (`PARAM_ALIASES`: `day_first` → `dayfirst`, `assume` →
+`assume_year`, `sep` → `separator`, `precision` → `decimals`, …). A `const` without `value` is a null constant
+(ADR-057).
 
 ## Static validation (`validate_mapping`)
 
 Errors: unknown target pointer, collection field mapped at root, duplicate target, unknown source,
-required root field or identity key not mapped, required collection item field not mapped, bad op params.
+required root field or identity key not mapped, required collection item field not mapped, bad or unknown op
+params.
 Warnings: critical field unmapped, critical field mapped to a constant.

@@ -33,6 +33,7 @@
 | 13 Backups that restore | every file in the nightly backup, restore proven on this stack, health page says what a backup holds | **done** | ADR-054 |
 | 14 Files that went wrong quietly | printed reports keep every page, a second price sheet is a question, currency columns are read, one date order per delivery | **done** | ADR-055 |
 | 15 Values that changed quietly | a reused mapping is checked on the data, conflicting duplicates are errors, no default on enum fields, four more number forms, publishing exports the approved version | **done** | ADR-056 |
+| 16 First real AI run | six ERP flavours × three deliveries through the live stack with a real model; the DSL tells the model its shape, unknown params are errors, drift sees a column that moved sheets, year 9999 is null, the API commits before it answers | **done** | ADR-057, `docs/REAL_AI_RUN_2026-11-02.md` |
 | 11 Closing a round | cancel with reopen, move to the right customer, replace with a corrected file; nothing deleted | **done** | ADR-052 |
 | 10 Memory across chats | topics kept while talking, search of earlier chats, pause, reset, memory-off and incognito chats | **done** | ADR-051 |
 | 9 Work beside the chat | flows, documents, slides, sheets and web pages open in a panel beside the chat, with versions, restore and previews | **done** | ADR-050 |

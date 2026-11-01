@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from forma.mapping_dsl.models import (
+    OP_PARAMS,
     CallExpr,
     ColExpr,
     CollectionMapping,
@@ -63,6 +64,11 @@ def _check_expr(e: Expr, path: str, rep: ValidationReport, source_ids: set[str])
             )
         if isinstance(node, CallExpr):
             p = node.params
+            allowed = OP_PARAMS.get(node.op, {})
+            for key in p:
+                if key not in allowed:
+                    hint = ", ".join(allowed) if allowed else "none"
+                    rep.error("unknown_param", f"{node.op} has no param {key!r} (allowed: {hint})", path)
             if (
                 node.op in (Op.REGEX_EXTRACT, Op.REGEX_REPLACE, Op.CONTAINS, Op.STARTS_WITH)
                 and "pattern" not in p

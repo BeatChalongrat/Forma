@@ -65,6 +65,9 @@ def test_parse_number_th(value: object, expected: float | None) -> None:
         ("46000", dt.date(2025, 12, 9)),  # Excel serial
         ("46000.5", dt.date(2025, 12, 9)),
         ("99999", None),  # out of plausible serial range
+        ("31.12.9999", None),  # SAP "valid forever": a sentinel, not Buddhist year 9456 (ADR-057)
+        ("9999-12-31", None),
+        ("31/12/9999", None),
         ("31/02/2569", None),  # invalid calendar date
         ("13/14/2026", None),
         ("foo", None),
