@@ -40,6 +40,7 @@ from forma.services import format_memory
 from forma.services import rounds as rs
 from forma.services.context import ServiceContext
 from forma.services.publishing import FORMAT, latest_export
+from forma.services.round_lifecycle import CLOSED
 from forma.storage import safe_name
 
 SIMILAR_MIN = 0.75  # closest approved format must be at least this similar …
@@ -329,6 +330,8 @@ def item_state(item: BatchItem, r: ImportRound | None) -> dict[str, Any]:
         return {"state": "processing", "step": 1, "message": "Preparing the round"}
     pub = (r.summary or {}).get("publish") or {}
     s = r.status
+    if s in CLOSED:
+        return {"state": "closed", "step": 1, "message": r.closed_reason or s, "closed_as": s}
     if s in ("uploaded", "profiled"):
         return {"state": "processing", "step": 2, "message": "Proposing the mapping"}
     if s in ("review", "rejected"):
@@ -460,7 +463,7 @@ def batch_view(session: Session, b: Batch) -> dict[str, Any]:
         "mapped": mapped,
         "stuck": len(stuck_items(session, b)),
         "done": all(
-            i["state"] in ("ready", "failed", "needs_customer", "needs_review", "needs_data_check")
+            i["state"] in ("ready", "failed", "needs_customer", "needs_review", "needs_data_check", "closed")
             for i in out_items
         ),
         "items": out_items,
@@ -506,6 +509,9 @@ def zip_outputs(ctx: ServiceContext, session: Session, b: Batch) -> tuple[bytes,
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
         for it in b.items:
             if not it.round_id:
+                continue
+            r = session.get(ImportRound, it.round_id)
+            if r is None or r.status in CLOSED:
                 continue
             art = latest_export(session, it.round_id, FORMAT)
             if art is None:

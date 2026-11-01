@@ -40,6 +40,12 @@ export function nextStep(r: Pick<ImportRound, 'status'>): NextStep {
       return { step: 5, action: 'Export JSON', th: 'ข้อมูลอนุมัติแล้ว ดาวน์โหลดได้เลย', tone: 'todo' }
     case 'published':
       return { step: 6, action: null, th: 'ส่งออกแล้ว', tone: 'done' }
+    case 'cancelled':
+      return { step: 0, action: 'Cancelled', th: 'ยกเลิกแล้ว', tone: 'done' }
+    case 'moved':
+      return { step: 0, action: 'Moved to another customer', th: 'ย้ายไปลูกค้าอื่นแล้ว', tone: 'done' }
+    case 'superseded':
+      return { step: 0, action: 'Replaced by a newer file', th: 'ถูกแทนที่ด้วยไฟล์ใหม่', tone: 'done' }
     default:
       return { step: 1, action: null, th: '', tone: 'working' }
   }

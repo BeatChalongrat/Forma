@@ -30,6 +30,14 @@ class RoundIn(BaseModel):
     target_schema: str | None = None  # None → the customer's format, else the default format
 
 
+class CloseIn(BaseModel):
+    reason: str = Field(min_length=1, max_length=500)
+
+
+class MoveIn(CloseIn):
+    customer_id: str
+
+
 class AskIn(BaseModel):
     question: str = Field(min_length=1, max_length=2000)
 

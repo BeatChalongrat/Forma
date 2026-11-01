@@ -16,6 +16,7 @@ from forma.api import serialize as ser
 from forma.auth import Principal
 from forma.core.errors import ValidationFailed
 from forma.db.models import Batch, BatchItem, Customer, ImportRound, SourceFile
+from forma.services.round_lifecycle import CLOSED
 
 
 class Preferences(BaseModel):
@@ -85,8 +86,13 @@ def history(
     q = select(ImportRound, uploaded.label("uploaded_at")).where(uploaded.is_not(None))
     if p.customers is not None:
         q = q.where(ImportRound.customer_id.in_(sorted(p.customers)))
-    if status:
+    # Closed rounds (ADR-052) are history, not work: shown only when asked for.
+    if status == "closed":
+        q = q.where(ImportRound.status.in_(CLOSED))
+    elif status:
         q = q.where(ImportRound.status == status)
+    else:
+        q = q.where(ImportRound.status.not_in(CLOSED))
     if customer_id:
         q = q.where(ImportRound.customer_id == customer_id)
     if start:

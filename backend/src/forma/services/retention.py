@@ -17,7 +17,7 @@ from forma.services.context import ServiceContext
 from forma.services.rounds import audit
 
 log = get_logger(__name__)
-CLOSED_ROUND_STATUSES = ("published", "rejected", "blocked")
+CLOSED_ROUND_STATUSES = ("published", "rejected", "blocked", "cancelled", "moved", "superseded")
 
 
 def load_policy(policies_dir: Path) -> dict[str, Any]:

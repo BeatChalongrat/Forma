@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 
 from forma.auth import Principal
 from forma.db.models import Customer, ImportRound
+from forma.services.round_lifecycle import CLOSED
 
 MIN_ROUNDS = 2  # rounds before a cadence can be estimated
 RECENT = 3  # rounds the watchlist looks at
@@ -28,7 +29,12 @@ def _text(en: str, th: str) -> dict[str, str]:
 
 
 def _rounds_by_customer(session: Session, p: Principal) -> dict[str, list[ImportRound]]:
-    q = select(ImportRound).order_by(ImportRound.customer_id, ImportRound.created_at)
+    # A cancelled, moved or replaced round was not a delivery (ADR-052).
+    q = (
+        select(ImportRound)
+        .where(ImportRound.status.not_in(CLOSED))
+        .order_by(ImportRound.customer_id, ImportRound.created_at)
+    )
     if p.customers is not None:
         q = q.where(ImportRound.customer_id.in_(sorted(p.customers)))
     out: dict[str, list[ImportRound]] = {}

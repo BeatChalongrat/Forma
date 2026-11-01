@@ -29,6 +29,7 @@
 | 8 Review explanations & clarification | policy reasons explained in Thai and English; the assistant asks clarification questions before assuming, with the review context carried into the chat | **done** | ADR-042 |
 | 8 Input contract readiness | full OOXML scan, strict CSV decoding, formula and error-cell gates, table detection across the whole sheet, unsupported schema shapes refused, the full target schema in AI prompts | **done** | ADR-043 |
 | 8 Durable queue reconciliation | on startup, queued jobs are checked against durable results before recovery and resubmission | **done** | ADR-044 |
+| 11 Closing a round | cancel with reopen, move to the right customer, replace with a corrected file; nothing deleted | **done** | ADR-052 |
 | 10 Memory across chats | topics kept while talking, search of earlier chats, pause, reset, memory-off and incognito chats | **done** | ADR-051 |
 | 9 Work beside the chat | flows, documents, slides, sheets and web pages open in a panel beside the chat, with versions, restore and previews | **done** | ADR-050 |
 | 8 Assistant sandbox and images | the assistant runs Python in an isolated container and reads images when the connected model can; files attach to a chat | **done** | ADR-048, ADR-049 |

@@ -7,6 +7,7 @@ import { AssistantIcon } from '../lib/icons'
 import { formatLabel, fmtBytes, fmtDate, fmtInt, cn } from '../lib/utils'
 import { PageHeader, StatusBadge, Section, Badge, Confidence, Drawer, KV, Spinner, FindingRow, Empty } from '../components/ui'
 import { RoundSteps } from '../components/RoundSteps'
+import { ClosedNote, RoundMenu } from '../components/RoundMenu'
 import { useToast } from '../lib/toast'
 import { usePreferences } from '../lib/preferences'
 
@@ -19,7 +20,7 @@ export function RoundPage() {
   const toast = useToast()
   const nav = useNavigate()
   const { data: r, isLoading } = useQuery({ queryKey: ['round', roundId], queryFn: () => api.round(roundId), refetchInterval: (q) => (['uploaded', 'profiled'].includes(q.state.data?.status ?? '') ? 2000 : false) })
-  const [fileOpen, setFileOpen] = useState<SourceFile | null>(null)
+  const [fileOpen, setFileOpen] = useState<SourceFile | null>(null), [moveRequest, setMoveRequest] = useState(0)
 
   const runJob = useMutation({
     mutationFn: async (kind: 'run' | 'propose' | 'transform') => {
@@ -49,10 +50,12 @@ export function RoundPage() {
         title={<span>{r.customer?.name} <span className="text-muted font-normal">· {r.label}</span></span>}
         subtitle={<span className="flex items-center gap-2 flex-wrap"><StatusBadge status={r.status} />{drift && <Badge tone={driftTone(drift)}>format: {formatLabel(drift)}</Badge>}<span className="text-muted">{fmtDate(r.created_at)}</span></span>}
         hint="รอบนี้อยู่ขั้นไหน และต้องทำอะไรต่อ ดูที่แถบด้านล่าง"
-        actions={<Link className="btn" to={`/assistant?round=${r.id}`}><AssistantIcon size={16} /> Ask about this file</Link>}
+        actions={<><Link className="btn" to={`/assistant?round=${r.id}`}><AssistantIcon size={16} /> Ask about this file</Link><RoundMenu round={r} moveRequest={moveRequest} /></>}
       />
 
-      <RoundSteps r={r} busy={runJob.isPending || doExport.isPending} onRun={(k) => runJob.mutate(k)} onExport={(id, fmt) => doExport.mutate({ id, fmt })} />
+      <ClosedNote r={r} />
+      {r.predecessor && <p className="mt-5 text-sm text-muted">{r.status === 'moved' ? null : r.predecessor.customer_id !== r.customer_id ? t(`Moved here from ${r.predecessor.customer_code ?? 'another customer'}`, `ย้ายมาจาก ${r.predecessor.customer_code ?? 'ลูกค้าอื่น'}`) : t('Replaces an earlier round', 'แทนรอบก่อนหน้า')} · <Link className="underline" to={`/rounds/${r.predecessor.id}`}>{r.predecessor.label ?? r.predecessor.id}</Link></p>}
+      {!['cancelled', 'moved', 'superseded'].includes(r.status) && <RoundSteps r={r} busy={runJob.isPending || doExport.isPending} onRun={(k) => runJob.mutate(k)} onExport={(id, fmt) => doExport.mutate({ id, fmt })} onMove={() => setMoveRequest(n => n + 1)} />}
 
       {memory && <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line bg-surface px-4 py-3 text-sm">
         <div>

@@ -69,7 +69,16 @@ def import_round(
         "summary": r.summary or {},
         "created_at": _dt(r.created_at),
         "updated_at": _dt(r.updated_at),
+        "successor_id": r.successor_id,
+        "predecessor_id": r.predecessor_id,
     }
+    if r.closed_at is not None:
+        d["closed"] = {
+            "from": r.closed_from,
+            "by": r.closed_by,
+            "at": _dt(r.closed_at),
+            "reason": r.closed_reason,
+        }
     if files:
         d["files"] = [source_file(f) for f in r.files]
     if customer_obj is not None:

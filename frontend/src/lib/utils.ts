@@ -65,11 +65,12 @@ export function describeExpr(e: { op: string; name?: string; value?: unknown; ar
 }
 export const STATUS_LABEL: Record<string, string> = {
   uploaded: 'Uploaded', profiled: 'File read', review: 'Needs review', auto_approved: 'Auto-approved', approved: 'Fields approved', transformed: 'Data ready for review',
+  cancelled: 'Cancelled', moved: 'Moved',
   approved_data: 'Data approved', published: 'Exported', blocked: 'Blocked', rejected: 'Rejected', failed: 'Failed', proposed: 'Proposed', superseded: 'Superseded', draft: 'Draft', open: 'Open',
 }
 export const STATUS_TONE: Record<string, 'ok' | 'warn' | 'bad' | 'info' | 'neutral'> = {
   uploaded: 'neutral', profiled: 'neutral', review: 'warn', auto_approved: 'ok', approved: 'ok', transformed: 'info', approved_data: 'ok', published: 'ok', blocked: 'bad', rejected: 'bad', failed: 'bad',
-  proposed: 'warn', superseded: 'neutral', draft: 'neutral', open: 'warn', done: 'ok', running: 'info', queued: 'neutral',
+  proposed: 'warn', superseded: 'neutral', cancelled: 'neutral', moved: 'neutral', draft: 'neutral', open: 'warn', done: 'ok', running: 'info', queued: 'neutral',
 }
 
 /** Python-style regex (may start with (?i)) → JS RegExp; null when it cannot be compiled. */
