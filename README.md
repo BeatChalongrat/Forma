@@ -195,7 +195,7 @@ audited without secrets and applied to every API and worker process within `FORM
 ```bash
 cp .env.production.example .env.production        # every variable explained; fill in the secrets
 docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build --scale worker=4
-open http://localhost/            # web (set FORMA_WEB_PORT to change)
+open http://localhost/            # web, on this machine only (FORMA_WEB_PORT and FORMA_BIND_HOST change that)
 curl http://localhost/ready       # db · storage · queue
 ```
 

@@ -11,8 +11,8 @@
 | Development | `dev` | headers `X-Forma-User`, `X-Forma-Roles`, `X-Forma-Customers`; unknown users get `FORMA_AUTH_DEV_DEFAULT_ROLE` | local only; the API refuses to start with `dev` when `FORMA_ENV=prod` unless `FORMA_AUTH_ALLOW_DEV_IN_PROD=true` is set deliberately for a local smoke test |
 | OIDC | `oidc` | JWT (bearer) verified against the issuer's JWKS; roles from `FORMA_AUTH_ROLE_CLAIM`; customers from `FORMA_AUTH_CUSTOMERS_CLAIM`; the SPA uses PKCE | production |
 
-Development mode has no login. The compose stack publishes the web port and MinIO on every network interface by
-default, so a local stack in `dev` must not be reachable from other devices (R31 in
+Development mode has no login. The compose stack publishes the web port and MinIO on 127.0.0.1, so only the machine
+it runs on can reach them. `FORMA_BIND_HOST` changes that, and must not change while `FORMA_AUTH=dev` (R31 in
 [RISK_REGISTER.md](RISK_REGISTER.md)).
 
 Approvals, edits, exports and settings changes record the authenticated identity as the actor, and request
