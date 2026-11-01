@@ -13,8 +13,9 @@ the approved one on real data, lets a configurable policy decide `auto_approve |
 gates on the contract, learns from every correction, calibrates its own policy from outcomes, expects the
 next delivery per customer, and keeps everything immutable, versioned and audited.
 
-Built: phases 0–8 (see [ROADMAP_STATUS.md](ROADMAP_STATUS.md)). Not yet established: accuracy on real files,
-the real downstream contract, OIDC against a real IdP, multi-host workers in anger ([RISK_REGISTER.md](RISK_REGISTER.md)).
+Built: phases 0–8 (see [ROADMAP_STATUS.md](ROADMAP_STATUS.md)). It runs for one person on one machine, with no
+server. Not yet established: accuracy on real files and the real downstream contract
+([RISK_REGISTER.md](RISK_REGISTER.md)). OIDC and multi-host workers matter only if FORMA moves to a server.
 
 ## 2. The documents and when to use them
 
@@ -43,11 +44,11 @@ the real downstream contract, OIDC against a real IdP, multi-host workers in ang
    alternatively, build the from-database evaluation that uses published rounds as the answer key (R1).
 3. **Automation appetite** — which calibration proposals to accept first (`trust_data_checks`, per-customer
    thresholds), and the review cadence for the precision report.
-4. **AI provider and budget** — provider, model, backup keys, monthly cap, and whether the assistant
-   and its reports are enabled for all roles.
-5. **Identity provider** — Keycloak or Entra, role and customer claims, who gets approver and admin.
-6. **Retention** — how long source files, datasets and exports are kept; when to switch retention from dry-run
+4. **AI provider and budget** — provider, model, backup keys and monthly cap.
+5. **Retention** — how long source files, datasets and exports are kept; when to switch retention from dry-run
    to apply.
+6. **Copies off this machine** — the repository has no remote and the backups sit on the same disk, so losing the
+   machine loses both. A private remote and a copy of the `backups` volume elsewhere cover that.
 
 Before any production use, the open items in the risk register need a decision, first R30 (a customer-scoped admin can change shared settings) and R20–R22.
 
@@ -125,7 +126,7 @@ Before any production use, the open items in the risk register need a decision, 
 | Field accuracy on the synthetic corpus, no AI | 0.996 (30/30 variants ≥ 0.99); identity 1.00; critical 1.00; drift 9/9 | `make eval-gate`, `data/eval_baseline.json` |
 | A 300-file night | 17 min, 8 worker processes, 12-core node, 30M rows | PERFORMANCE.md (pre-ADR-043; re-measure) |
 | Tests | 639 passed, 5 skipped locally, coverage 91 % (gate 85 % in CI) | `pytest`, CI |
-| Endpoints / tables / ADRs | ~110 / 19 / 46 | API_OVERVIEW.md, DATA_MODEL.md, adr/ |
+| Endpoints / tables / ADRs | ~126 / 23 / 53 | API_OVERVIEW.md, DATA_MODEL.md, adr/ |
 
 Anything else — accuracy on real files, provider accuracy, production throughput — is not yet measured and
 should be said so.

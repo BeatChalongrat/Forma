@@ -154,6 +154,9 @@ A round's format: the request's, else the customer's (`default_target_schema`), 
 
 ## Production shape (Phase 7)
 
+Today this stack runs on one machine for one person, with its ports on 127.0.0.1 and no login (R31). Replicas, nodes
+and OIDC below are what the design allows when it moves to a server.
+
 ```
  browser ──▶ nginx (web image: SPA + /api proxy) ──▶ API (FastAPI, N replicas)
                                                        │ enqueue()            ▲ /ready /metrics /api/ops
@@ -174,19 +177,25 @@ A round's format: the request's, else the customer's (`default_target_schema`), 
   Alembic migrations; JSON → JSONB; every datetime is UTC-aware.
 * **Auth & tenancy** (ADR-013). `FORMA_AUTH=dev` (header) or `oidc` (JWT via JWKS, PKCE in the SPA).
   Roles importer ⊂ reviewer ⊂ approver ⊂ admin enforced by one dependency; the authenticated actor is what
-  the audit log records; an optional `customers` claim scopes everything to a tenant's customers.
+  the audit log records; an optional `customers` claim scopes everything to a tenant's customers. The one-machine
+  stack runs in `dev` mode, which is safe only because its ports stay on 127.0.0.1.
 * **Security** (ADR-013). Uploads are sniffed by content, names sanitised, sizes capped; LLM endpoints are
   rate-limited and samples capped; agent output passes a guard (instruction-like text or pointers outside
   the schema → rejected → heuristic draft → review).
 * **Assistant** (ADR-029, 030, 040, 042, 045). A bounded tool loop over read-only, tenant-scoped tools;
   citations must name real evidence; the model selects server-built navigation, reports and one confirmable
   action, and asks clarification questions before assuming; conversations are stored per owner and access scope.
+  Code it writes runs in a container with no network and no secrets, and the results stay in the chat (ADR-048). It
+  reads pictures and files in a chat (ADR-049), keeps what it makes as versioned works (ADR-050) and remembers what a
+  person tells it, never what a file says (ADR-051).
 * **Observability** (ADR-014). `span()` tracing (OTLP when configured), Prometheus `/metrics` with
   scrape-time gauges from the DB, JSON logs with request ids that follow a job into its worker, `/health`
   and `/ready`, an admin Ops page (queue, workers, failed jobs + retry, spend, slowest rounds).
 * **Reliability** (ADR-015). Retries with backoff and a circuit breaker for the model (fallback never
   auto-approves); backup AI keys tried in order, each with its own breaker and model (ADR-025); retention policy with audited deletions, `forma backup|restore`, `docs/RUNBOOK.md`.
-* **Deployment** (ADR-016). One backend image (`forma serve` / `forma worker`), one web image,
+  Each retention pass is recorded, System health shows it, and `backup-nightly` dumps the database every 24 hours
+  (ADR-053).
+* **Deployment** (ADR-016). One backend image (`forma serve` / `forma worker`), one web image, a sandbox image,
   `docker-compose.prod.yml`, `.env.production.example` generated from `Settings`, CI gates (lint, types,
   tests on SQLite + Postgres + MinIO, migration/config drift, eval baseline, short bench, image builds).
 

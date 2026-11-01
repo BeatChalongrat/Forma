@@ -17,14 +17,15 @@
 ## 2. Gates (see [TESTING_STRATEGY.md](TESTING_STRATEGY.md))
 
 ```
-make check          # ruff + ruff format --check + mypy strict + pytest (coverage ≥ 80 %)
+make check          # ruff + ruff format --check + mypy strict + pytest (coverage ≥ 80 %) + npm test
 make eval-gate      # accuracy on the synthetic corpus vs data/eval_baseline.json
-cd frontend && npx tsc -b && npx oxlint src && npm run build
+cd frontend && npx tsc -b && npx oxlint src && npm test && npm run build
 cd backend && .venv/bin/forma config example --check ../.env.production.example   # when settings changed
 ```
 
 CI runs the same plus real Postgres/MinIO, the migration drift guard, a short benchmark, both images and the
-compose config.
+compose config. The repository has no remote yet, so CI does not run until the code is pushed. Until then the gates
+above are the only gates.
 
 ## 3. Database changes
 
@@ -79,4 +80,4 @@ formats).
 - [ ] migration (if model changed) · `.env.production.example` (if settings changed)
 - [ ] docs / ADR in the same commit · roadmap row if it is a feature
 - [ ] conventional commit · ff-merge into `main`
-- [ ] backup · deploy · `/ready` · smoke check (TESTING_STRATEGY §4)
+- [ ] backup · rebuild the stack · `/ready` · smoke check (TESTING_STRATEGY §4)

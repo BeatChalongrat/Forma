@@ -27,7 +27,7 @@ on real files yet; replace them once a baseline exists.
 | **Reliability** | Failed jobs | jobs in `failed` | Ops, `forma_jobs_queue` | 0 outside incidents |
 | | Stuck bulk items | items with no job | batch view `stuck` | 0 |
 | | Breaker open minutes | time the AI breaker was open; API process and primary route only (R27) | `forma_llm_breaker_open` | low; backups should absorb outages |
-| | Backup age | time since last `forma backup` | runbook check | < 24 h |
+| | Backup age | time since last `forma backup` | System health, audit `backup.create` | < 24 h |
 | **Cost** | Estimated AI cost per round | `llm_calls.cost_usd` per round | Prometheus `forma_llm_cost_usd_per_round`; Home shows the all-time total, Ops recent days | budgeted per customer tier |
 | **Adoption** | Verdict accepts vs manual approvals | `verdict.accept` audits ÷ approvals | audit | rising |
 | | Assistant answers with evidence | replies with ≥ 1 citation ÷ replies | conversations | ≈ 100 % |

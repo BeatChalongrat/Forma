@@ -63,13 +63,21 @@
 
 ## What remains (next phases)
 
+FORMA runs for one person on one machine, so what remains comes in two parts.
+
+**For real use**
+
 * **Eval on real customer files** — the harness is ready (`data/real/`, `forma eval --index|--llm|--replay`,
   ADR-041); what is missing are the first 20–30 real ERP exports with reviewed expected output and a
   baseline for them (`docs/EVALUATION.md`).
 * **Real target contract** — `target_schema/product.v1.json` is still the draft; swap in the downstream
   schema and run the schema diff + a full re-eval.
+* **Copies off this machine** — the repository has no remote, and the backups sit on the same disk.
+* **Engine next levers** — schema validation per column, nested structs from Polars (see PERFORMANCE.md).
+
+**Only when moving to a server**
+
 * **OIDC against a real IdP** — the token path is unit-tested with RSA keys and the SPA has the PKCE flow;
   it has not been exercised against Keycloak/Entra yet (`docs/PHASE7_REVIEW.md`).
 * **Multi-node arq in anger** — the compose stack runs two workers on one host; a multi-host run needs a
   shared S3 (not MinIO-on-the-same-box) and Postgres connection pooling (pgbouncer) sized to workers.
-* **Engine next levers** — schema validation per column, nested structs from Polars (see PERFORMANCE.md).

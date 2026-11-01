@@ -18,10 +18,11 @@ contract per delivery for a downstream system. The constraints that shaped the a
 | Layouts differ per customer and change without notice | Structural fingerprints, drift classification, mapping memory, an approved-format library |
 | Thai and English headers and values, Buddhist-era dates, VAT conventions | Explicit, tested Thai operations in the engine; no implicit locale behaviour (ADR-007) |
 | Output is a contract other systems depend on | Target schema is configuration; schema validation gates approval and export (ADR-001, ADR-026) |
-| An operations team, not engineers, runs it | Verdicts, questions with evidence, spreadsheet editing, Thai/English UI, one-click actions through the policy |
+| One person in operations, not an engineer, runs it | Verdicts, questions with evidence, spreadsheet editing, Thai/English UI, one-click actions through the policy |
 | AI must help without being trusted blindly | AI emits a declarative DSL; the policy decides; a guard checks every output; a model failure routes to review (ADR-002, ADR-008, ADR-013) |
 | Decisions must be auditable and reversible | Immutable sources, append-only versions, change sets, audit log, atomic writes (ADR-005, ADR-015) |
 | 300 files × 100K rows in a night | Polars engine, vectorised rules, process/arq workers, measured benchmark (ADR-010) |
+| One machine, no server | Ports published on 127.0.0.1 with no login (`FORMA_AUTH=dev`, R31); roles, customer scope and OIDC stay in the code for a later move; housekeeping and backups run by themselves (ADR-053) |
 
 ## 2. The two planes
 
@@ -199,16 +200,17 @@ themes). Pages are self-contained; API types live in `lib/api.ts`.
 | Page | Components | Backend it talks to |
 |---|---|---|
 | Overview (Home) | Workflow, WorkRoundDashboard, Foresight, VerdictLine, NextStepCell | dashboard, rounds, uploads, foresight |
-| Upload (bulk + work rounds) | BulkUpload, UploadPage | batches, jobs |
+| Upload (bulk + work rounds) | BulkUpload, UploadPage; UploadCard follows a working round on every page | batches, jobs |
 | Imports | WorkRounds, history filters | history, batches |
-| Round (case) | RoundSteps + VerdictCard, files, mapping versions, datasets | rounds, verdict, jobs |
-| Review | ReviewWorkspace (verdict, questions, evidence, preview, save), ClarificationCard via assistant | mappings/questions, evidence, answers, verdict |
+| Round (case) | RoundSteps + VerdictCard, RoundMenu (cancel, move, replace, reopen), files, mapping versions, datasets | rounds, verdict, jobs |
+| Review | ReviewWorkspace (verdict, questions, evidence, preview, save), age and wait for the customer, ClarificationCard via assistant | review, mappings/questions, evidence, answers, verdict |
 | MappingStudio, RelationshipMap | field view, what changed, compare, relationships, DSL | mappings, sandbox, field-review, relationships, previews |
 | DataEditor | grid, bulk edits, copilot, trace, changes/anomalies, findings, versions | datasets/* |
 | Customers | list with next expected, detail with formats, overrides, policy overrides | customers |
 | Settings | AI (connection, models, backups), formats, policy (+ calibration), learning, DSL, audit, system | settings/*, calibration, learning, schemas, audit |
-| Assistant | Assistant, AssistantResponse, AssistantReport, ChatFiles, ConfirmAction, ChatHistory, ChatMenu | assistant/*, conversations, stream |
-| Ops | queue, workers, failed jobs, breaker, spend | ops, jobs |
+| Assistant | Assistant, AssistantResponse, AssistantReport, ChatFiles, ConfirmAction, ArtifactPanel, FlowCanvas, ChatHistory (chats, works, saved), ChatMenu | assistant/*, conversations, stream |
+| Memory | what the assistant remembers: read, edit, add, delete, export, reset | assistant/memory |
+| Ops | queue, workers, failed jobs, breaker, spend, storage used, last retention pass, last backup | ops, jobs |
 | Guide, CommandPalette | feature catalogue (`lib/features.ts`) in English and Thai | — |
 
 ## 5. Data
@@ -249,7 +251,7 @@ Dataset versions are written object-first, row last, so no partial version is ev
 ### 5.3 Configuration
 
 Environment variables (`core/settings.py`, every field documented, `.env.production.example` generated and
-drift-checked) for infrastructure; `app_settings` for what the team edits in the web app (AI, policy,
+drift-checked) for infrastructure; `app_settings` for what is edited in the web app (AI, policy,
 formats, defaults, preferences). A revision row tells every process when to reload (ADR-016, ADR-017).
 
 ## 6. Security
@@ -281,8 +283,13 @@ browser ──▶ nginx (web image: SPA + /api proxy, SSE unbuffered) ──▶ 
 One backend image (`forma serve` / `forma worker`), one web image, a sandbox image for the assistant's code runs,
 `docker-compose.prod.yml` with a `migrate` service, generated `.env.production.example`, CI building the images and
 validating the compose file (ADR-016, ADR-048). The sandbox service has no network: the API reaches it through one
-Unix socket on a shared volume. Dev stays SQLite + local disk + no auth + no external service, and without the
-sandbox.
+Unix socket on a shared volume. A `backup-nightly` service dumps the database every 24 hours and keeps 14 days
+(ADR-053). Dev stays SQLite + local disk + no auth + no external service, and without the sandbox.
+
+Today this whole stack runs on one machine for one person. The web port and MinIO are published on 127.0.0.1, so
+nothing else can reach them, and `FORMA_AUTH=dev` with `FORMA_AUTH_ALLOW_DEV_IN_PROD=true` means there is no login.
+Moving to a server means OIDC first, then `FORMA_BIND_HOST` (R31 in [RISK_REGISTER.md](RISK_REGISTER.md)). The
+diagram's replicas and workers × N are what the design allows, not what this machine needs.
 
 ## 8. Observability and reliability
 

@@ -1,14 +1,15 @@
 # FORMA — AI-native data transformation and operations platform
 
 FORMA turns the Excel/CSV exports that ~300 customers send from their own ERPs every two weeks into one
-standard, validated JSON contract, and lets an operations team review, correct and publish the result
+standard, validated JSON contract, and lets one person in operations review, correct and publish the result
 without writing code. It reads any layout (Thai or English, multi-sheet, CSV in any encoding), decides what
 each file means, states a verdict with evidence, learns from every correction, and keeps every step
 auditable and reversible.
 
 > **สรุปภาษาไทย** — FORMA รับไฟล์ Excel/CSV จาก ERP ของลูกค้าได้ทุกรูปแบบ แปลงเป็น JSON ตาม contract ที่กำหนด
-> ตัดสินให้ว่าไฟล์นี้คืออะไร ควรทำอะไรต่อ พร้อมหลักฐาน และเรียนรู้จากการแก้ของทีม ops ทุกครั้ง
-> ทุกการตัดสินใจผ่าน policy ที่ตั้งค่าได้ ไม่มีโค้ดที่ AI สร้างแล้วรันเอง ทุกอย่างย้อนกลับได้และมี audit log
+> ตัดสินให้ว่าไฟล์นี้คืออะไร ควรทำอะไรต่อ พร้อมหลักฐาน และเรียนรู้จากทุกครั้งที่ผู้ใช้แก้ ใช้งานคนเดียวบนเครื่องเดียว
+> ทุกการตัดสินใจผ่าน policy ที่ตั้งค่าได้ โค้ดที่ AI เขียนรันได้เฉพาะใน sandbox ของผู้ช่วยและไม่แตะข้อมูลในระบบ
+> ทุกอย่างย้อนกลับได้และมี audit log
 > เริ่มใช้งานที่ [Quick start](#quick-start) เอกสารสำหรับทีมอยู่ที่ [docs/TEAM_LEAD_HANDBOOK.md](docs/TEAM_LEAD_HANDBOOK.md)
 
 ---
@@ -32,7 +33,7 @@ auditable and reversible.
 
 ## What FORMA does
 
-| Problem in the operations team | What FORMA does about it |
+| Problem in operations | What FORMA does about it |
 |---|---|
 | 300 customers, 300 layouts, Thai and English headers, several sheets per file | Profiles every sheet, detects tables (titles, offsets, stacked and side-by-side tables, totals rows), classifies columns, and maps them to the target contract by meaning |
 | A column renamed by the customer breaks the import | Fingerprints every file; a returning layout reuses the approved mapping, a drifted layout is re-proposed and checked field by field on the data, a wrong file is blocked |
@@ -156,14 +157,15 @@ mapping catalogue cannot enumerate (references, conditionals, tuple schemas) are
 | **Home** | Upload files; see what needs you with FORMA's conclusion per file; expected deliveries and the watchlist; work-round dashboard; statistics |
 | **Upload files** | Drop many files at once. Each is matched to its customer by layout (and the customer code in the file name), becomes its own round, and is published automatically when every check passes. Unknown layouts wait for you to pick a customer. One JSON per file, all in one zip |
 | **Imports** | Work rounds (named, dated, reusable) and the history of every file with filters that survive the browser's Back button |
-| **Round** | The case: the verdict card with its one-click accept, the three stages, files, mapping versions, datasets, the assistant in context |
+| **Round** | The case: the verdict card with its one-click accept, the three stages, files, mapping versions, datasets, the assistant in context; cancel, move to another customer, or replace with a corrected file |
 | **Review** | Questions and issues: the verdict first, then each uncertain field as a question answered from evidence traced to the source cell; preview the impact before saving |
 | **Mapping Studio** | Field view (drag a column onto a field), *What changed* vs the approved mapping with the data check, *Compare* (sandbox), *Relationships* (how the sheets connect, measured on the data), DSL on demand |
 | **Data Editor** | Spreadsheet editing (paste, ranges, bulk on picked rows), copilot in Thai or English, lineage to the Excel cell, changes and anomalies vs last round, records that break the format, versions and rollback |
 | **Customers** | Every customer, its approved formats, overrides, next expected delivery |
 | **Settings** | AI connection and backup keys; target formats; approval policy with the calibration report and proposals; what FORMA learned; DSL reference; audit log; system |
 | **Assistant** | Ask about files, customers, features, with cited evidence; server-computed reports (tables and charts); Python in an isolated sandbox for analysis, charts, flows and Word, Excel, PowerPoint or PDF files to download; images, documents, slides, emails, archives and data files in the chat; what it makes opens beside the chat with its versions kept; memory across chats that you can read and delete, and search of earlier chats; clarification questions; a confirmable "accept the verdict" action |
-| **System health** (admin) | Queue, workers, failed jobs with retry, breaker state, spend, slowest rounds |
+| **Memory** | What the assistant remembers about you: read, edit, add, delete, export, reset |
+| **System health** (admin) | Queue, workers, failed jobs with retry, breaker state, spend, slowest rounds, storage used, the last retention pass and the last backup |
 
 Every feature is findable with **Ctrl K** or the **Feature guide**, in English or Thai.
 
@@ -192,6 +194,8 @@ audited without secrets and applied to every API and worker process within `FORM
 
 ## Production deployment
 
+FORMA runs this stack on one machine for one person: nothing here needs a server.
+
 ```bash
 cp .env.production.example .env.production        # every variable explained; fill in the secrets
 docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build --scale worker=4
@@ -203,7 +207,7 @@ curl http://localhost/ready       # db · storage · queue
 on a machine other devices cannot reach (R31 in [docs/RISK_REGISTER.md](docs/RISK_REGISTER.md)).
 
 The stack is nginx (SPA + `/api` proxy) → FastAPI (N replicas) → Redis/arq workers (N nodes) → PostgreSQL
-(JSONB) + S3/MinIO. On start, API and workers reconcile queued jobs against durable results, recover stale
+(JSONB) + S3/MinIO, plus the assistant's code sandbox and a nightly database backup. On start, API and workers reconcile queued jobs against durable results, recover stale
 jobs and resubmit pending ones (ADR-044). Operations are in [docs/RUNBOOK.md](docs/RUNBOOK.md): worker
 crash, stuck round, wrong file published, provider outage, schema rollout, backup and restore, retention.
 
@@ -314,8 +318,9 @@ What is not yet established — and is said so wherever a number appears:
 * **Accuracy on real customer files.** Every figure comes from the synthetic corpus. The harness for real
   files exists (`data/real/`, `forma eval --index|--llm|--replay`); the files and a baseline do not.
 * **The real downstream contract.** `target_schema/product.v1.json` is a draft example.
-* **OIDC against a real identity provider**, multi-host arq with pgbouncer, and a provider-enabled evaluation
-  baseline in CI.
+* **A provider-enabled evaluation baseline in CI.**
+* **A server.** FORMA runs for one person on one machine. OIDC against a real identity provider and multi-host
+  arq with pgbouncer are built but not proven, and matter only if it moves to a server.
 * **Excel semantics FORMA does not interpret:** formulas are read as cached values, never recalculated;
   macros, images, comments, colours, pivots and external connections are not business rules (ADR-043).
 
