@@ -155,7 +155,7 @@ mapping catalogue cannot enumerate (references, conditionals, tuple schemas) are
 | Page | What you do there |
 |---|---|
 | **Home** | Upload files; see what needs you with FORMA's conclusion per file; expected deliveries and the watchlist; work-round dashboard; statistics |
-| **Upload files** | Drop many files at once. Each is matched to its customer by layout (and the customer code in the file name), becomes its own round, and is published automatically when every check passes. Unknown layouts wait for you to pick a customer. One JSON per file, all in one zip. A navy card shows how the round is going on every page |
+| **Upload files** | Drop many Excel (.xlsx, .xlsm, .xls, .xlsb), CSV or text files at once. Each is matched to its customer by layout (and the customer code in the file name), becomes its own round, and is published automatically when every check passes. Unknown layouts wait for you to pick a customer. One JSON per file, all in one zip. A navy card shows how the round is going on every page |
 | **Imports** | Work rounds (named, dated, reusable) and the history of every file with filters that survive the browser's Back button |
 | **Round** | The case: the verdict card with its one-click accept, the three stages, files, mapping versions, datasets, the assistant in context; cancel, move to another customer, or replace with a corrected file |
 | **Review** | Questions and issues: the verdict first, then each uncertain field as a question answered from evidence traced to the source cell; preview the impact before saving; every question shows its age, and one that needs the customer can wait with a note and a date |
@@ -271,7 +271,7 @@ target_schema/            product.v1.json — a DRAFT contract; register the rea
 policies/                 approval.yaml (auto-approve / review / block, sandbox, anomaly, publish, verdict)
 data/                     runtime data (git-ignored) · synthetic/ corpus with ground truth (committed) · real/ (local only)
 docs/                     architecture, flows, user stories, handbook, DSL, data model, Thai rules, evaluation,
-                          performance, runbook, ADRs 001–054
+                          performance, runbook, ADRs 001–056
 ```
 
 ---
@@ -297,10 +297,10 @@ compose config. Details: [docs/TESTING_STRATEGY.md](docs/TESTING_STRATEGY.md).
 | Product / QA | [docs/USER_STORIES.md](docs/USER_STORIES.md) — how the user works through a round, then every story and edge case, with the technique used at each step and why |
 | Engineers | [docs/API_OVERVIEW.md](docs/API_OVERVIEW.md) · [docs/MAPPING_DSL.md](docs/MAPPING_DSL.md) · [docs/DATA_MODEL.md](docs/DATA_MODEL.md) · [docs/THAI_CONTEXT_RULES.md](docs/THAI_CONTEXT_RULES.md) |
 | Security / compliance | [docs/RBAC_AND_SECURITY.md](docs/RBAC_AND_SECURITY.md) |
-| QA | [docs/TESTING_STRATEGY.md](docs/TESTING_STRATEGY.md) · [docs/EVALUATION.md](docs/EVALUATION.md) |
+| QA | [docs/TESTING_STRATEGY.md](docs/TESTING_STRATEGY.md) · [docs/EVALUATION.md](docs/EVALUATION.md) · [manual_test_files/README.md](manual_test_files/README.md) |
 | Operations | [docs/RUNBOOK.md](docs/RUNBOOK.md) · [docs/PERFORMANCE.md](docs/PERFORMANCE.md) |
 | New team members | [docs/ONBOARDING.md](docs/ONBOARDING.md) |
-| Decisions | [docs/adr/](docs/adr/) — 54 architecture decision records, binding unless superseded |
+| Decisions | [docs/adr/](docs/adr/) — 56 architecture decision records, binding unless superseded |
 | Status | [docs/ROADMAP_STATUS.md](docs/ROADMAP_STATUS.md) · [docs/RISK_REGISTER.md](docs/RISK_REGISTER.md) · [docs/KPIS_AND_METRICS.md](docs/KPIS_AND_METRICS.md) |
 
 ---

@@ -9,13 +9,14 @@ from typing import Any
 
 import polars as pl
 
-from forma.engine.thai import looks_like_thai_date, parse_number_th_py
+from forma.engine.thai import THAI_DIGITS, looks_like_thai_date, parse_number_th_py
 from forma.ingestion.readers import WorkbookMeta, read_meta, read_raw
 from forma.profiling.tables import TableCandidate, detect_tables, extract_table
 
 _THAI_RE = re.compile(r"[฀-๿]")
 _BARCODE_RE = re.compile(r"^\d{8}$|^\d{12,14}$")
 _SKU_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._/-]{1,31}$")
+_SLASH_DATE_RE = re.compile(r"^\s*(\d{1,2})[/.-](\d{1,2})[/.-](\d{2,4})\b")
 _BOOL_SET = {"y", "n", "yes", "no", "true", "false", "1", "0", "ใช่", "ไม่", "active", "inactive"}
 
 
@@ -158,6 +159,26 @@ def _header_lang(name: str) -> str:
     return "mixed" if th and en else "th" if th else "en"
 
 
+def _date_order(values: pl.Series) -> list[str]:
+    """What a whole column says about 03/04/2026. One value past 12 settles it: 31/10 can only be day-first
+    and 10/31 only month-first. A Buddhist year comes from a Thai export, which writes the day first."""
+    day = month = plain = False
+    for value in values.to_list():
+        m = _SLASH_DATE_RE.match(str(value).translate(THAI_DIGITS))
+        if m is None:
+            continue
+        first, second, year = int(m.group(1)), int(m.group(2)), int(m.group(3))
+        if first > 12 or year >= 2400 or 40 <= year < 100:
+            day = True
+        elif second > 12:
+            month = True
+        else:
+            plain = True
+    if day or month:
+        return [*(["day_first"] if day else []), *(["month_first"] if month else [])]
+    return ["ambiguous_date"] if plain else []
+
+
 def profile_column(s: pl.Series, position: int, *, sample_n: int = 8) -> ColumnProfile:
     n = s.len()
     non_null = s.drop_nulls()
@@ -209,6 +230,7 @@ def profile_column(s: pl.Series, position: int, *, sample_n: int = 8) -> ColumnP
             inferred = "date"
             if any(re.search(r"25[0-9]{2}|/[0-9]{2}$", str(v)) for v in vals):
                 hints.append("thai_date")
+            hints.extend(_date_order(non_null))
         if inferred == "string":
             avg = sum(len(str(v)) for v in vals) / total
             if avg > 40:

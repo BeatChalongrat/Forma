@@ -89,6 +89,34 @@ TYPE_COMPAT: dict[str, set[str]] = {
 }
 
 
+CURRENCY_MATCH = 0.85  # a weaker header match must not overrule the schema's default currency
+CURRENCY_WORDS = {
+    "thb": "THB",
+    "บาท": "THB",
+    "฿": "THB",
+    "baht": "THB",
+    "usd": "USD",
+    "$": "USD",
+    "us$": "USD",
+    "ดอลลาร์": "USD",
+    "dollar": "USD",
+    "eur": "EUR",
+    "€": "EUR",
+    "ยูโร": "EUR",
+    "jpy": "JPY",
+    "¥": "JPY",
+    "เยน": "JPY",
+    "cny": "CNY",
+    "rmb": "CNY",
+    "หยวน": "CNY",
+    "sgd": "SGD",
+    "hkd": "HKD",
+    "gbp": "GBP",
+    "aud": "AUD",
+}
+FOREIGN_CURRENCY_RE = re.compile(r"\b(?:USD|EUR|GBP|JPY|CNY|SGD|HKD|AUD)\b|US\$|ดอลลาร์|ยูโร|เยน|หยวน", re.I)
+
+
 def file_name_pattern(name: str) -> str:
     """Loose regex for a file name: digits/dates vary between rounds, the rest stays."""
     stem = re.sub(r"\.[^.]+$", "", name)
@@ -264,10 +292,57 @@ def crosstab_value_columns(table: TableProfile) -> list[str]:
 
 
 # --------------------------------------------------------------------------------------------
-def _expr_for(c: ColumnProfile, f: FieldSpec, source: str | None = None) -> Any:
+def _reads_day_first(tables: list[TableProfile], questions: list[str], evidence: list[str]) -> bool:
+    """One order for the whole delivery, because one column can hold nothing but 10/01/2026 while the next
+    proves the order with 10/31/2026. Reading each value alone is how a date swaps quietly."""
+    columns = [c for t in tables for c in t.columns]
+    month = [c.name for c in columns if "month_first" in c.hints]
+    day = [c.name for c in columns if "day_first" in c.hints]
+    unsure = [c.name for c in columns if "ambiguous_date" in c.hints]
+    if month and day:
+        questions.append(
+            f"Dates are day-first in {day[:3]} but month-first in {month[:3]}; read as day-first: confirm"
+        )
+        return True
+    if month:
+        evidence.append(f"dates read month-first: {month[:3]} hold values only that order allows")
+        return False
+    if unsure and not day:
+        questions.append(
+            f"Dates in {unsure[:3]} could be day-first or month-first; read as day-first: confirm"
+        )
+    return True
+
+
+def _currency_doubts(
+    tables: list[TableProfile], skip: set[int], root: int, currency: FieldSpec, code: str
+) -> list[str]:
+    """Every record is about to be labelled ``code``. Say so when a file suggests otherwise."""
+    doubts = []
+    for i, t in enumerate(tables):
+        if i in skip:
+            continue
+        for c in t.columns:
+            if FOREIGN_CURRENCY_RE.search(c.name):
+                doubts.append(f"Column '{c.name}' names a currency, but records are labelled {code}: confirm")
+            elif (
+                i != root
+                and score_header(c.name, currency)[0] >= CURRENCY_MATCH
+                and any(s.strip().upper() != code for s in c.samples)
+            ):
+                doubts.append(
+                    f"Sheet '{t.sheet}' has a currency column '{c.name}' ({', '.join(c.samples[:3])}), "
+                    f"but records are labelled {code}: confirm"
+                )
+    return doubts
+
+
+def _expr_for(c: ColumnProfile, f: FieldSpec, source: str | None = None, *, day_first: bool = True) -> Any:
     src = col(c.name, source)
     sem = f.semantic or ""
     t = set(f.json_type)
+    if sem == "currency":
+        return _map_values(f, src, CURRENCY_WORDS, keep_unmapped=True)
     if sem == "unit.sell":
         return call("unit_normalize", src)
     if sem == "unit.pack_size":
@@ -321,7 +396,7 @@ def _expr_for(c: ColumnProfile, f: FieldSpec, source: str | None = None) -> Any:
                 "ยกเลิก": "discontinued",
                 "x": "discontinued",
             },
-            default="active",
+            keep_unmapped=True,  # a word FORMA does not know stays as written and fails the contract's enum
         )
     if sem == "price.list_name":
         return _map_values(
@@ -382,13 +457,13 @@ def _expr_for(c: ColumnProfile, f: FieldSpec, source: str | None = None) -> Any:
                 "amount off": "amount_off",
                 "percent off": "percent_off",
             },
-            default="percent_off",
+            keep_unmapped=True,  # an unknown promotion kind is a contract error, never a percentage by default
             fuzzy=True,
         )
     if "boolean" in t:
         return call("parse_bool", src)
     if f.fmt == "date":
-        return call("parse_date_th", src)
+        return call("parse_date_th", src) if day_first else call("parse_date_th", src, dayfirst=False)
     if "number" in t or "integer" in t:
         return call("parse_number_th", src)
     if "array" in t:
@@ -442,8 +517,14 @@ def propose_mapping(
     colls = collection_roles(schema)
 
     roles: dict[int, tuple[str, float]] = {i: table_role(t, schema) for i, t in enumerate(profile.tables)}
-    for i in noise_tables(profile.tables):
+    noise = noise_tables(profile.tables)
+    for i in noise:
         roles[i] = ("other", 0.1)  # legends, footers, hidden calc sheets
+    for i, t in enumerate(profile.tables):  # someone hid it: a cost sheet must not become the selling price
+        if roles[i][0] != "other" and profile.meta.sheets[t.sheet_index].hidden:
+            roles[i] = ("other", 0.1)
+            questions.append(f"Sheet '{t.sheet}' is hidden and was left out: confirm it is not needed")
+    day_first = _reads_day_first(profile.tables, questions, evidence)
     # root = table that explains most root-level target fields (key + name weigh double); ties → more rows
     root_fields_all = [
         f
@@ -526,12 +607,12 @@ def propose_mapping(
     fields: list[FieldMapping] = []
     field_scores: list[float] = []
     for m in root_matches:
-        if currency is not None and m.field.pointer == currency.pointer:
+        if currency is not None and m.field.pointer == currency.pointer and m.score < CURRENCY_MATCH:
             continue
         fields.append(
             FieldMapping(
                 target=m.field.pointer,
-                expr=_expr_for(m.column, m.field),
+                expr=_expr_for(m.column, m.field, day_first=day_first),
                 confidence=round(m.score, 2),
                 evidence=m.evidence,
             )
@@ -548,6 +629,7 @@ def propose_mapping(
                 evidence=[f"default currency {code}"],
             )
         )
+        questions.extend(_currency_doubts(profile.tables, noise, root_idx, currency, code))
     sell, pack = schema.semantic_field("unit.sell"), schema.semantic_field("unit.pack_size")
     if (
         sell is not None
@@ -644,7 +726,7 @@ def propose_mapping(
                     items.append(
                         FieldMapping(
                             target=m.field.pointer,
-                            expr=_expr_for(m.column, m.field),
+                            expr=_expr_for(m.column, m.field, day_first=day_first),
                             confidence=round(m.score, 2),
                             evidence=m.evidence,
                         )
@@ -678,6 +760,12 @@ def propose_mapping(
                 questions.append(
                     f"Table '{t.sheet}' looks like {role} but no column links to root key '{sku_match.column.name}'"
                 )
+            continue
+        if any(done.target == target for done in collections):
+            # one source per collection: the engine has no rule for two price lists that disagree
+            sources[:] = [sp for sp in sources if sp.id != sid]
+            unmatched[sid] = [c.name for c in t.columns]
+            questions.append(f"Table '{t.sheet}' also looks like {role} and was left out: confirm")
             continue
         item_fields = [f for f in schema.leaf_fields() if f.in_collection == target]
         p_amount = item("pricing", "price.amount")
@@ -751,7 +839,7 @@ def propose_mapping(
             items.append(
                 FieldMapping(
                     target=m.field.pointer,
-                    expr=_expr_for(m.column, m.field, sid),
+                    expr=_expr_for(m.column, m.field, sid, day_first=day_first),
                     confidence=round(m.score, 2),
                     evidence=m.evidence,
                 )

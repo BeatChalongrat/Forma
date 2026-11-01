@@ -86,6 +86,30 @@ EN_MONTHS: dict[str, int] = {
 
 _NUM_CLEAN_RE = re.compile(r"[,\s฿$€£]|บาท|thb|baht", re.IGNORECASE)
 _NUM_RE = re.compile(r"^[-+]?\d+(\.\d+)?$")
+_WHOLE_BAHT_RE = re.compile(r"\.-$")  # 189.- : Thai for "189 baht exactly"
+_TRAILING_MINUS_RE = re.compile(r"^(.*\d)-$")  # 200.00- : SAP writes the sign last
+# 1.500,00 is unambiguous (dot groups of three, then a comma); 1.500 alone is not and stays 1.5
+_EUROPEAN_RE = re.compile(r"^[-+]?\d{1,3}(?:(?:\.\d{3})+,\d+|(?:\.\d{3}){2,})$")
+_DECIMAL_COMMA_RE = re.compile(r"^[-+]?\d+,\d{1,2}$")  # 1500,50 : a comma with one or two digits is a decimal
+
+
+def number_text(s: str) -> tuple[str, bool]:
+    """The digits of a written amount and whether it was negative, after the forms a regex cannot tell apart
+    from each other once the separators are gone: whole baht ``189.-``, SAP's trailing minus ``200.00-``,
+    European ``1.500,00`` and ``1500,50`` (ADR-056)."""
+    neg = False
+    s = _WHOLE_BAHT_RE.sub("", s)
+    m = _TRAILING_MINUS_RE.match(s)
+    if m:
+        neg, s = True, m.group(1)
+    body = _NUM_CLEAN_RE.sub("", s) if not _EUROPEAN_RE.match(s) and not _DECIMAL_COMMA_RE.match(s) else s
+    if _EUROPEAN_RE.match(s):
+        body = s.replace(".", "").replace(",", ".")
+    elif _DECIMAL_COMMA_RE.match(s):
+        body = s.replace(",", ".")
+    return body, neg
+
+
 _PAREN_NEG_RE = re.compile(r"^\((.*)\)$")
 _DATE_SEP_RE = re.compile(r"^(\d{1,4})[-/.](\d{1,2})[-/.](\d{1,4})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?.*)?$")
 _ISO_RE = re.compile(r"^(\d{4})-(\d{2})-(\d{2})")
@@ -113,7 +137,8 @@ def parse_number_th_py(value: object) -> float | None:
     if m:
         neg, s = True, m.group(1)
     s = s.rstrip("%")
-    s = _NUM_CLEAN_RE.sub("", s)
+    s, trailing = number_text(s)
+    neg = neg != trailing
     if s.startswith("-"):
         neg, s = (not neg), s[1:]
     if not _NUM_RE.match(s):
@@ -331,6 +356,11 @@ def unit_normalize_py(
     up = s.upper()
     if up in set(UNIT_SYNONYMS.values()):
         return up
+    # a bare packing figure: 1x12 is a case of twelve, 12's a pack of twelve (THAI_CONTEXT_RULES.md)
+    if re.fullmatch(r"\d+\s*[x×*]\s*\d+", s):
+        return "CARTON"
+    if re.fullmatch(r"\d+\s*'s", s):
+        return "PACK"
     return default if default is not None else str(value).strip().upper()
 
 

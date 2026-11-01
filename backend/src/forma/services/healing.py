@@ -20,6 +20,7 @@ MIN_PAIRS = 3  # SKUs present in both rounds needed before the data is allowed t
 SAME_SHARE = 0.9  # this share of equal values = same meaning
 STEADY_SHARE = 0.8  # this share of ratios within 1 % of the median = one consistent factor
 RISKY = ("vat_added", "vat_removed", "scaled", "different")
+STEADY = ("vat_added", "vat_removed", "scaled")  # one factor on every SKU: the file changed, not the data
 
 
 # --------------------------------------------------------------------------------------------
@@ -150,7 +151,8 @@ def data_check(
     if len(ratios) >= MIN_PAIRS:
         ratio = statistics.median(ratios)
         steady = sum(1 for x in ratios if ratio and abs(x / ratio - 1) <= 0.01) / len(ratios)
-        if steady >= STEADY_SHARE:
+        # a steady factor of one is not a factor: most values are the same and a few moved (a price change)
+        if steady >= STEADY_SHARE and abs(ratio - 1.0) >= 0.01:
             if abs(ratio - (1 + VAT_RATE)) < 0.005:
                 return {
                     **base,
@@ -190,13 +192,30 @@ def review(
     after: list[dict[str, Any]] | None,
     *,
     risk_of: Any = None,
+    check_unchanged: bool = False,
 ) -> dict[str, Any]:
-    """Every changed field with its data check; ``checks`` is what the policy reads."""
+    """Every changed field with its data check; ``checks`` is what the policy reads.
+
+    With ``check_unchanged`` the critical and high fields the mapping did not touch are checked too (ADR-056):
+    a layout that did not move can still carry prices with the VAT taken out or in satang. Values that merely
+    differ are then ``data_changed``, which nobody acts on here, because a new price list is the anomaly layer's
+    business; a steady factor on every SKU is the mapping's."""
     changes = field_changes(old, new)
     for c in changes:
         c["risk"] = risk_of(c["pointer"]) if risk_of else None
         if c["status"] in ("changed", "added") and before and after:
             c["check"] = data_check(schema, c["pointer"], before, after)
+        elif (
+            check_unchanged
+            and c["status"] == "unchanged"
+            and c.get("risk") in ("critical", "high")
+            and before
+            and after
+        ):
+            check = data_check(schema, c["pointer"], before, after)
+            if check["verdict"] == "different":
+                check = {**check, "verdict": "data_changed", "summary": check["summary"].split(" — ")[0]}
+            c["check"] = check
         else:
             c["check"] = None
     risky = [

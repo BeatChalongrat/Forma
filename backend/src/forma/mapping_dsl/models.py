@@ -221,6 +221,9 @@ class TableSpec(Strict):
     drop_total_rows: bool = Field(
         default=True, description="Drop trailing rows whose first text cell is a total marker"
     )
+    drop_repeated_headers: bool = Field(
+        default=True, description="Drop a header printed again on each page, and the title lines above it"
+    )
     fill_down: list[str] = Field(
         default_factory=list, description="Columns whose blanks inherit the value above (merged cells)"
     )

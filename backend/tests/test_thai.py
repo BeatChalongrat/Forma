@@ -116,7 +116,8 @@ def test_looks_like_thai_date() -> None:
         ("แพ็ค", "PACK"),
         ("12 ชิ้น/ลัง", "PCS"),
         ("XYZ", "XYZ"),  # unknown → passthrough upper-cased
-        ("1x12", "1X12"),
+        ("1x12", "CARTON"),
+        ("12's", "PACK"),
         (None, None),
         ("", None),
     ],

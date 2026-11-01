@@ -82,13 +82,30 @@ def _as_num(x: pl.Expr) -> pl.Expr:
     return pl.when(_as_str(x).is_null()).then(None).otherwise(_parse_number(x)).cast(pl.Float64, strict=False)
 
 
-def _parse_number(x: pl.Expr) -> pl.Expr:
+def number_text_expr(x: pl.Expr) -> pl.Expr:
+    """Polars twin of ``thai.number_text``, plus Thai digits and ``(123)``: one text form a cast can read."""
     s = _as_str(x).str.strip_chars()
     s = s.str.replace_many(_THAI_DIGITS_FROM, _THAI_DIGITS_TO)
     # (123) → -123
-    neg = s.str.starts_with("(") & s.str.ends_with(")")
-    s = pl.when(neg).then(pl.lit("-") + s.str.slice(1, s.str.len_chars() - 2)).otherwise(s)
-    s = s.str.replace_all(r"(?i)[,\s฿$€£]|บาท|thb|baht", "").str.strip_chars_end("%")
+    paren = s.str.starts_with("(") & s.str.ends_with(")")
+    s = pl.when(paren).then(pl.lit("-") + s.str.slice(1, s.str.len_chars() - 2)).otherwise(s)
+    s = s.str.strip_chars_end("%").str.replace(r"\.-$", "")
+    trailing = s.str.contains(r"\d-$")
+    s = pl.when(trailing).then(pl.lit("-") + s.str.replace(r"-$", "")).otherwise(s)
+    european = s.str.contains(r"^[-+]?\d{1,3}(?:(?:\.\d{3})+,\d+|(?:\.\d{3}){2,})$")
+    decimal_comma = s.str.contains(r"^[-+]?\d+,\d{1,2}$")
+    return (
+        pl.when(european)
+        .then(s.str.replace_all(r"\.", "").str.replace(",", "."))
+        .when(decimal_comma)
+        .then(s.str.replace(",", "."))
+        .otherwise(s.str.replace_all(r"(?i)[,\s฿$€£]|บาท|thb|baht", ""))
+    )
+
+
+def _parse_number(x: pl.Expr) -> pl.Expr:
+    s = number_text_expr(x)
+    s = s.str.replace(r"^--", "")  # a negative written both ways, e.g. (200.00-)
     s = pl.when(s.str.contains(r"^[-+]?\d+(\.\d+)?$")).then(s).otherwise(None)
     return s.cast(pl.Float64, strict=False)
 

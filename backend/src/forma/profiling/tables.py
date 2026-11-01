@@ -166,6 +166,29 @@ def _header_score(row: list[str | None], below: list[list[str | None]]) -> float
     )
 
 
+def _same_header(a: list[str | None], b: list[str | None]) -> bool:
+    return [normalize_header(c) for c in a if c is not None] == [
+        normalize_header(c) for c in b if c is not None
+    ]
+
+
+def _join_pages(tables: list[TableCandidate]) -> list[TableCandidate]:
+    """Blank rows can split a printed report into blocks. Blocks under one header are one table."""
+    joined: list[TableCandidate] = []
+    for t in sorted(tables, key=lambda x: x.header_row):
+        last = joined[-1] if joined else None
+        if (
+            last is not None
+            and last.headers == t.headers
+            and (last.first_column, last.last_column) == (t.first_column, t.last_column)
+        ):
+            last.data_end = t.data_end
+            last.n_rows = last.data_end - last.data_start
+        else:
+            joined.append(t)
+    return joined
+
+
 def detect_tables(df: pl.DataFrame, *, max_scan_rows: int = 60, gap: int = 2) -> list[TableCandidate]:
     """Find table regions in a raw string grid (``c0..cN`` columns)."""
     if df.height == 0 or df.width == 0:
@@ -206,6 +229,9 @@ def detect_tables(df: pl.DataFrame, *, max_scan_rows: int = 60, gap: int = 2) ->
                     best_i, best_s = i, s
             if best_s < 0.35:
                 continue
+            # A printed report repeats its header on every page. The later ones can score better, because
+            # only the first has another page's title below it, but everything above them is data.
+            best_i = next(i for i in range(best_i + 1) if _same_header(sub[i], sub[best_i]))
             header_rows = 1
             # multi-row header: next row is also mostly text with same fill, and the row after is numeric-ish
             if best_i + 2 < len(sub):
@@ -242,6 +268,7 @@ def detect_tables(df: pl.DataFrame, *, max_scan_rows: int = 60, gap: int = 2) ->
                     title=title,
                 )
             )
+    out = _join_pages(out)
     out.sort(key=lambda t: (-t.n_rows, t.header_row))
     for i, t in enumerate(out):
         t.index = i
@@ -296,6 +323,35 @@ def dedupe_names(names: list[str]) -> list[str]:
 # Extraction
 # --------------------------------------------------------------------------------------------
 SHEET_ROW = "__sheet_row__"  # 0-based row of the raw grid a data row came from (lineage only)
+PAGE_HEADER_MATCH = 0.8  # share of a header's cells a row must repeat to be that header printed again
+
+
+def _drop_page_breaks(
+    body: pl.DataFrame, data: list[str], header_rows: list[list[str | None]]
+) -> pl.DataFrame:
+    """Remove a header printed again on each page, with the title and page lines above it. Rows are found by
+    the header's first cell, so a sheet with no page breaks costs one column scan."""
+    repeats: set[int] = set()
+    for header in header_rows:
+        cells = [(data[i], str(c).strip()) for i, c in enumerate(header) if c is not None and i < len(data)]
+        if not cells:
+            continue
+        first, text = cells[0]
+        rows = body.with_row_index("__i__").filter(pl.col(first).str.strip_chars() == text)
+        for row in rows.iter_rows(named=True):
+            same = sum(str(row[column] or "").strip() == want for column, want in cells)
+            if same / len(cells) >= PAGE_HEADER_MATCH:
+                repeats.add(int(row["__i__"]))
+    if not repeats:
+        return body
+    filled = body.select(pl.sum_horizontal(pl.col(data).is_not_null()).alias("n"))["n"].to_list()
+    drop = set(repeats)
+    for at in repeats:
+        above = at - 1
+        while above >= 0 and filled[above] <= 1:  # blank rows, and one-cell lines such as a title or "page 2"
+            drop.add(above)
+            above -= 1
+    return body.with_row_index("__i__").filter(~pl.col("__i__").is_in(sorted(drop))).drop("__i__")
 
 
 def extract_table(
@@ -350,6 +406,7 @@ def extract_table(
                     "fill_down": spec.fill_down,
                     "unpivot": spec.unpivot,
                     "drop_total_rows": spec.drop_total_rows,
+                    "drop_repeated_headers": spec.drop_repeated_headers,
                     "stop_at_blank_rows": spec.stop_at_blank_rows,
                 }
             ),
@@ -367,6 +424,9 @@ def extract_table(
     if row_numbers:
         body = body.with_columns(pl.int_range(data_start, data_start + body.height).alias(SHEET_ROW))
     data = [c for c in body.columns if c != SHEET_ROW]  # every column unless lineage asked for rows
+    # before the blank-row stop: the blanks between two pages must not end the table
+    if spec.drop_repeated_headers and body.height:
+        body = _drop_page_breaks(body, data, header_rows)
 
     # stop at N consecutive blank rows
     if spec.stop_at_blank_rows and body.height:

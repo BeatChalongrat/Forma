@@ -49,7 +49,7 @@ as a duplicate; every sheet is read; the round shows its three stages (upload, a
 silently as empty data.
 
 Edge cases: xlsx with a title block and the header on row 7 · CSV in TIS-620 · an xlsx whose formulas have no
-cached values (transformation refused, review forced) · legacy .xls (review forced) · a file over the size cap
+cached values (transformation refused, review forced) · legacy .xls or binary .xlsb (review forced on every round) · a file type FORMA cannot read (named on the page, never dropped quietly) · a report printed page by page, with the header repeated (one table, every row kept) · a hidden sheet (left out, with a question) · a file over the size cap
 (413) · an encrypted workbook (unsupported, with guidance).
 
 | Step | Technique | Why |
@@ -59,7 +59,7 @@ cached values (transformation refused, review forced) · legacy .xls (review for
 | Read | fastexcel for cell values, full-row OOXML scan for structure facts | speed for 100K rows; hidden data, error cells and uncached formulas are facts the policy needs (ADR-003, ADR-043) |
 | Profile | full-sheet blank-row block detection, bounded header window, type inference, hints | multiple tables per sheet and long preambles are normal in ERP exports |
 
-Tests: `test_api.py::test_full_flow`, `test_ingestion_readiness.py`, `test_tables.py`, `test_guard_sniff.py`.
+Tests: `test_legacy_excel.py`, `test_quiet_failures.py`, `test_api.py::test_full_flow`, `test_ingestion_readiness.py`, `test_tables.py`, `test_guard_sniff.py`.
 
 ### A2. Upload many files at once (bulk)
 **ฉันอยาก**อัปโหลดไฟล์ของทุกลูกค้าทีเดียว **เพื่อ**ให้แต่ละไฟล์ถูกจับคู่กับลูกค้าและได้ JSON ของตัวเอง โดยฉันไม่ต้องเปิดทีละไฟล์
@@ -149,13 +149,15 @@ Tests: `test_batches.py::test_the_summary_counts_what_the_full_view_counts`.
 ### B1. A returning customer with an unchanged layout
 **ฉันอยาก**ให้ไฟล์ที่ layout เหมือนที่อนุมัติไว้ผ่านไปเองโดยฉันไม่ต้องดู **เพื่อ**ให้ฉันเห็นเฉพาะสิ่งที่เปลี่ยน
 
-AC: the approved mapping is reused verbatim (`memory`), confidence 1.0, policy auto-approves, verdict `clean`.
+AC: the approved mapping is reused verbatim (`memory`), confidence 1.0, policy auto-approves, verdict `clean`; the
+critical fields are still checked against last round's values, so prices that lost their VAT or moved to satang in an
+unchanged layout go to review with one question (ADR-056).
 
 | Technique | Why |
 |---|---|
 | strict/loose fingerprint equality → reuse | a person approved exactly these rules for exactly this layout (ADR-006) |
 
-Tests: `test_api.py::test_full_flow`, `test_heuristics_eval.py` (drift 9/9).
+Tests: `test_silent_values.py`, `test_api.py::test_full_flow`, `test_heuristics_eval.py` (drift 9/9).
 
 ### B2. A renamed or moved column
 **ฉันอยาก**ให้ FORMA ปรับ mapping เองและพิสูจน์จากข้อมูลว่าคอลัมน์ที่เปลี่ยนชื่อยังมีความหมายเดิม **เพื่อ**กดยอมรับได้ในคลิกเดียวโดยไม่ต้อง map ใหม่
