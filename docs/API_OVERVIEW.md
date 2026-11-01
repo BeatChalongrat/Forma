@@ -109,7 +109,7 @@ Long operations run as jobs: `POST …/run`, `/profile`, `/propose` and `/transf
 | Endpoint | Purpose |
 |---|---|
 | `GET /jobs` · `/jobs/{id}` · `/jobs/stats` · `POST /jobs/{id}/retry` | job rows of the caller's customers and retry (admin); `/jobs/stats` needs all-customer access |
-| `GET /ops` | queue, workers, failed jobs, breaker, spend, slowest rounds (all-customer access) |
+| `GET /ops` | queue, workers, failed jobs, breaker, spend, slowest rounds, and housekeeping: storage, the last retention pass, the age, size and contents of the last backup (all-customer access) |
 | `GET /audit?entity_id=` | audit log (all-customer access) |
 | `GET /dashboard` | Home figures for the caller's customers: rounds by status, open reviews, automation rate, AI spend, learning, recent rounds |
 | `GET /health` · `/ready` · `/metrics` | liveness; dependencies; Prometheus |

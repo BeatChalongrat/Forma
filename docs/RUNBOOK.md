@@ -9,7 +9,7 @@ or the Ops page (`/ops`, admin role). Health endpoints: `/health` (liveness), `/
 
 | Objective | Target | How it is met |
 |---|---|---|
-| RPO (data loss on total loss of the node) | ≤ 24 h | nightly `forma backup` (DB dump + manifest + objects). With S3 versioning + cross-region replication the object RPO drops to minutes; the DB RPO follows your Postgres backup/WAL shipping. |
+| RPO (data loss on total loss of the node) | ≤ 24 h | `backup-nightly` backs up the database and every file every 24 hours. It stays on this machine, so the target holds for a mistake or a damaged store, and losing the machine needs a copy elsewhere (R36). With S3 versioning + cross-region replication the object RPO drops to minutes; the DB RPO follows your Postgres backup/WAL shipping. |
 | RTO (time to serve again) | ≤ 1 h | documented restore below; images are stateless, state is DB + bucket. |
 | 300-file night | profile+propose ≤ 10 min, transform ≤ 15 min | `docs/PERFORMANCE.md`; 8 worker processes on a 12-core node. |
 
@@ -113,9 +113,9 @@ previous revision. Fix the migration, re-run. On SQLite (dev) delete the DB and 
 ## Backup and restore
 
 ```bash
-# the compose stack's `backup-nightly` service dumps the database every 24 hours and keeps 14 days
+# the compose stack's `backup-nightly` service runs the first line every 24 hours and keeps 14 days
 forma backup --out /backups --archive            # DB dump + manifest.json + objects/ → forma-backup-<stamp>.tar.gz
-forma backup --out /backups --no-objects         # when the bucket is versioned/replicated: manifest only
+forma backup --out /backups --no-objects         # only when the bucket is replicated elsewhere: manifest only
 
 # restore into an EMPTY database (no `forma db upgrade` first: the dump carries schema + alembic_version)
 forma restore /backups/forma-backup-20261028T020000Z.tar.gz
@@ -124,7 +124,11 @@ forma db upgrade                                 # only if the running code is n
 
 `manifest.json` lists every object key with size and sha256 and the schema revision; `forma restore`
 reports keys that are in the manifest but missing from the backup and the bucket, so a partial restore is
-visible, never silent.
+visible, never silent. A backup that failed leaves nothing with that name, and older ones are kept.
+
+Restore a backup into an empty stack after changing Postgres or the image. That is how ADR-054 found that no backup of
+this stack could be restored. On another machine a restore also needs `.env.production`, because AI keys are stored
+encrypted with `FORMA_SECRET_KEY`.
 
 ## Retention
 
@@ -137,7 +141,9 @@ Scheduled: `FORMA_RETENTION_INTERVAL_H=24` (and `FORMA_RETENTION_APPLY=true` to 
 inside the API/worker process. The first pass comes a minute after start, and a pass is skipped when one ran in
 the last half interval. Approved/published versions, rollback parents and open rounds are never touched; a round
 with no activity for 60 days is flagged on the home page and left alone. System health shows storage used, the
-last pass and what it did, and the age of the last backup, amber past a day (ADR-053).
+last pass and what it did, and the age and contents of the last backup, amber past a day or with no files in it
+(ADR-053, ADR-054). The compose bucket is versioned, so until a lifecycle rule expires old versions, a delete keeps
+the bytes on disk (R37). Add one before setting `FORMA_RETENTION_APPLY=true`.
 
 ## Who can reach the stack
 
@@ -145,8 +151,9 @@ The web port and MinIO are published on 127.0.0.1, so only the machine running t
 on one machine with `FORMA_AUTH=dev`, which has no login, and this is what makes that safe. Set `FORMA_BIND_HOST`
 only behind OIDC or a VPN, never with `FORMA_AUTH=dev`.
 
-On one machine a backup shares the machine's fate. Copy the `backups` volume somewhere else from time to time, and
-keep the code on a remote.
+On one machine a backup shares the machine's fate. `backup-nightly` holds the database and every file, which covers
+a mistake or a damaged store, not losing the machine (R36). Copy the newest backup and `.env.production` somewhere
+else, protected, because they hold customer data and the key that opens the AI keys, and keep the code on a remote.
 
 ## Capacity
 

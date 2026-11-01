@@ -3,11 +3,18 @@
 from __future__ import annotations
 
 import datetime as dt
+import hashlib
 import json
+import os
+import tarfile
+import time
 from collections.abc import Iterator
 from pathlib import Path
+from types import SimpleNamespace
+from typing import Any
 
 import pytest
+import yaml
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 from tests.test_api import _run, _upload, make_workbook
@@ -187,6 +194,155 @@ def test_backup_and_restore_round_trip(
     # refusing to restore into a non-empty database
     with pytest.raises(RuntimeError, match="non-empty"):
         backup.restore_backup(ctx2, archive)
+
+
+def test_a_backup_holds_the_bytes_its_manifest_names(client: TestClient, isolated_env: Path) -> None:
+    from forma.services import backup
+    from forma.services.context import get_context
+
+    _published_round(client, isolated_env, code="BK3")
+    ctx = get_context()
+    info = backup.create_backup(ctx, isolated_env / "bk", include_objects=True, archive=True)
+    with tarfile.open(info["path"], "r:gz") as tar:
+        members = {m.name.split("/", 1)[1]: m for m in tar.getmembers() if m.isfile()}
+
+        def read(name: str) -> bytes:
+            fh = tar.extractfile(members[name])
+            assert fh is not None
+            return fh.read()
+
+        manifest = json.loads(read("manifest.json"))
+        assert manifest["objects_included"] is True and manifest["object_count"] == info["objects"] > 0
+        for obj in manifest["objects"]:
+            held = read(f"objects/{obj['key']}")
+            assert hashlib.sha256(held).hexdigest() == obj["sha256"] and len(held) == obj["size"]
+
+
+def test_a_dump_from_a_newer_client_restores_on_an_older_server(tmp_path: Path) -> None:
+    from forma.services import backup
+
+    lines = [b"SET lock_timeout = 0;", b"SET transaction_timeout = 0;", b"SET row_security = off;"]
+    filler = [b"-- a comment"] * backup.DUMP_HEADER_LINES
+    dump = tmp_path / "db.sql"
+    dump.write_bytes(b"\n".join([*lines, *filler, b"SET transaction_timeout = 0; held in a row", b""]))
+    out = tmp_path / "clean.sql"
+    backup._drop_newer_settings(dump, out)
+    lines = out.read_bytes().splitlines()
+    assert lines[:2] == [b"SET lock_timeout = 0;", b"SET row_security = off;"]
+    assert lines[-1] == b"SET transaction_timeout = 0; held in a row"
+
+
+def test_a_backup_covers_every_kind_of_object(client: TestClient, isolated_env: Path) -> None:
+    from forma.services import backup, sandbox
+    from forma.services.context import get_context
+
+    _published_round(client, isolated_env, code="BK7")
+    ctx = get_context()
+    ctx.storage.put("assistant/chat1/file1.png", b"a picture in a chat")
+    ctx.storage.put(sandbox.details_key("c1", "m1"), b"{}")
+    info = backup.create_backup(ctx, isolated_env / "bk", include_objects=False)
+    manifest = json.loads((Path(info["path"]) / "manifest.json").read_text(encoding="utf-8"))
+    kinds = {o["key"].split("/")[0] for o in manifest["objects"]}
+    assert {"files", "datasets", "exports", "assistant", "sandbox"} <= kinds
+
+
+def test_a_bucket_is_taken_whole() -> None:
+    from forma.services import backup
+    from forma.storage import ObjectInfo
+
+    class Bucket:
+        name = "s3"
+
+        def list(self, prefix: str) -> Iterator[ObjectInfo]:
+            assert prefix == ""
+            yield ObjectInfo("a-kind-nobody-listed/x", 1)
+
+    ctx: Any = SimpleNamespace(storage=Bucket())
+    assert [o.key for o in backup._objects(ctx)] == ["a-kind-nobody-listed/x"]
+
+
+def test_a_backup_does_not_fill_the_object_cache(
+    client: TestClient, isolated_env: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from forma.services import backup
+    from forma.services.context import get_context
+
+    _published_round(client, isolated_env, code="BK4")
+    ctx = get_context()
+
+    def refuse(key: str) -> Path:
+        raise AssertionError(f"local_path caches the whole bucket on S3: {key}")
+
+    monkeypatch.setattr(ctx.storage, "local_path", refuse)
+    assert backup.create_backup(ctx, isolated_env / "bk", include_objects=True)["objects"] > 0
+
+
+@pytest.mark.parametrize("archive", [True, False])
+def test_a_failed_backup_leaves_nothing_behind(
+    client: TestClient, isolated_env: Path, monkeypatch: pytest.MonkeyPatch, archive: bool
+) -> None:
+    from forma.services import backup
+    from forma.services.context import get_context
+
+    _published_round(client, isolated_env, code="BK5")
+    ctx = get_context()
+    out = isolated_env / "bk"
+    calls = {"n": 0}
+    real = ctx.storage.open
+
+    def fails_on_the_second(key: str) -> Any:
+        calls["n"] += 1
+        if calls["n"] == 2:
+            raise OSError("the bucket went away")
+        return real(key)
+
+    monkeypatch.setattr(ctx.storage, "open", fails_on_the_second)
+    with pytest.raises(OSError, match="went away"):
+        backup.create_backup(ctx, out, include_objects=True, archive=archive)
+    assert list(out.iterdir()) == []
+
+
+def test_only_a_finished_backup_carries_the_name(client: TestClient, isolated_env: Path) -> None:
+    from forma.services import backup
+    from forma.services.context import get_context
+
+    out = isolated_env / "bk"
+    stale = out / ".forma-backup-20200101T000000Z"
+    (stale / "objects").mkdir(parents=True)
+    (stale / "objects" / "x").write_bytes(b"half")
+    running = out / ".forma-backup-29990101T000000Z.tar.gz"
+    running.write_bytes(b"half")
+    old = time.time() - backup.PARTIAL_MAX_AGE_S - 60
+    os.utime(stale, (old, old))
+    backup.create_backup(get_context(), out, include_objects=True, archive=True)
+    assert not stale.exists() and running.exists()
+    done = [p.name for p in out.iterdir() if p.name.startswith("forma-backup-")]
+    assert len(done) == 1 and done[0].endswith(".tar.gz")
+
+
+def test_the_health_page_says_whether_the_files_are_in_the_backup(
+    client: TestClient, isolated_env: Path
+) -> None:
+    from forma.cli import app
+
+    _published_round(client, isolated_env, code="BK6")
+    out = str(isolated_env / "bk")
+    assert runner.invoke(app, ["backup", "--out", out, "--archive", "--no-objects"]).exit_code == 0
+    backup = client.get("/api/ops").json()["housekeeping"]["backup"]
+    assert backup["files_included"] is False and backup["bytes"] > 0
+    assert runner.invoke(app, ["backup", "--out", out, "--archive"]).exit_code == 0
+    backup = client.get("/api/ops").json()["housekeeping"]["backup"]
+    assert backup["files_included"] is True and backup["bytes"] > 0
+
+
+def test_the_stack_backs_up_the_files_and_prunes_only_after_a_success() -> None:
+    compose = Path(__file__).parents[2] / "docker-compose.prod.yml"
+    services = yaml.safe_load(compose.read_text(encoding="utf-8"))["services"]
+    nightly = " ".join(services["backup-nightly"]["command"])
+    assert "--no-objects" not in nightly and "--archive && find" in nightly
+    assert "--no-objects" not in services["backup"]["command"]
+    for name in ("backup-nightly", "backup"):
+        assert "minio" in services[name]["depends_on"]
 
 
 def test_backup_cli(client: TestClient, isolated_env: Path) -> None:

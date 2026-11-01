@@ -374,7 +374,17 @@ def backup(out: Path = Path("../data/backups"), objects: bool = True, archive: b
     init_db()
     done = create_backup(get_context(), out.resolve(), include_objects=objects, archive=archive)
     with session_scope() as s:  # the System health page reads the age of the last backup from here
-        audit(s, "backup.create", "backup", "run", actor="backup", path=done["path"], objects=done["objects"])
+        audit(
+            s,
+            "backup.create",
+            "backup",
+            "run",
+            actor="backup",
+            path=done["path"],
+            objects=done["objects"],
+            objects_included=done["objects_included"],
+            bytes=done["bytes"],
+        )
     typer.echo(json.dumps(done, indent=2))
 
 

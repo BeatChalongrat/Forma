@@ -283,8 +283,8 @@ browser ──▶ nginx (web image: SPA + /api proxy, SSE unbuffered) ──▶ 
 One backend image (`forma serve` / `forma worker`), one web image, a sandbox image for the assistant's code runs,
 `docker-compose.prod.yml` with a `migrate` service, generated `.env.production.example`, CI building the images and
 validating the compose file (ADR-016, ADR-048). The sandbox service has no network: the API reaches it through one
-Unix socket on a shared volume. A `backup-nightly` service dumps the database every 24 hours and keeps 14 days
-(ADR-053). Dev stays SQLite + local disk + no auth + no external service, and without the sandbox.
+Unix socket on a shared volume. A `backup-nightly` service backs up the database and every file every 24 hours and keeps
+14 days (ADR-053, ADR-054). Dev stays SQLite + local disk + no auth + no external service, and without the sandbox.
 
 Today this whole stack runs on one machine for one person. The web port and MinIO are published on 127.0.0.1, so
 nothing else can reach them, and `FORMA_AUTH=dev` with `FORMA_AUTH_ALLOW_DEV_IN_PROD=true` means there is no login.
@@ -300,7 +300,7 @@ diagram's replicas and workers × N are what the design allows, not what this ma
   (ADR-015, ADR-025).
 * Idempotent, resumable jobs; stale recovery; durable-result reconciliation on startup; bulk-item resume
   (ADR-010, ADR-027, ADR-044).
-* Retention policy with audited deletions; `forma backup | restore`; RPO ≤ 24 h, RTO ≤ 1 h ([RUNBOOK.md](RUNBOOK.md)).
+* Retention policy with audited deletions; `forma backup | restore`; RPO ≤ 24 h and RTO ≤ 1 h are targets, and on one machine they do not cover losing the machine (R36, [RUNBOOK.md](RUNBOOK.md)).
 
 ## 9. Scaling
 
@@ -330,5 +330,5 @@ These are the project's rules. Where the code does not yet meet one, the gap is 
 
 ## 11. Decision records
 
-ADRs 001–047 in [adr/](adr/) are binding unless superseded by a newer ADR. The index with one line each is in
+ADRs 001–054 in [adr/](adr/) are binding unless superseded by a newer ADR. The index with one line each is in
 [TEAM_LEAD_HANDBOOK.md](TEAM_LEAD_HANDBOOK.md#5-decision-log-adr-index).

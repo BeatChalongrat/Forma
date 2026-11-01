@@ -30,6 +30,7 @@
 | 8 Input contract readiness | full OOXML scan, strict CSV decoding, formula and error-cell gates, table detection across the whole sheet, unsupported schema shapes refused, the full target schema in AI prompts | **done** | ADR-043 |
 | 8 Durable queue reconciliation | on startup, queued jobs are checked against durable results before recovery and resubmission | **done** | ADR-044 |
 | 12 Housekeeping and the review clock | retention on a schedule and visible, nightly backups, question age, waiting for the customer, idle rounds | **done** | ADR-053 |
+| 13 Backups that restore | every file in the nightly backup, restore proven on this stack, health page says what a backup holds | **done** | ADR-054 |
 | 11 Closing a round | cancel with reopen, move to the right customer, replace with a corrected file; nothing deleted | **done** | ADR-052 |
 | 10 Memory across chats | topics kept while talking, search of earlier chats, pause, reset, memory-off and incognito chats | **done** | ADR-051 |
 | 9 Work beside the chat | flows, documents, slides, sheets and web pages open in a panel beside the chat, with versions, restore and previews | **done** | ADR-050 |
@@ -72,7 +73,9 @@ FORMA runs for one person on one machine, so what remains comes in two parts.
   baseline for them (`docs/EVALUATION.md`).
 * **Real target contract** — `target_schema/product.v1.json` is still the draft; swap in the downstream
   schema and run the schema diff + a full re-eval.
-* **Copies off this machine** — the repository has no remote, and the backups sit on the same disk.
+* **Copies off this machine** — the repository has no remote, and the backups sit on the same disk (R36).
+* **Retention that frees disk** — the bucket is versioned, so a delete keeps the bytes until a lifecycle rule
+  expires them (R37). Settle this before switching retention on.
 * **Engine next levers** — schema validation per column, nested structs from Polars (see PERFORMANCE.md).
 
 **Only when moving to a server**

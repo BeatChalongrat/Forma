@@ -61,7 +61,8 @@ Details: [EVALUATION.md](EVALUATION.md), [adr/041](adr/041-evaluation-on-real-fi
    and change it, bring back the old version; tell it something to remember, then find it in a new chat.
 7. A round's life: upload and watch the navy card across pages; cancel a round and reopen it; move one to another
    customer; replace one with a corrected file and check the zip; park a question and bring it back.
-8. System health: storage used, last retention pass and last backup show real values.
+8. System health: storage used, last retention pass and last backup show real values. After changing Postgres or
+   the image, restore a backup into an empty stack (RUNBOOK, ADR-054).
 9. Both themes, 390 px width, Thai and English.
 
 ## 5. Definition of done (per change)

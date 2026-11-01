@@ -32,6 +32,7 @@ export function OpsPage() {
   const house = ops?.housekeeping
   const purged = house?.retention.last_counts ? Object.values(house.retention.last_counts).reduce((a, n) => a + n, 0) : 0
   const backupLate = !house?.backup.age_hours && house?.backup.age_hours !== 0 ? true : house.backup.age_hours > 24
+  const backupPartial = !!house?.backup.last_at && house.backup.files_included !== true
   return (
     <>
       <PageHeader
@@ -50,7 +51,7 @@ export function OpsPage() {
       {house && <div className="grid sm:grid-cols-3 gap-3 mb-5">
         <Stat label={t('Storage used', 'พื้นที่ที่ใช้')} value={house.storage.known ? fmtBytes(house.storage.bytes ?? 0) : '–'} hint={house.storage.known ? t(`${fmtInt(house.storage.objects)} files`, `${fmtInt(house.storage.objects)} ไฟล์`) : t('Storage did not answer', 'เช็กพื้นที่ไม่ได้')} />
         <Stat label={t('Retention', 'ลบข้อมูลเก่า')} tone={house.retention.schedule_h ? undefined : 'warn'} value={house.retention.last_at ? timeAgo(house.retention.last_at) : t('Not yet', 'ยังไม่เคยรัน')} hint={!house.retention.schedule_h ? t('No schedule set', 'ยังไม่ได้ตั้งเวลา') : house.retention.last_at ? (house.retention.last_applied ? t(`Removed ${fmtInt(purged)} items`, `ลบไป ${fmtInt(purged)} รายการ`) : t(`Plan only: ${fmtInt(purged)} items would go`, `แค่วางแผน: จะลบ ${fmtInt(purged)} รายการ`)) : t(`Every ${house.retention.schedule_h} h`, `ทุก ${house.retention.schedule_h} ชม.`)} />
-        <Stat label={t('Last backup', 'backup ล่าสุด')} tone={backupLate ? 'warn' : undefined} value={house.backup.last_at ? timeAgo(house.backup.last_at) : t('Never', 'ยังไม่เคย')} hint={backupLate ? t('Older than a day', 'เก่ากว่า 1 วัน') : t('Within a day', 'ภายใน 1 วัน')} />
+        <Stat label={t('Last backup', 'backup ล่าสุด')} tone={backupLate || backupPartial ? 'warn' : undefined} value={house.backup.last_at ? timeAgo(house.backup.last_at) : t('Never', 'ยังไม่เคย')} hint={backupLate ? t('Older than a day', 'เก่ากว่า 1 วัน') : backupPartial ? t('Database only, no files', 'มีแค่ฐานข้อมูล ไม่มีไฟล์') : t(`Database and files, ${fmtBytes(house.backup.bytes ?? 0)}`, `ฐานข้อมูลและไฟล์ ${fmtBytes(house.backup.bytes ?? 0)}`)} />
       </div>}
 
       <div className="grid lg:grid-cols-[1.3fr_1fr] gap-4">
