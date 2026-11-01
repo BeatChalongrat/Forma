@@ -98,6 +98,20 @@ Tests: `test_batches.py::test_work_round_date_append_and_retry`, `test_append_sc
 
 ---
 
+### A5. Undo a wrong upload
+**ฉันอยาก**ยกเลิกไฟล์ที่อัปโหลดผิด ย้ายไฟล์ไปลูกค้าที่ถูก หรือแทนที่ด้วยไฟล์ที่ลูกค้าแก้มาใหม่ **เพื่อ**ให้คิวงานและ JSON ที่ส่งออกตรงกับความจริง โดยไม่ลบประวัติ
+
+AC: cancel, move and replace each ask for a reason and are audited; a closed round leaves the review queue, the
+history list (shown under one filter), foresight's cadence and the work round's zip; only a cancelled round can be
+reopened; move reuses the stored file and runs the pipeline for the right customer; replace links the new round to
+the old one and the work round's file row follows the file; the verdict's "move to the right customer" opens the
+move dialog with the matched customer selected.
+
+Technique: three closed statuses with `closed_from/by/at/reason` and successor/predecessor links, no row deleted
+(ADR-052).
+
+Tests: `test_round_lifecycle.py`.
+
 ## Epic B — Deciding what a file means
 
 ### B1. A returning customer with an unchanged layout
@@ -460,7 +474,7 @@ AC: `SYSTEM_BASE` states it; the guard enforces it; tools mark truncation; tests
 
 | Epic | ADRs |
 |---|---|
-| A Receiving | 003, 005, 012, 013, 027, 033, 034, 043, 044 |
+| A Receiving | 003, 005, 012, 013, 027, 033, 034, 043, 044, 052 |
 | B Meaning | 001, 002, 006, 007, 008, 015, 017, 018, 019, 021, 025, 036, 038, 046 |
 | C Data | 020, 022, 023, 024, 026 |
 | D Verdict & review | 029, 035, 036, 042 |

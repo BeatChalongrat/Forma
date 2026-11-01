@@ -91,12 +91,15 @@ export type DriftReport = { classification: string; similarity: number; changes:
 export type ColumnProfile = { name: string; position: number; inferred_type: string; null_ratio: number; unique_ratio: number; unique_count: number; samples: string[]; min: string | null; max: string | null; header_lang: string; hints: string[] }
 export type TableProfile = { sheet: string; sheet_index: number; file_id?: string; file_name?: string; table: { header_row: number; headers: string[]; n_rows: number; title: string | null; score: number }; columns: ColumnProfile[]; n_rows: number; key_candidates: string[] }
 export type WorkbookProfile = { meta: { file_name: string; kind: string; sheets: { name: string; index: number; hidden: boolean; n_rows: number; n_cols: number; merged_ranges: string[]; formula_cells: number }[] }; tables: TableProfile[] }
-export type RoundStatus = 'uploaded' | 'profiled' | 'review' | 'auto_approved' | 'approved' | 'transformed' | 'approved_data' | 'published' | 'blocked' | 'rejected' | 'failed'
+export type RoundStatus = 'uploaded' | 'profiled' | 'review' | 'auto_approved' | 'approved' | 'transformed' | 'approved_data' | 'published' | 'blocked' | 'rejected' | 'failed' | 'cancelled' | 'moved' | 'superseded'
+export type RoundBrief = { id: string; label: string | null; status: string; customer_id: string; customer_code: string | null }
 export type ImportRound = {
   uploaded_at?: string
   id: string; customer_id: string; label: string | null; status: RoundStatus; target_schema: string; notes: string | null
-  summary: { drift?: string | null; drift_report?: DriftReport | null; decision?: string; mapping_version_id?: string; dataset_version_id?: string; rows?: number; errors?: number; error?: string; simulation?: SimSummary | null; has_previous_approval?: boolean; batch_id?: string; auto_publish?: boolean; publish?: PublishDecision; verdict?: Verdict | null; format_memory?: FormatMemory }
+  summary: { matches_other_customer?: { customer_id?: string; customer_code?: string; similarity?: number } | null; drift?: string | null; drift_report?: DriftReport | null; decision?: string; mapping_version_id?: string; dataset_version_id?: string; rows?: number; errors?: number; error?: string; simulation?: SimSummary | null; has_previous_approval?: boolean; batch_id?: string; auto_publish?: boolean; publish?: PublishDecision; verdict?: Verdict | null; format_memory?: FormatMemory }
   created_at: string; updated_at: string; files?: SourceFile[]; customer?: { id: string; code: string; name: string }
+  closed?: { from: string | null; by: string | null; at: string | null; reason: string | null }; successor_id?: string | null; predecessor_id?: string | null
+  successor?: RoundBrief | null; predecessor?: RoundBrief | null
   mappings?: MappingVersion[]; datasets?: DatasetVersion[]; review_tasks?: ReviewTask[]; jobs?: Job[]
 }
 /** what the policy decided after the data was created, for rounds that publish automatically (ADR-027) */
@@ -131,13 +134,13 @@ export type WatchItem = { customer_id: string; code: string; name: string; reaso
 export type Foresight = { generated_at: string; expected: ExpectedDelivery[]; counts: Record<Cadence['status'], number>; watchlist: WatchItem[] }
 export type VerdictAccepted = { did: 'approve_mapping' | 'apply_answers' | 'approve_dataset'; mapping_id?: string; dataset_id?: string; auto_publish?: boolean; verdict: Verdict }
 export type BatchMatch = { kind: 'known' | 'unknown'; how?: 'exact' | 'same_columns' | 'similar' | 'file_name'; named?: boolean; customer_id?: string; customer_code?: string | null; similarity?: number | null; classification?: string; reason?: string; candidates?: { customer_id: string; customer_code: string | null; similarity: number | null }[] }
-export type BatchItemState = 'processing' | 'needs_customer' | 'needs_review' | 'needs_data_check' | 'ready' | 'failed'
+export type BatchItemState = 'processing' | 'needs_customer' | 'needs_review' | 'needs_data_check' | 'ready' | 'failed' | 'closed'
 export type FormatMemory = { status: 'known' | 'reused' | 'changed' | 'new' | 'edited'; mapping_id: string | null; mapping_version: number | null; target_schema: string }
 export type BatchItem = {
   id: string; file_name: string; size: number; match: BatchMatch | null; customer: { id: string; code: string | null; name: string | null } | null
   round_id: string | null; round_status: string | null; mapping_version_id: string | null; dataset_version_id: string | null
   publish: PublishDecision | null; export_id: string | null; json_name: string; rows: number | null
-  state: BatchItemState; step: number; message: string; reasons?: string[]; verdict?: VerdictBrief | null
+  state: BatchItemState; step: number; message: string; reasons?: string[]; verdict?: VerdictBrief | null; closed_as?: string
   format_memory?: FormatMemory | null
 }
 export type BatchSummary = { id: string; label: string | null; work_date: string | null; expected_files: number | null; complete: boolean; auto_publish: boolean; created_by: string; created_at: string; total: number; counts: Partial<Record<BatchItemState, number>>; mapped: number; done: boolean; stuck: number }
@@ -355,6 +358,16 @@ export const api = {
   rounds: (q?: { status?: string; customer_id?: string }) => get<ImportRound[]>('/api/rounds' + qs(q)),
   round: (id: string) => get<ImportRound>(`/api/rounds/${id}`),
   createRound: (b: { customer_id: string; label?: string; target_schema?: string }) => post<ImportRound>('/api/rounds', b),
+  cancelRound: (id: string, reason: string) => post<ImportRound>(`/api/rounds/${encodeURIComponent(id)}/cancel`, { reason }),
+  reopenRound: (id: string) => post<ImportRound>(`/api/rounds/${encodeURIComponent(id)}/reopen`, {}),
+  moveRound: (id: string, b: { customer_id: string; reason: string }) => post<ImportRound & { job_id: string }>(`/api/rounds/${encodeURIComponent(id)}/move`, b),
+  replaceRound: (id: string, files: File[], reason: string, label?: string) => {
+    const fd = new FormData()
+    files.forEach((f) => fd.append('files', f))
+    fd.append('reason', reason)
+    if (label) fd.append('label', label)
+    return request<ImportRound & { job_id: string }>(`/api/rounds/${encodeURIComponent(id)}/replace`, { method: 'POST', body: fd })
+  },
   uploadFiles: (roundId: string, files: File[]) => {
     const fd = new FormData()
     files.forEach((f) => fd.append('files', f))

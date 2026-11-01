@@ -40,12 +40,14 @@ type Props = {
   onAccept?: (decisions: Record<string, boolean | number | string | null>) => void
   /** open a decision in the surrounding form (the review page's question) */
   onOpenDecision?: (id: string) => void
+  /** open the move dialog for a `assign_customer` verdict (ADR-052) */
+  onMove?: () => void
   compact?: boolean
   error?: string | null
 }
 
 /** The verdict card: conclusion, confidence, what only a person decides, the evidence, and what was folded away. */
-export function VerdictCard({ v, editable, busy, onAccept, onOpenDecision, compact, error }: Props) {
+export function VerdictCard({ v, editable, busy, onAccept, onOpenDecision, onMove, compact, error }: Props) {
   const { prefs, t } = usePreferences()
   const lang = prefs.language
   const [decisions, setDecisions] = useState<Record<string, boolean | number | string | null>>({})
@@ -69,6 +71,8 @@ export function VerdictCard({ v, editable, busy, onAccept, onOpenDecision, compa
           <button className="btn btn-primary" disabled={!canAct} onClick={() => onAccept?.(decisions)}>
             {busy ? t('Working…', 'กำลังทำ…') : v.outcome === 'accept' ? <><Check size={15} />{t('Accept and continue', 'ยอมรับและทำต่อ')}</> : <>{t('Save my answers', 'บันทึกคำตอบ')}<ArrowRight size={15} /></>}
           </button>
+        ) : v.outcome === 'assign_customer' && onMove ? (
+          <button className="btn btn-primary" disabled={!editable || busy} onClick={onMove}>{o[lang]}<ArrowRight size={15} /></button>
         ) : firstLink ? (
           <Link className="btn btn-primary" to={firstLink}>{o[lang]}<ArrowRight size={15} /></Link>
         ) : null)}

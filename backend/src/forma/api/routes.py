@@ -4,10 +4,11 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, Depends, File, Query, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Query, UploadFile
 from fastapi.responses import RedirectResponse, Response, StreamingResponse
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
+from starlette.concurrency import run_in_threadpool
 
 from forma.ai.agents import copilot_agent, diagnosis_agent
 from forma.api import serialize as ser
@@ -15,6 +16,7 @@ from forma.api.schemas import (
     AskIn,
     BatchRunIn,
     ChangesIn,
+    CloseIn,
     CompareIn,
     CopilotIn,
     CustomerIn,
@@ -22,6 +24,7 @@ from forma.api.schemas import (
     Decision,
     MappingEditIn,
     MappingPreviewIn,
+    MoveIn,
     ProposeIn,
     RelationshipsIn,
     RoundIn,
@@ -62,6 +65,7 @@ from forma.services import lineage as lin
 from forma.services import mapping as ms
 from forma.services import publishing as pub
 from forma.services import relationships as rel
+from forma.services import round_lifecycle as lifecycle
 from forma.services import rounds as rs
 from forma.services.context import ServiceContext, get_context
 
@@ -293,6 +297,7 @@ def get_round(
         select(Job).where(Job.round_id == r.id).order_by(Job.created_at.desc()).limit(10)
     ).all()
     d = ser.import_round(r, customer_obj=c)
+    d.update(lifecycle.related(session, r))
     d["mappings"] = [ser.mapping_version(m, document=False) for m in mappings]
     d["datasets"] = [ser.dataset_version(x) for x in datasets]
     d["review_tasks"] = [ser.review_task(t) for t in tasks]
@@ -425,6 +430,82 @@ def propose(
             request_id=p.request_id,
         )
     }
+
+
+@api.post("/rounds/{round_id}/cancel")
+def cancel_round(
+    round_id: str,
+    body: CloseIn,
+    session: Session = Depends(get_session),
+    p: Principal = Depends(require_role("importer")),
+) -> dict[str, Any]:
+    """Close a round that should not count: it leaves every queue, its files and history stay (ADR-052)."""
+    r = _round_scoped(session, p, round_id)
+    lifecycle.cancel(session, p, r, body.reason)
+    session.commit()
+    return ser.import_round(r, customer_obj=session.get(Customer, r.customer_id))
+
+
+@api.post("/rounds/{round_id}/reopen")
+def reopen_round(
+    round_id: str, session: Session = Depends(get_session), p: Principal = Depends(require_role("importer"))
+) -> dict[str, Any]:
+    r = _round_scoped(session, p, round_id)
+    lifecycle.reopen(session, p, r)
+    session.commit()
+    return ser.import_round(r, customer_obj=session.get(Customer, r.customer_id))
+
+
+@api.post("/rounds/{round_id}/move", status_code=201)
+def move_round(
+    round_id: str,
+    body: MoveIn,
+    sync: bool = Query(False),
+    session: Session = Depends(get_session),
+    p: Principal = Depends(require_role("importer")),
+) -> dict[str, Any]:
+    """The file was another customer's: the same files become that customer's round and run at once."""
+    r = _round_scoped(session, p, round_id)
+    ensure_customer(p, body.customer_id)
+    new = lifecycle.move(session, p, r, body.customer_id, body.reason)
+    session.commit()
+    job_id = runner.enqueue(
+        "run_pipeline",
+        {"round_id": new.id, "actor": p.actor, "auto_publish": bool((new.summary or {}).get("auto_publish"))},
+        round_id=new.id,
+        sync=sync,
+        request_id=p.request_id,
+    )
+    return {**ser.import_round(new, customer_obj=session.get(Customer, new.customer_id)), "job_id": job_id}
+
+
+@api.post("/rounds/{round_id}/replace", status_code=201)
+async def replace_round(
+    round_id: str,
+    files: list[UploadFile] = File(...),
+    reason: str = Form(..., min_length=1, max_length=500),
+    label: str | None = Form(None, max_length=255),
+    sync: bool = Query(False),
+    session: Session = Depends(get_session),
+    ctx: ServiceContext = Depends(ctx_dep),
+    p: Principal = Depends(require_role("importer")),
+) -> dict[str, Any]:
+    """A corrected delivery takes the old round's place; the old JSON leaves the work round's zip."""
+    r = _round_scoped(session, p, round_id)
+    loaded = [(f.filename or "upload.xlsx", await read_upload(f, ctx.settings.max_upload_mb)) for f in files]
+    new = lifecycle.replace(ctx, session, p, r, loaded, reason, label)
+    session.commit()
+    payload = {
+        "round_id": new.id,
+        "actor": p.actor,
+        "auto_publish": bool((new.summary or {}).get("auto_publish")),
+    }
+    # off the event loop: the arq backend submits with asyncio.run, which cannot nest in this async handler
+    job_id = await run_in_threadpool(
+        lambda: runner.enqueue("run_pipeline", payload, round_id=new.id, sync=sync, request_id=p.request_id)
+    )
+    session.expire_all()
+    return {**ser.import_round(new, customer_obj=session.get(Customer, new.customer_id)), "job_id": job_id}
 
 
 @api.post("/rounds/{round_id}/run")

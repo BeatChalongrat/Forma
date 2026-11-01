@@ -11,6 +11,7 @@ import { api, type BatchItem, type BatchItemState } from '../lib/api'
 import { cn, fmtBytes, fmtDate, fmtInt } from '../lib/utils'
 import { Badge, PageHeader, Section, Spinner, Modal } from '../components/ui'
 import { useToast } from '../lib/toast'
+import { RoundMenu } from '../components/RoundMenu'
 
 const ACCEPT = /\.(xlsx|xlsm|csv|txt|tsv)$/i
 
@@ -144,6 +145,7 @@ const STATE: Record<BatchItemState, { label: string; tone: 'ok' | 'warn' | 'bad'
   needs_data_check: { label: 'Check data', tone: 'warn' },
   ready: { label: 'JSON ready', tone: 'ok' },
   failed: { label: 'Failed', tone: 'bad' },
+  closed: { label: 'Closed', tone: 'neutral' },
 }
 
 /** One upload: every file, where it stands, and what to do — plus all the JSON in one zip. */
@@ -289,7 +291,7 @@ function ItemRow({ i }: { i: BatchItem }) {
         <div className="text-[11.5px] text-muted mt-1 max-w-[280px]">{i.verdict && i.state !== 'ready' && i.state !== 'processing' ? <VerdictLine v={i.verdict} /> : i.state === 'needs_data_check' && i.reasons?.length ? i.reasons.join(' · ') : i.message}</div>
       </td>
       <td className="text-right tnum">{fmtInt(i.rows)}</td>
-      <td className="text-right">{action}</td>
+      <td className="text-right"><span className="inline-flex items-center gap-1">{action}{i.round_id && i.round_status && i.customer && i.state !== 'closed' && <RoundMenu compact round={{ id: i.round_id, status: i.round_status, customer_id: i.customer.id, label: i.file_name }} />}</span></td>
     </tr>
   )
 }

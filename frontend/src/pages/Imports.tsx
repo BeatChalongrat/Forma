@@ -11,6 +11,7 @@ import { useToast } from '../lib/toast'
 import { dateInZone, usePreferences } from '../lib/preferences'
 import { Workflow } from '../components/Workflow'
 import { WorkRounds } from '../components/WorkRounds'
+import { CLOSED_STATUSES } from '../components/RoundMenu'
 
 export function Imports() {
   const { prefs, t, date } = usePreferences()
@@ -35,7 +36,7 @@ export function Imports() {
     Object.entries(values).forEach(([k, v]) => v ? next.set(k, v) : next.delete(k))
     return next
   }, { replace: true })
-  const statuses = [['', t('All statuses', 'ทุกสถานะ')], ['review', t('Needs answers', 'รอตอบคำถาม')], ['blocked', t('Check file', 'ต้องตรวจไฟล์')], ['transformed', t('Check results', 'ตรวจผลลัพธ์')], ['approved_data', t('Ready to download', 'พร้อมดาวน์โหลด')], ['published', t('Downloaded', 'ส่งออกแล้ว')], ['failed', t('Processing failed', 'ประมวลผลไม่สำเร็จ')], ['uploaded', t('Reading files', 'กำลังอ่านไฟล์')], ['profiled', t('Matching fields', 'กำลังจับคู่ข้อมูล')], ['approved', t('Ready to create results', 'พร้อมสร้างผลลัพธ์')], ['auto_approved', t('Matched automatically', 'จับคู่ผ่านอัตโนมัติ')], ['rejected', t('Needs correction', 'ต้องแก้ไข')]]
+  const statuses = [['', t('All statuses', 'ทุกสถานะ')], ['review', t('Needs answers', 'รอตอบคำถาม')], ['blocked', t('Check file', 'ต้องตรวจไฟล์')], ['transformed', t('Check results', 'ตรวจผลลัพธ์')], ['closed', t('Cancelled, moved or replaced', 'ยกเลิก ย้าย หรือถูกแทนที่')], ['approved_data', t('Ready to download', 'พร้อมดาวน์โหลด')], ['published', t('Downloaded', 'ส่งออกแล้ว')], ['failed', t('Processing failed', 'ประมวลผลไม่สำเร็จ')], ['uploaded', t('Reading files', 'กำลังอ่านไฟล์')], ['profiled', t('Matching fields', 'กำลังจับคู่ข้อมูล')], ['approved', t('Ready to create results', 'พร้อมสร้างผลลัพธ์')], ['auto_approved', t('Matched automatically', 'จับคู่ผ่านอัตโนมัติ')], ['rejected', t('Needs correction', 'ต้องแก้ไข')]]
   if (!filesView) return <WorkRounds />
   return <>
     <PageHeader title={t('Upload history', 'ประวัติไฟล์')} subtitle={t('Find past deliveries by the date the files were received.', 'ค้นหาไฟล์ย้อนหลังตามวันที่รับไฟล์เข้าระบบ')} actions={<Link to="/imports/new" className="btn btn-primary"><Upload size={16} />{t('Upload files', 'อัปโหลดไฟล์')}</Link>} />
@@ -56,7 +57,7 @@ export function Imports() {
       {query.error && <p role="alert" className="p-4 text-bad">{t('Could not load history.', 'โหลดประวัติไม่ได้')} <button className="btn btn-sm" onClick={() => void query.refetch()}>{t('Try again', 'ลองใหม่')}</button></p>}
       {!invalid && <table className="table"><thead><tr><th>{t('Customer / file', 'ลูกค้า / ไฟล์')}</th><th>{t('Next step', 'ขั้นตอนถัดไป')}</th><th>{t('Uploaded', 'วันที่อัปโหลด')}</th></tr></thead><tbody>
         {query.isPending && <tr><td colSpan={3} className="p-8 text-center text-muted">{t('Loading files…', 'กำลังโหลดไฟล์…')}</td></tr>}
-        {query.data?.items.map(r => <tr key={r.id}><td className="max-w-[480px]"><Link to={`/rounds/${r.id}`} className="font-medium text-navy hover:underline break-words">{r.customer?.code} · {r.label || r.customer?.name}</Link><div className="text-xs text-muted mt-1 break-words">{r.files?.map(f => f.name).join(', ')}</div></td><td><NextStepCell r={r} /></td><td className="whitespace-nowrap text-muted">{date(r.uploaded_at)}</td></tr>)}
+        {query.data?.items.map(r => <tr key={r.id}><td className="max-w-[480px]"><Link to={`/rounds/${r.id}`} className="font-medium text-navy hover:underline break-words">{r.customer?.code} · {r.label || r.customer?.name}</Link><div className="text-xs text-muted mt-1 break-words">{r.files?.map(f => f.name).join(', ')}{CLOSED_STATUSES.includes(r.status) && r.closed?.reason && <> · “{r.closed.reason}”</>}</div></td><td><NextStepCell r={r} />{r.successor_id && <Link className="block text-xs underline mt-1" to={`/rounds/${r.successor_id}`}>{t('Open the current round', 'เปิดรอบที่ใช้อยู่')}</Link>}</td><td className="whitespace-nowrap text-muted">{date(r.uploaded_at)}</td></tr>)}
         {query.data?.total === 0 && <tr><td colSpan={3} className="text-center p-8 text-muted">{t('No files match these filters.', 'ไม่พบไฟล์ที่ตรงกับตัวกรองนี้')}</td></tr>}
       </tbody></table>}
       <div className="p-4 flex items-center justify-between gap-3 border-t border-line"><button className="btn btn-sm" disabled={offset === 0} onClick={() => change({ offset: String(Math.max(0, offset - 50)) })}>{t('Previous', 'ก่อนหน้า')}</button><span className="text-sm text-muted">{t('Page', 'หน้า')} {Math.floor(offset / 50) + 1}</span><button className="btn btn-sm" disabled={!query.data || offset + 50 >= query.data.total} onClick={() => change({ offset: String(offset + 50) })}>{t('Next', 'ถัดไป')}</button></div>

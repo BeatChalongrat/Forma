@@ -7,9 +7,9 @@ import { VerdictCard } from './VerdictCard'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '../lib/api'
 
-type Props = { r: ImportRound; busy: boolean; onRun: (kind: 'run' | 'propose' | 'transform') => void; onExport: (datasetId: string, fmt: string) => void }
+type Props = { r: ImportRound; busy: boolean; onRun: (kind: 'run' | 'propose' | 'transform') => void; onExport: (datasetId: string, fmt: string) => void; onMove?: () => void }
 
-export function RoundSteps({ r, busy, onRun, onExport }: Props) {
+export function RoundSteps({ r, busy, onRun, onExport, onMove }: Props) {
   const { t } = usePreferences(), qc = useQueryClient()
   const { data: me } = useQuery({ queryKey: ['me'], queryFn: api.me })
   const verdictQuery = useQuery({ queryKey: ['verdict', r.id], queryFn: () => api.verdict(r.id), refetchInterval: ['uploaded', 'profiled', 'approved', 'auto_approved', 'approved_data'].includes(r.status) ? 5000 : false })
@@ -29,7 +29,7 @@ export function RoundSteps({ r, busy, onRun, onExport }: Props) {
             : t('Some fields need your confirmation. Answer the questions, preview the result, then approve when correct.', 'มีข้อมูลบางจุดที่ต้องให้คุณยืนยัน ตอบคำถาม ดูตัวอย่างผลลัพธ์ แล้วจึงอนุมัติเมื่อถูกต้อง')
   return <div className="mb-6">
     <Workflow status={r.status} />
-    {verdict && !ready && <div className="mb-4"><VerdictCard v={verdict} editable={canAct} busy={busy || accepting.isPending} onAccept={(d) => accepting.mutate(d)} error={accepting.error?.message} /></div>}
+    {verdict && !ready && <div className="mb-4"><VerdictCard v={verdict} editable={canAct} busy={busy || accepting.isPending} onAccept={(d) => accepting.mutate(d)} onMove={onMove} error={accepting.error?.message} /></div>}
     <div className="card p-5">
       <div className="flex flex-wrap items-center gap-4"><div className="flex-1 min-w-[200px]"><h2 className="font-semibold text-navy">{t('What happens next', 'ขั้นตอนต่อไป')}</h2><p className="text-sm text-ink-2 mt-2 leading-6">{explanation}</p></div>
         <div className="flex flex-wrap gap-2">

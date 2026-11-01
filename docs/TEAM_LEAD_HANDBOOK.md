@@ -116,6 +116,7 @@ login reachable from the network), R30 (a customer-scoped admin can change share
 | 049 | Images and files in an assistant chat |
 | 050 | What the assistant makes opens beside the chat, with its versions kept |
 | 051 | The assistant remembers a person across chats |
+| 052 | Closing a round without deleting it: cancel, move, replace |
 
 ## 6. Numbers to quote (and where they come from)
 

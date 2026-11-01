@@ -75,7 +75,7 @@ export function NextStepCell({ r }: { r: ImportRound }): ReactNode {
   const tone = s.tone === 'problem' ? 'bad' : s.tone === 'todo' ? 'warn' : s.tone === 'done' ? 'ok' : 'neutral'
   return (
     <span className="flex items-center gap-2 min-w-[160px]">
-      <Badge tone={tone} className="whitespace-nowrap shrink-0">{r.status === 'published' ? t('Done', 'เสร็จแล้ว') : `${workflowStep(r.status)}/3`}</Badge>
+      <Badge tone={tone} className="whitespace-nowrap shrink-0">{r.status === 'published' ? t('Done', 'เสร็จแล้ว') : s.step === 0 ? t('Closed', 'ปิดแล้ว') : `${workflowStep(r.status)}/3`}</Badge>
       <span className="leading-tight min-w-0"><span className="block text-[12.5px] font-semibold text-ink">{t(s.action ?? (s.tone === 'done' ? 'Downloaded' : 'Working…'), s.th || 'กำลังดำเนินการ')}</span>{r.summary.verdict && s.tone !== 'done' && <span className="block text-[12px] text-muted max-w-[360px]"><VerdictLine v={r.summary.verdict} /></span>}</span>
     </span>
   )

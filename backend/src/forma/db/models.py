@@ -85,9 +85,16 @@ class ImportRound(Base):
     label: Mapped[str | None] = mapped_column(String(255))
     status: Mapped[str] = mapped_column(String(32), default="uploaded", index=True)
     # uploaded → profiled → proposed → review | auto_approved → transformed → published | blocked | failed
+    # closed without deletion (ADR-052): cancelled | moved | superseded
     target_schema: Mapped[str] = mapped_column(String(64), default="product")
     notes: Mapped[str | None] = mapped_column(Text)
     summary: Mapped[dict[str, Any]] = mapped_column(JSONType, default=dict)
+    closed_from: Mapped[str | None] = mapped_column(String(32))  # the status before it was closed
+    closed_by: Mapped[str | None] = mapped_column(String(128))
+    closed_at: Mapped[dt.datetime | None] = mapped_column(UTCDateTime)
+    closed_reason: Mapped[str | None] = mapped_column(Text)
+    successor_id: Mapped[str | None] = mapped_column(String(40))  # the round that took this one's place
+    predecessor_id: Mapped[str | None] = mapped_column(String(40))  # the round this one replaced or came from
     created_at: Mapped[dt.datetime] = mapped_column(UTCDateTime, default=utcnow)
     updated_at: Mapped[dt.datetime] = mapped_column(UTCDateTime, default=utcnow, onupdate=utcnow)
 

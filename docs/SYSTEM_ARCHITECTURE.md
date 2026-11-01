@@ -154,6 +154,7 @@ saved configuration) and a SQLAlchemy `Session`; decisions and edits record the 
 | `assistant.py` | data-repair copilot: instruction → operations, "why" answers from evidence | 023 |
 | `workspace_assistant.py`, `workspace_tools.py`, `assistant_navigation.py`, `assistant_reports.py`, `conversations.py` | the workspace assistant: bounded tool loop over ~20 read-only tenant-scoped tools, citations, server-built navigation and confirmable actions, server-computed reports, clarification questions, persistent conversations with leases and streaming | 029, 030, 031, 034, 040, 042, 045 |
 | `code_sandbox.py`, `attachments.py` | the assistant's code runs: inputs checked against access, results stored in the chat; files in a chat | 048, 049 |
+| `round_lifecycle.py` | cancel, reopen, move and replace a round without deleting it; closed rounds leave queues, history, cadence and the zip | 052 |
 | `memory.py` | topics kept across chats, the rule that a message reading others' words saves nothing unasked, search of earlier chats | 051 |
 | `artifacts.py` | works beside the chat: flows, files, versions, previews made in the sandbox, restore, staleness | 050 |
 | `config.py` | runtime configuration edited in the web app: AI connection and backups, policy, formats, defaults, personal preferences; encrypted secrets; audited; revision bump | 017, 025 |
