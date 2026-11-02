@@ -70,9 +70,18 @@ def score(
         # a null or an empty list says the same as a missing key: the contract allows both spellings
         return [v for v in values_at(record, pointer) if v is not None and v != []]
 
-    def business_record(record: dict[str, Any]) -> str:
+    def business_record(record: dict[str, Any], like: dict[str, Any]) -> str:
+        # FORMA's own notes (source_meta) and the passthrough bag of unmapped source columns are not part
+        # of an answer key that has none
+        skip = (set(INTERNAL_KEYS) | {"attributes"}) - set(like)
         return _canonical(
-            _strip({k: v for k, v in record.items() if k not in INTERNAL_KEYS or schema.declares(k)})
+            _strip(
+                {
+                    k: v
+                    for k, v in record.items()
+                    if (k not in INTERNAL_KEYS or schema.declares(k)) and k not in skip
+                }
+            )
         )
 
     a, e = {key(r): r for r in actual}, {key(r): r for r in expected}
@@ -110,7 +119,9 @@ def score(
         "per_field": accuracy,
         # Field marginals alone miss swapped prices between two items. Compare whole items too.
         "per_collection": collections,
-        "exact_record_accuracy": sum(business_record(a[k]) == business_record(e[k]) for k in common)
+        "exact_record_accuracy": sum(
+            business_record(a[k], e[k]) == business_record(e[k], e[k]) for k in common
+        )
         / max(1, len(e)),
     }
 

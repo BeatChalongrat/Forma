@@ -364,6 +364,18 @@ class PolicyEngine:
             # fields the matcher had mapped and the model dropped are not a confidence question: a person
             # decides whether the file really lacks them (ADR-059)
             d.checks["agreement"] = {k: len(v) for k, v in agreement.items()}
+            selection = [
+                *(f"records: {k}" for k in sorted(agreement.get("record") or {})),
+                *(f"items of {k}" for k in sorted(agreement.get("collection") or {})),
+            ]
+            if selection and d.decision != "block":
+                if d.decision == "auto_approve":
+                    d.decision = "review"
+                    d.reasons = []
+                d.reasons.append(
+                    "the model selects rows differently from FORMA's matcher (" + "; ".join(selection) + ")"
+                )
+                d.priority = max(d.priority, self.policy["review"]["priority_weights"]["warnings"] * 5)
             dropped = [
                 p for p in agreement.get("dropped") or [] if self.risk_of(schema, p) in ("critical", "high")
             ]
