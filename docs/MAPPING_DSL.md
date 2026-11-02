@@ -23,6 +23,7 @@ sources:                      # one per table that is read
       drop_repeated_headers: true   # a header printed again on each page, and the one-cell lines above it
       drop_total_rows: true   # label "รวม"/"Total:"/"ยอดรวม…" with only numbers beside it ("SUM-01", "รวมมิตร" stay)
       fill_down: ["หมวด"]     # merged-cell groups
+      section_column: section # one-cell heading rows ("เครื่องดื่ม") become this column, filled down, and leave the data
       unpivot: { id_columns: ["Item Code"], value_columns_regex: "^[A-Z][a-z]{2}-\\d{2}$", variable_name: period, value_name: value }
     csv: { encoding: auto, delimiter: auto }
     rename: { "Item No.": "sku" }

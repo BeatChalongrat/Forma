@@ -44,7 +44,9 @@ that now includes or excludes VAT (a steady ×1.07 or ÷1.07 against last round)
 | `โหล`, `DZ` | DOZEN | – |
 | `กล่อง`, `BOX` | BOX | – |
 | `ขวด`, `BTL` | BOTTLE | – |
-Unknown units pass through upper-cased (never silently dropped); add synonyms via `params.synonyms`.
+Unknown units pass through upper-cased (never silently dropped); add synonyms via `params.synonyms`. SAP's
+German unit codes are known (ST → PCS, PAK → PACK, KAR → CARTON, KI → BOX, FL → BOTTLE, DO → CAN, BT → BAG),
+as is Odoo's "Dozens" (ADR-058).
 
 ## Status / booleans — `parse_bool`, `map_values`
 `ขาย`/`ใช้งาน`/`Y`/`TRUE` → active; `ไม่ขาย`/`N`/`FALSE` → inactive; `เลิกขาย`/`ยกเลิก`/`X` (SAP deletion flag) → discontinued.

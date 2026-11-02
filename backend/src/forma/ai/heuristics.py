@@ -488,13 +488,17 @@ def _map_values(f: FieldSpec, src: Any, mapping: dict[str, str], **params: Any) 
     return call("map_values", src, mapping=mapping, **params)
 
 
+VAT_ASSUMED_TEXT = "no VAT marker in headers; assumed VAT-inclusive (Thai retail convention) — confirm"
+VAT_ASSUMED_QUESTION_RE = re.compile(r"(?:Price column|Pricing table) '.+': " + re.escape(VAT_ASSUMED_TEXT))
+
+
 def _vat_included_guess(headers: list[str]) -> tuple[bool, str]:
     text = " ".join(norm(h) for h in headers)
     if re.search(r"ไม่รวม|ก่อน vat|ex vat|excl|exclude|before vat|net", text):
         return False, "header indicates VAT-exclusive"
     if re.search(r"รวม vat|รวมภาษี|incl|inc vat|including|with vat", text):
         return True, "header indicates VAT-inclusive"
-    return True, "no VAT marker in headers; assumed VAT-inclusive (Thai retail convention) — confirm"
+    return True, VAT_ASSUMED_TEXT
 
 
 def propose_mapping(

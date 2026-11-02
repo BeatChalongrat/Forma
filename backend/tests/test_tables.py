@@ -142,6 +142,35 @@ def test_fill_down(grid: Grid) -> None:
     assert f2["Cat"].null_count() == 2
 
 
+def test_section_rows_become_a_column_and_not_a_header(grid: Grid) -> None:
+    # a hand-made sheet: headings on their own row inside the data (ADR-058)
+    rows: list[list[object]] = [
+        ["รหัส", "ชื่อ", "ราคา"],
+        ["เครื่องดื่ม"],
+        ["A1", "น้ำดื่ม", "10"],
+        ["A2", "ชาเขียว", "12"],
+        ["999"],  # one numeric cell is data, not a heading
+        ["อาหารแห้ง"],
+        ["B1", "บะหมี่", "7"],
+        ["รวม", N, "29"],
+    ]
+    cands = detect_tables(grid(rows))
+    assert (
+        cands[0].header_rows == 1 and cands[0].headers == ["รหัส", "ชื่อ", "ราคา"] and cands[0].section_rows == 2
+    )
+    spec = cands[0].to_spec()
+    assert spec.section_column == "section"
+    f = extract_table(grid(rows), spec)
+    assert f.columns == ["รหัส", "ชื่อ", "ราคา", "section"]
+    assert f["รหัส"].to_list() == ["A1", "A2", "999", "B1"]
+    assert f["section"].to_list() == ["เครื่องดื่ม", "เครื่องดื่ม", "เครื่องดื่ม", "อาหารแห้ง"]
+    plain = extract_table(grid(rows), TableSpec(header_row=0))
+    assert plain["รหัส"].to_list() == ["เครื่องดื่ม", "A1", "A2", "999", "อาหารแห้ง", "B1"]
+    # a single one-cell line is a note, not a heading: it stays a data row (ADR-055)
+    lone = detect_tables(grid([rows[0], *rows[2:5], ["หมายเหตุ"], rows[6]]))[0]
+    assert lone.section_rows == 1 and lone.to_spec().section_column is None
+
+
 def test_unpivot(grid: Grid) -> None:
     rows: list[list[object]] = [["SKU", "Jan", "Feb"], ["a", "1", "2"], ["b", "3", "4"]]
     spec = TableSpec(

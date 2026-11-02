@@ -292,6 +292,7 @@ UNIT_SYNONYMS: dict[str, str] = {
     "ลัง": "CARTON",
     "หีบ": "CARTON",
     "dozen": "DOZEN",
+    "dozens": "DOZEN",
     "dz": "DOZEN",
     "doz": "DOZEN",
     "โหล": "DOZEN",
@@ -330,6 +331,14 @@ UNIT_SYNONYMS: dict[str, str] = {
     "ม้วน": "ROLL",
     "pair": "PAIR",
     "คู่": "PAIR",
+    # SAP unit codes (German abbreviations) as they appear in MEINS / KMEIN exports (ADR-058)
+    "st": "PCS",  # Stück
+    "pak": "PACK",  # Paket
+    "kar": "CARTON",  # Karton
+    "ki": "BOX",  # Kiste
+    "fl": "BOTTLE",  # Flasche
+    "do": "CAN",  # Dose
+    "bt": "BAG",  # Beutel
 }
 _PACK_RE_LIST = [
     re.compile(r"(\d+)\s*[xX×*]\s*(\d+)"),  # 1x12, 12x1

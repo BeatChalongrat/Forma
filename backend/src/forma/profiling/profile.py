@@ -11,7 +11,7 @@ import polars as pl
 
 from forma.engine.thai import THAI_DIGITS, looks_like_thai_date, parse_number_th_py
 from forma.ingestion.readers import WorkbookMeta, read_meta, read_raw
-from forma.profiling.tables import TableCandidate, detect_tables, extract_table
+from forma.profiling.tables import SECTION_COLUMN, TableCandidate, detect_tables, extract_table
 
 _THAI_RE = re.compile(r"[฀-๿]")
 _BARCODE_RE = re.compile(r"^\d{8}$|^\d{12,14}$")
@@ -260,6 +260,10 @@ def profile_column(s: pl.Series, position: int, *, sample_n: int = 8) -> ColumnP
 
 def profile_table(frame: pl.DataFrame, cand: TableCandidate, sheet: str, sheet_index: int) -> TableProfile:
     cols = [profile_column(frame[c], i) for i, c in enumerate(frame.columns)]
+    if cand.section_rows:  # the heading rows became this column (ADR-058); say so to the mapper and the model
+        for c in cols:
+            if c.name == SECTION_COLUMN:
+                c.hints.append("section_heading")
     key_candidates = [
         c.name
         for c in cols

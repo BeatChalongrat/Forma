@@ -292,6 +292,11 @@ class TableSpec(Strict):
     fill_down: list[str] = Field(
         default_factory=list, description="Columns whose blanks inherit the value above (merged cells)"
     )
+    section_column: str | None = Field(
+        default=None,
+        description="Rows with a single text cell under the header are section headings: their text fills"
+        " this new column down to the next heading and the rows leave the data (ADR-058)",
+    )
     drop_empty_columns: bool = True
     unpivot: Unpivot | None = None
     filter: Expr | None = Field(default=None, description="Row filter applied after extraction")

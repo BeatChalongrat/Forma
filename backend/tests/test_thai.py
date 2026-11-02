@@ -121,6 +121,10 @@ def test_looks_like_thai_date() -> None:
         ("XYZ", "XYZ"),  # unknown → passthrough upper-cased
         ("1x12", "CARTON"),
         ("12's", "PACK"),
+        ("FL", "BOTTLE"),  # SAP Flasche
+        ("KAR", "CARTON"),  # SAP Karton
+        ("ST", "PCS"),  # SAP Stück
+        ("Dozens", "DOZEN"),  # Odoo UoM name
         (None, None),
         ("", None),
     ],
