@@ -18,6 +18,7 @@ from catalogue import canonical  # noqa: E402
 
 KEYS = {"inventory": "warehouse_code", "promotions": "promo_code", "prices": "price_list"}
 UNSCORED = {"/prices/*/price_list", "/source_meta"}
+CASELESS = {"/inventory/*/warehouse_code", "/promotions/*/promo_code"}  # a code's case comes from the header
 
 
 def _leaves(obj: Any, path: str, out: dict[str, Any]) -> None:
@@ -28,7 +29,7 @@ def _leaves(obj: Any, path: str, out: dict[str, Any]) -> None:
         name = path.rsplit("/", 1)[-1]
         key = KEYS.get(name)
         for n, item in enumerate(obj):
-            tag = str(item.get(key, n)) if key else str(n)
+            tag = str(item.get(key, n)).lower() if key else str(n)  # MAIN / Main: a code's case is not scored
             _leaves(item, f"{path}[{tag}]", out)
     else:
         out[path] = obj
@@ -75,7 +76,8 @@ def score(got_rows: list[dict[str, Any]], want_rows: list[dict[str, Any]]) -> di
                 alt = _price_fallback(gl, path)
                 if alt is not None:
                     have = gl[alt]
-            if have == value or (isinstance(have, (int, float)) and isinstance(value, (int, float)) and abs(have - value) < 0.006):
+            caseless = gen in CASELESS and isinstance(have, str) and isinstance(value, str) and have.lower() == value.lower()
+            if have == value or caseless or (isinstance(have, (int, float)) and isinstance(value, (int, float)) and abs(have - value) < 0.006):
                 ok += 1
             else:
                 wrong.setdefault(gen, []).append(f"{sku}: want {value!r} got {have!r}")

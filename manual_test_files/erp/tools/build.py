@@ -323,6 +323,8 @@ def pos(items: list[Item], *, r3: bool = False) -> dict[str, Rows]:
 
 def build_pos(out: Path) -> None:
     promos = [p for p in PROMOS if p["type"] in ("percent_off", "fixed_price")]
+    # the POS writes EA for bottles and pieces alike: from the file alone PCS is the only honest unit
+    items = [replace(i, sell_unit="PCS") if i.sell_unit == "BOTTLE" else i for i in ITEMS]
     kw: dict[str, Any] = dict(lang="en", vat=True, warehouses=("Main", "Br2"), promos=promos)
     note = """
 # ลูกค้า POS — ชีตเดียวจากระบบ POS ตัวย่อล้วน (Itm No, Desc, Dept, Mfr, UPC, UOM, Pk, UP, Sts) สต็อกเป็นคอลัมน์กว้าง
@@ -334,9 +336,9 @@ def build_pos(out: Path) -> None:
 - r3: หัวคอลัมน์เท่าเดิมทุกช่อง แต่ UP กลายเป็นราคาก่อน VAT และ Tax Incl = N → ระบบต้องจับจากข้อมูล (×0.935 ทุกรายการ) ไม่ปล่อยผ่าน
 """
     (out / "r1").mkdir(parents=True, exist_ok=True)
-    book(out / "r1" / "ITEMS_EXPORT_1015.xlsx", pos(ITEMS))
-    write(out / "r1", expected(ITEMS, **kw), note)
-    i2 = round2(ITEMS)
+    book(out / "r1" / "ITEMS_EXPORT_1015.xlsx", pos(items))
+    write(out / "r1", expected(items, **kw), note)
+    i2 = round2(items)
     (out / "r2").mkdir(exist_ok=True)
     book(out / "r2" / "ITEMS_EXPORT_1029.xlsx", pos(i2))
     write(out / "r2", expected(i2, **kw), note)
