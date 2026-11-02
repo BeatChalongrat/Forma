@@ -59,26 +59,25 @@ def _table_columns(m: MappingVersion, doc: MappingDocument) -> dict[str, list[di
     r = session.get(ImportRound, m.round_id) if session is not None and m.round_id else None
     if r is None:
         return {}
-    tables: list[dict[str, Any]] = []
-    for f in r.files:
-        for t in (f.profile or {}).get("tables", []):
-            tables.append({**t, "_file": f.original_name})
     out: dict[str, list[dict[str, Any]]] = {}
     for s in doc.sources:
-        hit = None
+        file = ms._match_file(s, [f for f in r.files if f.status == "profiled"])
+        if file is None:
+            continue
+        tables = list((file.profile or {}).get("tables", []))
         if s.sheet is not None and s.sheet.name:
             want = s.sheet.name.strip().lower()
-            hit = next((t for t in tables if str(t.get("sheet", "")).strip().lower() == want), None)
-        if hit is None and s.file.name_pattern:
-            try:
-                rx = re.compile(s.file.name_pattern)
-                hit = next((t for t in tables if rx.search(t["_file"])), None)
-            except re.error:
-                hit = None
-        if hit is None and len(tables) == 1:
-            hit = tables[0]
-        if hit is not None:
-            out[s.id] = list(hit.get("columns", []))
+            tables = [t for t in tables if str(t.get("sheet", "")).strip().lower() == want]
+        elif s.sheet is not None and s.sheet.index is not None:
+            tables = [t for t in tables if t.get("sheet_index") == s.sheet.index]
+        elif s.sheet is not None and s.sheet.match:
+            tables = [t for t in tables if re.search(s.sheet.match, str(t.get("sheet", "")), re.IGNORECASE)]
+        if s.table.header_row != "auto":
+            exact = [t for t in tables if (t.get("table") or {}).get("header_row") == s.table.header_row]
+            if exact:
+                tables = exact
+        if len(tables) == 1:
+            out[s.id] = list(tables[0].get("columns", []))
     return out
 
 
@@ -137,6 +136,10 @@ def questions(ctx: ServiceContext, m: MappingVersion) -> dict[str, Any]:
     }
     has_checks = "low_confidence_critical" in checks or "low_confidence_high" in checks
     vat_flags = _vat_flags(schema, m.policy or {})
+    if any(isinstance(q, str) and VAT_ASSUMED_QUESTION_RE.fullmatch(q) for q in m.open_questions or []):
+        # the matcher assumed VAT-inclusive and asked; a model's confidence cannot settle that (ADR-060), so
+        # the card must offer the yes/no for every VAT flag, or the question could never be answered
+        vat_flags |= set(schema.semantic_pointers("price.vat_included"))
     disagree = ((m.policy or {}).get("agreement") or {}).get("disagree") or {}
     items: list[dict[str, Any]] = []
     for f in fields:
@@ -183,6 +186,28 @@ def questions(ctx: ServiceContext, m: MappingVersion) -> dict[str, Any]:
                 "evidence": evidence,
                 "note": f.note,
                 "contested": contested,
+            }
+        )
+    for clarification in (m.policy or {}).get("clarifications", []):
+        target = clarification["target"]
+        if target not in specs or clarification["question"] not in (m.open_questions or []):
+            continue
+        matched_field = next((f for f in fields if f.target == target), None)
+        if matched_field is None:
+            continue
+        items = [q for q in items if q["id"] != target]
+        items.append(
+            {
+                "id": target,
+                "field": specs[target].to_dict(),
+                "kind": clarification["kind"],
+                "options": clarification.get("options", []),
+                "question": clarification["question"],
+                "current": matched_field.expr.model_dump(mode="json", exclude_none=True),
+                "evidence": list(matched_field.evidence),
+                "note": clarification["why"],
+                "contested": True,
+                "scope": "constant_for_this_file",
             }
         )
     items.sort(
@@ -241,6 +266,12 @@ def answer_document(
             if not isinstance(value, str) or value not in q["options"]:
                 raise ValidationFailed("Choose one of the offered columns")
             f.expr = repoint(f.expr, _col_leaves(f.expr)[0], value)
+        elif kind in ("text", "enum"):
+            if not isinstance(value, str) or not value.strip() or len(value) > 5000:
+                raise ValidationFailed("Enter a nonempty value of at most 5000 characters")
+            if kind == "enum" and value not in q["options"]:
+                raise ValidationFailed("Choose one of the offered values")
+            f.expr = ConstExpr(value=value)
         elif kind != "confirm":
             f.expr = ConstExpr(value=value)
         f.confidence = 1.0
@@ -254,6 +285,10 @@ def answer_document(
         for q in (m.open_questions or [])
         if not (vat_resolved and isinstance(q, str) and VAT_ASSUMED_QUESTION_RE.fullmatch(q))
     ]
+    answered_prompts = {
+        q["question"] for q in (m.policy or {}).get("clarifications", []) if q["target"] in answers
+    }
+    remaining = [q for q in remaining if q not in answered_prompts]
     document = doc.model_dump(mode="json", exclude_none=True)
     return document, remaining, stable_hash([m.id, document, answers], 64)
 
@@ -297,7 +332,24 @@ def groups(ctx: ServiceContext, session: Session, p: Principal) -> list[dict[str
             if item["kind"] not in GROUPABLE:
                 continue
             same = sorted(item["options"]) if item["kind"] == "choice" else item["current"]
-            key = stable_hash([item["kind"], item["id"], same], 16)
+            # Identical wording does not make VAT, units or prices a shared business fact.
+            # Only batch within the same customer and exact target contract/read operation.
+            schema = ctx.registry.get_ref(m.target_schema)
+            from forma.ai.evidence import reading_signature
+
+            document = MappingDocument.model_validate(m.document)
+            key = stable_hash(
+                [
+                    m.customer_id,
+                    m.target_schema,
+                    stable_hash(schema.document),
+                    item["kind"],
+                    item["id"],
+                    same,
+                    reading_signature(document, item["id"]),
+                ],
+                16,
+            )
             b = buckets.setdefault(
                 key,
                 {

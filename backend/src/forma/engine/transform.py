@@ -96,10 +96,14 @@ def resolve_sheet(spec: SourceSpec, bound: BoundSource) -> int | str | None:
 
             rx = re.compile(spec.sheet.match, re.IGNORECASE)
             meta = read_meta(bound.path)
-            hit = next((s for s in meta.sheets if rx.search(s.name)), None)
-            if hit is None:
+            hits = [s for s in meta.sheets if rx.search(s.name)]
+            if not hits:
                 raise ValueError(f"no sheet matches /{spec.sheet.match}/ in {bound.path.name}")
-            sheet = hit.index
+            if len(hits) != 1:
+                raise ValueError(
+                    f"sheet pattern /{spec.sheet.match}/ matches {len(hits)} sheets in {bound.path.name}; name one sheet"
+                )
+            sheet = hits[0].index
     return sheet
 
 
@@ -345,6 +349,13 @@ class TransformEngine:
         # schema validation
         v_errors, invalid = self._validate(records)
         findings.extend(v_errors)
+        # Business invariants belong to the pinned contract. The proposed DSL cannot remove them.
+        from forma.ai.contract_checks import evaluate as evaluate_contract_checks
+
+        findings.extend(
+            Finding("contract_check", "error", **item)
+            for item in evaluate_contract_checks(records, self.schema.document)
+        )
 
         stats = {
             "rows_in": rows_in,

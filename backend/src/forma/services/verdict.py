@@ -106,6 +106,8 @@ THAI_QUESTIONS = {
 
 
 def _question(q: dict[str, Any]) -> dict[str, str]:
+    if q.get("question"):
+        return _text(q["question"], q["question"])
     f = q["field"]
     known = THAI_QUESTIONS.get(f.get("semantic") or "")
     if known and q["kind"] not in ("confirm", "choice"):
@@ -549,15 +551,16 @@ def for_mapping(
                     "kind": q["kind"],
                     "semantic": q["field"].get("semantic"),
                     "question": _question(q),
-                    "why": _text(
-                        "Below the confidence bar for its risk", "ความมั่นใจต่ำกว่าเกณฑ์ของระดับความเสี่ยงนี้"
-                    ),
+                    "why": _text(q["note"], q["note"])
+                    if q.get("question") and q.get("note")
+                    else _text("Below the confidence bar for its risk", "ความมั่นใจต่ำกว่าเกณฑ์ของระดับความเสี่ยงนี้"),
                     "options": [True, False]
                     if q["kind"] == "boolean"
                     else ["confirm"]
                     if q["kind"] == "confirm"
                     else list(q.get("options") or []),
                     "default": None,
+                    "scope": q.get("scope"),
                     "evidence_ids": [e["id"] for e in evidence if e["kind"] == "questions"],
                 }
             )

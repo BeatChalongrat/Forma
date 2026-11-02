@@ -23,7 +23,7 @@ from sqlalchemy.orm import Session
 
 from forma.core.errors import NotFound, ValidationFailed
 from forma.db.models import Correction, MappingVersion
-from forma.fingerprint.fingerprint import norm_header
+from forma.fingerprint.fingerprint import Fingerprint, compare, norm_header
 from forma.mapping_dsl.models import MappingDocument
 from forma.schema_registry import TargetSchema
 from forma.services.healing import field_changes
@@ -82,7 +82,8 @@ class Learned:
             if header not in headers:
                 continue
             n = len(customers)
-            if n >= share_after:
+            conflicting = any(h == header and t != target for h, t in anchors.pairs)
+            if n >= share_after and not conflicting:
                 hs = self.aliases.setdefault(target, {})
                 if header not in hs:
                     hs[header] = f"learned: {n} other customers map this header here (anchor, ADR-059)"
@@ -123,13 +124,13 @@ def anchors_for(
     """What other customers' approved mappings (and their operators' corrections) say a header means, for
     the same target contract. Each pair counts a customer once; the newest ``limit`` approved versions are
     read. Deterministic and cheap enough to run on every proposal."""
-    from forma.services.format_memory import approved_history
+    from forma.services.format_memory import approved_history, compatible
 
     out = Anchors()
     known = {f.pointer for f in schema.fields(include_system=True)}
     seen: set[str] = set()
     for m in approved_history(session, None, schema.ref)[:limit]:
-        if m.customer_id == customer_id or m.customer_id in seen:
+        if m.customer_id == customer_id or m.customer_id in seen or not compatible(m, schema):
             continue
         seen.add(m.customer_id)  # the newest approved layout speaks for a customer
         doc = m.document or {}
@@ -149,7 +150,7 @@ def anchors_for(
             Correction.customer_id != customer_id,
         )
     ):
-        if c.target in known and c.header and c.customer_id:
+        if c.target in known and c.header and c.customer_id and _same_contract(session, c, schema):
             out.add(c.header, c.target, c.customer_id)
     return out
 
@@ -260,7 +261,13 @@ def record_from_approval(session: Session, m: MappingVersion, actor: str) -> lis
 # --------------------------------------------------------------------------------------------
 # use: what the mapper reads before it guesses
 # --------------------------------------------------------------------------------------------
-def learned_for(session: Session, customer_id: str | None, schema: TargetSchema) -> Learned:
+def learned_for(
+    session: Session,
+    customer_id: str | None,
+    schema: TargetSchema,
+    *,
+    current_format: Fingerprint | None = None,
+) -> Learned:
     """This customer's confirmed aliases and constants plus the promoted (global) aliases."""
     out = Learned()
     known = {f.pointer for f in schema.fields(include_system=True)}
@@ -274,10 +281,20 @@ def learned_for(session: Session, customer_id: str | None, schema: TargetSchema)
         .order_by(Correction.created_at.desc())
     ).all()
     for r in rows:
-        if r.target not in known:
+        if r.target not in known or not _same_contract(session, r, schema):
             continue
         when = r.created_at.date().isoformat() if r.created_at else ""
         if r.kind == "constant":
+            if current_format is not None:
+                from forma.services.format_memory import mapping_fingerprint
+
+                origin = session.get(MappingVersion, r.mapping_version_id) if r.mapping_version_id else None
+                previous_format = mapping_fingerprint(origin) if origin else None
+                if previous_format is None or compare(previous_format, current_format).classification not in (
+                    "identical",
+                    "header_moved",
+                ):
+                    continue  # A value confirmed for one file layout is not a universal business fact.
             if r.target not in out.constants:
                 out.constants[r.target] = (r.after, f"learned: confirmed by {r.actor} on {when}")
                 out.ids.setdefault(r.target, []).append(r.id)
@@ -291,6 +308,16 @@ def learned_for(session: Session, customer_id: str | None, schema: TargetSchema)
                 )
                 out.ids.setdefault(r.target, []).append(r.id)
     return out
+
+
+def _same_contract(session: Session, correction: Correction, schema: TargetSchema) -> bool:
+    from forma.services.format_memory import compatible
+
+    if correction.mapping_version_id:
+        mapping = session.get(MappingVersion, correction.mapping_version_id)
+        return mapping is not None and compatible(mapping, schema)
+    # Explicit global promotions are vocabulary hints only, never cross-contract business constants.
+    return correction.kind == "promoted"
 
 
 def count_uses(session: Session, learned: Learned, used_pointers: set[str]) -> None:

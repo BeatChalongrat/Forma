@@ -284,6 +284,7 @@ def execute(archive: IO[bytes], workspace: Path, uid: int | None = None) -> dict
 # the server: one Unix socket, one run at a time
 # --------------------------------------------------------------------------------------------
 _RUN_LOCK = threading.Lock()
+_ADMISSION = threading.BoundedSemaphore(max(1, min(16, int(os.environ.get("SANDBOX_QUEUE_SLOTS", "3")))))
 
 
 def _packages() -> dict[str, str]:
@@ -322,6 +323,18 @@ class _Handler(BaseHTTPRequestHandler):
         self._reply(200, {"ok": True, "python": sys.version.split()[0], "packages": _packages()})
 
     def do_POST(self) -> None:
+        # Admit before receiving/spooling large files. Bound queued disk use and waiting threads.
+        if not _ADMISSION.acquire(blocking=False):
+            self.close_connection = True
+            self._reply(503, {"error": "busy"})
+            return
+        try:
+            self.connection.settimeout(30)
+            self._run()
+        finally:
+            _ADMISSION.release()
+
+    def _run(self) -> None:
         length = int(self.headers.get("Content-Length") or 0)
         if self.path != "/run" or not 0 < length <= MAX_REQUEST_BYTES:
             self.close_connection = True

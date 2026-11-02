@@ -541,6 +541,12 @@ class SchemaRegistry:
         (the web app previews it first). The caller's document is never modified."""
         document = copy.deepcopy(document)
         Draft202012Validator.check_schema(document)
+        from forma.ai.contract_checks import validate_checks
+
+        if check_errors := validate_checks(document):
+            raise ValidationFailed(
+                "Invalid business checks in target contract", details={"errors": check_errors}
+            )
         unsupported = mapping_support_issues(document)
         if unsupported:
             raise ValidationFailed(

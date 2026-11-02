@@ -74,6 +74,15 @@ class Settings(BaseSettings):
     llm_self_check_rows: int = Field(
         default=50, description="Source rows the engine runs for the agent's self-check (ADR-058)."
     )
+    mapping_lab_enabled: bool = Field(
+        default=True, description="Allow mapping agents to use the isolated runner when configured."
+    )
+    mapping_lab_sockets: list[str] = Field(
+        default_factory=list, description="Isolated runner socket pool; empty uses code_sandbox_socket"
+    )
+    mapping_lab_turns: int = Field(
+        default=3, ge=0, le=6, description="Maximum isolated Python experiments per mapping proposal."
+    )
 
     # Engine
     chunk_rows: int = Field(default=200_000, description="Rows per engine chunk.")
@@ -224,13 +233,19 @@ class Settings(BaseSettings):
     @classmethod
     def describe(cls) -> list[tuple[str, str, str]]:
         """(ENV_NAME, default, description) for every field — drives `.env.production.example`."""
+        import json
+
+        from pydantic_core import PydanticUndefined
+
         rows = []
         for name, f in cls.model_fields.items():
-            default = f.default
+            default: Any = f.default
+            if default is PydanticUndefined and f.default_factory is not None:
+                default = f.default_factory()  # type: ignore[call-arg]
             if isinstance(default, Path):
                 default = default.as_posix()  # OS-independent, so the generated example never drifts
             elif isinstance(default, list):
-                default = ",".join(default)
+                default = json.dumps(default)  # a list field is read back as JSON, so write it as JSON
             elif default is None:
                 default = ""
             rows.append((f"FORMA_{name.upper()}", str(default), f.description or ""))

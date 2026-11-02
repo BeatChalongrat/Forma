@@ -6,13 +6,63 @@ older ERP layouts remain usable; unapproved drafts and rejected mappings never d
 
 from __future__ import annotations
 
+import re
+
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from forma.core.hashing import stable_hash
 from forma.db.models import MappingVersion, SourceFile
 from forma.fingerprint.fingerprint import Fingerprint, compare, merge_fingerprints
+from forma.mapping_dsl.models import MappingDocument
 from forma.schema_registry import TargetSchema
+
+
+def rebind_approved(
+    mapping: MappingVersion, files: list[SourceFile], *, for_comparison: bool = False
+) -> MappingDocument:
+    """Rebind a proven format to renamed files by its stored structural fingerprint.
+
+    Only an already approved version may use this path. Fresh AI proposals must satisfy
+    their explicit selectors; neither similar sheet names nor a one-file round is proof.
+    Shadow comparisons may bind a unique close structural match, so column drift is
+    measured against the old reading. This exception never enables production reuse.
+    """
+    from forma.services.mapping import _match_file
+
+    doc = MappingDocument.model_validate(mapping.document)
+    if mapping.status != "approved" and mapping.approved_at is None:
+        return doc
+    prior = (mapping.policy or {}).get("file_fingerprints", {})
+    for source in doc.sources:
+        if _match_file(source, files) is not None:
+            continue
+        digest = doc.meta.fingerprints.get(source.id)
+        old = next((v for v in prior.values() if v.get("strict") == digest), None)
+        if old is None and len(prior) == 1:
+            old = next(iter(prior.values()))
+        if old is None:
+            continue
+        candidates = []
+        for f in files:
+            if f.status != "profiled" or not f.fingerprint:
+                continue
+            drift = compare(Fingerprint.from_dict(old), Fingerprint.from_dict(f.fingerprint))
+            if drift.classification in ("identical", "header_moved") or (
+                for_comparison
+                and drift.similarity >= 0.8
+                and drift.classification
+                in ("columns_renamed", "columns_added", "columns_removed", "types_changed")
+            ):
+                candidates.append(f)
+        selector = source.model_copy(deep=True)
+        selector.file.name_pattern = None
+        selector.file.fingerprint = None
+        hit = _match_file(selector, candidates)
+        if hit is not None:
+            source.file.name_pattern = "^" + re.escape(hit.original_name) + "$"
+            source.file.fingerprint = None
+    return doc
 
 
 def approved_history(

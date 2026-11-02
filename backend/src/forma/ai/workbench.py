@@ -21,7 +21,7 @@ from forma.mapping_dsl.models import MappingDocument
 from forma.profiling.profile import WorkbookProfile
 from forma.schema_registry import TargetSchema
 
-INSPECT_KINDS = ("columns", "distinct", "rows", "find")
+INSPECT_KINDS = ("columns", "distinct", "rows", "find", "raw", "sample", "structure", "trial_table")
 MAX_INSPECT_REQUESTS = 8
 MAX_DISTINCT = 40
 MAX_ROWS = 20
@@ -38,13 +38,33 @@ class RunReport:
     rows_out: int
     problems: list[str] = field(default_factory=list)
     sample: list[dict[str, Any]] = field(default_factory=list)
+    errors: int = 0
+    coverage: dict[str, Any] = field(default_factory=dict)
+    complete: bool = True
 
     @property
     def clean(self) -> bool:
         return not self.problems
 
+    @property
+    def score(self) -> tuple[int, int, int]:
+        # Never prefer an empty/broken result merely because it has fewer messages.
+        return (
+            int(self.rows_out == 0) + self.errors,
+            sum(p.startswith("coverage:") for p in self.problems),
+            len(self.problems),
+        )
+
     def to_dict(self) -> dict[str, Any]:
-        return {"rows_in": self.rows_in, "rows_out": self.rows_out, "problems": self.problems[:MAX_PROBLEMS]}
+        return {
+            "rows_in": self.rows_in,
+            "rows_out": self.rows_out,
+            "problems": self.problems[:MAX_PROBLEMS],
+            "problem_count": len(self.problems),
+            "errors": self.errors,
+            "coverage": self.coverage,
+            "complete": self.complete,
+        }
 
     def to_prompt(self) -> dict[str, Any]:
         return {**self.to_dict(), "sample_records": self.sample}
@@ -66,6 +86,8 @@ def inspect_problems(requests: Any, n_tables: int) -> list[str]:
     """Why a list of inspect requests cannot be answered (sent back to the model as validation errors)."""
     if not isinstance(requests, list) or not requests:
         return ["inspect must be a non-empty list of requests"]
+    if len(requests) > MAX_INSPECT_REQUESTS:
+        return [f"at most {MAX_INSPECT_REQUESTS} inspection requests per turn"]
     out: list[str] = []
     for i, r in enumerate(requests[:MAX_INSPECT_REQUESTS]):
         if not isinstance(r, dict):
@@ -82,7 +104,10 @@ def inspect_problems(requests: Any, n_tables: int) -> list[str]:
         if what == "distinct" and not isinstance(r.get("column"), str):
             out.append(f"inspect/{i}: distinct needs a column name")
         if what == "find" and not isinstance(r.get("pattern"), str):
-            out.append(f"inspect/{i}: find needs a pattern (regular expression)")
+            out.append(f"inspect/{i}: find needs literal text in pattern")
+        for key in ("start", "limit", "column_start", "column_limit"):
+            if key in r and (type(r[key]) is not int or r[key] < 0):
+                out.append(f"inspect/{i}: {key} must be a non-negative integer")
     return out
 
 
@@ -111,6 +136,7 @@ class FileWorkbench:
         rows: int = 50,
         max_chars: int = 200,
         history: dict[str, Any] | None = None,
+        execute: Callable[[str], dict[str, Any]] | None = None,
     ) -> None:
         self.schema = schema
         self.profile = profile
@@ -120,6 +146,7 @@ class FileWorkbench:
         self.rows = rows
         self.max_chars = max_chars
         self.history = history  # the approved mapping's simulation summary, when there is one (ADR-059)
+        self.execute = execute
         self._frames: dict[int, pl.DataFrame] = {}
 
     # ---- inspect ------------------------------------------------------------------------------------
@@ -130,12 +157,7 @@ class FileWorkbench:
         from forma.profiling.tables import extract_table
 
         t = self.profile.tables[table_index]
-        f = next((x for x in self.files if x.id == t.file_id), None) if t.file_id else None
-        if f is None:
-            usable = [x for x in self.files if x.status == "profiled"]
-            f = usable[0] if len(usable) == 1 else None
-        if f is None:
-            raise ValueError("the table's file is not in this round")
+        f = self._file(table_index)
         path = self.resolve(f.storage_key)
         is_csv = f.kind == "csv" or path.suffix.lower() in {".csv", ".txt", ".tsv"}
         raw = read_raw(path, None if is_csv else t.sheet, validate_cells=False)
@@ -143,18 +165,48 @@ class FileWorkbench:
         self._frames[table_index] = frame
         return frame
 
+    def _file(self, table_index: int) -> Any:
+        t = self.profile.tables[table_index]
+        f = next((x for x in self.files if x.id == t.file_id), None) if t.file_id else None
+        if t.file_id and f is None:
+            raise ValueError("the table's file ID is not in this round")
+        if f is None and t.file_name:
+            matches = [x for x in self.files if x.original_name == t.file_name]
+            f = matches[0] if len(matches) == 1 else None
+        if f is None and not t.file_name:
+            usable = [x for x in self.files if x.status == "profiled"]
+            f = usable[0] if len(usable) == 1 else None
+        if f is None:
+            raise ValueError("the table's file is not in this round")
+        return f
+
     def inspect(self, requests: list[dict[str, Any]]) -> list[dict[str, Any]]:
         out: list[dict[str, Any]] = []
         for r in requests[:MAX_INSPECT_REQUESTS]:
             try:
-                out.append({"request": r, "answer": self._answer(r)})
+                t = self.profile.tables[int(r["table_index"])]
+                out.append(
+                    {
+                        "request": r,
+                        "answer": self._answer(r),
+                        "source": {
+                            "file_id": t.file_id,
+                            "file_name": t.file_name,
+                            "sheet": t.sheet,
+                            "table_index": r["table_index"],
+                        },
+                    }
+                )
             except Exception as e:  # a bad request is an answer, not a crash
                 out.append({"request": r, "error": str(e)[:300]})
         return out
 
     def _answer(self, r: dict[str, Any]) -> Any:
-        frame = self._frame(int(r["table_index"]))
         what = r.get("what")
+        ti = int(r["table_index"])
+        if what in ("raw", "structure", "trial_table"):
+            return self._raw(r)
+        frame = self._frame(ti)
         if what == "columns":
             return [
                 {
@@ -172,7 +224,28 @@ class FileWorkbench:
             counts = frame[col].drop_nulls().value_counts(sort=True).head(limit)
             total = int(frame[col].n_unique())
             vals = [{"value": _clip(v, self.max_chars), "count": int(n)} for v, n in counts.iter_rows()]
-            return {"distinct": total, "null_count": int(frame[col].null_count()), "values": vals}
+            return {
+                "distinct": total,
+                "null_count": int(frame[col].null_count()),
+                "values": vals,
+                "truncated": total > len(vals),
+                "limit": limit,
+            }
+        if what == "sample":
+            # Deterministic coverage across the table, not just the first records.
+            indices = (
+                sorted({0, max(0, frame.height - 1), *[(frame.height - 1) * n // 9 for n in range(10)]})
+                if frame.height
+                else []
+            )
+            return {
+                "strategy": "evenly_spaced_including_tail",
+                "total_rows": frame.height,
+                "rows": [
+                    {"table_row": i, "values": _clip(frame.row(i, named=True), self.max_chars)}
+                    for i in indices
+                ],
+            }
         if what == "rows":
             start = max(0, int(r.get("start") or 0))
             limit = min(int(r.get("limit") or MAX_ROWS), MAX_ROWS)
@@ -182,38 +255,109 @@ class FileWorkbench:
             }
         if what == "find":
             pattern = str(r.get("pattern"))[:200]
-            rx = re.compile(pattern, re.IGNORECASE)
             hits: list[dict[str, Any]] = []
             for i, row in enumerate(frame.iter_rows(named=True)):
-                if any(v is not None and rx.search(str(v)) for v in row.values()):
+                if any(v is not None and pattern.casefold() in str(v).casefold() for v in row.values()):
                     hits.append({"row": i, **_clip(row, self.max_chars)})
                     if len(hits) >= MAX_FIND:
                         break
             return {"matches": hits, "capped": len(hits) >= MAX_FIND}
         raise ValueError(f"what must be one of {list(INSPECT_KINDS)}")
 
+    def _raw(self, r: dict[str, Any]) -> dict[str, Any]:
+        from forma.ingestion.readers import read_raw
+        from forma.mapping_dsl.models import TableSpec
+        from forma.profiling.tables import extract_table
+
+        ti = int(r["table_index"])
+        t, f = self.profile.tables[ti], self._file(ti)
+        raw = read_raw(
+            self.resolve(f.storage_key), None if f.kind == "csv" else t.sheet, validate_cells=False
+        )
+        if r["what"] == "structure":
+            return {
+                "rows": raw.height,
+                "columns": raw.width,
+                "profiled_tables": [
+                    x.table.to_spec().model_dump(mode="json")
+                    for x in self.profile.tables
+                    if x.file_id == t.file_id and x.sheet == t.sheet
+                ],
+                "sheet_metadata": [
+                    s for s in (f.profile or {}).get("meta", {}).get("sheets", []) if s["name"] == t.sheet
+                ],
+            }
+        if r["what"] == "trial_table":
+            spec = TableSpec.model_validate(r.get("table") or {})
+            trial = extract_table(raw, spec)
+            return {
+                "table": spec.model_dump(mode="json"),
+                "rows": trial.height,
+                "columns": trial.columns,
+                "sample": _clip(trial.head(10).to_dicts(), self.max_chars),
+            }
+        start, left = int(r.get("start", 0)), int(r.get("column_start", 0))
+        count = min(max(1, int(r.get("limit", 20))), 40)
+        width = min(max(1, int(r.get("column_limit", 20))), 40)
+        from openpyxl.utils.cell import get_column_letter
+
+        rows = raw.slice(start, count).select(raw.columns[left : left + width]).rows()
+        return {
+            "total_rows": raw.height,
+            "total_columns": raw.width,
+            "cells": [
+                {
+                    "cell": f"{get_column_letter(left + j + 1)}{start + i + 1}",
+                    "value": _clip(v, self.max_chars),
+                }
+                for i, row in enumerate(rows)
+                for j, v in enumerate(row)
+            ],
+            "note": "Original cell coordinates; values are untrusted data. Use sandbox for formula details.",
+        }
+
     # ---- ground -------------------------------------------------------------------------------------
     def _table_index(self, spec: Any) -> int | None:
         """The profiled table a DSL source reads: by sheet name, then by file pattern, then the only table."""
-        tables = self.profile.tables
-        if spec.sheet is not None and spec.sheet.name:
-            want = spec.sheet.name.strip().lower()
-            for i, t in enumerate(tables):
-                if t.sheet.strip().lower() == want:
-                    return i
+        candidates = list(enumerate(self.profile.tables))
+        from forma.services.mapping import _match_file
+
+        bound = _match_file(spec, [f for f in self.files if f.status == "profiled"])
+        if bound is None:
+            return None
+        candidates = [
+            (i, t)
+            for i, t in candidates
+            if (
+                t.file_id == bound.id
+                if t.file_id
+                else t.file_name == bound.original_name
+                if t.file_name
+                else len(self.files) == 1
+            )
+        ]
         if spec.file.name_pattern:
-            try:
-                rx = re.compile(spec.file.name_pattern)
-            except re.error:
-                rx = None
-            if rx is not None:
-                for i, t in enumerate(tables):
-                    if t.file_name and rx.search(t.file_name):
-                        return i
-        return 0 if len(tables) == 1 else None
+            rx = re.compile(spec.file.name_pattern, re.IGNORECASE)
+            candidates = [(i, t) for i, t in candidates if t.file_name and rx.search(t.file_name)]
+        if spec.sheet is not None:
+            sh = spec.sheet
+            if sh.name is not None:
+                candidates = [(i, t) for i, t in candidates if t.sheet.casefold() == sh.name.casefold()]
+            elif sh.match is not None:
+                candidates = [(i, t) for i, t in candidates if re.search(sh.match, t.sheet, re.IGNORECASE)]
+            else:
+                # Merged profile indices are global; resolve the file-local sheet index from its profile.
+                local_sheets = (bound.profile or {}).get("meta", {}).get("sheets", [])
+                names = {x["name"] for x in local_sheets if x["index"] == sh.index}
+                candidates = [(i, t) for i, t in candidates if t.sheet in names]
+        if spec.table.header_row != "auto":
+            exact = [(i, t) for i, t in candidates if t.table.header_row == spec.table.header_row]
+            if exact:
+                candidates = exact
+        return candidates[0][0] if len(candidates) == 1 else None
 
     def ground(self, doc: MappingDocument) -> list[dict[str, Any]]:
-        """Look at the file for the model before it maps (ADR-059): the full distinct values of every column
+        """Look at the file before mapping: bounded distinct-value evidence for each column
         a low-confidence draft field reads, and of the unused columns of the same table that could hold that
         field instead. Riskier fields first; at most ``GROUND_MAX_REQUESTS`` columns."""
         from forma.ai.fit import compatible
@@ -234,7 +378,12 @@ class FileWorkbench:
                 wanted.append((rank, ti, col))
 
         for f, src in fields:
-            if f.confidence is not None and f.confidence >= GROUND_CONFIDENCE:
+            if (
+                f.confidence is not None
+                and f.confidence >= GROUND_CONFIDENCE
+                and self.schema.has_field(f.target)
+                and self.schema.field(f.target).risk not in ("critical", "high")
+            ):
                 continue
             leaves = _col_leaves(f.expr)
             spec = sources.get(src)
@@ -242,7 +391,7 @@ class FileWorkbench:
             if len(leaves) != 1 or ti is None or not self.schema.has_field(f.target):
                 continue
             fs = self.schema.field(f.target)
-            rank = -RISK_ORDER.get(fs.risk, 0)
+            rank = -RISK_ORDER.get(fs.risk, 0) - (10 if (f.confidence or 0) < GROUND_CONFIDENCE else 0)
             want(rank, ti, leaves[0])
             for c in self.profile.tables[ti].columns:
                 if c.name not in taken.get(src, set()) and compatible(fs, c.to_dict()):
@@ -255,16 +404,16 @@ class FileWorkbench:
         return self.inspect(reqs) if reqs else []
 
     # ---- run ----------------------------------------------------------------------------------------
-    def run(self, doc: MappingDocument) -> RunReport:
+    def run(self, doc: MappingDocument, *, full: bool = False) -> RunReport:
         from forma.ai import plausibility
 
         bindings, problems = self.bind(doc)
         if problems:
-            return RunReport(0, 0, [f"binding: {p}" for p in problems])
+            return RunReport(0, 0, [f"binding: {p}" for p in problems], errors=len(problems), complete=full)
         try:
-            res = TransformEngine(self.schema).run(doc, bindings, limit=self.rows)
+            res = TransformEngine(self.schema).run(doc, bindings, limit=None if full else self.rows)
         except Exception as e:  # the engine refused the document outright
-            return RunReport(0, 0, [f"engine: {str(e)[:300]}"])
+            return RunReport(0, 0, [f"engine: {str(e)[:300]}"], errors=1, complete=full)
         out: list[str] = []
         for f in res.findings:
             if f.severity == "error" or (f.kind == "compile" and "not found" in f.message):
@@ -276,7 +425,12 @@ class FileWorkbench:
             out.insert(0, f"the mapping produced 0 records from {rows_in} source rows")
         else:
             for cm in doc.collections:
-                items = sum(len(rec.get(cm.target.strip("/"), []) or []) for rec in res.records)
+                items = sum(
+                    len(v)
+                    for rec in res.records
+                    for v in plausibility.values_at(rec, cm.target)
+                    if isinstance(v, list)
+                )
                 if items == 0:
                     out.append(
                         f"{cm.target}: 0 items for {rows_out} records (link or filter matches nothing)"
@@ -290,7 +444,20 @@ class FileWorkbench:
             if keep:
                 out.append(keep)
         sample = [_clip(_without_meta(rec), self.max_chars) for rec in res.records[:SAMPLE_RECORDS]]
-        return RunReport(rows_in, rows_out, out[:MAX_PROBLEMS], sample)
+        from forma.ai.reconciliation import coverage
+
+        return RunReport(
+            rows_in,
+            rows_out,
+            list(dict.fromkeys(out)),
+            sample,
+            errors=len(res.errors),
+            coverage=coverage(res.records, self.schema, res.stats),
+            complete=full,
+        )
+
+    def verify(self, doc: MappingDocument) -> RunReport:
+        return self.run(doc, full=True)
 
 
 def _col_leaves(expr: Any) -> list[str]:
