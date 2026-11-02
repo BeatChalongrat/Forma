@@ -18,7 +18,7 @@ from forma.ai import agents
 from forma.ai.clarifications import validate as validate_clarifications
 from forma.ai.contract_checks import evaluate as evaluate_checks
 from forma.ai.contract_checks import validate_checks
-from forma.ai.evidence import reading_signature
+from forma.ai.evidence import collection_signature, reading_core, reading_signature, record_signature
 from forma.ai.llm import LLMClient, MockProvider
 from forma.ai.policy import PolicyDecision
 from forma.ai.reconciliation import coverage, regressions, require_verification, verification
@@ -167,9 +167,8 @@ def test_verification_report_fails_closed(schema: TargetSchema) -> None:
     bound = verification(result(good), schema, complete=True, binding_problems=["binding: no file"])
     assert bound["problems"][0] == "binding: no file" and not bound["passed"]
     implausible = [{**r, "prices": [{"amount": -5.0}]} for r in good]
-    assert any(
-        "zero or negative" in p for p in verification(result(implausible), schema, complete=True)["problems"]
-    )
+    report = verification(result(implausible), schema, complete=True)
+    assert report["passed"] and any("zero or negative" in w for w in report["warnings"])  # a warning class
 
 
 def test_require_verification_blocks_automation_and_marks_the_risk() -> None:
@@ -180,6 +179,17 @@ def test_require_verification_blocks_automation_and_marks_the_risk() -> None:
     ok = PolicyDecision("auto_approve", 0)
     require_verification(ok, {"complete": True, "passed": True, "problems": []})
     assert ok.decision == "auto_approve" and ok.checks["full_verification"] is True
+    # plausibility warnings: a new mapping goes to review, a mapping reused from an approval keeps the budget
+    fresh = PolicyDecision("auto_approve", 0)
+    require_verification(fresh, {"complete": True, "passed": True, "problems": [], "warnings": ["w1"]})
+    assert (
+        fresh.decision == "review" and fresh.reasons == ["plausibility: w1"] and fresh.risk_level == "medium"
+    )
+    reused = PolicyDecision("auto_approve", 0)
+    require_verification(
+        reused, {"complete": True, "passed": True, "problems": [], "warnings": ["w1"]}, reused=True
+    )
+    assert reused.decision == "auto_approve" and reused.checks["plausibility_warnings"] == 1
     blocked = PolicyDecision("block", 100, ["wrong file"])
     require_verification(blocked, {"complete": False, "passed": False, "problems": ["sample"]})
     assert blocked.decision == "block" and blocked.priority == 100  # a block is already the stronger answer
@@ -335,8 +345,13 @@ def test_reading_signature_ignores_source_aliases_but_not_what_is_read() -> None
         assert reading_signature(a, target) == reading_signature(renamed, target)
     filtered = _doc()
     filtered.record.filters = [call("eq", col("สถานะ"), const("ขาย"))]
-    assert reading_signature(a, "/sku") != reading_signature(filtered, "/sku")
-    assert reading_signature(a, "/prices/*/amount") != reading_signature(filtered, "/prices/*/amount")
+    # a root filter or a dedupe key selects records; it does not change what a field reads
+    assert reading_signature(a, "/sku") == reading_signature(filtered, "/sku")
+    assert record_signature(a) != record_signature(filtered)
+    deduped = _doc()
+    deduped.record.dedupe.keys = ["/sku"]
+    assert reading_signature(a, "/currency") == reading_signature(deduped, "/currency")
+    assert record_signature(a) != record_signature(deduped) and "dedupe" in str(record_signature(deduped))
     relinked = _doc()
     relinked.collections[0].link = [JoinKey(left="รหัสสินค้า", right="บาร์โค้ด")]
     assert reading_signature(a, "/sku") == reading_signature(relinked, "/sku")
@@ -344,10 +359,24 @@ def test_reading_signature_ignores_source_aliases_but_not_what_is_read() -> None
     other_sheet = _doc()
     other_sheet.sources[0].sheet = SheetSelect(name="Other")
     assert reading_signature(a, "/sku") != reading_signature(other_sheet, "/sku")
+    wrapped = _doc()
+    wrapped.fields[0].expr = call("normalize_whitespace", call("cast", call("trim", col("รหัสสินค้า"))))
+    assert reading_signature(a, "/sku") != reading_signature(wrapped, "/sku")  # the text differs ...
+    assert reading_core(a, "/sku") == reading_core(wrapped, "/sku")  # ... the reading does not
+    stripped = _doc()
+    stripped.fields[0].expr = call("strip_leading_zeros", call("trim", col("รหัสสินค้า")))
+    assert reading_core(a, "/sku") != reading_core(stripped, "/sku")  # zeros gone: another identity
     scaled = _doc()
-    scaled.fields[0].expr = call("trim", call("upper", col("รหัสสินค้า")))
-    assert reading_signature(a, "/sku") != reading_signature(scaled, "/sku")
-    assert reading_signature(a, "/not_mapped") == {}
+    scaled.collections[0].fields[1].expr = call("multiply", scaled.collections[0].fields[1].expr, const(1000))
+    assert reading_core(a, "/prices/*/amount") != reading_core(scaled, "/prices/*/amount")
+    other_col = _doc()
+    other_col.fields[1].expr = col("สถานะ")
+    assert reading_core(a, "/product_name") != reading_core(other_col, "/product_name")
+    item_dedupe = _doc()
+    item_dedupe.collections[0].dedupe_keys = ["/price_list"]
+    assert reading_core(a, "/prices/*/amount") == reading_core(item_dedupe, "/prices/*/amount")
+    assert collection_signature(a) != collection_signature(item_dedupe)
+    assert reading_signature(a, "/not_mapped") == {} and reading_core(a, "/not_mapped") == {}
 
 
 # --------------------------------------------------------------------------------------------
@@ -780,3 +809,87 @@ def test_every_generated_env_example_value_loads_back(monkeypatch: pytest.Monkey
             assert getattr(loaded, name) == json.loads(value), env
         monkeypatch.delenv(env)
     assert Settings.describe()
+
+
+# --------------------------------------------------------------------------------------------
+# what the mock file set exposed: total rows with a count beside them, promotion dates on product rows,
+# contract checks after an edit, the exact-record score and the passthrough bag
+# --------------------------------------------------------------------------------------------
+def test_subtotal_rows_with_a_count_cell_are_not_records(tmp_path: Path) -> None:
+    import openpyxl
+    import polars as pl
+
+    from forma.ingestion.readers import read_raw
+    from forma.profiling.tables import detect_tables, extract_table
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    assert ws is not None
+    ws.append(["รหัส", "ชื่อ", "ราคา", "สถานะ"])
+    ws.append(["A1", "น้ำ", 7, "ขาย"])
+    ws.append(["A2", "ชา", 20, "ขาย"])
+    ws.append(["รวมหมวด", None, 27, "2 รายการ"])
+    ws.append(["B1", "ข้าว", 189, "ขาย"])
+    ws.append(["Subtotal", None, 189, "1 items"])
+    ws.append(["รวมทั้งหมด", None, 216, "3 รายการ"])
+    ws.append(["รวมมิตร", "ชื่อยี่ห้อ", 5, "ขาย"])  # a product whose code merely starts with รวม
+    wb.save(tmp_path / "t.xlsx")
+    raw = read_raw(tmp_path / "t.xlsx", 0, validate_cells=False)
+    frame = extract_table(raw, detect_tables(raw)[0].to_spec())
+    assert isinstance(frame, pl.DataFrame) and frame["รหัส"].to_list() == ["A1", "A2", "B1", "รวมมิตร"]
+
+
+def test_promotion_dates_on_the_product_row_are_not_price_dates(schema: TargetSchema) -> None:
+    from forma.ai.heuristics import propose_mapping
+
+    profile = _profile(
+        {
+            "สินค้า": [
+                ("รหัสสินค้า", "string"),
+                ("ชื่อสินค้า", "string"),
+                ("ราคาขาย (รวม VAT)", "float"),
+                ("รหัสโปร", "string"),
+                ("โปรเริ่ม", "date"),
+                ("โปรสิ้นสุด", "date"),
+            ]
+        }
+    )
+    doc = propose_mapping(profile, schema).mapping
+    price_fields = [f.target for c in doc.collections for f in c.fields if "/prices" in c.target]
+    assert not any("effective" in t for t in price_fields), price_fields
+
+
+def test_exact_record_score_ignores_the_passthrough_bag_the_key_lacks(schema: TargetSchema) -> None:
+    gold = [{"sku": "001", "product_name": "A"}, {"sku": "002", "product_name": "B"}]
+    actual = [{**r, "attributes": {"Extra": "x"}, "source_meta": {"row": 1}} for r in gold]
+    assert benchmark.score(actual, gold, schema)["exact_record_accuracy"] == 1.0
+    keyed = [{**r, "attributes": {"Extra": "y"}} for r in gold]  # the key asked for the bag: it counts
+    assert benchmark.score(actual, keyed, schema)["exact_record_accuracy"] == 0.0
+    assert benchmark.score(keyed, keyed, schema)["exact_record_accuracy"] == 1.0
+
+
+def test_selector_spelling_does_not_make_a_disagreement() -> None:
+    """The model names the file by pattern and spells the header row out; the matcher relied on the only
+    file and said "auto". Both read the same cells of the same sheet: that is agreement, not a question."""
+    a, b = _doc(), _doc()
+    b.sources[0].file.name_pattern = r"^products\.xlsx$"
+    b.sources[0].file.sheet_names_any = []
+    b.sources[0].table.header_row = 0
+    b.sources[0].description = "the product sheet"
+    b.sources[0].csv.encoding = "utf-8"
+    f = SimpleNamespace(
+        id="f1",
+        original_name="products.xlsx",
+        status="profiled",
+        profile={"meta": {"sheets": [{"name": "สินค้า", "index": 0}]}},
+        fingerprint=None,
+        kind="excel",
+    )
+    for target in ("/sku", "/prices/*/amount", "/currency"):
+        assert reading_signature(a, target, files=[f]) == reading_signature(b, target, files=[f]), target
+    c = _doc()
+    c.sources[0].table.data_end = 3
+    assert reading_signature(a, "/sku", files=[f]) != reading_signature(c, "/sku", files=[f])
+    d = _doc()
+    d.sources[0].file.name_pattern = r"^other\.xlsx$"  # binds to nothing: another file, not an alias
+    assert reading_signature(a, "/sku", files=[f]) != reading_signature(d, "/sku", files=[f])

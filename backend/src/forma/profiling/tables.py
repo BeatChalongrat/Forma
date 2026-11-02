@@ -24,10 +24,13 @@ SECTION_MIN_ROWS = 2  # one lone one-cell line is a note and stays data (ADR-055
 # "รวมมิตร") is kept; Thai compounds are unambiguous and match as prefixes.
 TOTAL_LABEL_RE = (
     r"^(?:(?:grand\s*|sub\s*-?\s*|sum\s*)?total|sum|รวม)(?:$|[\s:(\[])"
-    r"|^(?:รวมทั้งสิ้น|รวมทั้งหมด|ยอดรวม|รวมยอด|รวมเงิน|รวมสุทธิ)"
+    r"|^(?:รวมทั้งสิ้น|รวมทั้งหมด|ยอดรวม|รวมยอด|รวมเงิน|รวมสุทธิ|รวมหมวด|รวมกลุ่ม|รวมย่อย|รวมประเภท|รวมรายการ"
+    r"|รวมสินค้า|ผลรวม|subtotal)"
 )
-# Any other cell with a word in it means the row is data, not a total ("Total Care Shampoo", "PCS").
+# Any other cell with a word in it means the row is data, not a total ("Total Care Shampoo", "PCS") —
+# except a count beside the label ("5 รายการ", "12 items"), which is part of the total.
 _WORD_RE = r"[A-Za-zก-๎]{2,}"
+_COUNT_RE = r"^\s*\d+\s*(?:รายการ|ชิ้น|แถว|items?|rows?|records?|lines?)\s*$"
 _NUM_RE = re.compile(r"^[-+]?[\d,]*\.?\d+%?$|^[-+]?฿?[\d,]+(\.\d+)?$")
 _DATE_RE = re.compile(r"^\d{1,4}[-/.]\d{1,2}[-/.]\d{1,4}")
 
@@ -491,7 +494,12 @@ def extract_table(
     if spec.drop_total_rows and body.height and data:
         first_text = pl.coalesce([pl.col(c) for c in data]).str.to_lowercase().str.strip_chars()
         words = pl.sum_horizontal(
-            [pl.col(c).str.contains(_WORD_RE).fill_null(False).cast(pl.Int32) for c in data]
+            [
+                (pl.col(c).str.contains(_WORD_RE) & ~pl.col(c).str.contains(_COUNT_RE))
+                .fill_null(False)
+                .cast(pl.Int32)
+                for c in data
+            ]
         )
         cond = first_text.str.contains(TOTAL_LABEL_RE).fill_null(False) & (words <= 1)
         body = body.filter(~cond)

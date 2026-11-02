@@ -393,7 +393,7 @@ def propose_for_round(
                 if not any(n.startswith("llm_failed") for n in res.notes):
                     # two readers of the same file: where FORMA's matcher and the model agree is a free
                     # consistency signal, where they differ is the natural choice question (ADR-059)
-                    agreement = _agreement(draft.mapping, doc)
+                    agreement = _agreement(draft.mapping, doc, r.files)
                     agent_log.append({"agent": "agreement", **{k: len(v) for k, v in agreement.items()}})
                 open_questions = _without_settled(open_questions, doc, schema)
                 open_questions.extend(
@@ -504,7 +504,7 @@ def propose_for_round(
     from forma.ai.reconciliation import require_verification, verification
 
     verified = verification(sim, schema, complete=True, binding_problems=problems, self_check=self_check)
-    require_verification(decision, verified)
+    require_verification(decision, verified, reused=source_kind == "memory")
     _verdict(ctx, sandbox_report)
     mv = MappingVersion(
         id=mv_id,
@@ -640,15 +640,28 @@ def _col_names(expr: Any) -> list[str]:
     return out
 
 
-def _agreement(draft: MappingDocument, doc: MappingDocument) -> dict[str, Any]:
+def _agreement(
+    draft: MappingDocument, doc: MappingDocument, files: list[SourceFile] | None = None
+) -> dict[str, Any]:
     """Compare the complete reading, including transforms and selection boundaries.
 
     This is a consistency signal, not independent corroboration of business meaning.
     """
-    from forma.ai.evidence import reading_signature
+    from forma.ai.evidence import collection_signature, reading_core, record_signature
 
     a, b = healing._fields(draft), healing._fields(doc)
-    out: dict[str, Any] = {"agree": [], "disagree": {}, "model_only": [], "dropped": []}
+    out: dict[str, Any] = {"agree": [], "disagree": {}, "model_only": [], "dropped": [], "ops": []}
+    before, after = record_signature(draft, files=files), record_signature(doc, files=files)
+    if before != after:
+        # how records are selected changed (dedupe, root filters, joins): one mapping-level finding, not a
+        # question on every field
+        out["record"] = {
+            k: {"matcher": before[k], "model": after[k]} for k in before if before[k] != after[k]
+        }
+    cb, ca = collection_signature(draft, files=files), collection_signature(doc, files=files)
+    changed = {k for k in set(cb) & set(ca) if cb[k] != ca[k]}
+    if changed:  # how items attach changed (link, filter, item dedupe): one finding per collection
+        out["collection"] = {k: {"matcher": cb[k], "model": ca[k]} for k in sorted(changed)}
     for target in sorted(set(a) | set(b)):
         x, y = a.get(target), b.get(target)
         if x is None:
@@ -657,8 +670,10 @@ def _agreement(draft: MappingDocument, doc: MappingDocument) -> dict[str, Any]:
         if y is None:
             out["dropped"].append(target)
             continue
-        if reading_signature(draft, target) == reading_signature(doc, target):
+        if reading_core(draft, target, files=files) == reading_core(doc, target, files=files):
             out["agree"].append(target)
+            if healing._reads(x["expr"], "") != healing._reads(y["expr"], "") or x["expr"] != y["expr"]:
+                out["ops"].append(target)  # same cells, constants and value ops; different normalisation
         else:
             out["disagree"][target] = {
                 "matcher": healing._reads(x["expr"], healing._source_sheet(draft, x["source"]) or "")
@@ -1087,7 +1102,7 @@ def sandbox_compare(
         ctx,
         schema,
         doc,
-        MappingDocument.model_validate(baseline.document),
+        format_memory.rebind_approved(baseline, r.files, for_comparison=True),
         r.files,
         limit=limit,
         overrides=active_overrides(session, m.customer_id),

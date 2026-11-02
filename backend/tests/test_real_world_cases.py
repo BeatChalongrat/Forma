@@ -541,3 +541,48 @@ def test_the_model_cannot_invent_a_clarification_for_an_unmapped_field(
     assert m["created_by"] == "ai" and m["policy"]["clarifications"] == [] and "?" not in m["open_questions"]
     mapping_entry = next(e for e in m["agent_log"] if e["agent"] == "mapping")
     assert mapping_entry["attempts"] >= 2
+
+
+def test_contract_checks_are_rerun_after_a_data_edit(client: TestClient, isolated_env: Path) -> None:
+    """A business invariant lives in the contract: an edit that breaks it shows up on the new version."""
+    document = json.loads((FIXTURES / "schema.json").read_text(encoding="utf-8"))
+    ref = client.post("/api/schemas", json={"document": document}).json()["ref"]
+    cust = client.post("/api/customers", json={"code": "DISP2", "name": "DISP2"}).json()["id"]
+    good = isolated_env / "dispatch_good.csv"
+    good.write_text(
+        "Dispatch Ref,Destination,Cartons,Declared THB,Invoice THB\n0001,BKK,2,1200.25,1200.25\n0002,CNX,4,3000,3000\n",
+        encoding="utf-8",
+    )
+    r = client.post("/api/rounds", json={"customer_id": cust, "target_schema": ref}).json()
+    _upload(client, r["id"], good, good.name)
+    _run(client, r["id"])
+    r = client.get(f"/api/rounds/{r['id']}").json()
+    assert _mapping(client, r)["policy"]["verification"]["passed"], _mapping(client, r)["policy"][
+        "verification"
+    ]
+    _approve_and_transform(client, r, publish=False)
+    ds = client.get(f"/api/rounds/{r['id']}").json()["datasets"][-1]["id"]
+    assert not any(
+        f["kind"] == "contract_check" for f in client.get(f"/api/datasets/{ds}").json()["findings"]
+    )
+    edit = client.post(
+        f"/api/datasets/{ds}/changes",
+        json={
+            "operations": [
+                {
+                    "kind": "set_field",
+                    "target": "/invoice_value",
+                    "value": 1.0,
+                    "where": {
+                        "op": "eq",
+                        "args": [{"op": "col", "name": "/dispatch_id"}, {"op": "const", "value": "0001"}],
+                    },
+                }
+            ]
+        },
+    )
+    assert edit.status_code in (200, 201), edit.text
+    new_id = edit.json()["dataset"]["id"]
+    findings = client.get(f"/api/datasets/{new_id}").json()["findings"]
+    broken = [f for f in findings if f["kind"] == "contract_check"]
+    assert broken and "declared-matches-invoice" in broken[0]["message"] and broken[0]["severity"] == "error"

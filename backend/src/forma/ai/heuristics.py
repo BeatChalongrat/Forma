@@ -725,8 +725,17 @@ def propose_mapping(
                         evidence=[why],
                     )
                 )
+            promo_dates = [
+                f for f in schema.leaf_fields() if f.semantic in ("promo.start_date", "promo.end_date")
+            ]
             for m in root_price:
                 if m.field.semantic in ("price.effective_from", "price.effective_to"):
+                    # a date column that reads at least as much like a promotion's date ("โปรเริ่ม",
+                    # "Promo Start") belongs to the promotion on that row, not to the price
+                    if promo_dates and max(score_header(m.column.name, f)[0] for f in promo_dates) >= max(
+                        score_header(m.column.name, m.field)[0], 0.01
+                    ):
+                        continue
                     items.append(
                         FieldMapping(
                             target=m.field.pointer,

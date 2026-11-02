@@ -65,9 +65,11 @@ def verification(
     problems = list(binding_problems or [])
     if result is None:
         problems.append("No transformation result was verified")
-        return {"version": 1, "complete": False, "passed": False, "problems": problems}
+        return {"version": 1, "complete": False, "passed": False, "problems": problems, "warnings": []}
     problems.extend(f.message for f in result.errors)
-    problems.extend(plausibility.check(result.records, schema))
+    # values that pass the contract and still look wrong: a warning class of its own, so the policy can
+    # treat a mapping a person already approved differently from a new one
+    warnings = plausibility.check(result.records, schema)
     problems.extend(f.message for f in result.findings if "unknown root records" in f.message)
     if not complete:
         problems.append("Only a sample was checked")
@@ -81,6 +83,7 @@ def verification(
         "complete": complete,
         "passed": not problems,
         "problems": list(dict.fromkeys(problems)),
+        "warnings": list(dict.fromkeys(warnings)),
         "rows_checked": result.stats.get("rows_in", 0),
         "rows_out": len(result.records),
         "coverage": evidence,
@@ -88,12 +91,21 @@ def verification(
     }
 
 
-def require_verification(decision: Any, report: dict[str, Any]) -> None:
+def require_verification(decision: Any, report: dict[str, Any], *, reused: bool = False) -> None:
+    """An incomplete or failed verification never approves automatically. Plausibility warnings do the
+    same for a new or edited mapping; a mapping reused verbatim from an approval keeps the policy's
+    warning budget (a person accepted those values once already) and the warnings stay on the card."""
     decision.checks["full_verification"] = bool(report.get("complete") and report.get("passed"))
-    if decision.checks["full_verification"]:
+    warnings = list(report.get("warnings") or [])
+    decision.checks["plausibility_warnings"] = len(warnings)
+    if decision.checks["full_verification"] and (reused or not warnings):
         return
     if decision.decision == "auto_approve":
         decision.decision = "review"
-    decision.reasons.extend(f"verification: {p}" for p in report.get("problems", [])[:8])
+    if not decision.checks["full_verification"]:
+        decision.reasons.extend(f"verification: {p}" for p in report.get("problems", [])[:8])
+        decision.risk_level = "high"
+    else:
+        decision.reasons.extend(f"plausibility: {w}" for w in warnings[:8])
+        decision.risk_level = "high" if decision.risk_level == "high" else "medium"
     decision.priority = max(decision.priority, 40)
-    decision.risk_level = "high"

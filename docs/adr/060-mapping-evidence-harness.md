@@ -78,6 +78,32 @@ verify the mechanism; they do not measure representative customer accuracy. Use 
 reviewed golden labels, declared model/settings/budgets and a separate ambiguous-fact set before making
 comparative claims. Do not tune on the held-out results and continue calling them cold.
 
+## Amendments after the mock file set (2026-11-02)
+
+- Plausibility findings are a warning class of their own in the verification report (`warnings`, beside
+  `problems`). A new or edited mapping with any such warning still goes to review; a mapping reused
+  verbatim from an approval keeps the policy's warning budget, because a person accepted those values once
+  already and the warnings stay on the card. Incomplete checks, execution errors and orphaned items block
+  automatic approval in every case.
+- The Compare tab binds the approved mapping to renamed files the way the shadow comparison does.
+- Contract checks are recomputed after persistent overrides and after data edits; a broken invariant is a
+  `contract_check` error finding on the new version.
+- The benchmark scores a null and a missing key alike, and its exact-record score ignores the passthrough
+  `attributes` bag when the answer key has none.
+- The table extractor drops subtotal rows that carry a count beside the label ("รวมหมวด … 5 รายการ"),
+  and the matcher does not read a promotion's dates on the product row as the price's effective dates.
+- The reading signature compares what a field reads — the file its source binds to in the round, the
+  sheet, the range, unpivot, filter and fill-down, and the expression — not how a selector is spelled (file
+  pattern versus the only file, header row spelled out versus "auto", CSV options, descriptions). Root
+  filters, dedupe and joins select records, and a collection's link, filter and item dedupe select items;
+  each forms its own signature, and a difference there is one mapping-level review reason, not a contested
+  question on every field. Two readings agree when they read the same cells with the same constants and the
+  same value-changing ops (arithmetic, VAT, lookups, conditionals, cutting or rewriting identifiers); a
+  wrapper that only normalises (trim, whitespace, case, cast, Thai number or date parsing, unit and pack
+  normalisation, value maps) is not a different reading and is listed under ``agreement.ops`` instead. The first live runs with the
+  signature as written marked every field contested (the model had added a dedupe key) and put 7–12
+  confirm questions back on the card.
+
 ## Boundaries
 
 Arbitrary generated Python is not promoted into a production parser. Exploration must end in the reviewed

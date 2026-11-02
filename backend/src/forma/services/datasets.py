@@ -153,7 +153,9 @@ def transform_round(
         records, override_impact = apply_persistent_overrides(session, r.customer_id, schema, records)
         if override_impact.get("rows_affected") or override_impact.get("rows_deleted"):
             errors = schema_errors(schema, records)  # validate what the overrides produced
-            findings = _with_schema_findings(findings, errors, schema)
+            findings = _with_contract_findings(
+                _with_schema_findings(findings, errors, schema), records, schema
+            )
             stats["invalid_records"] = _invalid_count(errors)
     dv = _new_version(
         ctx,
@@ -235,6 +237,20 @@ def new_schema_errors(
 
 def _invalid_count(errors: list[dict[str, Any]]) -> int:
     return len({e["row"] for e in errors})
+
+
+def _with_contract_findings(
+    findings: list[dict[str, Any]], records: list[dict[str, Any]], schema: TargetSchema
+) -> list[dict[str, Any]]:
+    """Replace a version's business-check findings with the checks of its current records (ADR-060): an
+    override or an edit can break an invariant the mapping satisfied, and the contract decides, not the edit."""
+    from forma.ai.contract_checks import evaluate
+
+    kept = [f for f in findings or [] if f.get("kind") != "contract_check"]
+    fresh = [
+        Finding("contract_check", "error", **item).to_dict() for item in evaluate(records, schema.document)
+    ]
+    return [*kept, *fresh]
 
 
 def _with_schema_findings(
@@ -528,7 +544,7 @@ def apply_changes(
         version=dv.version + 1,
         status="draft",
         stats={**dv.stats, "last_change": impact, "invalid_records": _invalid_count(after)},
-        findings=_with_schema_findings(dv.findings, after, schema),
+        findings=_with_contract_findings(_with_schema_findings(dv.findings, after, schema), new, schema),
         parent_id=dv.id,
         created_by=actor,
         note=note,
