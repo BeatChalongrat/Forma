@@ -47,6 +47,16 @@ def _canonical(value: Any) -> str:
     return json.dumps(normalize(value), sort_keys=True, ensure_ascii=False, separators=(",", ":"))
 
 
+def _strip(value: Any) -> Any:
+    """Drop nulls and empty lists at every depth, so an absent key and an explicit null compare equal."""
+    if isinstance(value, dict):
+        out = {k: _strip(v) for k, v in value.items()}
+        return {k: v for k, v in out.items() if v is not None and v != []}
+    if isinstance(value, list):
+        return [_strip(v) for v in value]
+    return value
+
+
 def score(
     actual: list[dict[str, Any]], expected: list[dict[str, Any]], schema: TargetSchema
 ) -> dict[str, Any]:
@@ -56,8 +66,14 @@ def score(
     def key(record: dict[str, Any]) -> str:
         return _canonical([list(values_at(record, p)) for p in schema.identity_keys])
 
+    def present(record: dict[str, Any], pointer: str) -> list[Any]:
+        # a null or an empty list says the same as a missing key: the contract allows both spellings
+        return [v for v in values_at(record, pointer) if v is not None and v != []]
+
     def business_record(record: dict[str, Any]) -> str:
-        return _canonical({k: v for k, v in record.items() if k not in INTERNAL_KEYS or schema.declares(k)})
+        return _canonical(
+            _strip({k: v for k, v in record.items() if k not in INTERNAL_KEYS or schema.declares(k)})
+        )
 
     a, e = {key(r): r for r in actual}, {key(r): r for r in expected}
     if len(e) != len(expected):
@@ -67,15 +83,15 @@ def score(
     for field in schema.leaf_fields():
         # Collection order is immaterial; duplicates are material. Never hide missing identities.
         accuracy[field.pointer] = sum(
-            Counter(_canonical(v) for v in values_at(a[k], field.pointer))
-            == Counter(_canonical(v) for v in values_at(e[k], field.pointer))
+            Counter(_canonical(v) for v in present(a[k], field.pointer))
+            == Counter(_canonical(v) for v in present(e[k], field.pointer))
             for k in common
         ) / max(1, len(e))
     critical = [accuracy[f.pointer] for f in schema.leaf_fields() if f.risk in ("critical", "high")]
     collections = {
         c.pointer: sum(
-            Counter(_canonical(v) for v in values_at(a[k], c.pointer + "/*"))
-            == Counter(_canonical(v) for v in values_at(e[k], c.pointer + "/*"))
+            Counter(_canonical(_strip(v)) for v in values_at(a[k], c.pointer + "/*"))
+            == Counter(_canonical(_strip(v)) for v in values_at(e[k], c.pointer + "/*"))
             for k in common
         )
         / max(1, len(e))
