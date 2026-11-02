@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import datetime as dt
+import json
 import re
 from collections.abc import Callable
 from pathlib import Path
@@ -30,6 +31,7 @@ from forma.db.models import (
     SourceFile,
 )
 from forma.engine.transform import BoundSource, TransformEngine, TransformResult
+from forma.fingerprint.fingerprint import norm_header
 from forma.mapping_dsl.models import MappingDocument, SourceSpec
 from forma.mapping_dsl.validate import validate_mapping
 from forma.profiling.profile import WorkbookProfile
@@ -285,6 +287,8 @@ def propose_for_round(
     )
     use_llm = (not ctx.llm.is_mock) if use_llm is None else use_llm
     agent_log: list[dict[str, Any]] = []
+    agreement: dict[str, Any] | None = None
+    confidence_basis: dict[str, Any] | None = None
     open_questions: list[str] = []
     llm_fallback = False
     learning_note: dict[str, Any] | None = None
@@ -306,6 +310,12 @@ def propose_for_round(
         from forma.services import learning
 
         learned = learning.learned_for(session, r.customer_id, schema)
+        # ... and what other customers' approved mappings say these headers mean (ADR-059)
+        learned.absorb(
+            learning.anchors_for(session, r.customer_id, schema),
+            {norm_header(c.name) for t in profile.tables for c in t.columns},
+            int((ctx.policy.policy.get("learning") or {}).get("share_after_customers", 2)),
+        )
         draft: HeuristicProposal = propose_mapping(
             profile, schema, customer_id=r.customer_id, learned=None if learned.empty else learned
         )
@@ -335,6 +345,7 @@ def propose_for_round(
                 resolve=ctx.storage.local_path,
                 rows=ctx.settings.llm_self_check_rows,
                 max_chars=ctx.settings.llm_max_sample_chars,
+                history=(previous.policy or {}).get("simulation") if previous else None,
             )
             try:
                 if previous is not None and drift not in (None, "unrelated_file"):
@@ -369,6 +380,11 @@ def propose_for_round(
                     source_kind = "ai"
                 _record_llm(session, r.id, res)
                 agent_log.append(res.to_dict())
+                if not any(n.startswith("llm_failed") for n in res.notes):
+                    # two readers of the same file: where FORMA's matcher and the model agree is a free
+                    # consistency signal, where they differ is the natural choice question (ADR-059)
+                    agreement = _agreement(draft.mapping, doc)
+                    agent_log.append({"agent": "agreement", **{k: len(v) for k, v in agreement.items()}})
                 open_questions = _without_settled(open_questions, doc, schema)
                 open_questions.extend(
                     res.data.get("open_questions", []) if isinstance(res.data, dict) else []
@@ -398,16 +414,33 @@ def propose_for_round(
         if sim
         else [{"kind": "binding", "severity": "error", "message": p} for p in problems]
     )
-    if sim:  # values that pass the contract and still cannot be right (ADR-058)
-        findings.extend(
-            {"kind": "plausibility", "severity": "warning", "message": p}
-            for p in plausibility.check(sim.records, schema)
-        )
+    prev_sim = (previous.policy or {}).get("simulation") if previous else None
+    implausible: list[str] = []
+    if (
+        sim
+    ):  # values that pass the contract and still cannot be right (ADR-058), or unlike last round's (ADR-059)
+        implausible = [
+            *plausibility.check(sim.records, schema),
+            *plausibility.check_history(sim.records, schema, prev_sim),
+        ]
+        findings.extend({"kind": "plausibility", "severity": "warning", "message": p} for p in implausible)
     rows_out = sim.stats["rows_out"] if sim else 0
+    self_check = next(
+        (
+            e["data"]["self_check"]
+            for e in agent_log
+            if isinstance(e.get("data"), dict) and e["data"].get("self_check")
+        ),
+        None,
+    )
+    if source_kind in ("ai", "ai_adaptation"):
+        # the model's word on its confidence is bounded by what FORMA could check (ADR-059)
+        confidence_basis = _ground_confidence(
+            doc, agreement, self_check, implausible, ctx.policy.policy.get("confidence") or {}
+        )
 
     # 5) policy (row-count sanity vs the previous approved round, when both simulations were complete)
     row_change_ratio = None
-    prev_sim = (previous.policy or {}).get("simulation") if previous else None
     if (
         sim
         and prev_sim
@@ -456,6 +489,7 @@ def propose_for_round(
         sandbox=sandbox_report,
         field_checks=review["checks"] if review else None,
         open_questions=open_questions,
+        agreement=agreement,
     )
     _verdict(ctx, sandbox_report)
     mv = MappingVersion(
@@ -477,19 +511,16 @@ def propose_for_round(
             "target_schema_hash": stable_hash(schema.document),
             "reused_from": previous.id if source_kind == "memory" and previous else None,
             "file_fingerprints": file_fps,
-            "simulation": sim.summary() if sim else None,
+            "simulation": (
+                {**sim.summary(), "fill": plausibility.fill_shares(sim.records, schema)} if sim else None
+            ),
             "sample": (sim.records[:5] if sim else []),
             "sandbox": sandbox_report,
             "field_review": review,
             "learning": learning_note,
-            "self_check": next(
-                (
-                    e["data"]["self_check"]
-                    for e in agent_log
-                    if isinstance(e.get("data"), dict) and e["data"].get("self_check")
-                ),
-                None,
-            ),
+            "self_check": self_check,
+            "agreement": agreement,
+            "confidence_basis": confidence_basis,
         },
         agent_log=agent_log,
         open_questions=open_questions,
@@ -515,6 +546,20 @@ def propose_for_round(
     if decision.decision == "auto_approve":
         _supersede_others(session, r.customer_id, mv.id)
         r.status = "auto_approved"
+        if _sampled_for_audit(r.id, float((ctx.policy.policy.get("audit") or {}).get("sample_share", 0))):
+            # a spot check of automation (ADR-059): the approval stands, a person looks anyway, and what
+            # they find is the honest accuracy of the automatic path (calibration reads it)
+            session.add(
+                ReviewTask(
+                    round_id=r.id,
+                    customer_id=r.customer_id,
+                    mapping_version_id=mv.id,
+                    kind="audit",
+                    priority=1,
+                    reasons=["sampled spot check of an automatic approval"],
+                    details={"decision": "auto_approve", "audit": True, "findings": findings[:50]},
+                )
+            )
     else:
         kind = (
             "blocked"
@@ -559,6 +604,116 @@ def propose_for_round(
         source=source_kind,
     )
     return mv
+
+
+def _col_names(expr: Any) -> list[str]:
+    """Column names a stored expression reads, in order, without their source prefix."""
+    out: list[str] = []
+    if isinstance(expr, dict):
+        if expr.get("op") == "col" and expr.get("name"):
+            out.append(str(expr["name"]))
+        for v in expr.values():
+            out.extend(_col_names(v))
+    elif isinstance(expr, list):
+        for v in expr:
+            out.extend(_col_names(v))
+    return out
+
+
+def _agreement(draft: MappingDocument, doc: MappingDocument) -> dict[str, Any]:
+    """Where FORMA's matcher and the model read the file alike (ADR-059). Agreement is about *which columns*
+    a field reads: the same columns (on the same sheet, when both name one) agree whatever the ops around them
+    and whatever the source is called; different columns, or different constants, disagree (what each reads);
+    ``model_only`` and ``dropped``: one of them has the field and the other does not."""
+    a, b = healing._fields(draft), healing._fields(doc)
+    out: dict[str, Any] = {"agree": [], "disagree": {}, "model_only": [], "dropped": []}
+    for target in sorted(set(a) | set(b)):
+        x, y = a.get(target), b.get(target)
+        if x is None:
+            out["model_only"].append(target)
+            continue
+        if y is None:
+            out["dropped"].append(target)
+            continue
+        cx, cy = sorted(set(_col_names(x["expr"]))), sorted(set(_col_names(y["expr"])))
+        sx = next(
+            (s.sheet.name for s in draft.sources if s.id == x["source"] and s.sheet and s.sheet.name), None
+        )
+        sy = next(
+            (s.sheet.name for s in doc.sources if s.id == y["source"] and s.sheet and s.sheet.name), None
+        )
+        same_sheet = sx is None or sy is None or sx.strip().lower() == sy.strip().lower()
+        if (cx and cx == cy and same_sheet) or (not cx and not cy and x["expr"] == y["expr"]):
+            out["agree"].append(target)
+        else:
+            out["disagree"][target] = {
+                "matcher": healing._reads(x["expr"], healing._source_sheet(draft, x["source"]) or "")
+                or [json.dumps(x["expr"], ensure_ascii=False)[:80]],
+                "model": healing._reads(y["expr"], healing._source_sheet(doc, y["source"]) or "")
+                or [json.dumps(y["expr"], ensure_ascii=False)[:80]],
+            }
+    return out
+
+
+def _ground_confidence(
+    doc: MappingDocument,
+    agreement: dict[str, Any] | None,
+    self_check: dict[str, Any] | None,
+    implausible: list[str],
+    policy: dict[str, Any],
+) -> dict[str, Any]:
+    """Bound each field's confidence by evidence FORMA holds (ADR-059): agreement with the matcher raises a
+    low number to the floor, disagreement caps a high one, a plausibility warning naming the field caps it,
+    and an unresolved self-check caps the whole mapping. Every change leaves a line in the evidence."""
+    floor = float(policy.get("agree_floor", 0.9))
+    cap = float(policy.get("disagree_cap", 0.7))
+    pcap = float(policy.get("plausibility_cap", 0.75))
+    scap = float(policy.get("unresolved_self_check_cap", 0.8))
+    agree = set((agreement or {}).get("agree") or [])
+    disagree = (agreement or {}).get("disagree") or {}
+    flagged = {m.split(":", 1)[0].strip() for m in implausible if m.startswith("/")}
+    basis: dict[str, Any] = {"raised": [], "capped": [], "mapping_capped": False}
+    for fm in [*doc.fields, *(x for c in doc.collections for x in c.fields)]:
+        conf = fm.confidence if fm.confidence is not None else (doc.meta.confidence or 0.5)
+        if fm.target in agree and conf < floor:
+            fm.confidence = floor
+            fm.evidence = [
+                *fm.evidence,
+                f"FORMA's matcher reads this field the same way: confidence {conf:.2f} → {floor:.2f}",
+            ]
+            basis["raised"].append(fm.target)
+        elif fm.target in disagree and conf > cap:
+            fm.confidence = cap
+            other = ", ".join(disagree[fm.target].get("matcher") or []) or "another column"
+            fm.evidence = [
+                *fm.evidence,
+                f"FORMA's matcher read {other} instead: confidence {conf:.2f} → {cap:.2f}",
+            ]
+            basis["capped"].append(fm.target)
+        now = fm.confidence if fm.confidence is not None else conf
+        if fm.target in flagged and now > pcap:
+            fm.confidence = pcap
+            fm.evidence = [
+                *fm.evidence,
+                f"a plausibility warning names this field: confidence capped at {pcap:.2f}",
+            ]
+            if fm.target not in basis["capped"]:
+                basis["capped"].append(fm.target)
+    if self_check and self_check.get("problems_left") and (doc.meta.confidence or 0) > scap:
+        doc.meta.confidence = scap
+        doc.meta.evidence = [
+            *doc.meta.evidence,
+            f"the self-check left problems: mapping confidence capped at {scap:.2f}",
+        ]
+        basis["mapping_capped"] = True
+    return basis
+
+
+def _sampled_for_audit(round_id: str, share: float) -> bool:
+    """Deterministic per round: the same round is always in or out of the sample (rule 4)."""
+    if share <= 0:
+        return False
+    return int(stable_hash(round_id)[:8], 16) % 10_000 < round(share * 10_000)
 
 
 def _without_settled(questions: list[str], doc: MappingDocument, schema: TargetSchema) -> list[str]:
@@ -622,8 +777,6 @@ def _supersede_others(session: Session, customer_id: str, keep_id: str) -> None:
 
 def _examples(session: Session, customer_id: str, profile: WorkbookProfile) -> list[dict[str, Any]]:
     """Few-shot: approved mappings from *other* customers whose headers overlap (loose fingerprint / header jaccard)."""
-    from forma.fingerprint.fingerprint import norm_header
-
     mine = {norm_header(c.name) for t in profile.tables for c in t.columns}
     out: list[tuple[float, dict[str, Any]]] = []
     for m in session.scalars(

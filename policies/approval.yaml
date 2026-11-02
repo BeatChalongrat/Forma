@@ -66,3 +66,15 @@ risk_overrides:                          # per-semantic risk overrides (defaults
   "discount.percent": critical
   "promo.start_date": critical
   "promo.end_date": critical
+
+confidence:                              # ADR-059: confidence from evidence, not from the model's word
+  agree_floor: 0.90                      # FORMA's matcher and the model read a field the same way → at least this sure
+  disagree_cap: 0.70                     # they read it differently → at most this sure, and the field becomes a choice
+  unresolved_self_check_cap: 0.80        # the self-check left problems → the mapping is at most this sure
+  plausibility_cap: 0.75                 # a plausibility warning names the field → at most this sure
+
+learning:                                # ADR-059: what other customers approved
+  share_after_customers: 2               # a header → field pair this many customers approved is everyone's alias
+
+audit:                                   # ADR-059: spot checks of automation
+  sample_share: 0.05                     # share of automatic approvals a person looks at anyway (deterministic per round)

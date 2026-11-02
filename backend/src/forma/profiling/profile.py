@@ -18,6 +18,7 @@ _BARCODE_RE = re.compile(r"^\d{8}$|^\d{12,14}$")
 _SKU_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._/-]{1,31}$")
 _SLASH_DATE_RE = re.compile(r"^\s*(\d{1,2})[/.-](\d{1,2})[/.-](\d{2,4})\b")
 _BOOL_SET = {"y", "n", "yes", "no", "true", "false", "1", "0", "ใช่", "ไม่", "active", "inactive"}
+TOP_VALUES = 10  # most frequent distinct values kept per column; the model sees them before it maps (ADR-059)
 
 
 @dataclass
@@ -36,6 +37,7 @@ class ColumnProfile:
     hints: list[str] = field(
         default_factory=list
     )  # sku_like, barcode_like, price_like, thai_date, percent, ...
+    top_values: list[list[Any]] = field(default_factory=list)  # [value, count] by frequency (ADR-059)
 
     def to_dict(self) -> dict[str, Any]:
         return self.__dict__.copy()
@@ -242,6 +244,8 @@ def profile_column(s: pl.Series, position: int, *, sample_n: int = 8) -> ColumnP
             ):
                 hints.append("unit_like")
     samples = [str(v) for v in non_null.unique(maintain_order=True).head(sample_n).to_list()]
+    counts = non_null.value_counts(sort=True).head(TOP_VALUES) if nn else None
+    top_values = [[str(v), int(k)] for v, k in counts.iter_rows()] if counts is not None else []
     return ColumnProfile(
         name=s.name,
         position=position,
@@ -255,6 +259,7 @@ def profile_column(s: pl.Series, position: int, *, sample_n: int = 8) -> ColumnP
         avg_len=round(sum(len(str(v)) for v in vals) / len(vals), 1) if vals else 0.0,
         header_lang=_header_lang(s.name),
         hints=hints,
+        top_values=top_values,
     )
 
 

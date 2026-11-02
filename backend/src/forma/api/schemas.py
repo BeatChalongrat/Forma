@@ -44,6 +44,19 @@ class WaitIn(BaseModel):
     note: str = Field(min_length=1, max_length=500)
 
 
+class ConfirmIn(BaseModel):
+    """A spot check of an automatic approval found nothing wrong (ADR-059)."""
+
+    comment: str | None = Field(default=None, max_length=2000)
+
+
+class GroupAnswerIn(BaseModel):
+    """One answer for the same question across several files (ADR-059)."""
+
+    key: str = Field(min_length=8, max_length=64)
+    answer: bool | str
+
+
 class AskIn(BaseModel):
     question: str = Field(min_length=1, max_length=2000)
 

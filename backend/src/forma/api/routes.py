@@ -18,10 +18,12 @@ from forma.api.schemas import (
     ChangesIn,
     CloseIn,
     CompareIn,
+    ConfirmIn,
     CopilotIn,
     CustomerIn,
     CustomerPatch,
     Decision,
+    GroupAnswerIn,
     MappingEditIn,
     MappingPreviewIn,
     MoveIn,
@@ -759,6 +761,42 @@ def resume_review(
     task_id: str, session: Session = Depends(get_session), p: Principal = Depends(require_role("reviewer"))
 ) -> dict[str, Any]:
     return ser.review_task(rq.resume(session, p, _task_scoped(session, p, task_id)))
+
+
+@api.post("/review/{task_id}/confirm")
+def confirm_audit(
+    task_id: str,
+    body: ConfirmIn,
+    session: Session = Depends(get_session),
+    p: Principal = Depends(require_role("reviewer")),
+) -> dict[str, Any]:
+    """A spot check of an automatic approval found nothing wrong (ADR-059)."""
+    return ser.review_task(rq.confirm_audit(session, p, _task_scoped(session, p, task_id), body.comment))
+
+
+@api.get("/review/question-groups")
+def question_groups(
+    session: Session = Depends(get_session),
+    p: Principal = Depends(current_principal),
+    ctx: ServiceContext = Depends(ctx_dep),
+) -> list[dict[str, Any]]:
+    """The same question across several open files: one answer settles them all (ADR-059)."""
+    from forma.services import review_questions
+
+    return review_questions.groups(ctx, session, p)
+
+
+@api.post("/review/question-groups/answer")
+def answer_question_group(
+    body: GroupAnswerIn,
+    session: Session = Depends(get_session),
+    p: Principal = Depends(require_role("reviewer")),
+    ctx: ServiceContext = Depends(ctx_dep),
+) -> dict[str, Any]:
+    from forma.services import review_questions
+
+    ids = review_questions.answer_group(ctx, session, p, body.key, body.answer, p.actor)
+    return {"mapping_version_ids": ids, "answered": len(ids)}
 
 
 @api.get("/review")

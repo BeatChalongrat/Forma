@@ -32,7 +32,7 @@ Job · AuditLog · LLMCall · AppSetting · StoredSchema   (operational ledgers 
 | `batches` | `Batch` | a bulk upload or work round: label, `work_date`, `expected_files`, `auto_publish` |
 | `batch_items` | `BatchItem` | one file of a batch: match, stored status, customer, round |
 | `mapping_versions` | `MappingVersion` | document, status, confidence, policy report, agent log, open questions, parent |
-| `review_tasks` | `ReviewTask` | queue row: kind, priority, reasons, details (risk, verdict brief), resolution |
+| `review_tasks` | `ReviewTask` | queue row: kind (`mapping`, `drift`, `data`, `blocked`, `audit`: a sampled spot check of an automatic approval, ADR-059), priority, reasons, details (risk, verdict brief), resolution |
 | `dataset_versions` | `DatasetVersion` | JSONL object key, row count, stats (`invalid_records`), findings, parent |
 | `change_sets` | `ChangeSet` | a reviewed batch of edits that produced a new dataset version |
 | `overrides` | `Override` | persistent edit re-applied on every future import of the customer (ADR-024) |

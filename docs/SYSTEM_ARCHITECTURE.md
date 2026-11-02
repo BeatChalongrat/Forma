@@ -148,10 +148,10 @@ saved configuration) and a SQLAlchemy `Session`; decisions and edits record the 
 | `lineage.py`, `anomalies.py` | cell-level trace with cause of change; anomalies within a round, vs last round, vs usual size | 020, 022 |
 | `batches.py`, `publishing.py` | bulk upload: identify customer by layout and file-name code, attach to a round, item states, stuck detection and resume; policy-decided automatic approval + export; zip of all JSON | 027, 033, 034 |
 | `verdict.py`, `verdict_flow.py` | one conclusion per file (rules, suppression, confidence, decisions, evidence, digest); stored on the round, recomputed when stale; accept through the ordinary approval paths | 036 |
-| `learning.py` | corrections learned from approvals (aliases, constants, accepted), `Learned` for the mapper, suggestions and promotion, stats | 038 |
-| `calibration.py` | outcomes per decision, precision per rule, proposals (trust data checks, confidence bar, per-customer row change and price-move thresholds), apply | 037, 039 |
+| `learning.py` | corrections learned from approvals (aliases, constants, accepted), `Learned` for the mapper, anchors from other customers' approved mappings (`anchors_for`, `Learned.absorb`), suggestions and promotion, stats | 038, 059 |
+| `calibration.py` | outcomes per decision, precision per rule, correction rate per signal (matcher and model agreed / disagreed / model only), spot-check counts, proposals (trust data checks, confidence bar, the agreement floor, per-customer row change and price-move thresholds), apply | 037, 039, 059 |
 | `foresight.py` | cadence and expected deliveries, watchlist | 039 |
-| `review_questions.py`, `review_evidence.py`, `review_explanations.py` | questions from uncertain fields, answers as new versions, evidence traced to cells, bilingual explanations of policy reasons | 029, 035, 042 |
+| `review_questions.py`, `review_evidence.py`, `review_explanations.py` | questions from uncertain fields (a disputed field is a `choice` with the matcher's column first), the same question across open files as a group with one answer, answers as new versions, evidence traced to cells, bilingual explanations of policy reasons | 029, 035, 042, 058, 059 |
 | `assistant.py` | data-repair copilot: instruction → operations, "why" answers from evidence | 023 |
 | `workspace_assistant.py`, `workspace_tools.py`, `assistant_navigation.py`, `assistant_reports.py`, `conversations.py` | the workspace assistant: bounded tool loop over ~20 read-only tenant-scoped tools, citations, server-built navigation and confirmable actions, server-computed reports, clarification questions, persistent conversations with leases and streaming | 029, 030, 031, 034, 040, 042, 045 |
 | `code_sandbox.py`, `attachments.py` | the assistant's code runs: inputs checked against access, results stored in the chat; files in a chat | 048, 049 |
@@ -224,7 +224,7 @@ themes). Pages are self-contained; API types live in `lib/api.ts`.
 | `source_files` | sha256, storage key, profile, fingerprint, drift | immutable |
 | `batches`, `batch_items` | bulk uploads / work rounds and their files (match, state, round) | ADR-027, 033 |
 | `mapping_versions` | document, status, confidence, policy report (decision, checks, sandbox, field review, verdict, learning), agent log, parent | append-only |
-| `review_tasks` | queue rows: kind, priority, reasons, details (risk, verdict brief) | |
+| `review_tasks` | queue rows: kind (`mapping`, `drift`, `data`, `blocked`, `audit` = a spot check of an automatic approval), priority, reasons, details (risk, verdict brief) | |
 | `dataset_versions` | records key (JSONL object), row count, stats (`invalid_records`), findings, parent | append-only, object-first |
 | `change_sets`, `overrides` | edits with impact; persistent rules re-applied every import | ADR-024 |
 | `exports` | artifact key, format, sha256 | atomic publish |
@@ -330,5 +330,5 @@ These are the project's rules. Where the code does not yet meet one, the gap is 
 
 ## 11. Decision records
 
-ADRs 001–058 in [adr/](adr/) are binding unless superseded by a newer ADR. The index with one line each is in
+ADRs 001–059 in [adr/](adr/) are binding unless superseded by a newer ADR. The index with one line each is in
 [TEAM_LEAD_HANDBOOK.md](TEAM_LEAD_HANDBOOK.md#5-decision-log-adr-index).

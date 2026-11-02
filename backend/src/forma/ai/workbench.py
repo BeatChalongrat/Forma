@@ -55,6 +55,12 @@ class Workbench(Protocol):
 
     def run(self, doc: MappingDocument) -> RunReport: ...
 
+    def ground(self, doc: MappingDocument) -> list[dict[str, Any]]: ...
+
+
+GROUND_CONFIDENCE = 0.9  # a draft field below this is looked at before the model's first turn (ADR-059)
+GROUND_MAX_REQUESTS = MAX_INSPECT_REQUESTS
+
 
 def inspect_problems(requests: Any, n_tables: int) -> list[str]:
     """Why a list of inspect requests cannot be answered (sent back to the model as validation errors)."""
@@ -104,6 +110,7 @@ class FileWorkbench:
         resolve: Callable[[str], Path],
         rows: int = 50,
         max_chars: int = 200,
+        history: dict[str, Any] | None = None,
     ) -> None:
         self.schema = schema
         self.profile = profile
@@ -112,6 +119,7 @@ class FileWorkbench:
         self.resolve = resolve
         self.rows = rows
         self.max_chars = max_chars
+        self.history = history  # the approved mapping's simulation summary, when there is one (ADR-059)
         self._frames: dict[int, pl.DataFrame] = {}
 
     # ---- inspect ------------------------------------------------------------------------------------
@@ -184,6 +192,68 @@ class FileWorkbench:
             return {"matches": hits, "capped": len(hits) >= MAX_FIND}
         raise ValueError(f"what must be one of {list(INSPECT_KINDS)}")
 
+    # ---- ground -------------------------------------------------------------------------------------
+    def _table_index(self, spec: Any) -> int | None:
+        """The profiled table a DSL source reads: by sheet name, then by file pattern, then the only table."""
+        tables = self.profile.tables
+        if spec.sheet is not None and spec.sheet.name:
+            want = spec.sheet.name.strip().lower()
+            for i, t in enumerate(tables):
+                if t.sheet.strip().lower() == want:
+                    return i
+        if spec.file.name_pattern:
+            try:
+                rx = re.compile(spec.file.name_pattern)
+            except re.error:
+                rx = None
+            if rx is not None:
+                for i, t in enumerate(tables):
+                    if t.file_name and rx.search(t.file_name):
+                        return i
+        return 0 if len(tables) == 1 else None
+
+    def ground(self, doc: MappingDocument) -> list[dict[str, Any]]:
+        """Look at the file for the model before it maps (ADR-059): the full distinct values of every column
+        a low-confidence draft field reads, and of the unused columns of the same table that could hold that
+        field instead. Riskier fields first; at most ``GROUND_MAX_REQUESTS`` columns."""
+        from forma.ai.fit import compatible
+        from forma.schema_registry import RISK_ORDER
+
+        sources = {s.id: s for s in doc.sources}
+        fields = [(f, doc.record.root_source) for f in doc.fields]
+        fields += [(f, c.source) for c in doc.collections for f in c.fields]
+        taken: dict[str, set[str]] = {}
+        for f, src in fields:
+            taken.setdefault(src, set()).update(_col_leaves(f.expr))
+        wanted: list[tuple[int, int, str]] = []  # (risk rank, table index, column)
+        seen: set[tuple[int, str]] = set()
+
+        def want(rank: int, ti: int, col: str) -> None:
+            if (ti, col) not in seen and col in {c.name for c in self.profile.tables[ti].columns}:
+                seen.add((ti, col))
+                wanted.append((rank, ti, col))
+
+        for f, src in fields:
+            if f.confidence is not None and f.confidence >= GROUND_CONFIDENCE:
+                continue
+            leaves = _col_leaves(f.expr)
+            spec = sources.get(src)
+            ti = self._table_index(spec) if spec is not None else None
+            if len(leaves) != 1 or ti is None or not self.schema.has_field(f.target):
+                continue
+            fs = self.schema.field(f.target)
+            rank = -RISK_ORDER.get(fs.risk, 0)
+            want(rank, ti, leaves[0])
+            for c in self.profile.tables[ti].columns:
+                if c.name not in taken.get(src, set()) and compatible(fs, c.to_dict()):
+                    want(rank + 1, ti, c.name)
+        wanted.sort(key=lambda w: (w[0], w[1], w[2]))
+        reqs = [
+            {"table_index": ti, "what": "distinct", "column": col}
+            for _, ti, col in wanted[:GROUND_MAX_REQUESTS]
+        ]
+        return self.inspect(reqs) if reqs else []
+
     # ---- run ----------------------------------------------------------------------------------------
     def run(self, doc: MappingDocument) -> RunReport:
         from forma.ai import plausibility
@@ -211,9 +281,26 @@ class FileWorkbench:
                     out.append(
                         f"{cm.target}: 0 items for {rows_out} records (link or filter matches nothing)"
                     )
+            for f in res.findings:  # items that belong to no record: a total row or a wrong link column
+                if "unknown root records" in f.message and f"{f.kind}: {f.message}" not in out:
+                    out.append(f"{f.kind}: {f.message}")
             out.extend(plausibility.check(res.records, self.schema))
+            out.extend(plausibility.check_history(res.records, self.schema, self.history))
+            keep = plausibility.keep_ratio_problem(rows_in, rows_out, self.history)
+            if keep:
+                out.append(keep)
         sample = [_clip(_without_meta(rec), self.max_chars) for rec in res.records[:SAMPLE_RECORDS]]
         return RunReport(rows_in, rows_out, out[:MAX_PROBLEMS], sample)
+
+
+def _col_leaves(expr: Any) -> list[str]:
+    from forma.mapping_dsl.models import CallExpr, ColExpr
+
+    if isinstance(expr, ColExpr):
+        return [expr.name]
+    if isinstance(expr, CallExpr):
+        return [n for a in expr.args for n in _col_leaves(a)]
+    return []
 
 
 def _without_meta(rec: dict[str, Any]) -> dict[str, Any]:

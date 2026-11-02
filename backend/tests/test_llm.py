@@ -71,6 +71,9 @@ def test_parse_json_variants() -> None:
     with pytest.raises(ValueError, match="no JSON object"):
         _parse_json("[1, 2]")
     assert _parse_json('[{"a": 1}]') == {"a": 1}  # the inner object is salvaged
+    # a second object or prose after the first complete object is chatter, not a wrong answer (ADR-059)
+    assert _parse_json('{"a": 1}\n{"note": "and here is why"}') == {"a": 1}
+    assert _parse_json('{"a": {"b": 1}} Hope this helps} {') == {"a": {"b": 1}}
     with pytest.raises(ValueError):
         _parse_json('{"a": }')
 

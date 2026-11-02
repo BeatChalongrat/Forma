@@ -21,6 +21,8 @@ Long operations run as jobs: `POST …/run`, `/profile`, `/propose` and `/transf
 | `POST /rounds` · `GET /rounds` · `GET /rounds/{id}` | create / list / read a delivery (with files, mappings, datasets, review tasks, jobs) |
 | `POST /rounds/{id}/files` | upload files (multipart); sha256 store; duplicates marked |
 | `POST /review/{id}/wait` · `POST /review/{id}/resume` | park a question for the customer with a note and a date; bring it back (ADR-053) |
+| `POST /review/{id}/confirm` | a spot check of an automatic approval found nothing wrong (ADR-059) |
+| `GET /review/question-groups` · `POST /review/question-groups/answer` | the same question across several open files; one answer gives every member its own new version (ADR-059) |
 | `POST /rounds/{id}/cancel` · `POST /rounds/{id}/reopen` · `POST /rounds/{id}/move` · `POST /rounds/{id}/replace` (multipart) | close a round without deleting it, with a reason; only a cancelled round reopens; move and replace make a successor round and run it (ADR-052) |
 | `GET /rounds/{id}/files/{fid}` · `…/grid` | file facts; a bounded grid of raw cells |
 | `POST /rounds/{id}/profile` · `/propose` · `/transform` · `/run` | the stages, or the whole pipeline |

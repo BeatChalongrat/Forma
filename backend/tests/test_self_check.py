@@ -34,6 +34,10 @@ class FakeBench:
         self.ran.append(doc)
         return self.reports.pop(0)
 
+    def ground(self, doc: MappingDocument) -> list[dict[str, Any]]:
+        self.grounded = doc
+        return []
+
 
 @pytest.fixture
 def profile() -> WorkbookProfile:

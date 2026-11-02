@@ -93,6 +93,18 @@ DEFAULT_POLICY: dict[str, Any] = {
         "max_high_anomalies": 0,  # more high-severity anomalies than this → a person checks the data
         "max_error_findings": 0,  # engine errors (duplicate identities, broken joins) → a person checks
     },
+    # Confidence from evidence, not from the model's word (ADR-059): what FORMA's own matcher, the
+    # self-check and the plausibility rules say about a field bounds the confidence the model gave it.
+    "confidence": {
+        "agree_floor": 0.9,  # the matcher and the model read a field the same way: at least this sure
+        "disagree_cap": 0.7,  # they read it differently: at most this sure, and it becomes a choice
+        "unresolved_self_check_cap": 0.8,  # the self-check left problems: the mapping is at most this sure
+        "plausibility_cap": 0.75,  # a plausibility warning names the field: at most this sure
+    },
+    # Learning across customers (ADR-059): a header → field pair this many customers approved is everyone's alias.
+    "learning": {"share_after_customers": 2},
+    # Spot checks of automation (ADR-059): this share of automatic approvals gets a person's look anyway.
+    "audit": {"sample_share": 0.05},
     # The verdict layer (ADR-036): one conclusion per file, from the stored reports.
     "verdict": {
         "min_pairs": 3,  # identity-matched SKUs before data checks may carry a conclusion
@@ -176,6 +188,22 @@ def validate_policy(policy: dict[str, Any]) -> list[str]:
     for sem, risk in p["risk_overrides"].items():
         if risk not in RISK_ORDER:
             problems.append(f"risk_overrides.{sem} must be one of {list(RISK_ORDER)}")
+    for k, v in p["confidence"].items():
+        if k not in DEFAULT_POLICY["confidence"]:
+            problems.append(f"confidence.{k} is not a known setting")
+        else:
+            number(f"confidence.{k}", v, 0, 1)
+    sa = p["learning"].get("share_after_customers")
+    if isinstance(sa, bool) or not isinstance(sa, int) or sa < 1:
+        problems.append("learning.share_after_customers must be a whole number ≥ 1")
+    for k in p["learning"]:
+        if k != "share_after_customers":
+            problems.append(f"learning.{k} is not a known setting")
+    for k, v in p["audit"].items():
+        if k != "sample_share":
+            problems.append(f"audit.{k} is not a known setting")
+        else:
+            number("audit.sample_share", v, 0, 1)
     for k, v in p["verdict"].items():
         if k not in DEFAULT_POLICY["verdict"]:
             problems.append(f"verdict.{k} is not a known setting")
@@ -309,6 +337,7 @@ class PolicyEngine:
         sandbox: dict[str, Any] | None = None,
         field_checks: list[dict[str, Any]] | None = None,
         open_questions: list[Any] | None = None,
+        agreement: dict[str, Any] | None = None,
     ) -> PolicyDecision:
         d = self._decide(
             mapping,
@@ -331,6 +360,25 @@ class PolicyEngine:
                 d.reasons = []
             d.reasons.append(f"{len(open_questions)} questions still need operator confirmation")
             d.priority = max(d.priority, 50)
+        if agreement is not None:
+            # fields the matcher had mapped and the model dropped are not a confidence question: a person
+            # decides whether the file really lacks them (ADR-059)
+            d.checks["agreement"] = {k: len(v) for k, v in agreement.items()}
+            dropped = [
+                p for p in agreement.get("dropped") or [] if self.risk_of(schema, p) in ("critical", "high")
+            ]
+            if dropped and d.decision != "block":
+                if d.decision == "auto_approve":
+                    d.decision = "review"
+                    d.reasons = []
+                d.reasons.append(
+                    "the model dropped fields FORMA's matcher had mapped: " + ", ".join(dropped[:6])
+                )
+                d.priority = max(
+                    d.priority,
+                    self.policy["review"]["priority_weights"]["critical_field_low_confidence"] // 2,
+                )
+                d.checks["dropped_high_risk"] = dropped
         self._classify(
             d, findings=findings, rows_out=rows_out, drift=drift, sandbox=sandbox, field_checks=field_checks
         )

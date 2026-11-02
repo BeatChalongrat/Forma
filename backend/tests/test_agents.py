@@ -150,6 +150,10 @@ def test_mapping_agent_falls_back_to_draft(profile: WorkbookProfile, schema: Tar
     draft = _draft()
     doc, res = agents.mapping_agent(client, profile, schema, draft)
     assert doc is draft.mapping and res.attempts == 0 and res.notes[0].startswith("llm_failed")
+    # the failed agent reports what it spent, not the client's lifetime total (ADR-059)
+    assert res.usage.calls == 1 and client.total_usage.calls == 1
+    doc, res = agents.mapping_agent(client, profile, schema, draft)
+    assert res.usage.calls == 1 and client.total_usage.calls == 2 and res.usage.model == "m"
 
 
 def test_adaptation_agent(profile: WorkbookProfile, schema: TargetSchema) -> None:
