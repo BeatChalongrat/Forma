@@ -22,6 +22,6 @@
 
 สร้างใหม่: `backend/.venv/Scripts/python manual_test_files/erp/tools/build.py`
 เทียบผล: `backend/.venv/Scripts/python manual_test_files/erp/tools/score.py got.json expected.json`
-(ให้คะแนนทีละฟิลด์ จับคู่ inventory ด้วย warehouse_code, promotions ด้วย promo_code; ไม่ให้คะแนนชื่อ price_list)
+(ให้คะแนนทีละฟิลด์ จับคู่ inventory ด้วย warehouse_code, promotions ด้วย promo_code โดยไม่สนตัวพิมพ์ของรหัส; ไม่ให้คะแนนชื่อ price_list)
 
 ผลการรันจริงครั้งแรก (2 พ.ย. 2026, deepseek-flash) อยู่ใน `docs/REAL_AI_RUN_2026-11-02.md`
