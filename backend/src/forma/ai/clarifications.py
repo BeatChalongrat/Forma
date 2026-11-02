@@ -17,7 +17,9 @@ QUESTION_SCHEMA = {
             "target": {"type": "string"},
             "question": {"type": "string", "maxLength": 500},
             "why": {"type": "string", "maxLength": 1000},
-            "kind": {"type": "string", "enum": ["boolean", "number", "text", "enum"]},
+            "kind": {"type": "string", "enum": ["boolean", "number", "text", "enum", "confirm"]},
+            "action": {"type": "string", "enum": ["constant", "date_format", "value_map", "confirm"]},
+            "source_value": {"type": "string", "maxLength": 500},
             "options": {"type": "array", "items": {"type": "string"}, "maxItems": 12},
         },
         "required": ["target", "question", "why", "kind"],
@@ -45,6 +47,7 @@ def validate(questions: Any, doc: MappingDocument, schema: TargetSchema) -> list
             "number": {"integer", "number"},
             "text": {"string"},
             "enum": {"string"},
+            "confirm": types,
         }[q["kind"]]
         if not types & expected:
             errors.append(f"Clarification type for {target} must match the target schema")
@@ -52,4 +55,8 @@ def validate(questions: Any, doc: MappingDocument, schema: TargetSchema) -> list
             errors.append(f"Clarification {target} needs at least two distinct choices")
         if not q["question"].strip() or not q["why"].strip():
             errors.append(f"Clarification {target} must explain the missing business fact")
+        if q.get("action") == "date_format" and schema.field(target).fmt != "date":
+            errors.append(f"Clarification {target} is not a date field")
+        if q.get("action") == "value_map" and not q.get("source_value"):
+            errors.append(f"Clarification {target} needs the ambiguous source value")
     return errors

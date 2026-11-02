@@ -253,6 +253,8 @@ def forget_learned(
 
 
 class AnswersIn(BaseModel):
+    remember: list[str] = Field(default_factory=list, max_length=100)
+    acknowledged: list[str] = Field(default_factory=list, max_length=100)
     model_config = ConfigDict(extra="forbid")
     answers: dict[str, bool | float | str] = Field(max_length=100)
     digest: str = ""
@@ -269,7 +271,9 @@ def preview_answers(
     m = _mapping_scoped(session, p, mapping_id)
     if m.round_id is None:
         raise ValidationFailed("This mapping has no source delivery")
-    doc, remaining, digest = review_questions.answer_document(ctx, m, body.answers, p.actor)
+    doc, remaining, digest = review_questions.answer_document(
+        ctx, m, body.answers, p.actor, remember=body.remember, acknowledged=body.acknowledged
+    )
     return {
         **review_evidence.answer_impact(ctx, session, m, doc, body.answers),
         "digest": digest,
@@ -287,7 +291,16 @@ def apply_answers(
 ) -> dict[str, Any]:
     m = _mapping_scoped(session, p, mapping_id)
     return ser.mapping_version(
-        review_questions.apply_answers(ctx, session, m, body.answers, body.digest, p.actor)
+        review_questions.apply_answers(
+            ctx,
+            session,
+            m,
+            body.answers,
+            body.digest,
+            p.actor,
+            remember=body.remember,
+            acknowledged=body.acknowledged,
+        )
     )
 
 

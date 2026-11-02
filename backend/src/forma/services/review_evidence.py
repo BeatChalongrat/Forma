@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections import Counter
 from typing import Any
 
 from sqlalchemy.orm import Session
@@ -16,6 +17,86 @@ from forma.services.context import ServiceContext
 from forma.services.lineage import _expr_columns, _Sources
 
 SAMPLE_LIMIT = 50
+
+
+def validate_answer_effects(
+    ctx: ServiceContext,
+    session: Session,
+    m: MappingVersion,
+    document: dict[str, Any],
+    decisions: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """Execute the complete delivery and reject new invalid records or unrelated changes."""
+    from forma.ai.plausibility import values_at
+    from forma.core.hashing import stable_hash
+
+    r = session.get(ImportRound, m.round_id)
+    if r is None:
+        raise ValidationFailed("This mapping has no source delivery")
+    schema = ctx.registry.get_ref(m.target_schema)
+    before, old_errors = mapping.simulate(
+        ctx, MappingDocument.model_validate(m.document), schema, r.files, limit=None
+    )
+    after, errors = mapping.simulate(
+        ctx, MappingDocument.model_validate(document), schema, r.files, limit=None
+    )
+    if before is None or after is None or old_errors or errors:
+        raise ValidationFailed(
+            "Could not verify the complete delivery", details={"errors": old_errors + errors}
+        )
+    if after.stats.get("invalid_records", 0) > before.stats.get("invalid_records", 0):
+        raise ValidationFailed(
+            "These answers introduce invalid output records",
+            details={"findings": [f.to_dict() for f in after.errors]},
+        )
+    old_findings = {(f.kind, f.target, f.message) for f in before.errors}
+    introduced = [f.to_dict() for f in after.errors if (f.kind, f.target, f.message) not in old_findings]
+    if introduced:
+        raise ValidationFailed(
+            "These answers introduce new validation errors", details={"findings": introduced}
+        )
+
+    def indexed(records: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+        return {stable_hash([_get_pointer(rec, p) for p in schema.identity_keys]): rec for rec in records}
+
+    old, new = indexed(before.records), indexed(after.records)
+
+    def identity_counts(records: list[dict[str, Any]]) -> Counter[str]:
+        return Counter(stable_hash([_get_pointer(rec, p) for p in schema.identity_keys]) for rec in records)
+
+    if old.keys() != new.keys() or identity_counts(before.records) != identity_counts(after.records):
+        raise ValidationFailed(
+            "These answers change record identities or remove records; use the mapping editor"
+        )
+    targets = {q["field"]["pointer"] for q in decisions if q.get("action") != "select_rows"}
+    row_choices = [q for q in decisions if q.get("action") == "select_rows"]
+    for key, rec in old.items():
+        # Equal aggregate error counts can hide fixing one row while breaking another.
+        old_record_errors = {(e["pointer"], e["validator"]) for e in schema.validate_record(rec)}
+        new_record_errors = {(e["pointer"], e["validator"]) for e in schema.validate_record(new[key])}
+        if new_record_errors - old_record_errors:
+            raise ValidationFailed(
+                "These answers introduce an invalid field in a previously valid record",
+                details={"identity": key, "errors": sorted(new_record_errors - old_record_errors)},
+            )
+        for spec in schema.leaf_fields():
+            if spec.pointer in targets:
+                continue
+            allowed = any(
+                spec.pointer.startswith(q["collection"] + "/")
+                and all(_get_pointer(rec, p) == v for p, v in q["identity"].items())
+                for q in row_choices
+            )
+            if not allowed and list(values_at(rec, spec.pointer)) != list(values_at(new[key], spec.pointer)):
+                raise ValidationFailed(
+                    "These answers alter an unrelated field", details={"field": spec.pointer, "identity": key}
+                )
+    return {
+        "complete": True,
+        "passed": True,
+        "records_checked": len(after.records),
+        "remaining_errors": len(after.errors),
+    }
 
 
 def overview(ctx: ServiceContext, session: Session, m: MappingVersion) -> dict[str, Any]:
@@ -164,6 +245,15 @@ def answer_impact(
         raise ValidationFailed("This mapping has no source delivery")
     before = mapping.preview_mapping(ctx, session, m.round_id, m.document, limit=SAMPLE_LIMIT)
     after = mapping.preview_mapping(ctx, session, m.round_id, document, limit=SAMPLE_LIMIT)
+    from forma.services.review_questions import questions
+
+    catalogue = {q["id"]: q for q in questions(ctx, m)["questions"]}
+    try:
+        checked = validate_answer_effects(ctx, session, m, document, [catalogue[k] for k in answers])
+    except ValidationFailed as exc:
+        checked = {"complete": True, "passed": False, "error": str(exc)}
+        after["ok"] = False
+        after["errors"] = [str(exc)]
     counts, detail = sandbox.compare_records(
         ctx.registry.get_ref(m.target_schema), before.get("records", []), after.get("records", []), cap=50
     )
@@ -171,6 +261,7 @@ def answer_impact(
         "preview": after,
         "before": before.get("records", [])[:3],
         "comparison": {
+            "validation": checked,
             "counts": counts,
             "rows": detail["changed"],
             "sample_limit": SAMPLE_LIMIT,

@@ -133,9 +133,10 @@ def test_duplicates_that_disagree_are_an_error_and_identical_ones_a_warning(tmp_
 
     conflict = [HEADER, *ROWS, [*ROWS[0][:3], 999.0, "ขาย"]]
     res = _transform(_book(tmp_path / "conflict.xlsx", conflict))
-    f = next(x for x in res.findings if x.kind == "dedupe")
-    assert f.severity == "error" and "different values" in f.message and "ราคาขาย" in f.message
+    f = next(x for x in res.findings if x.kind == "dedupe" and x.severity == "error")
+    assert "conflicting values" in f.message and f.target == "/prices"
     assert f.details["conflicting"] == 1
+    assert len(res.records[0]["prices"]) == 2  # Both alternatives remain available to the reviewer.
 
 
 # ---- A1 and A5 through the API --------------------------------------------------------------------------------

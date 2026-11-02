@@ -298,7 +298,15 @@ class TransformEngine:
         # identity + dedupe
         identity_cols = mapping.record.dedupe.keys or self.schema.identity_keys
         identity_cols = [c for c in identity_cols if c in out.columns]
-        out, fnd = self._dedupe(out, identity_cols, mapping.record.dedupe.keep)
+        child_columns = {
+            name
+            for cm in mapping.collections
+            if cm.source == root_id
+            for fm in cm.fields
+            for name in _referenced_columns(fm.expr, cm.source)
+        }
+        # Child-level variation is preserved in collections; root output conflicts still matter.
+        out, fnd = self._dedupe(out, identity_cols, mapping.record.dedupe.keep, ignored=child_columns)
         findings.extend(fnd)
 
         # collections
@@ -469,7 +477,9 @@ class TransformEngine:
                 exprs.append(e.alias(t))
         return out.with_columns(exprs) if exprs else out
 
-    def _dedupe(self, out: pl.DataFrame, keys: list[str], keep: str) -> tuple[pl.DataFrame, list[Finding]]:
+    def _dedupe(
+        self, out: pl.DataFrame, keys: list[str], keep: str, *, ignored: set[str] | None = None
+    ) -> tuple[pl.DataFrame, list[Finding]]:
         if not keys:
             return out, []
         dups = (
@@ -482,7 +492,11 @@ class TransformEngine:
         if dups.height:
             sample = [",".join(str(x) for x in r[: len(keys)]) for r in dups.head(10).rows()]
             # the same row twice is noise; two rows of one identity that disagree are a decision nobody made
-            others = [c for c in out.columns if c not in keys and not c.endswith(ROW_COL)]
+            others = [
+                c
+                for c in out.columns
+                if c not in keys and c not in (ignored or set()) and not c.endswith(ROW_COL)
+            ]
             disagree = (
                 out.filter(pl.all_horizontal([pl.col(k).is_not_null() for k in keys]))
                 .group_by(keys)
@@ -576,9 +590,21 @@ class TransformEngine:
         if not dedupe_keys:
             # default: schema-declared item identity if fully mapped, else every mapped item field
             declared = [k.lstrip("/") for k in self.schema.collection_identity_keys(cm.target)]
-            dedupe_keys = declared if declared and all(k in rel_names for k in declared) else list(rel_names)
+            dedupe_keys = [k for k in declared if k in rel_names] or list(rel_names)
         before = items.height
-        items = items.unique(subset=["__link__", *dedupe_keys], keep="first", maintain_order=True)
+        # Drop exact duplicates only. Conflicting alternatives must survive for a person to resolve.
+        items = items.unique(subset=["__link__", *rel_names], keep="first", maintain_order=True)
+        conflicts = items.group_by(["__link__", *dedupe_keys]).len().filter(pl.col("len") > 1)
+        if conflicts.height:
+            findings.append(
+                Finding(
+                    "dedupe",
+                    "error",
+                    f"{cm.target}: {conflicts.height} collection identities have conflicting values",
+                    target=cm.target,
+                    details={"conflicting": conflicts.height},
+                )
+            )
         if items.height < before:
             findings.append(
                 Finding(

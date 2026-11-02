@@ -1,0 +1,607 @@
+{
+  "version": 1,
+  "created": "2026-11-02",
+  "synthetic": true,
+  "customer_exports_verified": false,
+  "cases": [
+    {
+      "id": "G01_th_split",
+      "title": "ไทย: สินค้า ราคา สต็อกแยกสามไฟล์",
+      "market": "TH",
+      "archetype": "SAP-like split export",
+      "archetype_status": "synthetic hypothesis, not a verified customer export",
+      "risk": "join ด้วย SKU; รักษาเลขศูนย์; แพ็กและจำนวนชิ้น",
+      "expected_behavior": "map_from_evidence",
+      "rules": "CTN = CARTON. Inventory is already counted in individual pieces; do not multiply stock by pack size. Join files on MATNR, never row position."
+    },
+    {
+      "id": "G02_id_decimal",
+      "title": "อินโดนีเซีย: ทศนิยมคอมมาและ CSV คั่น ;",
+      "market": "ID",
+      "archetype": "regional distributor export",
+      "archetype_status": "synthetic hypothesis, not a verified customer export",
+      "risk": "1.234,56; ภาษา Indonesia",
+      "expected_behavior": "map_from_evidence"
+    },
+    {
+      "id": "G03_my_warehouses",
+      "title": "มาเลเซีย: SKU ซ้ำเพราะหลายคลัง",
+      "market": "MY",
+      "archetype": "NetSuite-like saved search",
+      "archetype_status": "synthetic hypothesis, not a verified customer export",
+      "risk": "24 แถวต้องได้ 12 สินค้า; ไม่ทำ stock หาย",
+      "expected_behavior": "map_from_evidence"
+    },
+    {
+      "id": "G04_ph_variants",
+      "title": "ฟิลิปปินส์: รองเท้าไซซ์และสี",
+      "market": "PH",
+      "archetype": "fashion ERP / retailer export",
+      "archetype_status": "synthetic hypothesis, not a verified customer export",
+      "risk": "ห้ามรวม variant ตามชื่อหรือ parent SKU",
+      "expected_behavior": "map_from_evidence",
+      "rules": "One record per variant SKU; preserve Color and EU size as attributes.color and attributes.size strings. Parent style is not the identity."
+    },
+    {
+      "id": "G05_sg_currency",
+      "title": "สิงคโปร์: หลายสกุลเงินในไฟล์เดียว",
+      "market": "SG",
+      "archetype": "Oracle/NetSuite-like price list",
+      "archetype_status": "synthetic hypothesis, not a verified customer export",
+      "risk": "ห้ามรวมเงินหรือแปลง FX; มี target ที่สองให้ทดสอบ",
+      "expected_behavior": "map_from_evidence",
+      "rules": "Keep the currency from each row. Do not convert currencies. Dates are explicitly DD/MM/YYYY."
+    },
+    {
+      "id": "G06_fr_amount",
+      "title": "สำนักงานใหญ่ยุโรป: ราคาแบบฝรั่งเศส",
+      "market": "EU source",
+      "archetype": "regional beauty spreadsheet",
+      "archetype_status": "synthetic hypothesis, not a verified customer export",
+      "risk": "ช่องว่างและ narrow no-break space + decimal comma + €",
+      "expected_behavior": "map_from_evidence",
+      "rules": "Prix HT is net, tax excluded. French numeric convention: spaces group thousands, comma is decimal. Do not include the currency symbol in the amount."
+    },
+    {
+      "id": "G07_de_integer",
+      "title": "ยุโรป: จุดเป็นตัวคั่นหลักพัน",
+      "market": "EU source",
+      "archetype": "SAP-like regional CSV",
+      "archetype_status": "synthetic hypothesis, not a verified customer export",
+      "risk": "1.234 หมายถึง 1234 เมื่อมีหลักฐาน locale",
+      "expected_behavior": "map_from_evidence",
+      "rules": "Nettopreis uses de-DE grouping and decimal conventions. All dates are day.month.year."
+    },
+    {
+      "id": "G08_us_dates",
+      "title": "สำนักงานใหญ่ใช้วันที่แบบสหรัฐฯ",
+      "market": "US-format source, not aCommerce sales market",
+      "archetype": "regional ERP report",
+      "archetype_status": "synthetic hypothesis, not a verified customer export",
+      "risk": "03/04 ต้องเป็น March 4 ตามหัวคอลัมน์",
+      "expected_behavior": "map_from_evidence"
+    },
+    {
+      "id": "G09_jp_utf16",
+      "title": "ญี่ปุ่น: หัวตารางภาษาญี่ปุ่นและ UTF-16",
+      "market": "JP source",
+      "archetype": "supplier TSV export",
+      "archetype_status": "synthetic hypothesis, not a verified customer export",
+      "risk": "encoding; ชื่อสินค้า; รหัสยังเป็นข้อความ",
+      "expected_behavior": "map_from_evidence"
+    },
+    {
+      "id": "G10_kr_workbook",
+      "title": "เกาหลี: SKU และ barcode ที่ขึ้นต้นศูนย์",
+      "market": "KR source",
+      "archetype": "electronics supplier workbook",
+      "archetype_status": "synthetic hypothesis, not a verified customer export",
+      "risk": "ชนิดข้อความและภาษาเกาหลี",
+      "expected_behavior": "map_from_evidence"
+    },
+    {
+      "id": "G11_active_price",
+      "title": "ราคาเก่าและใหม่ในไฟล์เดียว",
+      "market": "SEA",
+      "archetype": "price history export",
+      "archetype_status": "synthetic hypothesis, not a verified customer export",
+      "risk": "ห้ามปล่อยราคาเก่าเป็น standard อีกตัว",
+      "expected_behavior": "map_from_evidence",
+      "rules": "Export active prices only. Exclude expired records; retain effective_from for the active record."
+    },
+    {
+      "id": "G12_row_tax",
+      "title": "ภาษีแตกต่างกันเป็นรายสินค้า",
+      "market": "SEA",
+      "archetype": "regional commercial spreadsheet",
+      "archetype_status": "synthetic hypothesis, not a verified customer export",
+      "risk": "ห้ามเปลี่ยน VAT ทั้งไฟล์เป็นค่าคงที่เมื่อยืนยัน",
+      "expected_behavior": "map_from_evidence",
+      "rules": "Amount is exactly as supplied, either inclusive or exclusive according to the row. Do not gross up or remove tax. Preserve each row’s flag and rate. Rates are synthetic test data, not statutory guidance."
+    },
+    {
+      "id": "G13_ask_date",
+      "title": "วันที่ไม่มีหลักฐานว่าขึ้นวันหรือเดือน",
+      "market": "Unspecified",
+      "archetype": "unknown spreadsheet",
+      "archetype_status": "synthetic hypothesis, not a verified customer export",
+      "risk": "ต้องถาม ไม่ใช้ที่ตั้งลูกค้ามาเดา",
+      "expected_behavior": "ask_before_publish"
+    },
+    {
+      "id": "G14_ask_currency",
+      "title": "สัญลักษณ์ $ ไม่ระบุรหัสสกุลเงิน",
+      "market": "Unspecified",
+      "archetype": "unknown spreadsheet",
+      "archetype_status": "synthetic hypothesis, not a verified customer export",
+      "risk": "ห้ามเดา USD/SGD/THB",
+      "expected_behavior": "ask_before_publish"
+    },
+    {
+      "id": "G15_ask_unit",
+      "title": "หน่วย BT ไม่มีคำอธิบาย",
+      "market": "Unspecified",
+      "archetype": "unknown ERP abbreviation",
+      "archetype_status": "synthetic hypothesis, not a verified customer export",
+      "risk": "BT ห้ามแปลงเป็น BAG หรือ BOTTLE เอง",
+      "expected_behavior": "ask_before_publish"
+    },
+    {
+      "id": "G16_ask_conflict",
+      "title": "SKU เดียวราคาไม่ตรงกันและไม่มีเวลา",
+      "market": "Unspecified",
+      "archetype": "unknown duplicate export",
+      "archetype_status": "synthetic hypothesis, not a verified customer export",
+      "risk": "ห้าม last-row-wins เงียบ ๆ",
+      "expected_behavior": "ask_before_publish"
+    }
+  ],
+  "rounds": [
+    {
+      "id": "G01_th_split_r1",
+      "case": "G01_th_split",
+      "round": "r1",
+      "split": "cold",
+      "family": "G01_th_split",
+      "files": [
+        {
+          "path": "inputs/G01_th_split/r1/material.xlsx",
+          "sha256": "f71ceb5aa0c7f7314fba918513d58b3349fa03ec65cf1a5d55104373948c9b00",
+          "encoding": "OOXML",
+          "delimiter": null
+        },
+        {
+          "path": "inputs/G01_th_split/r1/prices.xlsx",
+          "sha256": "b4f4218b606b53e3e274dd78ef492c89410a6ab4c8402f5579ea75ade7489522",
+          "encoding": "OOXML",
+          "delimiter": null
+        },
+        {
+          "path": "inputs/G01_th_split/r1/inventory.xlsx",
+          "sha256": "346bd8236f05f0f47b793eb65636b043fe675d8be52811204ec7f20f31cfd2b9",
+          "encoding": "OOXML",
+          "delimiter": null
+        }
+      ],
+      "task": "inputs/G01_th_split/r1/task.md",
+      "schema": "schemas/product.v1.json",
+      "expected": "oracle/G01_th_split/r1/expected.json",
+      "review": "oracle/G01_th_split/r1/review.json",
+      "expected_behavior": "map_from_evidence",
+      "drift": "new"
+    },
+    {
+      "id": "G02_id_decimal_r1",
+      "case": "G02_id_decimal",
+      "round": "r1",
+      "split": "cold",
+      "family": "G02_id_decimal",
+      "files": [
+        {
+          "path": "inputs/G02_id_decimal/r1/produk.csv",
+          "sha256": "227cbcfd08912c36198497c91ea2955d52ea04be4efd97c76d64abdc657b2d92",
+          "encoding": "utf8",
+          "delimiter": ";"
+        }
+      ],
+      "task": "inputs/G02_id_decimal/r1/task.md",
+      "schema": "schemas/product.v1.json",
+      "expected": "oracle/G02_id_decimal/r1/expected.json",
+      "review": "oracle/G02_id_decimal/r1/review.json",
+      "expected_behavior": "map_from_evidence",
+      "drift": "new"
+    },
+    {
+      "id": "G03_my_warehouses_r1",
+      "case": "G03_my_warehouses",
+      "round": "r1",
+      "split": "cold",
+      "family": "G03_my_warehouses",
+      "files": [
+        {
+          "path": "inputs/G03_my_warehouses/r1/inventory_export.csv",
+          "sha256": "c520089bee5bdcf55461ec90ec3fd00e8559c076c0b4584d1d80556b30c23c1b",
+          "encoding": "utf8",
+          "delimiter": ","
+        }
+      ],
+      "task": "inputs/G03_my_warehouses/r1/task.md",
+      "schema": "schemas/product.v1.json",
+      "expected": "oracle/G03_my_warehouses/r1/expected.json",
+      "review": "oracle/G03_my_warehouses/r1/review.json",
+      "expected_behavior": "map_from_evidence",
+      "drift": "new"
+    },
+    {
+      "id": "G04_ph_variants_r1",
+      "case": "G04_ph_variants",
+      "round": "r1",
+      "split": "cold",
+      "family": "G04_ph_variants",
+      "files": [
+        {
+          "path": "inputs/G04_ph_variants/r1/variants.xlsx",
+          "sha256": "5d70b74a1025b203aa0767f933d02be7ad7902ef7ffb3560ac627c7b642ca887",
+          "encoding": "OOXML",
+          "delimiter": null
+        }
+      ],
+      "task": "inputs/G04_ph_variants/r1/task.md",
+      "schema": "schemas/product.v1.json",
+      "expected": "oracle/G04_ph_variants/r1/expected.json",
+      "review": "oracle/G04_ph_variants/r1/review.json",
+      "expected_behavior": "map_from_evidence",
+      "drift": "new"
+    },
+    {
+      "id": "G05_sg_currency_r1",
+      "case": "G05_sg_currency",
+      "round": "r1",
+      "split": "cold",
+      "family": "G05_sg_currency",
+      "files": [
+        {
+          "path": "inputs/G05_sg_currency/r1/price_export.csv",
+          "sha256": "32ac051a0181af415222ea9664a288b5f2ed11aede9d67d7431574a31dff36da",
+          "encoding": "utf8",
+          "delimiter": ","
+        }
+      ],
+      "task": "inputs/G05_sg_currency/r1/task.md",
+      "schema": "schemas/product.v1.json",
+      "expected": "oracle/G05_sg_currency/r1/expected.json",
+      "review": "oracle/G05_sg_currency/r1/review.json",
+      "expected_behavior": "map_from_evidence",
+      "drift": "new"
+    },
+    {
+      "id": "G06_fr_amount_r1",
+      "case": "G06_fr_amount",
+      "round": "r1",
+      "split": "cold",
+      "family": "G06_fr_amount",
+      "files": [
+        {
+          "path": "inputs/G06_fr_amount/r1/tarif.xlsx",
+          "sha256": "b660d86c2d35a14c59259ab190043c8fd50a15b0e1cb3b063eda99538767eb9e",
+          "encoding": "OOXML",
+          "delimiter": null
+        }
+      ],
+      "task": "inputs/G06_fr_amount/r1/task.md",
+      "schema": "schemas/product.v1.json",
+      "expected": "oracle/G06_fr_amount/r1/expected.json",
+      "review": "oracle/G06_fr_amount/r1/review.json",
+      "expected_behavior": "map_from_evidence",
+      "drift": "new"
+    },
+    {
+      "id": "G07_de_integer_r1",
+      "case": "G07_de_integer",
+      "round": "r1",
+      "split": "cold",
+      "family": "G07_de_integer",
+      "files": [
+        {
+          "path": "inputs/G07_de_integer/r1/artikel.csv",
+          "sha256": "edda7342b9a859dbd8cabd04869797798e6cfb5c3d2a1e96f5202ff3f630e176",
+          "encoding": "utf8",
+          "delimiter": ";"
+        }
+      ],
+      "task": "inputs/G07_de_integer/r1/task.md",
+      "schema": "schemas/product.v1.json",
+      "expected": "oracle/G07_de_integer/r1/expected.json",
+      "review": "oracle/G07_de_integer/r1/review.json",
+      "expected_behavior": "map_from_evidence",
+      "drift": "new"
+    },
+    {
+      "id": "G08_us_dates_r1",
+      "case": "G08_us_dates",
+      "round": "r1",
+      "split": "cold",
+      "family": "G08_us_dates",
+      "files": [
+        {
+          "path": "inputs/G08_us_dates/r1/prices.csv",
+          "sha256": "e6c10a09dee2dd3d2ba836b553027a6cf4254967cc17e1540b4429d9fb03a8f9",
+          "encoding": "utf8",
+          "delimiter": ","
+        }
+      ],
+      "task": "inputs/G08_us_dates/r1/task.md",
+      "schema": "schemas/product.v1.json",
+      "expected": "oracle/G08_us_dates/r1/expected.json",
+      "review": "oracle/G08_us_dates/r1/review.json",
+      "expected_behavior": "map_from_evidence",
+      "drift": "new"
+    },
+    {
+      "id": "G09_jp_utf16_r1",
+      "case": "G09_jp_utf16",
+      "round": "r1",
+      "split": "cold",
+      "family": "G09_jp_utf16",
+      "files": [
+        {
+          "path": "inputs/G09_jp_utf16/r1/商品.tsv",
+          "sha256": "8708811b33d4edcbd022403af14debcd6f2452a62a426f9fb4940083a2a8e9ae",
+          "encoding": "utf16le",
+          "delimiter": "\t"
+        }
+      ],
+      "task": "inputs/G09_jp_utf16/r1/task.md",
+      "schema": "schemas/product.v1.json",
+      "expected": "oracle/G09_jp_utf16/r1/expected.json",
+      "review": "oracle/G09_jp_utf16/r1/review.json",
+      "expected_behavior": "map_from_evidence",
+      "drift": "new"
+    },
+    {
+      "id": "G10_kr_workbook_r1",
+      "case": "G10_kr_workbook",
+      "round": "r1",
+      "split": "cold",
+      "family": "G10_kr_workbook",
+      "files": [
+        {
+          "path": "inputs/G10_kr_workbook/r1/products.xlsx",
+          "sha256": "cea0a1f5edb68d1a75d2cd8fc204d45f7e1caf2e511194b8873cc862dae5c940",
+          "encoding": "OOXML",
+          "delimiter": null
+        }
+      ],
+      "task": "inputs/G10_kr_workbook/r1/task.md",
+      "schema": "schemas/product.v1.json",
+      "expected": "oracle/G10_kr_workbook/r1/expected.json",
+      "review": "oracle/G10_kr_workbook/r1/review.json",
+      "expected_behavior": "map_from_evidence",
+      "drift": "new"
+    },
+    {
+      "id": "G11_active_price_r1",
+      "case": "G11_active_price",
+      "round": "r1",
+      "split": "cold",
+      "family": "G11_active_price",
+      "files": [
+        {
+          "path": "inputs/G11_active_price/r1/history.csv",
+          "sha256": "93d2209dceccb38149f7b45fcf07ff83d7bd805b083b332c9a3e0bc1782faa32",
+          "encoding": "utf8",
+          "delimiter": ","
+        }
+      ],
+      "task": "inputs/G11_active_price/r1/task.md",
+      "schema": "schemas/product.v1.json",
+      "expected": "oracle/G11_active_price/r1/expected.json",
+      "review": "oracle/G11_active_price/r1/review.json",
+      "expected_behavior": "map_from_evidence",
+      "drift": "new"
+    },
+    {
+      "id": "G12_row_tax_r1",
+      "case": "G12_row_tax",
+      "round": "r1",
+      "split": "cold",
+      "family": "G12_row_tax",
+      "files": [
+        {
+          "path": "inputs/G12_row_tax/r1/tax_flags.csv",
+          "sha256": "ce81a94be3e6b18a8ceb06e61204f52893d7ea2cac457d4006fa3d4651117b98",
+          "encoding": "utf8",
+          "delimiter": ","
+        }
+      ],
+      "task": "inputs/G12_row_tax/r1/task.md",
+      "schema": "schemas/product.v1.json",
+      "expected": "oracle/G12_row_tax/r1/expected.json",
+      "review": "oracle/G12_row_tax/r1/review.json",
+      "expected_behavior": "map_from_evidence",
+      "drift": "new"
+    },
+    {
+      "id": "G13_ask_date_r1",
+      "case": "G13_ask_date",
+      "round": "r1",
+      "split": "cold",
+      "family": "G13_ask_date",
+      "files": [
+        {
+          "path": "inputs/G13_ask_date/r1/export.csv",
+          "sha256": "a828705dc26e826aacc2066145201105255fef1a7f9d91d60904d0b372e1b553",
+          "encoding": "utf8",
+          "delimiter": ","
+        }
+      ],
+      "task": "inputs/G13_ask_date/r1/task.md",
+      "schema": "schemas/product.v1.json",
+      "expected": "oracle/G13_ask_date/r1/expected.json",
+      "review": "oracle/G13_ask_date/r1/review.json",
+      "expected_behavior": "ask_before_publish",
+      "drift": "new"
+    },
+    {
+      "id": "G14_ask_currency_r1",
+      "case": "G14_ask_currency",
+      "round": "r1",
+      "split": "cold",
+      "family": "G14_ask_currency",
+      "files": [
+        {
+          "path": "inputs/G14_ask_currency/r1/export.csv",
+          "sha256": "bb071d48072c263f15278a8d771bf619c44ce4e4dcd516688600cc8d6cb1b24a",
+          "encoding": "utf8",
+          "delimiter": ","
+        }
+      ],
+      "task": "inputs/G14_ask_currency/r1/task.md",
+      "schema": "schemas/product.v1.json",
+      "expected": "oracle/G14_ask_currency/r1/expected.json",
+      "review": "oracle/G14_ask_currency/r1/review.json",
+      "expected_behavior": "ask_before_publish",
+      "drift": "new"
+    },
+    {
+      "id": "G15_ask_unit_r1",
+      "case": "G15_ask_unit",
+      "round": "r1",
+      "split": "cold",
+      "family": "G15_ask_unit",
+      "files": [
+        {
+          "path": "inputs/G15_ask_unit/r1/export.csv",
+          "sha256": "9a28c218e564d4f1c37e9c25051db7e413aa9380aa187f89c0e51719f4a7cffc",
+          "encoding": "utf8",
+          "delimiter": ","
+        }
+      ],
+      "task": "inputs/G15_ask_unit/r1/task.md",
+      "schema": "schemas/product.v1.json",
+      "expected": "oracle/G15_ask_unit/r1/expected.json",
+      "review": "oracle/G15_ask_unit/r1/review.json",
+      "expected_behavior": "ask_before_publish",
+      "drift": "new"
+    },
+    {
+      "id": "G16_ask_conflict_r1",
+      "case": "G16_ask_conflict",
+      "round": "r1",
+      "split": "cold",
+      "family": "G16_ask_conflict",
+      "files": [
+        {
+          "path": "inputs/G16_ask_conflict/r1/export.csv",
+          "sha256": "8748cf79f81cc3e1fcbc650cc24d4696166da2a6c94d1941cd8341068077baba",
+          "encoding": "utf8",
+          "delimiter": ","
+        }
+      ],
+      "task": "inputs/G16_ask_conflict/r1/task.md",
+      "schema": "schemas/product.v1.json",
+      "expected": "oracle/G16_ask_conflict/r1/expected.json",
+      "review": "oracle/G16_ask_conflict/r1/review.json",
+      "expected_behavior": "ask_before_publish",
+      "drift": "new"
+    },
+    {
+      "id": "G02_id_decimal_r2",
+      "case": "G02_id_decimal",
+      "round": "r2",
+      "split": "warm",
+      "family": "G02_id_decimal",
+      "files": [
+        {
+          "path": "inputs/G02_id_decimal/r2/produk.csv",
+          "sha256": "454a1cb6c942e3b9e51718ff40d0497d21f835f54b57994763580ce912bab16c",
+          "encoding": "utf8",
+          "delimiter": ";"
+        }
+      ],
+      "task": "inputs/G02_id_decimal/r2/task.md",
+      "schema": "schemas/product.v1.json",
+      "expected": "oracle/G02_id_decimal/r2/expected.json",
+      "review": "oracle/G02_id_decimal/r2/review.json",
+      "expected_behavior": "map_from_evidence",
+      "drift": "same format, changed values"
+    },
+    {
+      "id": "G02_id_decimal_r3",
+      "case": "G02_id_decimal",
+      "round": "r3",
+      "split": "warm",
+      "family": "G02_id_decimal",
+      "files": [
+        {
+          "path": "inputs/G02_id_decimal/r3/produk.csv",
+          "sha256": "02a002452945b7548bc3f48c24de819947288059b4a9f5c870d4ca36b1f498e2",
+          "encoding": "utf8",
+          "delimiter": ";"
+        }
+      ],
+      "task": "inputs/G02_id_decimal/r3/task.md",
+      "schema": "schemas/product.v1.json",
+      "expected": "oracle/G02_id_decimal/r3/expected.json",
+      "review": "oracle/G02_id_decimal/r3/review.json",
+      "expected_behavior": "map_from_evidence",
+      "drift": "same headers, decimals switch to en-US, explicit source note"
+    },
+    {
+      "id": "G03_my_warehouses_r2",
+      "case": "G03_my_warehouses",
+      "round": "r2",
+      "split": "warm",
+      "family": "G03_my_warehouses",
+      "files": [
+        {
+          "path": "inputs/G03_my_warehouses/r2/inventory_export.csv",
+          "sha256": "b87135b4f5b87bacaf7cc912bce9c052d387b6b80910e89fa0ad27f51804d255",
+          "encoding": "utf8",
+          "delimiter": ","
+        }
+      ],
+      "task": "inputs/G03_my_warehouses/r2/task.md",
+      "schema": "schemas/product.v1.json",
+      "expected": "oracle/G03_my_warehouses/r2/expected.json",
+      "review": "oracle/G03_my_warehouses/r2/review.json",
+      "expected_behavior": "map_from_evidence",
+      "drift": "same format, changed values"
+    },
+    {
+      "id": "G03_my_warehouses_r3",
+      "case": "G03_my_warehouses",
+      "round": "r3",
+      "split": "warm",
+      "family": "G03_my_warehouses",
+      "files": [
+        {
+          "path": "inputs/G03_my_warehouses/r3/inventory_export.csv",
+          "sha256": "0fe99e9068d55f334f5d7fa1467da555b755374601539e839732a4aa4d55f2b3",
+          "encoding": "utf8",
+          "delimiter": ","
+        }
+      ],
+      "task": "inputs/G03_my_warehouses/r3/task.md",
+      "schema": "schemas/product.v1.json",
+      "expected": "oracle/G03_my_warehouses/r3/expected.json",
+      "review": "oracle/G03_my_warehouses/r3/review.json",
+      "expected_behavior": "map_from_evidence",
+      "drift": "same headers, stock becomes cartons, conversion evidence provided"
+    }
+  ],
+  "alternate_contract": {
+    "case": "G05_sg_currency_r1",
+    "schema": "schemas/commercial-offer.json",
+    "task": "inputs/G05_sg_currency/r1/task-commercial-offer.md",
+    "expected": "oracle/G05_sg_currency/r1/expected-commercial-offer.json"
+  },
+  "counts": {
+    "cases": 16,
+    "rounds": 20,
+    "source_files": 22,
+    "xlsx": 6,
+    "csv_tsv": 16
+  },
+  "production_llm_run": false
+}

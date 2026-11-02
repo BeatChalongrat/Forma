@@ -1,0 +1,502 @@
+[
+  {
+    "id": "G12_row_tax_r1",
+    "score": {
+      "field_accuracy": 1.0,
+      "penalized_accuracy": 1.0,
+      "exact_record_accuracy": 1.0,
+      "correct_fields": 96,
+      "expected_fields": 96,
+      "rows_got": 12,
+      "rows_expected": 12,
+      "identity_precision": 1.0,
+      "identity_recall": 1.0,
+      "duplicate_records": 0,
+      "missing_rows": [],
+      "extra_rows": [],
+      "wrong": [],
+      "extra_values": [],
+      "phase": "before human assistance",
+      "expected_questions": []
+    },
+    "questions": 2,
+    "question_types": {
+      "confirm": 2
+    },
+    "question_fields": [
+      "/prices/*/vat_included",
+      "/prices/*/price_list"
+    ],
+    "open_questions": [
+      "Price column 'Amount as supplied': no VAT marker in headers; assumed VAT-inclusive (Thai retail convention) — confirm"
+    ],
+    "contested": 2,
+    "decision": "review",
+    "source": "ai",
+    "reused_from": null,
+    "drift": null,
+    "disagree": 2,
+    "verification_passed": true,
+    "verification_problems": [],
+    "self_check": {
+      "fix_rounds": 0,
+      "grounded": 8,
+      "python_turns": 0
+    },
+    "elapsed_seconds": 34.785683,
+    "job_seconds": 22.906299999999998,
+    "cost_usd_log": 0.045162999999999995,
+    "calls": 2,
+    "input_tokens": 28587,
+    "output_tokens": 4144,
+    "flags": []
+  },
+  {
+    "id": "G13_ask_date_r1",
+    "score": {
+      "field_accuracy": 1.0,
+      "penalized_accuracy": 1.0,
+      "exact_record_accuracy": 1.0,
+      "correct_fields": 108,
+      "expected_fields": 108,
+      "rows_got": 12,
+      "rows_expected": 12,
+      "identity_precision": 1.0,
+      "identity_recall": 1.0,
+      "duplicate_records": 0,
+      "missing_rows": [],
+      "extra_rows": [],
+      "wrong": [],
+      "extra_values": [],
+      "phase": "before clarification; gold-dependent unresolved fields are not necessarily mapper errors",
+      "expected_questions": [
+        {
+          "topic": "date_order",
+          "field": "/prices/*/effective_from",
+          "question": "03/04/2026 หมายถึง 3 เมษายน หรือ 4 มีนาคม?",
+          "answer": "DD/MM/YYYY: 3 April 2026",
+          "scope": "Effective date column, this source"
+        }
+      ]
+    },
+    "questions": 3,
+    "question_types": {
+      "enum": 1,
+      "confirm": 2
+    },
+    "question_fields": [
+      "/prices/*/effective_from",
+      "/prices/*/vat_included",
+      "/prices/*/price_list"
+    ],
+    "open_questions": [
+      "Dates in ['Effective date'] could be day-first or month-first; read as day-first: confirm",
+      "Effective date '03/04/2026' is identical on all rows and ambiguous between 3 April 2026 (DMY) and 4 March 2026 (MDY); must be confirmed before /prices/*/effective_from is trusted.",
+      "Source has no warehouse/stock, promotion, barcode, brand or category columns, so /inventory, /promotions, /barcode, /brand and /category are intentionally left empty rather than fabricated.",
+      "/status has no source column; schema default 'active' applies and was not invented as a constant.",
+      "Source dates look like '03/04/2026' — is this day-first (3 April 2026) or month-first (4 March 2026)?"
+    ],
+    "contested": 3,
+    "decision": "review",
+    "source": "ai",
+    "reused_from": null,
+    "drift": null,
+    "disagree": 2,
+    "verification_passed": true,
+    "verification_problems": [],
+    "self_check": {
+      "fix_rounds": 0,
+      "grounded": 8,
+      "python_turns": 0
+    },
+    "elapsed_seconds": 37.742785,
+    "job_seconds": 27.1148,
+    "cost_usd_log": 0.048879000000000006,
+    "calls": 2,
+    "input_tokens": 28667,
+    "output_tokens": 5053,
+    "flags": []
+  },
+  {
+    "id": "G14_ask_currency_r1",
+    "score": {
+      "field_accuracy": 0.875,
+      "penalized_accuracy": 0.875,
+      "exact_record_accuracy": 0.0,
+      "correct_fields": 84,
+      "expected_fields": 96,
+      "rows_got": 12,
+      "rows_expected": 12,
+      "identity_precision": 1.0,
+      "identity_recall": 1.0,
+      "duplicate_records": 0,
+      "missing_rows": [],
+      "extra_rows": [],
+      "wrong": [
+        {
+          "key": "'00470001'",
+          "path": "/currency",
+          "expected": "SGD",
+          "actual": "USD",
+          "missing": false
+        },
+        {
+          "key": "'00470002'",
+          "path": "/currency",
+          "expected": "SGD",
+          "actual": "USD",
+          "missing": false
+        },
+        {
+          "key": "'00470003'",
+          "path": "/currency",
+          "expected": "SGD",
+          "actual": "USD",
+          "missing": false
+        },
+        {
+          "key": "'00470004'",
+          "path": "/currency",
+          "expected": "SGD",
+          "actual": "USD",
+          "missing": false
+        },
+        {
+          "key": "'00470005'",
+          "path": "/currency",
+          "expected": "SGD",
+          "actual": "USD",
+          "missing": false
+        },
+        {
+          "key": "'00470006'",
+          "path": "/currency",
+          "expected": "SGD",
+          "actual": "USD",
+          "missing": false
+        },
+        {
+          "key": "'00470007'",
+          "path": "/currency",
+          "expected": "SGD",
+          "actual": "USD",
+          "missing": false
+        },
+        {
+          "key": "'00470008'",
+          "path": "/currency",
+          "expected": "SGD",
+          "actual": "USD",
+          "missing": false
+        },
+        {
+          "key": "'00470009'",
+          "path": "/currency",
+          "expected": "SGD",
+          "actual": "USD",
+          "missing": false
+        },
+        {
+          "key": "'00470010'",
+          "path": "/currency",
+          "expected": "SGD",
+          "actual": "USD",
+          "missing": false
+        },
+        {
+          "key": "'00470011'",
+          "path": "/currency",
+          "expected": "SGD",
+          "actual": "USD",
+          "missing": false
+        },
+        {
+          "key": "'00470012'",
+          "path": "/currency",
+          "expected": "SGD",
+          "actual": "USD",
+          "missing": false
+        }
+      ],
+      "extra_values": [],
+      "phase": "before clarification; gold-dependent unresolved fields are not necessarily mapper errors",
+      "expected_questions": [
+        {
+          "topic": "currency",
+          "field": "/currency",
+          "question": "ราคาที่แสดง $ ใช้สกุลเงินใด?",
+          "answer": "SGD",
+          "scope": "all rows in this source"
+        }
+      ]
+    },
+    "questions": 4,
+    "question_types": {
+      "text": 1,
+      "confirm": 3
+    },
+    "question_fields": [
+      "/currency",
+      "/prices/*/amount",
+      "/prices/*/vat_included",
+      "/prices/*/price_list"
+    ],
+    "open_questions": [
+      "Net price values are prefixed with '$' but the file has no currency column. The '$-prefixed amount' was provisionally mapped to USD; the ISO 4217 code must be confirmed (no FX conversion is applied).",
+      "Prices in 'Net price' are written with a '$' prefix (e.g. '$1234.56'). Which ISO 4217 currency code does '$' mean for this file?"
+    ],
+    "contested": 4,
+    "decision": "review",
+    "source": "ai",
+    "reused_from": null,
+    "drift": null,
+    "disagree": 4,
+    "verification_passed": true,
+    "verification_problems": [],
+    "self_check": {
+      "fix_rounds": 0,
+      "grounded": 7,
+      "python_turns": 0
+    },
+    "elapsed_seconds": 61.548118,
+    "job_seconds": 49.734100000000005,
+    "cost_usd_log": 0.082834,
+    "calls": 3,
+    "input_tokens": 45374,
+    "output_tokens": 9365,
+    "flags": []
+  },
+  {
+    "id": "G15_ask_unit_r1",
+    "score": {
+      "field_accuracy": 0.875,
+      "penalized_accuracy": 0.875,
+      "exact_record_accuracy": 0.0,
+      "correct_fields": 84,
+      "expected_fields": 96,
+      "rows_got": 12,
+      "rows_expected": 12,
+      "identity_precision": 1.0,
+      "identity_recall": 1.0,
+      "duplicate_records": 0,
+      "missing_rows": [],
+      "extra_rows": [],
+      "wrong": [
+        {
+          "key": "'00470001'",
+          "path": "/unit/sell_unit",
+          "expected": "BOTTLE",
+          "actual": "BT",
+          "missing": false
+        },
+        {
+          "key": "'00470002'",
+          "path": "/unit/sell_unit",
+          "expected": "BOTTLE",
+          "actual": "BT",
+          "missing": false
+        },
+        {
+          "key": "'00470003'",
+          "path": "/unit/sell_unit",
+          "expected": "BOTTLE",
+          "actual": "BT",
+          "missing": false
+        },
+        {
+          "key": "'00470004'",
+          "path": "/unit/sell_unit",
+          "expected": "BOTTLE",
+          "actual": "BT",
+          "missing": false
+        },
+        {
+          "key": "'00470005'",
+          "path": "/unit/sell_unit",
+          "expected": "BOTTLE",
+          "actual": "BT",
+          "missing": false
+        },
+        {
+          "key": "'00470006'",
+          "path": "/unit/sell_unit",
+          "expected": "BOTTLE",
+          "actual": "BT",
+          "missing": false
+        },
+        {
+          "key": "'00470007'",
+          "path": "/unit/sell_unit",
+          "expected": "BOTTLE",
+          "actual": "BT",
+          "missing": false
+        },
+        {
+          "key": "'00470008'",
+          "path": "/unit/sell_unit",
+          "expected": "BOTTLE",
+          "actual": "BT",
+          "missing": false
+        },
+        {
+          "key": "'00470009'",
+          "path": "/unit/sell_unit",
+          "expected": "BOTTLE",
+          "actual": "BT",
+          "missing": false
+        },
+        {
+          "key": "'00470010'",
+          "path": "/unit/sell_unit",
+          "expected": "BOTTLE",
+          "actual": "BT",
+          "missing": false
+        },
+        {
+          "key": "'00470011'",
+          "path": "/unit/sell_unit",
+          "expected": "BOTTLE",
+          "actual": "BT",
+          "missing": false
+        },
+        {
+          "key": "'00470012'",
+          "path": "/unit/sell_unit",
+          "expected": "BOTTLE",
+          "actual": "BT",
+          "missing": false
+        }
+      ],
+      "extra_values": [],
+      "phase": "before clarification; gold-dependent unresolved fields are not necessarily mapper errors",
+      "expected_questions": [
+        {
+          "topic": "unit_meaning",
+          "field": "/unit/sell_unit",
+          "question": "BT ในไฟล์นี้หมายถึงหน่วยใด?",
+          "answer": "BOTTLE",
+          "scope": "BT in this source only; not a global alias"
+        }
+      ]
+    },
+    "questions": 4,
+    "question_types": {
+      "text": 1,
+      "confirm": 3
+    },
+    "question_fields": [
+      "/unit/sell_unit:value:9ed0965ce03b",
+      "/sku",
+      "/prices/*/vat_included",
+      "/prices/*/price_list"
+    ],
+    "open_questions": [
+      "No source column carries pack size, effective dates, barcode, category, brand, stock or promotions; those optional pointers are left unpopulated rather than guessed.",
+      "/status is absent from the source; the schema default 'active' applies and no status value is fabricated."
+    ],
+    "contested": 4,
+    "decision": "review",
+    "source": "ai",
+    "reused_from": null,
+    "drift": null,
+    "disagree": 3,
+    "verification_passed": true,
+    "verification_problems": [],
+    "self_check": {
+      "fix_rounds": 0,
+      "grounded": 8,
+      "python_turns": 0
+    },
+    "elapsed_seconds": 70.627995,
+    "job_seconds": 57.973600000000005,
+    "cost_usd_log": 0.071006,
+    "calls": 2,
+    "input_tokens": 28378,
+    "output_tokens": 10657,
+    "flags": []
+  },
+  {
+    "id": "G16_ask_conflict_r1",
+    "score": {
+      "field_accuracy": 1.0,
+      "penalized_accuracy": 0.96,
+      "exact_record_accuracy": 0.9166666666666666,
+      "correct_fields": 96,
+      "expected_fields": 96,
+      "rows_got": 12,
+      "rows_expected": 12,
+      "identity_precision": 1.0,
+      "identity_recall": 1.0,
+      "duplicate_records": 0,
+      "missing_rows": [],
+      "extra_rows": [],
+      "wrong": [],
+      "extra_values": [
+        {
+          "key": "'00470001'",
+          "path": "/prices",
+          "value": {
+            "price_list": "standard",
+            "amount": 9999.0,
+            "vat_included": false,
+            "vat_rate": 0.05
+          },
+          "reason": "extra collection member"
+        }
+      ],
+      "phase": "before clarification; gold-dependent unresolved fields are not necessarily mapper errors",
+      "expected_questions": [
+        {
+          "topic": "duplicate_conflict",
+          "field": "/prices/*/amount",
+          "question": "SKU 00470001 ราคา 1234.56 กับ 9999 ควรใช้รายการใด?",
+          "answer": "Keep 1234.56; the 9999 record is an erroneous duplicate.",
+          "scope": "SKU 00470001, this file"
+        }
+      ]
+    },
+    "questions": 4,
+    "question_types": {
+      "enum": 1,
+      "confirm": 3
+    },
+    "question_fields": [
+      "row:65558e814162c4be8cc135f4",
+      "/prices/*/vat_included",
+      "/prices/*/amount",
+      "/prices/*/price_list"
+    ],
+    "open_questions": [
+      "SKU 00470001 ('SIM neutral 1') occurs twice: source row 2 with Net price 1234.56 and source row 14 with Net price 9999. Both share Price list 'standard' and the file has no effective_from/effective_to, so the two rows collide on the /prices identity key (price_list, effective_from=null). Should 9999 replace 1234.56, be a separate price entry, or be dropped?",
+      "Tax rate '5%' is stored as vat_rate 0.05 on the basis of the 'Tax included = No' flag; if 5% is not the applicable VAT rate for these prices the value must be corrected at source.",
+      "SKU 00470001 appears twice with different Net price values (1234.56 in row 2 and 9999 in row 14) and no effective_from/effective_to to separate them. Which amount is the valid standard price for this SKU?",
+      "ข้อมูลของ {'/sku': '00470001'} ขัดแย้งกัน เลือกแถวต้นทางที่ถูกต้อง"
+    ],
+    "contested": 4,
+    "decision": "review",
+    "source": "ai",
+    "reused_from": null,
+    "drift": null,
+    "disagree": 2,
+    "verification_passed": false,
+    "verification_problems": [
+      "/prices: 1 collection identities have conflicting values",
+      "dedupe: /prices: 1 collection identities have conflicting values"
+    ],
+    "self_check": {
+      "fix_rounds": 2,
+      "grounded": 8,
+      "python_turns": 0
+    },
+    "elapsed_seconds": 194.090325,
+    "job_seconds": 182.6568,
+    "cost_usd_log": 0.30704200000000004,
+    "calls": 8,
+    "input_tokens": 166510,
+    "output_tokens": 35133,
+    "flags": [
+      "extra collection items",
+      "verification false"
+    ]
+  }
+]

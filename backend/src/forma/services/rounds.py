@@ -99,11 +99,19 @@ def get_customer(session: Session, customer_id: str) -> Customer:
 # Rounds & files
 # --------------------------------------------------------------------------------------------
 def create_round(
-    session: Session, customer_id: str, label: str | None = None, target_schema: str = "product"
+    session: Session,
+    customer_id: str,
+    label: str | None = None,
+    target_schema: str = "product",
+    *,
+    instructions: str | None = None,
 ) -> ImportRound:
     get_customer(session, customer_id)
     r = ImportRound(
-        customer_id=customer_id, label=label or dt.date.today().isoformat(), target_schema=target_schema
+        customer_id=customer_id,
+        label=label or dt.date.today().isoformat(),
+        target_schema=target_schema,
+        notes=instructions,
     )
     session.add(r)
     session.flush()

@@ -338,7 +338,7 @@ UNIT_SYNONYMS: dict[str, str] = {
     "ki": "BOX",  # Kiste
     "fl": "BOTTLE",  # Flasche
     "do": "CAN",  # Dose
-    "bt": "BAG",  # Beutel
+    # BT is ambiguous; resolve in customer/source-scoped decisions.
 }
 _PACK_RE_LIST = [
     re.compile(r"(\d+)\s*[xX×*]\s*(\d+)"),  # 1x12, 12x1

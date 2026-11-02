@@ -63,6 +63,52 @@ def test_claim_is_atomic(client: TestClient, isolated_env: Path) -> None:
     assert runner.job_status(job_id)["attempts"] == 1
 
 
+def test_arq_retry_uses_new_generation_without_duplicate_current_job(client, monkeypatch):
+    import asyncio
+    from unittest.mock import AsyncMock
+
+    import arq
+
+    from forma.db.models import Job
+    from forma.db.session import session_scope
+    from forma.jobs.runner import ArqBackend
+
+    pool = AsyncMock()
+    monkeypatch.setattr(arq, "create_pool", AsyncMock(return_value=pool))
+    with session_scope() as s:
+        s.add(Job(id="job_generation_test", kind="profile_round", payload={}, attempts=0, status="queued"))
+    backend = ArqBackend("redis://localhost:6379/0")
+    asyncio.run(backend._enqueue("job_generation_test"))
+    asyncio.run(backend._enqueue("job_generation_test"))
+    with session_scope() as s:
+        s.get(Job, "job_generation_test").attempts = 1
+    asyncio.run(backend._enqueue("job_generation_test"))
+    assert [c.kwargs["_job_id"] for c in pool.enqueue_job.call_args_list] == [
+        "job_generation_test:0",
+        "job_generation_test:0",
+        "job_generation_test:1",
+    ]
+    assert all(c.args == ("arq_run_job", "job_generation_test") for c in pool.enqueue_job.call_args_list)
+
+
+def test_worker_refreshes_configuration_before_handler(client, isolated_env, monkeypatch):
+    from forma.jobs import runner
+    from forma.services.context import ServiceContext
+
+    seen = []
+    original = ServiceContext.refresh
+
+    def refresh(self):
+        seen.append(True)
+        original(self)
+
+    monkeypatch.setattr(ServiceContext, "refresh", refresh)
+    rid = _round_with_file(client, isolated_env, "NEWSCHEMA")
+    jid = runner.enqueue("profile_round", {"round_id": rid}, round_id=rid, sync=True)
+    assert runner.job_status(jid)["status"] == "done"
+    assert seen
+
+
 def test_stale_running_job_is_requeued_then_given_up(client: TestClient, isolated_env: Path) -> None:
     from forma.db.models import ImportRound, Job
     from forma.db.session import session_scope

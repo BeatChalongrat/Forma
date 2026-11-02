@@ -1,0 +1,23 @@
+{
+  "expected_behavior": "ask_before_publish",
+  "questions": [
+    {
+      "topic": "duplicate_conflict",
+      "field": "/prices/*/amount",
+      "question": "SKU 00470001 ราคา 1234.56 กับ 9999 ควรใช้รายการใด?",
+      "answer": "Keep 1234.56; the 9999 record is an erroneous duplicate.",
+      "scope": "SKU 00470001, this file"
+    }
+  ],
+  "expected_rows": 12,
+  "drift": "new",
+  "phase": "expected.json is post-clarification only",
+  "critical_checks": [
+    "SKU identity",
+    "price amount and collection multiplicity",
+    "currency",
+    "row-specific tax",
+    "unit and pack basis",
+    "date meaning"
+  ]
+}

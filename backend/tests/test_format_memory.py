@@ -35,9 +35,18 @@ def customer(c: TestClient, code: str = "MEM") -> str:
 
 
 def run(
-    c: TestClient, cid: str, path: Path, target: str = "product@1", *, use_llm: bool = False
+    c: TestClient,
+    cid: str,
+    path: Path,
+    target: str = "product@1",
+    *,
+    use_llm: bool = False,
+    instructions: str | None = None,
 ) -> dict[str, Any]:
-    r = c.post("/api/rounds", json={"customer_id": cid, "target_schema": target}).json()
+    r = c.post(
+        "/api/rounds", json={"customer_id": cid, "target_schema": target, "instructions": instructions}
+    ).json()
+    assert r["notes"] == instructions
     _upload(c, r["id"], path, name=path.name)
     response = c.post(f"/api/rounds/{r['id']}/run", json={"sync": True, "use_llm": use_llm})
     assert response.status_code == 200, response.text
@@ -50,6 +59,19 @@ def run(
 def approve(c: TestClient, m: dict[str, Any]) -> None:
     result = c.post(f"/api/mappings/{m['id']}/approve", json={})
     assert result.status_code == 200, result.text
+
+
+def test_changed_requirements_do_not_reuse_identical_headers(client: TestClient, isolated_env: Path) -> None:
+    cid = customer(client, "CONTEXT")
+    path = make_workbook(isolated_env / "context.xlsx")
+    first = run(client, cid, path, instructions="Stock is in pieces")
+    approve(client, first)
+    same = run(client, cid, path, instructions="Stock is in pieces")
+    assert same["policy"]["source"] == "memory"
+    changed = run(client, cid, path, instructions="Stock is now cartons of 12")
+    assert changed["policy"]["source"] != "memory"
+    entry = next(e for e in changed["agent_log"] if e["agent"] == "operator_requirements")
+    assert entry["changed_since_approved"] is True
 
 
 def test_a_b_a_reuses_history_and_new_values_without_ai(

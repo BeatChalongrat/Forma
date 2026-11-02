@@ -277,7 +277,9 @@ def create_round(
     ensure_customer(p, body.customer_id)
     c = rs.get_customer(session, body.customer_id)
     ref = cfg.resolve_target_schema(session, ctx.registry, body.target_schema, c.default_target_schema)
-    return ser.import_round(rs.create_round(session, body.customer_id, body.label, ref))
+    return ser.import_round(
+        rs.create_round(session, body.customer_id, body.label, ref, instructions=body.instructions)
+    )
 
 
 @api.get("/rounds/{round_id}")

@@ -1,0 +1,1668 @@
+[
+  {
+    "id": "G01_th_split_r1",
+    "score": {
+      "field_accuracy": 1.0,
+      "penalized_accuracy": 1.0,
+      "exact_record_accuracy": 1.0,
+      "correct_fields": 168,
+      "expected_fields": 168,
+      "rows_got": 12,
+      "rows_expected": 12,
+      "identity_precision": 1.0,
+      "identity_recall": 1.0,
+      "duplicate_records": 0,
+      "missing_rows": [],
+      "extra_rows": [],
+      "wrong": [],
+      "extra_values": [],
+      "phase": "before human assistance",
+      "expected_questions": []
+    },
+    "questions": 10,
+    "question_types": {
+      "choice": 5,
+      "confirm": 5
+    },
+    "question_fields": [
+      "/prices/*/amount",
+      "/prices/*/vat_included",
+      "/prices/*/price_list",
+      "/inventory/*/warehouse_code",
+      "/inventory/*/qty",
+      "/sku",
+      "/currency",
+      "/product_name",
+      "/unit/sell_unit",
+      "/unit/pack_size"
+    ],
+    "open_questions": [
+      "Sheet 'Legend' has a currency column 'Code' (CTN, Stock basis), but records are labelled THB: confirm",
+      "Prices sheet has no effective_from / effective_to columns, so no price validity window is published — confirm whether the standard prices are open-ended or have dates held elsewhere.",
+      "No status column exists in any sheet; /status is left unmapped so the schema default 'active' applies rather than a fabricated value. Confirm that all 12 materials are active.",
+      "No category, brand, description, reserved-stock or promotion columns exist in these exports; those targets are intentionally unmapped rather than guessed.",
+      "Prices carry VAT included = No together with Tax rate 5% (a fixture value); confirm the 5% rate should be published as /prices/*/vat_rate = 0.05 even though the amounts are VAT-exclusive and are not grossed up."
+    ],
+    "contested": 10,
+    "decision": "review",
+    "source": "ai",
+    "reused_from": null,
+    "drift": null,
+    "disagree": 11,
+    "verification_passed": true,
+    "verification_problems": [],
+    "self_check": {
+      "fix_rounds": 0,
+      "grounded": 8,
+      "python_turns": 0
+    },
+    "elapsed_seconds": 103.937741,
+    "job_seconds": 98.4766,
+    "cost_usd_log": 0.145891,
+    "calls": 4,
+    "input_tokens": 74727,
+    "output_tokens": 17791,
+    "flags": [
+      "disagree >= 8",
+      "cards > 8"
+    ]
+  },
+  {
+    "id": "G02_id_decimal_r1",
+    "score": {
+      "field_accuracy": 1.0,
+      "penalized_accuracy": 1.0,
+      "exact_record_accuracy": 1.0,
+      "correct_fields": 96,
+      "expected_fields": 96,
+      "rows_got": 12,
+      "rows_expected": 12,
+      "identity_precision": 1.0,
+      "identity_recall": 1.0,
+      "duplicate_records": 0,
+      "missing_rows": [],
+      "extra_rows": [],
+      "wrong": [],
+      "extra_values": [],
+      "phase": "before human assistance",
+      "expected_questions": []
+    },
+    "questions": 2,
+    "question_types": {
+      "confirm": 2
+    },
+    "question_fields": [
+      "/sku",
+      "/currency"
+    ],
+    "open_questions": [
+      "No SKU-like header found in root table; using 'Kode barang' as identity — confirm",
+      "No source column carries product status; /status is left unmapped so the schema default 'active' applies only if the downstream system applies defaults. Confirm whether status should be omitted or set explicitly.",
+      "No effective_from/effective_to dates are present; confirm the single 'standard' price has no validity window.",
+      "No pack-size field exists; /unit/pack_size is set to null. Confirm null is preferred over a default pack size.",
+      "No inventory or promotion columns exist in produk.csv; confirm no /inventory or /promotions entries should be emitted."
+    ],
+    "contested": 2,
+    "decision": "review",
+    "source": "ai",
+    "reused_from": null,
+    "drift": null,
+    "disagree": 2,
+    "verification_passed": true,
+    "verification_problems": [],
+    "self_check": {
+      "fix_rounds": 0,
+      "grounded": 8,
+      "python_turns": 0
+    },
+    "elapsed_seconds": 685.636495,
+    "job_seconds": 99.85199999999999,
+    "cost_usd_log": 0.105062,
+    "calls": 2,
+    "input_tokens": 26450,
+    "output_tokens": 19653,
+    "flags": [
+      "initial profile failed, recovered"
+    ]
+  },
+  {
+    "id": "G02_id_decimal_r2",
+    "score": {
+      "field_accuracy": 1.0,
+      "penalized_accuracy": 1.0,
+      "exact_record_accuracy": 1.0,
+      "correct_fields": 96,
+      "expected_fields": 96,
+      "rows_got": 12,
+      "rows_expected": 12,
+      "identity_precision": 1.0,
+      "identity_recall": 1.0,
+      "duplicate_records": 0,
+      "missing_rows": [],
+      "extra_rows": [],
+      "wrong": [],
+      "extra_values": [],
+      "phase": "before human assistance",
+      "expected_questions": []
+    },
+    "questions": 0,
+    "question_types": {},
+    "question_fields": [],
+    "open_questions": [],
+    "contested": 0,
+    "decision": "auto_approve",
+    "source": "memory",
+    "reused_from": "map_01M6EJZBJRC843HFJZMEZYMPAC",
+    "drift": "identical",
+    "disagree": 0,
+    "verification_passed": true,
+    "verification_problems": [],
+    "self_check": {
+      "fix_rounds": null,
+      "grounded": null,
+      "python_turns": null
+    },
+    "elapsed_seconds": 12.733344,
+    "job_seconds": 0.32389999999999997,
+    "cost_usd_log": 0,
+    "calls": 0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "flags": []
+  },
+  {
+    "id": "G02_id_decimal_r3",
+    "score": {
+      "field_accuracy": 1.0,
+      "penalized_accuracy": 1.0,
+      "exact_record_accuracy": 1.0,
+      "correct_fields": 96,
+      "expected_fields": 96,
+      "rows_got": 12,
+      "rows_expected": 12,
+      "identity_precision": 1.0,
+      "identity_recall": 1.0,
+      "duplicate_records": 0,
+      "missing_rows": [],
+      "extra_rows": [],
+      "wrong": [],
+      "extra_values": [],
+      "phase": "before human assistance",
+      "expected_questions": []
+    },
+    "questions": 0,
+    "question_types": {},
+    "question_fields": [],
+    "open_questions": [
+      "No SKU-like header found in root table; using 'Kode barang' as identity — confirm"
+    ],
+    "contested": 0,
+    "decision": "review",
+    "source": "ai_adaptation",
+    "reused_from": null,
+    "drift": "identical",
+    "disagree": 2,
+    "verification_passed": true,
+    "verification_problems": [],
+    "self_check": {
+      "fix_rounds": 0,
+      "grounded": 8,
+      "python_turns": 0
+    },
+    "elapsed_seconds": 24.849831,
+    "job_seconds": 14.6399,
+    "cost_usd_log": 0.029684,
+    "calls": 1,
+    "input_tokens": 17228,
+    "output_tokens": 3114,
+    "flags": []
+  },
+  {
+    "id": "G03_my_warehouses_r1",
+    "score": {
+      "field_accuracy": 1.0,
+      "penalized_accuracy": 1.0,
+      "exact_record_accuracy": 1.0,
+      "correct_fields": 144,
+      "expected_fields": 144,
+      "rows_got": 12,
+      "rows_expected": 12,
+      "identity_precision": 1.0,
+      "identity_recall": 1.0,
+      "duplicate_records": 0,
+      "missing_rows": [],
+      "extra_rows": [],
+      "wrong": [],
+      "extra_values": [],
+      "phase": "before human assistance",
+      "expected_questions": []
+    },
+    "questions": 2,
+    "question_types": {
+      "confirm": 2
+    },
+    "question_fields": [
+      "/prices/*/vat_included",
+      "/prices/*/price_list"
+    ],
+    "open_questions": [
+      "No status/active flag, barcode, brand, category path or description column exists in inventory_export.csv; those pointers are intentionally left unmapped rather than defaulted or invented.",
+      "No effective_from / effective_to dates exist in the file; both price-validity pointers remain unmapped (nullable).",
+      "/promotions has no source evidence in this file, so no promotions collection is produced.",
+      "Confirm that 'Tax included = No' should be published as vat_included=false with the file-stated 5% vat_rate (fixture value, not a statutory-rate claim)."
+    ],
+    "contested": 2,
+    "decision": "review",
+    "source": "ai",
+    "reused_from": null,
+    "drift": null,
+    "disagree": 2,
+    "verification_passed": false,
+    "verification_problems": [
+      "12 duplicate identities on ['/sku'] (12 of them with different values in Location, Available; keep=first)",
+      "dedupe: 12 duplicate identities on ['/sku'] (12 of them with different values in Location, Available; keep=first)"
+    ],
+    "self_check": {
+      "fix_rounds": 2,
+      "grounded": 8,
+      "python_turns": 0
+    },
+    "elapsed_seconds": 100.107746,
+    "job_seconds": 95.23370000000001,
+    "cost_usd_log": 0.188232,
+    "calls": 6,
+    "input_tokens": 115288,
+    "output_tokens": 18236,
+    "flags": [
+      "verification false"
+    ]
+  },
+  {
+    "id": "G03_my_warehouses_r2",
+    "score": {
+      "field_accuracy": 1.0,
+      "penalized_accuracy": 1.0,
+      "exact_record_accuracy": 1.0,
+      "correct_fields": 144,
+      "expected_fields": 144,
+      "rows_got": 12,
+      "rows_expected": 12,
+      "identity_precision": 1.0,
+      "identity_recall": 1.0,
+      "duplicate_records": 0,
+      "missing_rows": [],
+      "extra_rows": [],
+      "wrong": [],
+      "extra_values": [],
+      "phase": "before human assistance",
+      "expected_questions": []
+    },
+    "questions": 0,
+    "question_types": {},
+    "question_fields": [],
+    "open_questions": [],
+    "contested": 0,
+    "decision": "review",
+    "source": "memory",
+    "reused_from": "map_01M6EJX68X73YSV7JQQ1X6JQH2",
+    "drift": "identical",
+    "disagree": 0,
+    "verification_passed": false,
+    "verification_problems": [
+      "12 duplicate identities on ['/sku'] (12 of them with different values in Location, Available; keep=first)"
+    ],
+    "self_check": {
+      "fix_rounds": null,
+      "grounded": null,
+      "python_turns": null
+    },
+    "elapsed_seconds": 7.844437,
+    "job_seconds": 0.4622,
+    "cost_usd_log": 0,
+    "calls": 0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "flags": [
+      "verification false"
+    ]
+  },
+  {
+    "id": "G03_my_warehouses_r3",
+    "score": {
+      "field_accuracy": 1.0,
+      "penalized_accuracy": 0.9230769230769231,
+      "exact_record_accuracy": 0.0,
+      "correct_fields": 144,
+      "expected_fields": 144,
+      "rows_got": 12,
+      "rows_expected": 12,
+      "identity_precision": 1.0,
+      "identity_recall": 1.0,
+      "duplicate_records": 0,
+      "missing_rows": [],
+      "extra_rows": [],
+      "wrong": [],
+      "extra_values": [
+        {
+          "key": "'00470001'",
+          "path": "/unit/pack_size",
+          "value": 12,
+          "reason": "unasserted output fact"
+        },
+        {
+          "key": "'00470002'",
+          "path": "/unit/pack_size",
+          "value": 12,
+          "reason": "unasserted output fact"
+        },
+        {
+          "key": "'00470003'",
+          "path": "/unit/pack_size",
+          "value": 12,
+          "reason": "unasserted output fact"
+        },
+        {
+          "key": "'00470004'",
+          "path": "/unit/pack_size",
+          "value": 12,
+          "reason": "unasserted output fact"
+        },
+        {
+          "key": "'00470005'",
+          "path": "/unit/pack_size",
+          "value": 12,
+          "reason": "unasserted output fact"
+        },
+        {
+          "key": "'00470006'",
+          "path": "/unit/pack_size",
+          "value": 12,
+          "reason": "unasserted output fact"
+        },
+        {
+          "key": "'00470007'",
+          "path": "/unit/pack_size",
+          "value": 12,
+          "reason": "unasserted output fact"
+        },
+        {
+          "key": "'00470008'",
+          "path": "/unit/pack_size",
+          "value": 12,
+          "reason": "unasserted output fact"
+        },
+        {
+          "key": "'00470009'",
+          "path": "/unit/pack_size",
+          "value": 12,
+          "reason": "unasserted output fact"
+        },
+        {
+          "key": "'00470010'",
+          "path": "/unit/pack_size",
+          "value": 12,
+          "reason": "unasserted output fact"
+        },
+        {
+          "key": "'00470011'",
+          "path": "/unit/pack_size",
+          "value": 12,
+          "reason": "unasserted output fact"
+        },
+        {
+          "key": "'00470012'",
+          "path": "/unit/pack_size",
+          "value": 12,
+          "reason": "unasserted output fact"
+        }
+      ],
+      "phase": "before human assistance",
+      "expected_questions": []
+    },
+    "questions": 0,
+    "question_types": {},
+    "question_fields": [],
+    "open_questions": [],
+    "contested": 0,
+    "decision": "review",
+    "source": "ai_adaptation",
+    "reused_from": null,
+    "drift": "identical",
+    "disagree": 2,
+    "verification_passed": false,
+    "verification_problems": [
+      "12 duplicate identities on ['/sku'] (12 of them with different values in Location; keep=first)",
+      "dedupe: 12 duplicate identities on ['/sku'] (12 of them with different values in Location; keep=first)"
+    ],
+    "self_check": {
+      "fix_rounds": 2,
+      "grounded": 8,
+      "python_turns": 0
+    },
+    "elapsed_seconds": 144.724705,
+    "job_seconds": 126.77749999999999,
+    "cost_usd_log": 0.130815,
+    "calls": 3,
+    "input_tokens": 65711,
+    "output_tokens": 16276,
+    "flags": [
+      "verification false"
+    ]
+  },
+  {
+    "id": "G04_ph_variants_r1",
+    "score": {
+      "field_accuracy": 1.0,
+      "penalized_accuracy": 0.9090909090909091,
+      "exact_record_accuracy": 0.0,
+      "correct_fields": 120,
+      "expected_fields": 120,
+      "rows_got": 12,
+      "rows_expected": 12,
+      "identity_precision": 1.0,
+      "identity_recall": 1.0,
+      "duplicate_records": 0,
+      "missing_rows": [],
+      "extra_rows": [],
+      "wrong": [],
+      "extra_values": [
+        {
+          "key": "'STYLE-1-BLK-40'",
+          "path": "/attributes/parent_style",
+          "value": "STYLE-1",
+          "reason": "unasserted output fact"
+        },
+        {
+          "key": "'STYLE-1-BLK-41'",
+          "path": "/attributes/parent_style",
+          "value": "STYLE-1",
+          "reason": "unasserted output fact"
+        },
+        {
+          "key": "'STYLE-1-WHT-40'",
+          "path": "/attributes/parent_style",
+          "value": "STYLE-1",
+          "reason": "unasserted output fact"
+        },
+        {
+          "key": "'STYLE-1-WHT-41'",
+          "path": "/attributes/parent_style",
+          "value": "STYLE-1",
+          "reason": "unasserted output fact"
+        },
+        {
+          "key": "'STYLE-2-BLK-40'",
+          "path": "/attributes/parent_style",
+          "value": "STYLE-2",
+          "reason": "unasserted output fact"
+        },
+        {
+          "key": "'STYLE-2-BLK-41'",
+          "path": "/attributes/parent_style",
+          "value": "STYLE-2",
+          "reason": "unasserted output fact"
+        },
+        {
+          "key": "'STYLE-2-WHT-40'",
+          "path": "/attributes/parent_style",
+          "value": "STYLE-2",
+          "reason": "unasserted output fact"
+        },
+        {
+          "key": "'STYLE-2-WHT-41'",
+          "path": "/attributes/parent_style",
+          "value": "STYLE-2",
+          "reason": "unasserted output fact"
+        },
+        {
+          "key": "'STYLE-3-BLK-40'",
+          "path": "/attributes/parent_style",
+          "value": "STYLE-3",
+          "reason": "unasserted output fact"
+        },
+        {
+          "key": "'STYLE-3-BLK-41'",
+          "path": "/attributes/parent_style",
+          "value": "STYLE-3",
+          "reason": "unasserted output fact"
+        },
+        {
+          "key": "'STYLE-3-WHT-40'",
+          "path": "/attributes/parent_style",
+          "value": "STYLE-3",
+          "reason": "unasserted output fact"
+        },
+        {
+          "key": "'STYLE-3-WHT-41'",
+          "path": "/attributes/parent_style",
+          "value": "STYLE-3",
+          "reason": "unasserted output fact"
+        }
+      ],
+      "phase": "before human assistance",
+      "expected_questions": []
+    },
+    "questions": 7,
+    "question_types": {
+      "choice": 7
+    },
+    "question_fields": [
+      "/sku",
+      "/currency",
+      "/prices/*/amount",
+      "/prices/*/vat_included",
+      "/product_name",
+      "/unit/sell_unit",
+      "/prices/*/price_list"
+    ],
+    "open_questions": [
+      "/attributes keys: the target catalogue exposes only the /attributes container, so Color, EU size and Parent style cannot be addressed as explicit nested pointers. They are kept by renaming the source columns to color, size and parent_style and letting attributes_passthrough write them under /attributes. Confirm the resulting keys (color, size, parent_style) are the ones downstream expects.",
+      "'EU size' is an integer in the source, so the passthrough attribute /attributes.size will be a number (40, 41), not the string the operator note mentions. Confirm whether a numeric value is acceptable or the attribute must be stringified.",
+      "No status, barcode, brand, category or description column exists in this file; those optional fields are omitted rather than filled with invented values (the schema default 'active' for /status applies only if the consumer applies it)."
+    ],
+    "contested": 7,
+    "decision": "review",
+    "source": "ai",
+    "reused_from": null,
+    "drift": null,
+    "disagree": 7,
+    "verification_passed": true,
+    "verification_problems": [],
+    "self_check": {
+      "fix_rounds": 0,
+      "grounded": 8,
+      "python_turns": 0
+    },
+    "elapsed_seconds": 684.76165,
+    "job_seconds": 99.4215,
+    "cost_usd_log": 0.154222,
+    "calls": 5,
+    "input_tokens": 76134,
+    "output_tokens": 19522,
+    "flags": [
+      "initial profile failed, recovered"
+    ]
+  },
+  {
+    "id": "G05_sg_currency_alt",
+    "score": {
+      "field_accuracy": 1.0,
+      "penalized_accuracy": 1.0,
+      "exact_record_accuracy": 1.0,
+      "correct_fields": 72,
+      "expected_fields": 72,
+      "rows_got": 12,
+      "rows_expected": 12,
+      "identity_precision": 1.0,
+      "identity_recall": 1.0,
+      "duplicate_records": 0,
+      "missing_rows": [],
+      "extra_rows": [],
+      "wrong": [],
+      "extra_values": [],
+      "phase": "before human assistance",
+      "expected_questions": []
+    },
+    "questions": 0,
+    "question_types": {},
+    "question_fields": [],
+    "open_questions": [
+      "Dates in ['Valid from (DD/MM/YYYY)'] could be day-first or month-first; read as day-first: confirm",
+      "No SKU-like header found in root table; using 'SKU' as identity — confirm",
+      "'Sales unit' (constant 'PCS') and 'Price list' (constant 'standard') are supplied in the file but the alternate commercial-offer contract (additionalProperties=false) has no property for a unit of measure or a price-list name; they are retained as source evidence only and are not emitted. Confirm this is intended, or supply an extended contract if the unit/price list must be published.",
+      "The profiler typed the SKU column as integer while raw distinct values are zero-padded text ('00470001'). Emitted as text; confirm the extraction layer reads SKU as text so leading zeros cannot be lost upstream."
+    ],
+    "contested": 0,
+    "decision": "review",
+    "source": "ai",
+    "reused_from": null,
+    "drift": null,
+    "disagree": 0,
+    "verification_passed": true,
+    "verification_problems": [],
+    "self_check": {
+      "fix_rounds": 0,
+      "grounded": 8,
+      "python_turns": 0
+    },
+    "elapsed_seconds": null,
+    "job_seconds": 27.5661,
+    "cost_usd_log": 0.036472000000000004,
+    "calls": 2,
+    "input_tokens": 16272,
+    "output_tokens": 5050,
+    "flags": []
+  },
+  {
+    "id": "G05_sg_currency_r1",
+    "score": {
+      "field_accuracy": 1.0,
+      "penalized_accuracy": 1.0,
+      "exact_record_accuracy": 1.0,
+      "correct_fields": 108,
+      "expected_fields": 108,
+      "rows_got": 12,
+      "rows_expected": 12,
+      "identity_precision": 1.0,
+      "identity_recall": 1.0,
+      "duplicate_records": 0,
+      "missing_rows": [],
+      "extra_rows": [],
+      "wrong": [],
+      "extra_values": [],
+      "phase": "before human assistance",
+      "expected_questions": []
+    },
+    "questions": 3,
+    "question_types": {
+      "confirm": 3
+    },
+    "question_fields": [
+      "/sku",
+      "/prices/*/vat_included",
+      "/prices/*/price_list"
+    ],
+    "open_questions": [
+      "Dates in ['Valid from (DD/MM/YYYY)'] could be day-first or month-first; read as day-first: confirm",
+      "/prices/*/amount is mapped from 'Net price' (the only amount column, with Tax included = 'No'). Please confirm that 'Net price' is the customer-facing selling price for the 'standard' list rather than an internal net/cost figure.",
+      "No pack size is stated anywhere in price_export.csv, so /unit/pack_size is left null; confirm that PCS is sold as single pieces."
+    ],
+    "contested": 3,
+    "decision": "review",
+    "source": "ai",
+    "reused_from": null,
+    "drift": null,
+    "disagree": 3,
+    "verification_passed": true,
+    "verification_problems": [],
+    "self_check": {
+      "fix_rounds": 0,
+      "grounded": 8,
+      "python_turns": 0
+    },
+    "elapsed_seconds": 49.196572,
+    "job_seconds": 43.5191,
+    "cost_usd_log": 0.059141,
+    "calls": 2,
+    "input_tokens": 27209,
+    "output_tokens": 7983,
+    "flags": []
+  },
+  {
+    "id": "G06_fr_amount_r1",
+    "score": {
+      "field_accuracy": 1.0,
+      "penalized_accuracy": 1.0,
+      "exact_record_accuracy": 1.0,
+      "correct_fields": 96,
+      "expected_fields": 96,
+      "rows_got": 12,
+      "rows_expected": 12,
+      "identity_precision": 1.0,
+      "identity_recall": 1.0,
+      "duplicate_records": 0,
+      "missing_rows": [],
+      "extra_rows": [],
+      "wrong": [],
+      "extra_values": [],
+      "phase": "before human assistance",
+      "expected_questions": []
+    },
+    "questions": 3,
+    "question_types": {
+      "confirm": 3
+    },
+    "question_fields": [
+      "/sku",
+      "/currency",
+      "/unit/sell_unit"
+    ],
+    "open_questions": [
+      "No SKU-like header found in root table; using 'Référence' as identity — confirm",
+      "Column 'Prix HT (EUR)' names a currency, but records are labelled THB: confirm",
+      "Confirm whether 'Référence' (8-digit 0047xxxx) should also be exported as /barcode; it is an internal article reference and is not verified as EAN/GTIN.",
+      "No pack size, effective dates, status, inventory or promotion evidence appears in tarif.xlsx; these optional targets are intentionally left unmapped."
+    ],
+    "contested": 3,
+    "decision": "review",
+    "source": "ai",
+    "reused_from": null,
+    "drift": null,
+    "disagree": 3,
+    "verification_passed": true,
+    "verification_problems": [],
+    "self_check": {
+      "fix_rounds": 0,
+      "grounded": 8,
+      "python_turns": 0
+    },
+    "elapsed_seconds": 756.055492,
+    "job_seconds": 121.6852,
+    "cost_usd_log": 0.160743,
+    "calls": 5,
+    "input_tokens": 73123,
+    "output_tokens": 21905,
+    "flags": [
+      "initial profile failed, recovered"
+    ]
+  },
+  {
+    "id": "G07_de_integer_r1",
+    "score": {
+      "field_accuracy": 1.0,
+      "penalized_accuracy": 1.0,
+      "exact_record_accuracy": 1.0,
+      "correct_fields": 108,
+      "expected_fields": 108,
+      "rows_got": 12,
+      "rows_expected": 12,
+      "identity_precision": 1.0,
+      "identity_recall": 1.0,
+      "duplicate_records": 0,
+      "missing_rows": [],
+      "extra_rows": [],
+      "wrong": [],
+      "extra_values": [],
+      "phase": "before human assistance",
+      "expected_questions": []
+    },
+    "questions": 2,
+    "question_types": {
+      "confirm": 2
+    },
+    "question_fields": [
+      "/currency",
+      "/prices/*/amount"
+    ],
+    "open_questions": [
+      "Dates in ['Gültig ab (TT.MM.JJJJ)'] could be day-first or month-first; read as day-first: confirm",
+      "No SKU-like header found in root table; using 'Artikelnummer' as identity — confirm",
+      "No status column exists in artikel.csv; /status is left unmapped so the schema default 'active' applies rather than a guessed value. Confirm if 'active' should be stated explicitly.",
+      "No barcode/EAN, brand, category path, pack size, effective-to date, inventory (warehouse/qty) or promotion columns exist in this file, so those targets stay empty rather than being fabricated.",
+      "'/prices/*/amount' relies on the operator's de-DE convention ('1.234' = 1234 EUR); if these amounts are actually 1.234 EUR the magnitude is 1000x too high — confirm the reading before publishing.",
+      "Artikelnummer is emitted as read; if the CSV reader numericised it (470001) the original 8-digit zero padding cannot be reconstructed from the file itself."
+    ],
+    "contested": 1,
+    "decision": "review",
+    "source": "ai",
+    "reused_from": null,
+    "drift": null,
+    "disagree": 1,
+    "verification_passed": true,
+    "verification_problems": [],
+    "self_check": {
+      "fix_rounds": 0,
+      "grounded": 8,
+      "python_turns": 0
+    },
+    "elapsed_seconds": 107.467319,
+    "job_seconds": 97.8914,
+    "cost_usd_log": 0.084908,
+    "calls": 2,
+    "input_tokens": 26412,
+    "output_tokens": 14624,
+    "flags": []
+  },
+  {
+    "id": "G08_us_dates_r1",
+    "score": {
+      "field_accuracy": 1.0,
+      "penalized_accuracy": 1.0,
+      "exact_record_accuracy": 1.0,
+      "correct_fields": 108,
+      "expected_fields": 108,
+      "rows_got": 12,
+      "rows_expected": 12,
+      "identity_precision": 1.0,
+      "identity_recall": 1.0,
+      "duplicate_records": 0,
+      "missing_rows": [],
+      "extra_rows": [],
+      "wrong": [],
+      "extra_values": [],
+      "phase": "before human assistance",
+      "expected_questions": []
+    },
+    "questions": 2,
+    "question_types": {
+      "confirm": 2
+    },
+    "question_fields": [
+      "/prices/*/vat_included",
+      "/prices/*/price_list"
+    ],
+    "open_questions": [
+      "Dates in ['Effective from (MM/DD/YYYY)'] could be day-first or month-first; read as day-first: confirm",
+      "prices.csv is classified as a pricing export, so /inventory and /promotions are left unmapped: no warehouse, qty, reserved, promo code, promo type or discount columns exist in this file. If other sheets/files of the round carry them, they must be supplied separately.",
+      "/status has no source column; the value 'active' is only the schema default and should not be read as a confirmed business fact.",
+      "/unit/pack_size, /barcode, /brand, /category, /description and /prices/*/effective_to have no source columns in prices.csv and are left unmapped rather than invented.",
+      "The SKU cells are profiled as numeric for range statistics while the read values are zero-padded text (00470001–00470012); the string cast preserves them, but if the reader ever coerces SKU to an integer the zeros would be lost and a width-8 identifier format would be required."
+    ],
+    "contested": 2,
+    "decision": "review",
+    "source": "ai",
+    "reused_from": null,
+    "drift": null,
+    "disagree": 2,
+    "verification_passed": true,
+    "verification_problems": [],
+    "self_check": {
+      "fix_rounds": 0,
+      "grounded": 8,
+      "python_turns": 0
+    },
+    "elapsed_seconds": 67.011788,
+    "job_seconds": 62.2973,
+    "cost_usd_log": 0.090941,
+    "calls": 3,
+    "input_tokens": 43865,
+    "output_tokens": 11769,
+    "flags": []
+  },
+  {
+    "id": "G09_jp_utf16_r1",
+    "score": {
+      "field_accuracy": 1.0,
+      "penalized_accuracy": 0.6666666666666666,
+      "exact_record_accuracy": 0.0,
+      "correct_fields": 96,
+      "expected_fields": 96,
+      "rows_got": 12,
+      "rows_expected": 12,
+      "identity_precision": 1.0,
+      "identity_recall": 1.0,
+      "duplicate_records": 0,
+      "missing_rows": [],
+      "extra_rows": [],
+      "wrong": [],
+      "extra_values": [
+        {
+          "key": "'00470001'",
+          "path": "/attributes",
+          "value": {
+            "価格リスト": "standard",
+            "税抜価格": "1234",
+            "税込": "いいえ",
+            "税率": "5%"
+          },
+          "reason": "unasserted output fact"
+        },
+        {
+          "key": "'00470002'",
+          "path": "/attributes",
+          "value": {
+            "価格リスト": "standard",
+            "税抜価格": "1334",
+            "税込": "いいえ",
+            "税率": "5%"
+          },
+          "reason": "unasserted output fact"
+        },
+        {
+          "key": "'00470003'",
+          "path": "/attributes",
+          "value": {
+            "価格リスト": "standard",
+            "税抜価格": "1434",
+            "税込": "いいえ",
+            "税率": "5%"
+          },
+          "reason": "unasserted output fact"
+        },
+        {
+          "key": "'00470004'",
+          "path": "/attributes",
+          "value": {
+            "価格リスト": "standard",
+            "税抜価格": "1534",
+            "税込": "いいえ",
+            "税率": "5%"
+          },
+          "reason": "unasserted output fact"
+        },
+        {
+          "key": "'00470005'",
+          "path": "/attributes",
+          "value": {
+            "価格リスト": "standard",
+            "税抜価格": "1634",
+            "税込": "いいえ",
+            "税率": "5%"
+          },
+          "reason": "unasserted output fact"
+        },
+        {
+          "key": "'00470006'",
+          "path": "/attributes",
+          "value": {
+            "価格リスト": "standard",
+            "税抜価格": "1734",
+            "税込": "いいえ",
+            "税率": "5%"
+          },
+          "reason": "unasserted output fact"
+        },
+        {
+          "key": "'00470007'",
+          "path": "/attributes",
+          "value": {
+            "価格リスト": "standard",
+            "税抜価格": "1834",
+            "税込": "いいえ",
+            "税率": "5%"
+          },
+          "reason": "unasserted output fact"
+        },
+        {
+          "key": "'00470008'",
+          "path": "/attributes",
+          "value": {
+            "価格リスト": "standard",
+            "税抜価格": "1934",
+            "税込": "いいえ",
+            "税率": "5%"
+          },
+          "reason": "unasserted output fact"
+        },
+        {
+          "key": "'00470009'",
+          "path": "/attributes",
+          "value": {
+            "価格リスト": "standard",
+            "税抜価格": "2034",
+            "税込": "いいえ",
+            "税率": "5%"
+          },
+          "reason": "unasserted output fact"
+        },
+        {
+          "key": "'00470010'",
+          "path": "/attributes",
+          "value": {
+            "価格リスト": "standard",
+            "税抜価格": "2134",
+            "税込": "いいえ",
+            "税率": "5%"
+          },
+          "reason": "unasserted output fact"
+        },
+        {
+          "key": "'00470011'",
+          "path": "/attributes",
+          "value": {
+            "価格リスト": "standard",
+            "税抜価格": "2234",
+            "税込": "いいえ",
+            "税率": "5%"
+          },
+          "reason": "unasserted output fact"
+        },
+        {
+          "key": "'00470012'",
+          "path": "/attributes",
+          "value": {
+            "価格リスト": "standard",
+            "税抜価格": "2334",
+            "税込": "いいえ",
+            "税率": "5%"
+          },
+          "reason": "unasserted output fact"
+        }
+      ],
+      "phase": "before human assistance",
+      "expected_questions": []
+    },
+    "questions": 3,
+    "question_types": {
+      "choice": 3
+    },
+    "question_fields": [
+      "/sku",
+      "/currency",
+      "/prices/*/vat_included"
+    ],
+    "open_questions": [
+      "No SKU-like header found in root table; using '商品コード' as identity — confirm",
+      "No source column provides pack size, brand, category, barcode, description, warehouse/stock, promotions or price validity dates (effective_from/effective_to); those target fields are left unpopulated rather than guessed.",
+      "The 5% 税率 is a fixture value stated explicitly in the file and is written through as vat_rate=0.05 without any VAT recalculation; 税抜価格 stays the VAT-exclusive amount because 税込=いいえ."
+    ],
+    "contested": 2,
+    "decision": "review",
+    "source": "ai",
+    "reused_from": null,
+    "drift": null,
+    "disagree": 2,
+    "verification_passed": true,
+    "verification_problems": [],
+    "self_check": {
+      "fix_rounds": 0,
+      "grounded": 7,
+      "python_turns": 0
+    },
+    "elapsed_seconds": 51.728237,
+    "job_seconds": 47.6038,
+    "cost_usd_log": 0.062536,
+    "calls": 2,
+    "input_tokens": 25876,
+    "output_tokens": 9165,
+    "flags": []
+  },
+  {
+    "id": "G10_kr_workbook_r1",
+    "score": {
+      "field_accuracy": 1.0,
+      "penalized_accuracy": 1.0,
+      "exact_record_accuracy": 1.0,
+      "correct_fields": 108,
+      "expected_fields": 108,
+      "rows_got": 12,
+      "rows_expected": 12,
+      "identity_precision": 1.0,
+      "identity_recall": 1.0,
+      "duplicate_records": 0,
+      "missing_rows": [],
+      "extra_rows": [],
+      "wrong": [],
+      "extra_values": [],
+      "phase": "before human assistance",
+      "expected_questions": []
+    },
+    "questions": 2,
+    "question_types": {
+      "confirm": 2
+    },
+    "question_fields": [
+      "/currency",
+      "/prices/*/vat_included"
+    ],
+    "open_questions": [
+      "No SKU-like header found in root table; using '상품코드' as identity — confirm",
+      "세전 가격 is mapped as the 'standard' price-list amount with vat_included=false and vat_rate=0.05 taken verbatim from 세율; confirm that this pre-tax price is the intended selling price to publish for that list.",
+      "No status column exists in this file; the schema default 'active' is left to apply. Confirm all 12 products should be active rather than inactive/discontinued.",
+      "바코드 values are sequential 13-digit strings (0880123100000..0880123100011) with a leading zero; confirm they are real GTIN/EAN-13 barcodes before publishing them downstream.",
+      "No columns exist for category, brand, description, pack size or price effective dates; those pointers are intentionally left unmapped rather than filled with invented values."
+    ],
+    "contested": 1,
+    "decision": "review",
+    "source": "ai",
+    "reused_from": null,
+    "drift": null,
+    "disagree": 1,
+    "verification_passed": true,
+    "verification_problems": [],
+    "self_check": {
+      "fix_rounds": 0,
+      "grounded": 8,
+      "python_turns": 0
+    },
+    "elapsed_seconds": 39.809415,
+    "job_seconds": 35.090199999999996,
+    "cost_usd_log": 0.072479,
+    "calls": 3,
+    "input_tokens": 44039,
+    "output_tokens": 7110,
+    "flags": []
+  },
+  {
+    "id": "G11_active_price_r1",
+    "score": {
+      "field_accuracy": 1.0,
+      "penalized_accuracy": 1.0,
+      "exact_record_accuracy": 1.0,
+      "correct_fields": 108,
+      "expected_fields": 108,
+      "rows_got": 12,
+      "rows_expected": 12,
+      "identity_precision": 1.0,
+      "identity_recall": 1.0,
+      "duplicate_records": 0,
+      "missing_rows": [],
+      "extra_rows": [],
+      "wrong": [],
+      "extra_values": [],
+      "phase": "before human assistance",
+      "expected_questions": []
+    },
+    "questions": 8,
+    "question_types": {
+      "enum": 1,
+      "confirm": 7
+    },
+    "question_fields": [
+      "/prices/*/effective_to",
+      "/sku",
+      "/currency",
+      "/prices/*/amount",
+      "/prices/*/vat_included",
+      "/product_name",
+      "/unit/sell_unit",
+      "/prices/*/price_list"
+    ],
+    "open_questions": [
+      "/status: 'Record state' describes the validity of a price record (active/expired), not the product lifecycle. Should expired price rows mark the product as 'discontinued', or should /status come from a separate product-master field (default 'active' for SKUs with an active price)?",
+      "history.csv has no 'Valid to' column. How should the price end date (effective_to) be determined for the retained active records?"
+    ],
+    "contested": 8,
+    "decision": "review",
+    "source": "ai",
+    "reused_from": null,
+    "drift": null,
+    "disagree": 8,
+    "verification_passed": true,
+    "verification_problems": [],
+    "self_check": {
+      "fix_rounds": 0,
+      "grounded": 8,
+      "python_turns": 0
+    },
+    "elapsed_seconds": 111.911371,
+    "job_seconds": 105.9773,
+    "cost_usd_log": 0.123251,
+    "calls": 3,
+    "input_tokens": 45103,
+    "output_tokens": 19537,
+    "flags": [
+      "disagree >= 8"
+    ]
+  },
+  {
+    "id": "G12_row_tax_r1",
+    "score": {
+      "field_accuracy": 1.0,
+      "penalized_accuracy": 1.0,
+      "exact_record_accuracy": 1.0,
+      "correct_fields": 96,
+      "expected_fields": 96,
+      "rows_got": 12,
+      "rows_expected": 12,
+      "identity_precision": 1.0,
+      "identity_recall": 1.0,
+      "duplicate_records": 0,
+      "missing_rows": [],
+      "extra_rows": [],
+      "wrong": [],
+      "extra_values": [],
+      "phase": "before human assistance",
+      "expected_questions": []
+    },
+    "questions": 3,
+    "question_types": {
+      "boolean": 1,
+      "confirm": 2
+    },
+    "question_fields": [
+      "/prices/*/vat_included",
+      "/sku",
+      "/prices/*/price_list"
+    ],
+    "open_questions": [
+      "Price column 'Amount as supplied': no VAT marker in headers; assumed VAT-inclusive (Thai retail convention) — confirm"
+    ],
+    "contested": 3,
+    "decision": "review",
+    "source": "ai",
+    "reused_from": null,
+    "drift": null,
+    "disagree": 3,
+    "verification_passed": true,
+    "verification_problems": [],
+    "self_check": {
+      "fix_rounds": 0,
+      "grounded": 8,
+      "python_turns": 0
+    },
+    "elapsed_seconds": 143.893508,
+    "job_seconds": 121.76350000000001,
+    "cost_usd_log": 0.073375,
+    "calls": 2,
+    "input_tokens": 26579,
+    "output_tokens": 11699,
+    "flags": []
+  },
+  {
+    "id": "G13_ask_date_r1",
+    "score": {
+      "field_accuracy": 1.0,
+      "penalized_accuracy": 1.0,
+      "exact_record_accuracy": 1.0,
+      "correct_fields": 108,
+      "expected_fields": 108,
+      "rows_got": 12,
+      "rows_expected": 12,
+      "identity_precision": 1.0,
+      "identity_recall": 1.0,
+      "duplicate_records": 0,
+      "missing_rows": [],
+      "extra_rows": [],
+      "wrong": [],
+      "extra_values": [],
+      "phase": "before clarification; gold-dependent unresolved fields are not necessarily mapper errors",
+      "expected_questions": [
+        {
+          "topic": "date_order",
+          "field": "/prices/*/effective_from",
+          "question": "03/04/2026 หมายถึง 3 เมษายน หรือ 4 มีนาคม?",
+          "answer": "DD/MM/YYYY: 3 April 2026",
+          "scope": "Effective date column, this source"
+        }
+      ]
+    },
+    "questions": 3,
+    "question_types": {
+      "enum": 1,
+      "confirm": 2
+    },
+    "question_fields": [
+      "/prices/*/effective_from",
+      "/prices/*/vat_included",
+      "/prices/*/price_list"
+    ],
+    "open_questions": [
+      "Dates in ['Effective date'] could be day-first or month-first; read as day-first: confirm",
+      "Effective-date day/month order is undetermined for '03/04/2026' (day-first assumed provisionally).",
+      "No status, category, barcode, inventory or promotion columns are present; those targets are left empty (status only carries the schema default 'active', which the file does not state).",
+      "Pack size for the 'PCS' sales unit is not stated anywhere in the file, so /unit/pack_size is left null.",
+      "The column 'Effective date' contains '03/04/2026' in every row. Should this be read day-first (3 April 2026) or month-first (4 March 2026)?"
+    ],
+    "contested": 3,
+    "decision": "review",
+    "source": "ai",
+    "reused_from": null,
+    "drift": null,
+    "disagree": 2,
+    "verification_passed": true,
+    "verification_problems": [],
+    "self_check": {
+      "fix_rounds": 0,
+      "grounded": 8,
+      "python_turns": 0
+    },
+    "elapsed_seconds": 34.331486,
+    "job_seconds": 28.221700000000002,
+    "cost_usd_log": 0.048708,
+    "calls": 2,
+    "input_tokens": 27272,
+    "output_tokens": 5359,
+    "flags": []
+  },
+  {
+    "id": "G14_ask_currency_r1",
+    "score": {
+      "field_accuracy": 0.875,
+      "penalized_accuracy": 0.875,
+      "exact_record_accuracy": 0.0,
+      "correct_fields": 84,
+      "expected_fields": 96,
+      "rows_got": 12,
+      "rows_expected": 12,
+      "identity_precision": 1.0,
+      "identity_recall": 1.0,
+      "duplicate_records": 0,
+      "missing_rows": [],
+      "extra_rows": [],
+      "wrong": [
+        {
+          "key": "'00470001'",
+          "path": "/currency",
+          "expected": "SGD",
+          "actual": "THB",
+          "missing": false
+        },
+        {
+          "key": "'00470002'",
+          "path": "/currency",
+          "expected": "SGD",
+          "actual": "THB",
+          "missing": false
+        },
+        {
+          "key": "'00470003'",
+          "path": "/currency",
+          "expected": "SGD",
+          "actual": "THB",
+          "missing": false
+        },
+        {
+          "key": "'00470004'",
+          "path": "/currency",
+          "expected": "SGD",
+          "actual": "THB",
+          "missing": false
+        },
+        {
+          "key": "'00470005'",
+          "path": "/currency",
+          "expected": "SGD",
+          "actual": "THB",
+          "missing": false
+        },
+        {
+          "key": "'00470006'",
+          "path": "/currency",
+          "expected": "SGD",
+          "actual": "THB",
+          "missing": false
+        },
+        {
+          "key": "'00470007'",
+          "path": "/currency",
+          "expected": "SGD",
+          "actual": "THB",
+          "missing": false
+        },
+        {
+          "key": "'00470008'",
+          "path": "/currency",
+          "expected": "SGD",
+          "actual": "THB",
+          "missing": false
+        },
+        {
+          "key": "'00470009'",
+          "path": "/currency",
+          "expected": "SGD",
+          "actual": "THB",
+          "missing": false
+        },
+        {
+          "key": "'00470010'",
+          "path": "/currency",
+          "expected": "SGD",
+          "actual": "THB",
+          "missing": false
+        },
+        {
+          "key": "'00470011'",
+          "path": "/currency",
+          "expected": "SGD",
+          "actual": "THB",
+          "missing": false
+        },
+        {
+          "key": "'00470012'",
+          "path": "/currency",
+          "expected": "SGD",
+          "actual": "THB",
+          "missing": false
+        }
+      ],
+      "extra_values": [],
+      "phase": "before clarification; gold-dependent unresolved fields are not necessarily mapper errors",
+      "expected_questions": [
+        {
+          "topic": "currency",
+          "field": "/currency",
+          "question": "ราคาที่แสดง $ ใช้สกุลเงินใด?",
+          "answer": "SGD",
+          "scope": "all rows in this source"
+        }
+      ]
+    },
+    "questions": 4,
+    "question_types": {
+      "enum": 1,
+      "confirm": 3
+    },
+    "question_fields": [
+      "/currency",
+      "/prices/*/amount",
+      "/prices/*/vat_included",
+      "/prices/*/price_list"
+    ],
+    "open_questions": [
+      "/currency unresolved: no currency column; 'Net price' values are formatted with '$' while the target default is THB. Mapped provisionally to the THB default at low confidence; awaiting the operator answer (no FX conversion performed).",
+      "/prices/*/vat_rate is taken from the file's explicit 'Tax rate' = 5% (0.05), which differs from the schema default 0.07. It is a fixture value in the source and is used as stated; confirm if the operator intends a different statutory rate.",
+      "/prices/*/effective_from and /prices/*/effective_to: the file contains no validity dates, so both are omitted (null).",
+      "/unit/pack_size: 'Sales unit' is only 'PCS' and there is no per-pack/packaging column; pack size left null rather than derived from the product name.",
+      "/status, /brand, /barcode, /category, /description, /inventory and /promotions have no corresponding source columns and are omitted rather than fabricated; /status falls back to the schema default 'active'.",
+      "ไฟล์นี้ไม่มีคอลัมน์สกุลเงิน แต่ราคาในคอลัมน์ Net price แสดงด้วยเครื่องหมาย $ (เช่น $1234.56) ทั้งที่ค่าเริ่มต้นของสคีมาคือ THB — สกุลเงินของราคาในไฟล์นี้คืออะไร?"
+    ],
+    "contested": 4,
+    "decision": "review",
+    "source": "ai",
+    "reused_from": null,
+    "drift": null,
+    "disagree": 3,
+    "verification_passed": true,
+    "verification_problems": [],
+    "self_check": {
+      "fix_rounds": 0,
+      "grounded": 7,
+      "python_turns": 0
+    },
+    "elapsed_seconds": 42.691559,
+    "job_seconds": 38.5088,
+    "cost_usd_log": 0.054993,
+    "calls": 2,
+    "input_tokens": 27649,
+    "output_tokens": 6836,
+    "flags": []
+  },
+  {
+    "id": "G15_ask_unit_r1",
+    "score": {
+      "field_accuracy": 0.875,
+      "penalized_accuracy": 0.875,
+      "exact_record_accuracy": 0.0,
+      "correct_fields": 84,
+      "expected_fields": 96,
+      "rows_got": 12,
+      "rows_expected": 12,
+      "identity_precision": 1.0,
+      "identity_recall": 1.0,
+      "duplicate_records": 0,
+      "missing_rows": [],
+      "extra_rows": [],
+      "wrong": [
+        {
+          "key": "'00470001'",
+          "path": "/unit/sell_unit",
+          "expected": "BOTTLE",
+          "actual": "BAG",
+          "missing": false
+        },
+        {
+          "key": "'00470002'",
+          "path": "/unit/sell_unit",
+          "expected": "BOTTLE",
+          "actual": "BAG",
+          "missing": false
+        },
+        {
+          "key": "'00470003'",
+          "path": "/unit/sell_unit",
+          "expected": "BOTTLE",
+          "actual": "BAG",
+          "missing": false
+        },
+        {
+          "key": "'00470004'",
+          "path": "/unit/sell_unit",
+          "expected": "BOTTLE",
+          "actual": "BAG",
+          "missing": false
+        },
+        {
+          "key": "'00470005'",
+          "path": "/unit/sell_unit",
+          "expected": "BOTTLE",
+          "actual": "BAG",
+          "missing": false
+        },
+        {
+          "key": "'00470006'",
+          "path": "/unit/sell_unit",
+          "expected": "BOTTLE",
+          "actual": "BAG",
+          "missing": false
+        },
+        {
+          "key": "'00470007'",
+          "path": "/unit/sell_unit",
+          "expected": "BOTTLE",
+          "actual": "BAG",
+          "missing": false
+        },
+        {
+          "key": "'00470008'",
+          "path": "/unit/sell_unit",
+          "expected": "BOTTLE",
+          "actual": "BAG",
+          "missing": false
+        },
+        {
+          "key": "'00470009'",
+          "path": "/unit/sell_unit",
+          "expected": "BOTTLE",
+          "actual": "BAG",
+          "missing": false
+        },
+        {
+          "key": "'00470010'",
+          "path": "/unit/sell_unit",
+          "expected": "BOTTLE",
+          "actual": "BAG",
+          "missing": false
+        },
+        {
+          "key": "'00470011'",
+          "path": "/unit/sell_unit",
+          "expected": "BOTTLE",
+          "actual": "BAG",
+          "missing": false
+        },
+        {
+          "key": "'00470012'",
+          "path": "/unit/sell_unit",
+          "expected": "BOTTLE",
+          "actual": "BAG",
+          "missing": false
+        }
+      ],
+      "extra_values": [],
+      "phase": "before clarification; gold-dependent unresolved fields are not necessarily mapper errors",
+      "expected_questions": [
+        {
+          "topic": "unit_meaning",
+          "field": "/unit/sell_unit",
+          "question": "BT ในไฟล์นี้หมายถึงหน่วยใด?",
+          "answer": "BOTTLE",
+          "scope": "BT in this source only; not a global alias"
+        }
+      ]
+    },
+    "questions": 2,
+    "question_types": {
+      "confirm": 2
+    },
+    "question_fields": [
+      "/prices/*/vat_included",
+      "/prices/*/price_list"
+    ],
+    "open_questions": [
+      "No pack-size column exists in export.csv, so /unit/pack_size is intentionally left unmapped rather than filled with a guess. If a pack size exists elsewhere for these SKUs, provide that file or confirm BT means a single bottle with no pack configuration.",
+      "The source unit code 'BT' is mapped through the built-in unit table to the canonical sell-unit enum; confirm the customer's canonical value for BT (e.g. BOTTLE) if their downstream system expects a different label."
+    ],
+    "contested": 2,
+    "decision": "review",
+    "source": "ai",
+    "reused_from": null,
+    "drift": null,
+    "disagree": 2,
+    "verification_passed": true,
+    "verification_problems": [],
+    "self_check": {
+      "fix_rounds": 0,
+      "grounded": 8,
+      "python_turns": 0
+    },
+    "elapsed_seconds": 42.915781,
+    "job_seconds": 37.2084,
+    "cost_usd_log": 0.074158,
+    "calls": 3,
+    "input_tokens": 45858,
+    "output_tokens": 7075,
+    "flags": []
+  },
+  {
+    "id": "G16_ask_conflict_r1",
+    "score": {
+      "field_accuracy": 1.0,
+      "penalized_accuracy": 0.96,
+      "exact_record_accuracy": 0.9166666666666666,
+      "correct_fields": 96,
+      "expected_fields": 96,
+      "rows_got": 12,
+      "rows_expected": 12,
+      "identity_precision": 1.0,
+      "identity_recall": 1.0,
+      "duplicate_records": 0,
+      "missing_rows": [],
+      "extra_rows": [],
+      "wrong": [],
+      "extra_values": [
+        {
+          "key": "'00470001'",
+          "path": "/prices",
+          "value": {
+            "price_list": "standard",
+            "amount": 9999.0,
+            "vat_included": false,
+            "vat_rate": 0.05
+          },
+          "reason": "extra collection member"
+        }
+      ],
+      "phase": "before clarification; gold-dependent unresolved fields are not necessarily mapper errors",
+      "expected_questions": [
+        {
+          "topic": "duplicate_conflict",
+          "field": "/prices/*/amount",
+          "question": "SKU 00470001 ราคา 1234.56 กับ 9999 ควรใช้รายการใด?",
+          "answer": "Keep 1234.56; the 9999 record is an erroneous duplicate.",
+          "scope": "SKU 00470001, this file"
+        }
+      ]
+    },
+    "questions": 2,
+    "question_types": {
+      "confirm": 2
+    },
+    "question_fields": [
+      "/prices/*/vat_included",
+      "/prices/*/price_list"
+    ],
+    "open_questions": [
+      "SKU 00470001 appears twice (row 1 and row 13) with identical name/currency/unit/price list/tax but different Net price: 1234.56 vs 9999. The product record keeps the first row and, because /prices has no dedupe keys, both amounts would be emitted under price list 'standard'. Which amount is the real standard price, or is the second row an alternative/erroneous entry that should be dropped?",
+      "'Tax included' = No on every row while 'Tax rate' = 5%: the 5% is carried as vat_rate 0.05 verbatim and the amount is not grossed up. If 5% is instead meant to be embedded in the net price, the amount would need vat_adjust(mode=add, rate=0.05) — the source contains no formula or note to decide this.",
+      "Currency is explicitly 'MYR' and no conversion was applied (schema default THB intentionally not used). Confirm MYR output is intended.",
+      "No source columns exist for /status, /barcode, /brand, /category, /inventory or /promotions; they are left absent rather than filled with invented values."
+    ],
+    "contested": 2,
+    "decision": "review",
+    "source": "ai",
+    "reused_from": null,
+    "drift": null,
+    "disagree": 2,
+    "verification_passed": false,
+    "verification_problems": [
+      "1 duplicate identities on ['/sku'] (1 of them with different values in Net price; keep=first)",
+      "dedupe: 1 duplicate identities on ['/sku'] (1 of them with different values in Net price; keep=first)"
+    ],
+    "self_check": {
+      "fix_rounds": 2,
+      "grounded": 8,
+      "python_turns": 2
+    },
+    "elapsed_seconds": 172.780468,
+    "job_seconds": 166.7456,
+    "cost_usd_log": 0.270014,
+    "calls": 8,
+    "input_tokens": 146826,
+    "output_tokens": 30797,
+    "flags": [
+      "extra collection items",
+      "verification false"
+    ]
+  }
+]

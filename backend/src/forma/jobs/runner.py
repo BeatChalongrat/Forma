@@ -192,9 +192,13 @@ class ArqBackend:
         from arq import create_pool
         from arq.connections import RedisSettings
 
+        with session_scope() as session:
+            job = session.get(Job, job_id)
+            generation = job.attempts if job else 0
         pool = await create_pool(RedisSettings.from_dsn(self.redis_url))
         try:
-            await pool.enqueue_job("arq_run_job", job_id, _job_id=job_id)
+            # A new generation must not collide with a retained ARQ result.
+            await pool.enqueue_job("arq_run_job", job_id, _job_id=f"{job_id}:{generation}")
         finally:
             await pool.close()
 
@@ -438,6 +442,7 @@ def run_job(job_id: str) -> bool:
     t0 = time.perf_counter()
     try:
         with _trace_job(job_id, kind):
+            ctx.refresh()  # Read config committed before this job was enqueued.
             with session_scope() as s:
                 job = s.get(Job, job_id)
                 completed = completed_job_result(s, job) if job else None

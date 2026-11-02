@@ -35,7 +35,11 @@ def rebind_approved(
         return doc
     prior = (mapping.policy or {}).get("file_fingerprints", {})
     for source in doc.sources:
-        if _match_file(source, files) is not None:
+        bound = _match_file(source, files)
+        if bound is not None:
+            if bound.kind == "csv":
+                source.sheet = None
+                source.file.sheet_names_any = []
             continue
         digest = doc.meta.fingerprints.get(source.id)
         old = next((v for v in prior.values() if v.get("strict") == digest), None)
@@ -58,10 +62,16 @@ def rebind_approved(
         selector = source.model_copy(deep=True)
         selector.file.name_pattern = None
         selector.file.fingerprint = None
+        if old.get("kind") == "csv" and all(f.kind == "csv" for f in candidates):
+            selector.sheet = None
+            selector.file.sheet_names_any = []
         hit = _match_file(selector, candidates)
         if hit is not None:
             source.file.name_pattern = "^" + re.escape(hit.original_name) + "$"
             source.file.fingerprint = None
+            if hit.kind == "csv":
+                source.sheet = None
+                source.file.sheet_names_any = []
     return doc
 
 
@@ -109,7 +119,13 @@ def select_baseline(
     session: Session, customer_id: str, schema: TargetSchema, current: Fingerprint | None
 ) -> MappingVersion | None:
     """Newest exact approved layout, otherwise closest compatible baseline for adaptation."""
-    candidates = [m for m in approved_history(session, customer_id, schema.ref) if compatible(m, schema)]
+    from forma.services.decision_memory import eligible
+
+    candidates = [
+        m
+        for m in approved_history(session, customer_id, schema.ref)
+        if compatible(m, schema) and eligible(session, m)
+    ]
     closest: MappingVersion | None = None
     similarity = -1.0
     if current is not None:
