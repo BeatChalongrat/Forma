@@ -63,6 +63,17 @@ class Settings(BaseSettings):
     llm_max_sample_chars: int = Field(
         default=200, description="Max characters per sample cell sent to a model."
     )
+    llm_inspect_rounds: int = Field(
+        default=2,
+        description="Turns in which a mapping agent may ask read-only questions about the file (ADR-058).",
+    )
+    llm_self_check_rounds: int = Field(
+        default=2,
+        description="Times a mapping agent sees its mapping run on the first rows and may fix it (ADR-058).",
+    )
+    llm_self_check_rows: int = Field(
+        default=50, description="Source rows the engine runs for the agent's self-check (ADR-058)."
+    )
 
     # Engine
     chunk_rows: int = Field(default=200_000, description="Rows per engine chunk.")

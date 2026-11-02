@@ -8,18 +8,20 @@ retries are versioned together (``PROMPT_VERSION``).
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
 from forma.ai import guard
 from forma.ai.heuristics import HeuristicProposal
 from forma.ai.llm import LLMClient, LLMError, Usage, set_agent
+from forma.ai.workbench import MAX_INSPECT_REQUESTS, RunReport, Workbench, inspect_problems
 from forma.mapping_dsl.models import OP_ARITY, OP_PARAMS, MappingDocument, Op
 from forma.mapping_dsl.validate import validate_mapping
 from forma.profiling.profile import WorkbookProfile
 from forma.schema_registry import TargetSchema
 
-PROMPT_VERSION = "2026.10.30"
+PROMPT_VERSION = "2026.11.02"
 
 SYSTEM_BASE = """You are FORMA's mapping intelligence. FORMA converts messy ERP exports (Excel/CSV, Thai and English,
 multi-sheet) into the target JSON contract supplied for this request. There is no fixed product contract.
@@ -41,6 +43,14 @@ Rules you must follow:
 - Do not infer VAT inclusion, rate, currency, units or other business facts from retail conventions.
   Use explicit source evidence, contract defaults or confirmed operator decisions. Otherwise ask.
 - Every field mapping must carry confidence (0-1) and evidence (why: header, samples, rules).
+- You may look at the file before you answer: return {{"inspect": [requests], "mapping": null}} with up to
+  {max_inspect} requests, each {{table_index, what: columns | distinct | rows | find, column?, pattern?, start?, limit?}}.
+  FORMA answers under earlier_turns and asks again. Do this when the samples cannot settle a point (which values
+  a status column takes, whether dates are day-first, what a cryptic column holds). The limits say how many such
+  turns are left.
+- After you return a mapping FORMA runs it on the first rows and shows you the result under earlier_turns:
+  record count, problems, implausible values, sample records. Fix the mapping so the problems disappear; if the
+  result is right as the data stands, return the same mapping and say why in changes_from_draft.
 - If something is ambiguous, list a specific question in open_questions and lower the affected field's
   confidence. A provisional draft is not confirmed evidence. Never conceal a missing source value with
   a fabricated constant merely to satisfy the JSON schema.
@@ -64,6 +74,10 @@ def _ops_list() -> str:
         + "\n  Every call node is {op, args: [child nodes], params: {literal options}}; a column is"
         ' {"op":"col","name":...}; a literal is {"op":"const","value":...}. Options go in params, never in args.'
     )
+
+
+def _system(task: str) -> str:
+    return SYSTEM_BASE.format(ops=_ops_list(), max_inspect=MAX_INSPECT_REQUESTS) + task
 
 
 def dsl_problems(exc: Exception, *, limit: int = 10) -> list[str]:
@@ -257,10 +271,7 @@ SCHEMA_AGENT_SCHEMA: dict[str, Any] = {
 
 
 def schema_agent(client: LLMClient, profile: WorkbookProfile, schema: TargetSchema) -> AgentResult:
-    system = (
-        SYSTEM_BASE.format(ops=_ops_list())
-        + "\nTask: classify each detected table's role and each column's semantic meaning."
-    )
+    system = _system("\nTask: classify each detected table's role and each column's semantic meaning.")
     user = json.dumps(
         {
             "workbook_profile": _profile_digest(profile),
@@ -285,16 +296,136 @@ def schema_agent(client: LLMClient, profile: WorkbookProfile, schema: TargetSche
 # --------------------------------------------------------------------------------------------
 # Mapping Agent — full MappingDocument, starting from the heuristic draft
 # --------------------------------------------------------------------------------------------
+INSPECT_SCHEMA: dict[str, Any] = {
+    "type": "array",
+    "description": "Read-only questions about the file, answered by FORMA before you write the mapping",
+    "items": {
+        "type": "object",
+        "properties": {
+            "table_index": {"type": "integer"},
+            "what": {"type": "string", "enum": ["columns", "distinct", "rows", "find"]},
+            "column": {"type": "string"},
+            "pattern": {"type": "string"},
+            "start": {"type": "integer"},
+            "limit": {"type": "integer"},
+        },
+        "required": ["table_index", "what"],
+    },
+}
+
 MAPPING_AGENT_SCHEMA: dict[str, Any] = {
     "type": "object",
     "properties": {
-        "mapping": MappingDocument.json_schema_document(),
+        "mapping": {"oneOf": [MappingDocument.json_schema_document(), {"type": "null"}]},
+        "inspect": INSPECT_SCHEMA,
         "open_questions": {"type": "array", "items": {"type": "string"}},
         "changes_from_draft": {"type": "array", "items": {"type": "string"}},
         "confidence": {"type": "number"},
     },
     "required": ["mapping"],
 }
+
+
+def _rounds() -> tuple[int, int]:
+    from forma.core.settings import get_settings
+
+    s = get_settings()
+    return s.llm_inspect_rounds, s.llm_self_check_rounds
+
+
+@dataclass
+class _Loop:
+    """One agent conversation: inspect turns, a mapping, FORMA's run of it, fixes (ADR-058)."""
+
+    doc: MappingDocument
+    data: dict[str, Any]
+    usage: Usage
+    attempts: int
+    self_check: dict[str, Any] | None
+
+
+def _agent_loop(
+    client: LLMClient,
+    *,
+    system: str,
+    payload: dict[str, Any],
+    schema: TargetSchema,
+    validate_doc: Callable[[dict[str, Any]], list[str]],
+    workbench: Workbench | None,
+    n_tables: int,
+) -> _Loop:
+    inspect_rounds, check_rounds = _rounds() if workbench is not None else (0, 0)
+    turns: list[dict[str, Any]] = []
+    history: list[dict[str, Any]] = []
+    usage, attempts, inspections, checks = Usage(), 0, 0, 0
+    best: tuple[int, MappingDocument, dict[str, Any], RunReport] | None = None
+    while True:
+        may_inspect = workbench is not None and inspections < inspect_rounds
+
+        def _validate(d: dict[str, Any], may_inspect: bool = may_inspect) -> list[str]:
+            if d.get("inspect") and not d.get("mapping"):
+                if may_inspect:
+                    return inspect_problems(d["inspect"], n_tables)
+                return ["no inspection turns are left: return the mapping now"]
+            if not d.get("mapping"):
+                return ["mapping is required (an object, not null)"]
+            return validate_doc(d)
+
+        body = {
+            **payload,
+            "limits": {
+                "inspect_turns_left": max(0, inspect_rounds - inspections) if workbench is not None else 0,
+                "fix_rounds_left": max(0, check_rounds - checks) if workbench is not None else 0,
+            },
+        }
+        if turns:
+            body["earlier_turns"] = turns
+        res = client.structured(
+            system=system,
+            user=json.dumps(body, ensure_ascii=False),
+            schema=MAPPING_AGENT_SCHEMA,
+            validate=_guarded(schema, _validate),
+        )
+        usage.add(res.usage)
+        attempts += res.attempts
+        d = res.data
+        if may_inspect and d.get("inspect") and not d.get("mapping"):
+            assert workbench is not None
+            reqs = list(d["inspect"])[:MAX_INSPECT_REQUESTS]
+            answers = workbench.inspect(reqs)
+            inspections += 1
+            turns.append({"you_asked": reqs, "the_file_answered": answers})
+            history.append({"turn": "inspect", "requests": len(reqs)})
+            continue
+        doc = MappingDocument.model_validate(d["mapping"])
+        if workbench is None:
+            return _Loop(doc, d, usage, attempts, None)
+        report = workbench.run(doc)
+        history.append({"turn": "mapping", "rows_out": report.rows_out, "problems": report.problems[:6]})
+        if best is None or len(report.problems) < best[0]:
+            best = (len(report.problems), doc, d, report)
+        if report.clean or checks >= check_rounds:
+            break
+        checks += 1
+        turns.append(
+            {
+                "your_mapping": d["mapping"],
+                "forma_ran_it_on_the_first_rows": report.to_prompt(),
+                "do": "Fix the mapping so these problems disappear. If the result is right as the data stands,"
+                " return the same mapping and say why in changes_from_draft.",
+            }
+        )
+    assert best is not None
+    _, doc, d, report = best
+    self_check = {
+        "rows_checked": report.rows_in,
+        "rows_out": report.rows_out,
+        "fix_rounds": checks,
+        "inspections": inspections,
+        "problems_left": report.problems[:10],
+        "history": history,
+    }
+    return _Loop(doc, d, usage, attempts, self_check)
 
 
 def mapping_agent(
@@ -306,10 +437,10 @@ def mapping_agent(
     schema_analysis: dict[str, Any] | None = None,
     examples: list[dict[str, Any]] | None = None,
     learned: dict[str, Any] | None = None,
+    workbench: Workbench | None = None,
 ) -> tuple[MappingDocument, AgentResult]:
-    system = (
-        SYSTEM_BASE.format(ops=_ops_list())
-        + "\nTask: produce the final MappingDocument. Start from the deterministic draft; keep what is right, fix what is wrong,"
+    system = _system(
+        "\nTask: produce the final MappingDocument. Start from the deterministic draft; keep what is right, fix what is wrong,"
         " add missing fields/collections/joins, and set honest per-field confidence. Keep source ids and table specs from the draft"
         " unless they are clearly wrong. Return {mapping, open_questions, changes_from_draft, confidence}."
     )
@@ -328,7 +459,6 @@ def mapping_agent(
     if learned:
         # decisions this customer's operators made before (ADR-038): keep them unless the file contradicts them
         payload["what_the_operator_taught_before"] = learned
-    user = json.dumps(payload, ensure_ascii=False)
 
     def _validate(d: dict[str, Any]) -> list[str]:
         try:
@@ -340,8 +470,14 @@ def mapping_agent(
 
     set_agent("mapping")
     try:
-        res = client.structured(
-            system=system, user=user, schema=MAPPING_AGENT_SCHEMA, validate=_guarded(schema, _validate)
+        loop = _agent_loop(
+            client,
+            system=system,
+            payload=payload,
+            schema=schema,
+            validate_doc=_validate,
+            workbench=workbench,
+            n_tables=len(profile.tables),
         )
     except LLMError as e:
         # Fall back to the deterministic draft but record the failure as a note (policy → review).
@@ -353,14 +489,22 @@ def mapping_agent(
             [f"llm_failed: {e}"],
         )
         return draft.mapping, r
-    doc = MappingDocument.model_validate(res.data["mapping"])
+    doc = loop.doc
     doc.meta.created_by = "ai"
-    doc.meta.model = res.usage.model or client.model  # the route that answered (ADR-025)
-    if res.data.get("confidence") is not None:
-        doc.meta.confidence = float(res.data["confidence"])
-    return doc, AgentResult(
-        "mapping", {k: v for k, v in res.data.items() if k != "mapping"}, res.usage, res.attempts
-    )
+    doc.meta.model = loop.usage.model or client.model  # the route that answered (ADR-025)
+    if loop.data.get("confidence") is not None:
+        doc.meta.confidence = float(loop.data["confidence"])
+    return doc, _agent_result("mapping", loop)
+
+
+def _agent_result(name: str, loop: _Loop) -> AgentResult:
+    data = {k: v for k, v in loop.data.items() if k not in ("mapping", "inspect")}
+    notes: list[str] = []
+    if loop.self_check is not None:
+        data["self_check"] = loop.self_check
+        if loop.self_check["problems_left"]:
+            notes.append(f"self_check_unresolved: {len(loop.self_check['problems_left'])} problem(s) left")
+    return AgentResult(name, data, loop.usage, loop.attempts, notes)
 
 
 # --------------------------------------------------------------------------------------------
@@ -401,9 +545,8 @@ def diagnosis_agent(
     findings: list[dict[str, Any]],
     sample_records: list[dict[str, Any]],
 ) -> tuple[AgentResult, MappingDocument | None]:
-    system = (
-        SYSTEM_BASE.format(ops=_ops_list())
-        + "\nTask: diagnose why the transformation produced these findings (validation errors, quality failures, join problems)."
+    system = _system(
+        "\nTask: diagnose why the transformation produced these findings (validation errors, quality failures, join problems)."
         " Explain root causes with evidence, propose fixes, and if the fix is a mapping change return the FULL patched MappingDocument"
         " under patched_mapping (same DSL), else null. Write summary_th in Thai for the operations team."
     )
@@ -453,10 +596,10 @@ def adaptation_agent(
     draft: HeuristicProposal,
     *,
     learned: dict[str, Any] | None = None,
+    workbench: Workbench | None = None,
 ) -> tuple[MappingDocument, AgentResult]:
-    system = (
-        SYSTEM_BASE.format(ops=_ops_list())
-        + "\nTask: the customer's file format drifted. Adapt the previously APPROVED mapping to the new structure with minimal changes:"
+    system = _system(
+        "\nTask: the customer's file format drifted. Adapt the previously APPROVED mapping to the new structure with minimal changes:"
         " keep business decisions (VAT assumptions, value maps, filters) from the approved mapping, re-point renamed columns, add new"
         " columns only when they map to target fields, and list every change in changes_from_draft."
     )
@@ -470,7 +613,6 @@ def adaptation_agent(
     }
     if learned:
         payload["what_the_operator_taught_before"] = learned
-    user = json.dumps(payload, ensure_ascii=False)
 
     def _validate(d: dict[str, Any]) -> list[str]:
         try:
@@ -481,17 +623,21 @@ def adaptation_agent(
 
     set_agent("adaptation")
     try:
-        res = client.structured(
-            system=system, user=user, schema=MAPPING_AGENT_SCHEMA, validate=_guarded(schema, _validate)
+        loop = _agent_loop(
+            client,
+            system=system,
+            payload=payload,
+            schema=schema,
+            validate_doc=_validate,
+            workbench=workbench,
+            n_tables=len(profile.tables),
         )
     except LLMError as e:
         return draft.mapping, AgentResult("adaptation", {}, client.total_usage, 0, [f"llm_failed: {e}"])
-    doc = MappingDocument.model_validate(res.data["mapping"])
+    doc = loop.doc
     doc.meta.created_by = "ai"
-    doc.meta.model = res.usage.model or client.model  # the route that answered (ADR-025)
-    return doc, AgentResult(
-        "adaptation", {k: v for k, v in res.data.items() if k != "mapping"}, res.usage, res.attempts
-    )
+    doc.meta.model = loop.usage.model or client.model  # the route that answered (ADR-025)
+    return doc, _agent_result("adaptation", loop)
 
 
 # --------------------------------------------------------------------------------------------
@@ -535,9 +681,8 @@ def copilot_agent(
     *,
     derived: list[str] | None = None,
 ) -> AgentResult:
-    system = (
-        SYSTEM_BASE.format(ops=_ops_list())
-        + "\nTask: translate the operator's natural-language instruction into SAFE, reviewable data operations over target fields."
+    system = _system(
+        "\nTask: translate the operator's natural-language instruction into SAFE, reviewable data operations over target fields."
         " Never apply anything; only plan. Use `where` as a DSL boolean expression whose col names are target pointers (e.g. {op:'eq',args:[{op:'col',name:'/category'},{op:'const',value:'Electronics'}]})."
         " Conditions over collections use the derived figures as col names, e.g. sum(/inventory/*/qty) for total"
         " stock or count(/promotions) for 'in a promotion' (0 = not in one)."

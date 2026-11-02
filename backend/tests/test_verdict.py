@@ -137,6 +137,31 @@ def test_vat_shift_asks_about_the_vat_field_with_a_stated_default(schema: Target
     )
 
 
+def test_a_choice_carries_its_options_and_the_self_check_is_evidence(schema: TargetSchema) -> None:
+    q = {
+        "id": "/product_name",
+        "kind": "choice",
+        "options": ["ชื่อ", "ยี่ห้อ"],
+        "field": {"name": "product_name", "risk": "high", "description": "Product name"},
+    }
+    v = _mapping_verdict(
+        schema,
+        questions=[q],
+        policy={
+            "decision": "review",
+            "reasons": ["first time"],
+            "checks": {},
+            "self_check": {"rows_checked": 50, "fix_rounds": 1, "inspections": 1, "problems_left": ["x"]},
+        },
+    )
+    d = v["must_decide"][0]
+    assert d["kind"] == "choice" and d["options"] == ["ชื่อ", "ยี่ห้อ"]
+    assert d["question"]["en"] == "Which column holds Product name?"
+    ev = next(e for e in v["evidence"] if e["kind"] == "self_check")
+    assert ev["numbers"] == {"rows": 50, "fix_rounds": 1, "inspections": 1, "problems_left": 1}
+    assert "1 problem(s) left" in ev["text"]["en"]
+
+
 def test_first_time_and_clean(schema: TargetSchema) -> None:
     q = {"id": "/sku", "kind": "confirm", "field": {"name": "sku", "risk": "critical", "description": "SKU"}}
     first = _mapping_verdict(schema, questions=[q])

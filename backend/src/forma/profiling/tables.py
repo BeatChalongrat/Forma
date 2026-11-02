@@ -15,6 +15,10 @@ import polars as pl
 
 from forma.mapping_dsl.models import TableSpec
 
+SECTION_COLUMN = "section"  # the column a detected table's heading rows become (ADR-058)
+SECTION_MAX_CHARS = 60
+SECTION_MIN_ROWS = 2  # one lone one-cell line is a note and stays data (ADR-055); two or more are headings
+
 # A total row is labelled by its first non-null cell. Short markers must stand alone ("Total",
 # "Total:", "รวม 25 รายการ") so data that merely starts with the same letters ("SUM-01", "Summer…",
 # "รวมมิตร") is kept; Thai compounds are unambiguous and match as prefixes.
@@ -44,6 +48,7 @@ class TableCandidate:
     score: float
     title: str | None = None
     notes: list[str] = field(default_factory=list)
+    section_rows: int = 0  # one-cell heading rows inside the data (ADR-058)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -59,6 +64,7 @@ class TableCandidate:
             "score": round(self.score, 3),
             "title": self.title,
             "notes": self.notes,
+            "section_rows": self.section_rows,
         }
 
     def to_spec(self) -> TableSpec:
@@ -69,6 +75,7 @@ class TableCandidate:
             data_end=self.data_end,
             first_column=self.first_column,
             last_column=self.last_column,
+            section_column=SECTION_COLUMN if self.section_rows >= SECTION_MIN_ROWS else None,
         )
 
 
@@ -166,6 +173,20 @@ def _header_score(row: list[str | None], below: list[list[str | None]]) -> float
     )
 
 
+def _is_section_row(row: list[str | None]) -> bool:
+    """A heading inside the data: one short text cell and nothing else (not a number, date or total)."""
+    cells = [c for c in row if c is not None and str(c).strip() != ""]
+    if len(cells) != 1:
+        return False
+    s = str(cells[0]).strip()
+    return (
+        len(s) <= SECTION_MAX_CHARS
+        and _cell_kind(s) == "text"
+        and bool(re.search(_WORD_RE, s))
+        and not re.search(TOTAL_LABEL_RE, s.lower())
+    )
+
+
 def _same_header(a: list[str | None], b: list[str | None]) -> bool:
     return [normalize_header(c) for c in a if c is not None] == [
         normalize_header(c) for c in b if c is not None
@@ -233,16 +254,23 @@ def detect_tables(df: pl.DataFrame, *, max_scan_rows: int = 60, gap: int = 2) ->
             # only the first has another page's title below it, but everything above them is data.
             best_i = next(i for i in range(best_i + 1) if _same_header(sub[i], sub[best_i]))
             header_rows = 1
-            # multi-row header: next row is also mostly text with same fill, and the row after is numeric-ish
+            # multi-row header: next row is also mostly text with a similar fill, and the row after is
+            # numeric-ish. A row with one cell is a section heading, not a header (ADR-058).
             if best_i + 2 < len(sub):
+                head_cells = [c for c in sub[best_i] if c is not None]
                 nxt = sub[best_i + 1]
                 nxt_cells = [c for c in nxt if c is not None]
-                if nxt_cells and sum(_cell_kind(c) == "text" for c in nxt_cells) / len(nxt_cells) > 0.8:
+                if (
+                    nxt_cells
+                    and len(nxt_cells) >= max(2, len(head_cells) // 2)
+                    and sum(_cell_kind(c) == "text" for c in nxt_cells) / len(nxt_cells) > 0.8
+                ):
                     after = [c for c in sub[best_i + 2] if c is not None]
                     if after and sum(_cell_kind(c) in ("num", "date") for c in after) / len(after) > 0.3:
                         header_rows = 2
             headers = merge_header_rows(sub[best_i : best_i + header_rows])
             data_start = r0 + best_i + header_rows
+            section_rows = sum(1 for row in sub[best_i + header_rows :] if _is_section_row(row))
             # Boundaries cover the full sheet even though header scoring uses a bounded sample.
             data_end = r1
             title = None
@@ -266,6 +294,7 @@ def detect_tables(df: pl.DataFrame, *, max_scan_rows: int = 60, gap: int = 2) ->
                     n_rows=n_rows,
                     score=best_s,
                     title=title,
+                    section_rows=section_rows,
                 )
             )
     out = _join_pages(out)
@@ -442,6 +471,22 @@ def extract_table(
     # drop fully blank rows
     if body.height:
         body = body.filter(~pl.all_horizontal(pl.col(data).is_null()))
+    # section headings: one text cell on a row of its own becomes a column, filled down (ADR-058)
+    if spec.section_column and body.height and data:
+        filled = pl.sum_horizontal([pl.col(c).is_not_null().cast(pl.Int32) for c in data])
+        first = pl.coalesce([pl.col(c) for c in data]).str.strip_chars()
+        heading = (
+            (filled == 1)
+            & (first.str.len_chars() <= SECTION_MAX_CHARS)
+            & first.str.contains(_WORD_RE)
+            & ~first.str.contains(_NUM_RE.pattern)
+            & ~first.str.to_lowercase().str.contains(TOTAL_LABEL_RE)
+        ).fill_null(False)
+        body = (
+            body.with_columns(pl.when(heading).then(first).otherwise(None).alias(spec.section_column))
+            .with_columns(pl.col(spec.section_column).fill_null(strategy="forward"))
+            .filter(~heading)
+        )
     # drop total rows: a total label in the first non-null cell and nothing but numbers beside it
     if spec.drop_total_rows and body.height and data:
         first_text = pl.coalesce([pl.col(c) for c in data]).str.to_lowercase().str.strip_chars()

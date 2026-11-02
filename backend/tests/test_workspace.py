@@ -93,6 +93,36 @@ def uncertain_mapping(c: TestClient, tmp: Path) -> tuple[dict[str, Any], str, st
     return r, edited["id"], ptr
 
 
+def test_a_question_with_alternatives_offers_the_columns(client: TestClient, isolated_env: Path) -> None:
+    # /product_name read from one column with low confidence, and a free text column beside it (ADR-058)
+    r = delivery(client, isolated_env)
+    m = client.get(f"/api/mappings/{r['mappings'][0]['id']}").json()
+    doc = copy.deepcopy(m["document"])
+    for f in doc["fields"] + [f for coll in doc["collections"] for f in coll["fields"]]:
+        f["confidence"] = 1.0
+    doc["fields"] = [f for f in doc["fields"] if f["target"] != "/brand"]  # frees "ยี่ห้อ"
+    name = next(f for f in doc["fields"] if f["target"] == "/product_name")
+    name["expr"], name["confidence"] = {"op": "col", "name": "ชื่อสินค้า"}, 0.5
+    desc = next((f for f in doc["fields"] if f["target"] == "/description"), None)
+    if desc:
+        desc["confidence"] = 0.5  # low risk, one column, no decision: not asked
+    edited = client.post(f"/api/mappings/{m['id']}/edit", json={"document": doc}).json()
+    qs = client.get(f"/api/mappings/{edited['id']}/questions").json()["questions"]
+    by_id = {q["id"]: q for q in qs}
+    assert by_id["/product_name"]["kind"] == "choice"
+    assert by_id["/product_name"]["options"][0] == "ชื่อสินค้า" and "ยี่ห้อ" in by_id["/product_name"]["options"]
+    assert "/description" not in by_id
+    bad = client.post(
+        f"/api/mappings/{edited['id']}/answers/preview", json={"answers": {"/product_name": "nope"}}
+    )
+    assert bad.status_code == 422
+    preview = client.post(
+        f"/api/mappings/{edited['id']}/answers/preview", json={"answers": {"/product_name": "ยี่ห้อ"}}
+    )
+    assert preview.status_code == 200, preview.text
+    assert preview.json()["preview"]["records"][0]["product_name"] == "Siam"
+
+
 def test_answer_preview_versions_and_policy(client: TestClient, isolated_env: Path) -> None:
     from forma.db.models import MappingVersion
     from forma.db.session import session_scope

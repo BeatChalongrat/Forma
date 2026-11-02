@@ -40,7 +40,11 @@ def test_scoped_navigation_and_review_destination(client: TestClient, isolated_e
         assert choices[0]["url"] == f"/review?round={r['id']}&status=open"
         assert choices[0]["label"] == "เปิดตรวจปัญหาไฟล์นี้"
         assert any(a["url"].endswith("/mapping/" + r["mappings"][0]["id"]) for a in choices)
-        assert all(a["detail"].startswith("W001") or "October" in a["detail"] for a in choices)
+        # every link names the customer or the round; the accept action carries the verdict's words (ADR-040)
+        assert all(
+            a["detail"].startswith("W001") or "October" in a["detail"] or a.get("kind") == "act"
+            for a in choices
+        )
         denied = Principal("other", frozenset({"importer"}), frozenset())
         with pytest.raises(Forbidden):
             navigation_choices(s, denied, "inspect_import", {}, {"id": r["id"]}, "th")
@@ -120,12 +124,20 @@ def test_a_verdict_that_needs_no_decision_becomes_a_confirmable_action(
         row = s.get(ImportRound, r["id"])
         assert row
         v = dict((row.summary or {}).get("verdict") or {})
-        # the demo delivery asks questions: no act
-        assert v.get("must_decide")
+        # the demo delivery leaves nothing to decide: confirm-only questions are gone (ADR-058)
+        assert not v.get("must_decide") and v.get("outcome") == "accept"
+        row.summary = {
+            **row.summary,
+            "verdict": {**v, "outcome": "answer", "must_decide": [{"id": "/sku", "kind": "confirm"}]},
+        }
+    with session_scope() as s:
+        # an open decision: no act
         assert not any(
             a.get("kind") == "act"
             for a in navigation_choices(s, reviewer, "inspect_import", {}, {"id": r["id"]}, "en")
         )
+        row = s.get(ImportRound, r["id"])
+        assert row
         row.summary = {
             **row.summary,
             "verdict": {**v, "outcome": "accept", "must_decide": [], "digest": "abc12345"},

@@ -11,10 +11,12 @@ from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from forma.ai import plausibility
 from forma.ai.agents import PROMPT_VERSION, AgentResult, adaptation_agent, mapping_agent, schema_agent
-from forma.ai.heuristics import HeuristicProposal, propose_mapping
+from forma.ai.heuristics import VAT_ASSUMED_QUESTION_RE, HeuristicProposal, propose_mapping
 from forma.ai.llm import LLMError
 from forma.ai.policy import PolicyDecision
+from forma.ai.workbench import FileWorkbench
 from forma.core.errors import Conflict, NotFound, PolicyBlocked, ValidationFailed
 from forma.core.hashing import stable_hash
 from forma.core.ids import new_id
@@ -323,8 +325,17 @@ def propose_for_round(
             agent_log.append({"agent": "learning", **learning_note})
         doc = draft.mapping
         source_kind = "heuristic"
-        # 3) AI refinement
+        # 3) AI refinement, with the file to look at and the engine to try the mapping on (ADR-058)
         if use_llm:
+            workbench = FileWorkbench(
+                schema,
+                profile,
+                r.files,
+                bind=lambda d: bind_sources(d, r.files, resolve=ctx.storage.local_path),
+                resolve=ctx.storage.local_path,
+                rows=ctx.settings.llm_self_check_rows,
+                max_chars=ctx.settings.llm_max_sample_chars,
+            )
             try:
                 if previous is not None and drift not in (None, "unrelated_file"):
                     prev_doc = MappingDocument.model_validate(previous.document)
@@ -337,6 +348,7 @@ def propose_for_round(
                         drift_detail or {},
                         draft,
                         learned=None if learned.empty else learned.for_prompt(),
+                        workbench=workbench,
                     )
                     source_kind = "ai_adaptation"
                 else:
@@ -352,10 +364,12 @@ def propose_for_round(
                         schema_analysis=sa.data,
                         examples=examples,
                         learned=None if learned.empty else learned.for_prompt(),
+                        workbench=workbench,
                     )
                     source_kind = "ai"
                 _record_llm(session, r.id, res)
                 agent_log.append(res.to_dict())
+                open_questions = _without_settled(open_questions, doc, schema)
                 open_questions.extend(
                     res.data.get("open_questions", []) if isinstance(res.data, dict) else []
                 )
@@ -384,6 +398,11 @@ def propose_for_round(
         if sim
         else [{"kind": "binding", "severity": "error", "message": p} for p in problems]
     )
+    if sim:  # values that pass the contract and still cannot be right (ADR-058)
+        findings.extend(
+            {"kind": "plausibility", "severity": "warning", "message": p}
+            for p in plausibility.check(sim.records, schema)
+        )
     rows_out = sim.stats["rows_out"] if sim else 0
 
     # 5) policy (row-count sanity vs the previous approved round, when both simulations were complete)
@@ -463,6 +482,14 @@ def propose_for_round(
             "sandbox": sandbox_report,
             "field_review": review,
             "learning": learning_note,
+            "self_check": next(
+                (
+                    e["data"]["self_check"]
+                    for e in agent_log
+                    if isinstance(e.get("data"), dict) and e["data"].get("self_check")
+                ),
+                None,
+            ),
         },
         agent_log=agent_log,
         open_questions=open_questions,
@@ -532,6 +559,19 @@ def propose_for_round(
         source=source_kind,
     )
     return mv
+
+
+def _without_settled(questions: list[str], doc: MappingDocument, schema: TargetSchema) -> list[str]:
+    """The heuristic's "assumed VAT-inclusive — confirm" question is moot once the AI set the flag from evidence
+    (ADR-058); a model that kept the guess keeps the question."""
+    vat = schema.semantic_pointers("price.vat_included")
+    fields = [f for f in [*doc.fields, *(f for c in doc.collections for f in c.fields)] if f.target in vat]
+    settled = bool(fields) and all(
+        f.expr.op == "const" and (f.confidence or 0) >= 0.9 and f.evidence for f in fields
+    )
+    if not settled:
+        return questions
+    return [q for q in questions if not VAT_ASSUMED_QUESTION_RE.fullmatch(q)]
 
 
 def _inherit_confidence(doc: MappingDocument, review: dict[str, Any], previous: MappingVersion) -> None:

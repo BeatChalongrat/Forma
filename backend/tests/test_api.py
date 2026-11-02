@@ -617,15 +617,15 @@ def test_ai_endpoints_with_llm(client: TestClient, isolated_env: Path) -> None:
     rnd2 = c.post("/api/rounds", json={"customer_id": cust["id"], "label": "ai"}).json()
     _upload(c, rnd2["id"], make_workbook(isolated_env / "renamed.xlsx", rename_qty=True), name="renamed.xlsx")
     heuristic_doc = c.get(f"/api/mappings/{mid}").json()["document"]
-    fake.answers = [
-        {"tables": [{"table_index": 0, "role": "products"}]},
-        {
-            "mapping": heuristic_doc,
-            "confidence": 0.5,
-            "open_questions": ["AI asks: VAT?"],
-            "changes_from_draft": [],
-        },
-    ]
+    answer = {
+        "mapping": heuristic_doc,
+        "confidence": 0.5,
+        "open_questions": ["AI asks: VAT?"],
+        "changes_from_draft": [],
+    }
+    # the old mapping still reads the renamed column: FORMA runs it, reports the missing column, and the
+    # model insists twice (ADR-058) — the best answer is kept and the problem is on record
+    fake.answers = [{"tables": [{"table_index": 0, "role": "products"}]}, answer, answer, answer]
     pjob = c.post(f"/api/rounds/{rnd2['id']}/profile", params={"sync": "true"}).json()["job_id"]
     assert c.get(f"/api/jobs/{pjob}").json()["status"] == "done"
     job_id = c.post(f"/api/rounds/{rnd2['id']}/propose", json={"sync": True, "use_llm": True}).json()[
@@ -639,3 +639,9 @@ def test_ai_endpoints_with_llm(client: TestClient, isolated_env: Path) -> None:
     )
     assert "AI asks: VAT?" in mv["open_questions"]
     assert {entry["agent"] for entry in mv["agent_log"]} >= {"heuristic", "adaptation"}
+    adaptation = next(e for e in mv["agent_log"] if e["agent"] == "adaptation")
+    check = adaptation["data"]["self_check"]
+    assert check["fix_rounds"] == 2 and check["inspections"] == 0 and check["rows_out"] > 0
+    assert any("not found" in p for p in check["problems_left"])
+    assert adaptation["notes"][0].startswith("self_check_unresolved: ")
+    assert mv["policy"]["self_check"] == check

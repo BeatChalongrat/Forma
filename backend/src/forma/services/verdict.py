@@ -108,11 +108,13 @@ THAI_QUESTIONS = {
 def _question(q: dict[str, Any]) -> dict[str, str]:
     f = q["field"]
     known = THAI_QUESTIONS.get(f.get("semantic") or "")
-    if known and q["kind"] != "confirm":
+    if known and q["kind"] not in ("confirm", "choice"):
         return _text(*known)
     name = str(f.get("name") or "").replace("_", " ")
     en = f.get("description") or name
     th = f.get("description_th") or THAI_LABELS.get(f.get("semantic") or "") or f.get("description") or name
+    if q["kind"] == "choice":
+        return _text(f"Which column holds {en}?", f"คอลัมน์ไหนคือ{th}?")
     return _text(f"Is {en} read correctly?", f"{th} อ่านถูกต้องไหม?")
 
 
@@ -327,6 +329,22 @@ def for_mapping(
         )
     if llm_fallback:
         ev("ai", "AI was unavailable; the deterministic draft is in use", "AI ใช้งานไม่ได้ ใช้ร่างจากกฎแทน", None)
+    self_check = policy.get("self_check") or {}
+    if self_check:
+        left = len(self_check.get("problems_left") or [])
+        rounds, looked = int(self_check.get("fix_rounds") or 0), int(self_check.get("inspections") or 0)
+        ev(
+            "self_check",
+            f"The AI ran its mapping on the first {self_check.get('rows_checked', 0)} rows"
+            f" ({looked} look(s) at the file, {rounds} fix round(s)): {left} problem(s) left",
+            f"AI ลองรัน mapping กับ {self_check.get('rows_checked', 0)} แถวแรก"
+            f" (ดูไฟล์ {looked} ครั้ง แก้ {rounds} รอบ): เหลือปัญหา {left} ข้อ",
+            None,
+            rows=self_check.get("rows_checked", 0),
+            fix_rounds=rounds,
+            inspections=looked,
+            problems_left=left,
+        )
     if questions:
         ev(
             "questions",
@@ -538,7 +556,7 @@ def for_mapping(
                     if q["kind"] == "boolean"
                     else ["confirm"]
                     if q["kind"] == "confirm"
-                    else [],
+                    else list(q.get("options") or []),
                     "default": None,
                     "evidence_ids": [e["id"] for e in evidence if e["kind"] == "questions"],
                 }

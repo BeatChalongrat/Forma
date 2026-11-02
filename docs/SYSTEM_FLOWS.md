@@ -610,6 +610,8 @@ cancelled comes back as `open` if the round is reopened (ADR-053).
 | A status or promotion kind FORMA has no word for | kept as written and refused by the contract's enum, so it reaches a person; never active or percent_off by default | ADR-056 |
 | A column moved to another sheet | `columns_moved`: the approved mapping is not reused; the adaptation agent re-points it and a person reviews | ADR-057 |
 | A model writes an option the engine does not know (`day_first`) | repaired when it is a known spelling, otherwise refused by the validator and sent back to the model — never ignored | ADR-057 |
+| A mapping yields 0 records, or dates in the year 9456 | the engine runs the model's mapping on the first rows before the model is done; the report goes back to it and it fixes the mapping; what is left is a warning on the card | ADR-058 |
+| A heading row sits inside the data ("เครื่องดื่ม") | a section row: it becomes a column filled down to the next heading and leaves the data; never a product, never a header | ADR-058 |
 | Records break the contract | approval and export refused; Data Editor shows them; a save is refused only for errors it adds | ADR-026 |
 | Worker dies mid-job | stale recovery re-queues; stages already recorded are skipped; dataset objects are never partial | ADR-010, 015 |
 | Queue was full or Redis down at upload time | bulk items detected as stuck; Resume re-enqueues; startup reconciliation marks jobs done when results exist | ADR-027, 044 |
