@@ -22,6 +22,10 @@ class SandboxUnavailable(RuntimeError):
     pass
 
 
+class SandboxBusy(SandboxUnavailable):
+    """No code ran. Another isolated runner may safely accept the same request."""
+
+
 @dataclass(frozen=True)
 class Input:
     """One file for the run. ``open`` is called once, when the request is built."""
@@ -100,6 +104,8 @@ class SocketRunner:
         try:
             with self._client(timeout_s + 180) as client:
                 response = client.post("/run", content=archive, headers={"Content-Type": "application/x-tar"})
+            if response.status_code == 503:
+                raise SandboxBusy("All runner slots are occupied")
             if response.status_code != 200:
                 raise SandboxUnavailable(f"the runner answered HTTP {response.status_code}")
             return parse_result(response.json())
@@ -114,3 +120,28 @@ class SocketRunner:
                 return client.get("/health").status_code == 200
         except httpx.HTTPError:
             return False
+
+
+class RunnerPool:
+    """Separate containers, each serial. Never run concurrent code under the same sandbox UID.
+
+    Busy responses can fail over; uncertain failures cannot, to avoid duplicating a run.
+    """
+
+    def __init__(self, sockets: list[str]) -> None:
+        import random
+
+        self.runners = [SocketRunner(path) for path in dict.fromkeys(sockets)]
+        random.SystemRandom().shuffle(self.runners)
+
+    def run(self, code: str, inputs: Iterable[Input], timeout_s: float) -> RunResult:
+        inputs = list(inputs)
+        for runner in self.runners:
+            try:
+                return runner.run(code, inputs, timeout_s)
+            except SandboxBusy:
+                continue
+        raise SandboxBusy("All isolated runners are busy")
+
+    def healthy(self) -> bool:
+        return any(runner.healthy() for runner in self.runners)

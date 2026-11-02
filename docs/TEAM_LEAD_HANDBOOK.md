@@ -1,7 +1,7 @@
 # FORMA — Team lead handbook
 
 > **สรุปภาษาไทย** — จุดเริ่มต้นสำหรับหัวหน้าทีม: ระบบคืออะไรในหนึ่งหน้า, เอกสารแต่ละฉบับอยู่ไหนและใช้ตอนไหน,
-> ตัวชี้วัดที่ต้องดู, ความเสี่ยงที่เปิดอยู่, สิ่งที่ต้องตัดสินใจ, และสารบัญ ADR ทั้ง 59 ฉบับแบบบรรทัดเดียว
+> ตัวชี้วัดที่ต้องดู, ความเสี่ยงที่เปิดอยู่, สิ่งที่ต้องตัดสินใจ, และสารบัญ ADR ทั้ง 60 ฉบับแบบบรรทัดเดียว
 
 ## 1. One page
 
@@ -125,6 +125,7 @@ Before any production use, the open items in the risk register need a decision, 
 | 057 | What the first real AI run taught: op params in the prompt and validator, drift per table, year 9999, commit before the response |
 | 058 | The agent checks its own work: inspect the file, run the mapping on the first rows and fix it, plausibility checks, section rows, choice questions |
 | 059 | Confidence from evidence: the model sees values and FORMA's look before it maps, anchors from other customers, matcher-vs-model agreement bounds confidence, history plausibility, thresholds from outcomes, spot checks, grouped questions |
+| 060 | Mapping evidence and execution harness: strict file binding, reading signatures, raw-cell inspection, isolated Python experiments, full-file verification and coverage, contract checks, typed clarifications, benchmark |
 
 ## 6. Numbers to quote (and where they come from)
 
@@ -132,8 +133,8 @@ Before any production use, the open items in the risk register need a decision, 
 |---|---|---|
 | Field accuracy on the synthetic corpus, no AI | 0.996 (30/30 variants ≥ 0.99); identity 1.00; critical 1.00; drift 9/9 | `make eval-gate`, `data/eval_baseline.json` |
 | A 300-file night | 17 min, 8 worker processes, 12-core node, 30M rows | PERFORMANCE.md (pre-ADR-043; re-measure) |
-| Tests | 744 passed, 5 skipped locally, coverage 91 % (gate 85 % in CI) | `pytest`, CI |
-| Endpoints / tables / ADRs | ~129 / 23 / 59 | API_OVERVIEW.md, DATA_MODEL.md, adr/ |
+| Tests | 807 passed, 5 skipped locally, coverage 91 % (gate 85 % in CI) | `pytest`, CI |
+| Endpoints / tables / ADRs | ~129 / 23 / 60 | API_OVERVIEW.md, DATA_MODEL.md, adr/ |
 
 Anything else — accuracy on real files, provider accuracy, production throughput — is not yet measured and
 should be said so.

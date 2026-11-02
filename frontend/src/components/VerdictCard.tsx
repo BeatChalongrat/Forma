@@ -115,11 +115,13 @@ function Decision({ n, d, value, editable, onChange, onOpen }: { n: number; d: V
       </div>
       <fieldset disabled={!editable} className="mt-2 flex flex-wrap gap-2">
         {d.kind === 'boolean' && [true, false].map((opt) => <button key={String(opt)} className={cn('btn btn-sm', value === opt && 'btn-primary')} aria-pressed={value === opt} onClick={() => onChange(opt)}>{opt ? yes : no}</button>)}
-        {d.kind === 'choice' && d.options.map((opt) => <button key={String(opt)} className={cn('btn btn-sm', value === opt && 'btn-primary')} aria-pressed={value === opt} onClick={() => onChange(String(opt))}>{String(opt)}</button>)}
+        {(d.kind === 'choice' || d.kind === 'enum') && d.options.map((opt) => <button key={String(opt)} className={cn('btn btn-sm', value === opt && 'btn-primary')} aria-pressed={value === opt} onClick={() => onChange(String(opt))}>{String(opt)}</button>)}
+        {d.kind === 'text' && <input className="input" maxLength={5000} aria-label={d.question[lang]} value={value === undefined || value === null ? '' : String(value)} onChange={e => onChange(e.target.value || null)} />}
         {d.kind === 'number' && <input className="input max-w-40" type="number" aria-label={d.question[lang]} value={value === undefined || value === null ? '' : String(value)} onChange={(e) => onChange(e.target.value === '' ? null : Number(e.target.value))} />}
         {d.kind === 'confirm' && <button className={cn('btn btn-sm', value === 'confirm' && 'btn-primary')} aria-pressed={value === 'confirm'} onClick={() => onChange('confirm')}><Check size={14} />{t('Correct as read', 'อ่านถูกต้องแล้ว')}</button>}
         <button className={cn('btn btn-ghost btn-sm', value === 'unknown' && 'bg-surface-2')} aria-pressed={value === 'unknown'} onClick={() => onChange('unknown')}>{t('Not sure', 'ยังไม่ทราบ')}</button>
       </fieldset>
+      {d.scope === 'constant_for_this_file' && <p className="text-xs text-muted mt-2">{t('Applies to every record in this file. Use the field editor if values differ by row.', 'ใช้กับทุกรายการในไฟล์นี้ ถ้าค่าต่างกันแต่ละแถว ให้แก้การจับคู่คอลัมน์')}</p>}
     </div>
   )
 }

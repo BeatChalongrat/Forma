@@ -253,7 +253,7 @@ def test_file_workbench_runs_the_mapping_and_reports(tmp_path: Path, schema: Tar
     assert report.to_prompt()["sample_records"] == []
 
 
-def test_settled_vat_question_is_dropped(schema: TargetSchema) -> None:
+def test_model_confidence_cannot_settle_a_business_question(schema: TargetSchema) -> None:
     from forma.services.mapping import _without_settled
 
     q = [
@@ -264,7 +264,7 @@ def test_settled_vat_question_is_dropped(schema: TargetSchema) -> None:
     doc = _doc()
     vat = next(f for c in doc.collections for f in c.fields if f.target.endswith("/vat_included"))
     vat.confidence, vat.evidence = 0.95, ["Info sheet: net price excluding VAT 7%"]
-    assert _without_settled(list(q), doc, schema) == ["other"]
+    assert _without_settled(list(q), doc, schema) == q
     vat.confidence = 0.6
     assert _without_settled(list(q), doc, schema) == q
 

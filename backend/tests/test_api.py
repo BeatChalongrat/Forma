@@ -617,6 +617,8 @@ def test_ai_endpoints_with_llm(client: TestClient, isolated_env: Path) -> None:
     rnd2 = c.post("/api/rounds", json={"customer_id": cust["id"], "label": "ai"}).json()
     _upload(c, rnd2["id"], make_workbook(isolated_env / "renamed.xlsx", rename_qty=True), name="renamed.xlsx")
     heuristic_doc = c.get(f"/api/mappings/{mid}").json()["document"]
+    for source in heuristic_doc["sources"]:
+        source["file"]["name_pattern"] = r"^renamed\.xlsx$"
     answer = {
         "mapping": heuristic_doc,
         "confidence": 0.5,

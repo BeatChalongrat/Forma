@@ -125,7 +125,7 @@ services:
       migrate: { condition: service_completed_successfully }
       redis: { condition: service_healthy }
       minio-init: { condition: service_completed_successfully }
-    volumes: ["formadata:/data"]
+    volumes: ["formadata:/data", "sandbox-socket:/run/sandbox"]
     deploy:
       replicas: ${FORMA_WORKER_REPLICAS:-2}
     restart: unless-stopped

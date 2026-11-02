@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 
 from forma.ai import plausibility
 from forma.ai.agents import PROMPT_VERSION, AgentResult, adaptation_agent, mapping_agent, schema_agent
-from forma.ai.heuristics import VAT_ASSUMED_QUESTION_RE, HeuristicProposal, propose_mapping
+from forma.ai.heuristics import HeuristicProposal, propose_mapping
 from forma.ai.llm import LLMError
 from forma.ai.policy import PolicyDecision
 from forma.ai.workbench import FileWorkbench
@@ -72,34 +72,41 @@ def bind_sources(
 def _match_file(s: SourceSpec, files: list[SourceFile]) -> SourceFile | None:
     if not files:
         return None
-    if len(files) == 1 and not s.file.name_pattern and not s.file.sheet_names_any:
+    if len(files) == 1 and not s.file.name_pattern and not s.file.sheet_names_any and not s.file.fingerprint:
         return files[0]
     scored: list[tuple[float, SourceFile]] = []
     for f in files:
         score = 0.0
         if s.file.name_pattern:
             try:
-                if re.search(s.file.name_pattern, f.original_name):
-                    score += 2.0
+                if not re.search(s.file.name_pattern, f.original_name, re.IGNORECASE):
+                    continue
+                score += 2.0
             except re.error:
-                pass
+                return None
         if s.file.sheet_names_any and f.profile:
             names = {sh["name"].strip().lower() for sh in f.profile.get("meta", {}).get("sheets", [])}
             if any(n.strip().lower() in names for n in s.file.sheet_names_any):
                 score += 1.5
-        if s.file.fingerprint and f.fingerprint and f.fingerprint.get("strict") == s.file.fingerprint:
+            else:
+                continue
+        if s.file.fingerprint:
+            if not f.fingerprint or f.fingerprint.get("strict") != s.file.fingerprint:
+                continue
             score += 3.0
         if s.sheet and s.sheet.name and f.profile:
             names = {sh["name"].strip().lower() for sh in f.profile.get("meta", {}).get("sheets", [])}
             if s.sheet.name.strip().lower() in names:
                 score += 1.0
+            else:
+                continue
         if f.kind == "csv" and s.sheet is None:
             score += 0.5
         scored.append((score, f))
     scored.sort(key=lambda x: -x[0])
-    if scored and scored[0][0] > 0:
+    if scored and (len(scored) == 1 or scored[0][0] > scored[1][0]):
         return scored[0][1]
-    return files[0] if len(files) == 1 else None
+    return None
 
 
 # --------------------------------------------------------------------------------------------
@@ -178,7 +185,7 @@ def _sandbox(
     if baseline is None or not ctx.policy.policy["sandbox"]["enabled"]:
         return None
     try:
-        base_doc = MappingDocument.model_validate(baseline.document)
+        base_doc = format_memory.rebind_approved(baseline, files, for_comparison=True)
     except Exception:
         return None
     report, details = sandbox.run(
@@ -296,7 +303,7 @@ def propose_for_round(
 
     # 1) Mapping memory: identical structure → reuse the approved mapping verbatim
     if previous is not None and drift in ("identical", "header_moved"):
-        doc = MappingDocument.model_validate(previous.document)
+        doc = format_memory.rebind_approved(previous, r.files)
         doc.meta.version = next_version
         doc.meta.confidence = 1.0
         doc.meta.created_by = "system"
@@ -309,7 +316,7 @@ def propose_for_round(
         # 2) deterministic draft, reading what this customer's operators taught FORMA before (ADR-038)
         from forma.services import learning
 
-        learned = learning.learned_for(session, r.customer_id, schema)
+        learned = learning.learned_for(session, r.customer_id, schema, current_format=current_fp)
         # ... and what other customers' approved mappings say these headers mean (ADR-059)
         learned.absorb(
             learning.anchors_for(session, r.customer_id, schema),
@@ -337,6 +344,8 @@ def propose_for_round(
         source_kind = "heuristic"
         # 3) AI refinement, with the file to look at and the engine to try the mapping on (ADR-058)
         if use_llm:
+            from forma.services.mapping_lab import executor
+
             workbench = FileWorkbench(
                 schema,
                 profile,
@@ -345,6 +354,7 @@ def propose_for_round(
                 resolve=ctx.storage.local_path,
                 rows=ctx.settings.llm_self_check_rows,
                 max_chars=ctx.settings.llm_max_sample_chars,
+                execute=executor(ctx, r.files, schema),
                 history=(previous.policy or {}).get("simulation") if previous else None,
             )
             try:
@@ -389,6 +399,7 @@ def propose_for_round(
                 open_questions.extend(
                     res.data.get("open_questions", []) if isinstance(res.data, dict) else []
                 )
+                open_questions.extend(q["question"] for q in res.data.get("clarifications", []))
                 if any(n.startswith("llm_failed") for n in res.notes):
                     llm_fallback = True
                     source_kind = "heuristic"
@@ -407,7 +418,7 @@ def propose_for_round(
     sim, problems = (
         (None, [f"{i.code}: {i.message}" for i in rep.issues if i.level == "error"])
         if not rep.ok
-        else simulate(ctx, doc, schema, r.files)
+        else simulate(ctx, doc, schema, r.files, limit=None)
     )
     findings = (
         [f.to_dict() for f in sim.findings]
@@ -445,8 +456,7 @@ def propose_for_round(
         sim
         and prev_sim
         and prev_sim.get("rows_out")
-        and sim.stats["rows_out"] < 3000
-        and prev_sim["rows_out"] < 3000
+        and (prev_sim.get("complete") is True or prev_sim["rows_out"] < 3000)
     ):
         row_change_ratio = abs(sim.stats["rows_out"] - prev_sim["rows_out"]) / prev_sim["rows_out"]
     mv_id = new_id("map")
@@ -491,6 +501,10 @@ def propose_for_round(
         open_questions=open_questions,
         agreement=agreement,
     )
+    from forma.ai.reconciliation import require_verification, verification
+
+    verified = verification(sim, schema, complete=True, binding_problems=problems, self_check=self_check)
+    require_verification(decision, verified)
     _verdict(ctx, sandbox_report)
     mv = MappingVersion(
         id=mv_id,
@@ -512,7 +526,9 @@ def propose_for_round(
             "reused_from": previous.id if source_kind == "memory" and previous else None,
             "file_fingerprints": file_fps,
             "simulation": (
-                {**sim.summary(), "fill": plausibility.fill_shares(sim.records, schema)} if sim else None
+                {**sim.summary(), "complete": True, "fill": plausibility.fill_shares(sim.records, schema)}
+                if sim
+                else None
             ),
             "sample": (sim.records[:5] if sim else []),
             "sandbox": sandbox_report,
@@ -521,6 +537,10 @@ def propose_for_round(
             "self_check": self_check,
             "agreement": agreement,
             "confidence_basis": confidence_basis,
+            "verification": verified,
+            "clarifications": [
+                q for entry in agent_log for q in (entry.get("data") or {}).get("clarifications", [])
+            ],
         },
         agent_log=agent_log,
         open_questions=open_questions,
@@ -621,10 +641,12 @@ def _col_names(expr: Any) -> list[str]:
 
 
 def _agreement(draft: MappingDocument, doc: MappingDocument) -> dict[str, Any]:
-    """Where FORMA's matcher and the model read the file alike (ADR-059). Agreement is about *which columns*
-    a field reads: the same columns (on the same sheet, when both name one) agree whatever the ops around them
-    and whatever the source is called; different columns, or different constants, disagree (what each reads);
-    ``model_only`` and ``dropped``: one of them has the field and the other does not."""
+    """Compare the complete reading, including transforms and selection boundaries.
+
+    This is a consistency signal, not independent corroboration of business meaning.
+    """
+    from forma.ai.evidence import reading_signature
+
     a, b = healing._fields(draft), healing._fields(doc)
     out: dict[str, Any] = {"agree": [], "disagree": {}, "model_only": [], "dropped": []}
     for target in sorted(set(a) | set(b)):
@@ -635,15 +657,7 @@ def _agreement(draft: MappingDocument, doc: MappingDocument) -> dict[str, Any]:
         if y is None:
             out["dropped"].append(target)
             continue
-        cx, cy = sorted(set(_col_names(x["expr"]))), sorted(set(_col_names(y["expr"])))
-        sx = next(
-            (s.sheet.name for s in draft.sources if s.id == x["source"] and s.sheet and s.sheet.name), None
-        )
-        sy = next(
-            (s.sheet.name for s in doc.sources if s.id == y["source"] and s.sheet and s.sheet.name), None
-        )
-        same_sheet = sx is None or sy is None or sx.strip().lower() == sy.strip().lower()
-        if (cx and cx == cy and same_sheet) or (not cx and not cy and x["expr"] == y["expr"]):
+        if reading_signature(draft, target) == reading_signature(doc, target):
             out["agree"].append(target)
         else:
             out["disagree"][target] = {
@@ -717,16 +731,11 @@ def _sampled_for_audit(round_id: str, share: float) -> bool:
 
 
 def _without_settled(questions: list[str], doc: MappingDocument, schema: TargetSchema) -> list[str]:
-    """The heuristic's "assumed VAT-inclusive — confirm" question is moot once the AI set the flag from evidence
-    (ADR-058); a model that kept the guess keeps the question."""
-    vat = schema.semantic_pointers("price.vat_included")
-    fields = [f for f in [*doc.fields, *(f for c in doc.collections for f in c.fields)] if f.target in vat]
-    settled = bool(fields) and all(
-        f.expr.op == "const" and (f.confidence or 0) >= 0.9 and f.evidence for f in fields
-    )
-    if not settled:
-        return questions
-    return [q for q in questions if not VAT_ASSUMED_QUESTION_RE.fullmatch(q)]
+    """A model's confidence/evidence prose cannot resolve a business assumption.
+
+    Structured operator answers retire the question in review_questions.answer_document.
+    """
+    return questions
 
 
 def _inherit_confidence(doc: MappingDocument, review: dict[str, Any], previous: MappingVersion) -> None:
@@ -903,7 +912,7 @@ def save_mapping_edit(
     document: dict[str, Any],
     actor: str,
     *,
-    simulate_rows: int | None = 3000,
+    simulate_rows: int | None = None,
     remaining_questions: list[Any] | None = None,
 ) -> MappingVersion:
     """A human edited the DSL in the Mapping Studio → new proposed version (never mutate in place)."""
@@ -931,7 +940,9 @@ def save_mapping_edit(
     doc.meta.target_schema = schema.ref
     doc.meta.customer_id = parent.customer_id
     r = session.get(ImportRound, parent.round_id) if parent.round_id else None
-    sim, problems = simulate(ctx, doc, schema, r.files if r else [], limit=simulate_rows) if r else (None, [])
+    # Saving a production candidate always verifies the entire input. Preview endpoints may sample.
+    sim, problems = simulate(ctx, doc, schema, r.files if r else [], limit=None) if r else (None, [])
+    remaining_questions = parent.open_questions if remaining_questions is None else remaining_questions
     findings = (
         [f.to_dict() for f in sim.findings]
         if sim
@@ -958,6 +969,10 @@ def save_mapping_edit(
         sandbox=sandbox_report,
         open_questions=remaining_questions,
     )
+    from forma.ai.reconciliation import require_verification, verification
+
+    verified = verification(sim, schema, complete=True, binding_problems=problems)
+    require_verification(decision, verified)
     _verdict(ctx, sandbox_report)
     mv = MappingVersion(
         id=mv_id,
@@ -976,7 +991,13 @@ def save_mapping_edit(
             "source": "human_edit",
             "target_schema_hash": stable_hash(schema.document),
             "file_fingerprints": (parent.policy or {}).get("file_fingerprints", {}),
-            "simulation": sim.summary() if sim else None,
+            "simulation": {**sim.summary(), "complete": True} if sim else None,
+            "verification": verified,
+            "clarifications": [
+                q
+                for q in (parent.policy or {}).get("clarifications", [])
+                if q["question"] in (remaining_questions or [])
+            ],
             "sample": sim.records[:5] if sim else [],
             "sandbox": sandbox_report,
         },

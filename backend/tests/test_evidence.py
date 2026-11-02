@@ -80,10 +80,10 @@ def test_ground_looks_at_uncertain_columns_and_their_alternatives(
     columns = [x["request"]["column"] for x in looked]
     assert columns[0] == "ชื่อสินค้า"  # the column read comes first
     assert "สถานะ" in columns  # a free text column that could hold the name instead
-    assert "รหัสสินค้า" not in columns  # taken by /sku
+    assert "รหัสสินค้า" in columns  # critical identity is checked even when its draft confidence is high
     assert looked[0]["answer"]["values"][0]["value"] == "สินค้า 1"
     doc.fields[1].confidence = 0.95
-    assert bench.ground(doc) == []  # nothing is uncertain: nothing to look at
+    assert bench.ground(doc)  # critical fields still need source evidence when the model claims confidence
 
 
 def test_the_agent_sees_what_forma_looked_at(profile: WorkbookProfile, schema: TargetSchema) -> None:
@@ -295,9 +295,9 @@ def test_an_automatic_approval_can_be_spot_checked(client: TestClient, isolated_
     assert set(rep["per_signal"]) == {"agree", "disagree", "model_only"}
 
 
-def _unsure_name(c: TestClient, root: Path, code: str) -> str:
+def _unsure_name(c: TestClient, root: Path, code: str, customer_id: str | None = None) -> str:
     """A proposed mapping whose /product_name is read from one column with low confidence (a choice)."""
-    cust = c.post("/api/customers", json={"code": code, "name": code}).json()["id"]
+    cust = customer_id or c.post("/api/customers", json={"code": code, "name": code}).json()["id"]
     r = c.post("/api/rounds", json={"customer_id": cust}).json()["id"]
     _upload(c, r, make_workbook(root / f"{code}.xlsx"))
     mv = _run(c, r)["result"]["mapping_version_id"]
@@ -312,10 +312,13 @@ def _unsure_name(c: TestClient, root: Path, code: str) -> str:
 
 def test_the_same_question_across_files_is_answered_once(client: TestClient, isolated_env: Path) -> None:
     c = client
-    a, b = _unsure_name(c, isolated_env, "G1"), _unsure_name(c, isolated_env, "G2")
+    cust = c.post("/api/customers", json={"code": "GROUP", "name": "GROUP"}).json()["id"]
+    a, b = _unsure_name(c, isolated_env, "G1", cust), _unsure_name(c, isolated_env, "G1", cust)
+    other_customer = _unsure_name(c, isolated_env, "G1")
     groups = c.get("/api/review/question-groups").json()
     g = next(x for x in groups if x["field"]["pointer"] == "/product_name")
     assert g["kind"] == "choice" and {m["mapping_id"] for m in g["members"]} == {a, b}
+    assert other_customer not in {m["mapping_id"] for m in g["members"]}
     assert g["options"][0] == "ชื่อสินค้า" and "ยี่ห้อ" in g["options"]
     assert (
         c.post("/api/review/question-groups/answer", json={"key": "0" * 16, "answer": "ยี่ห้อ"}).status_code

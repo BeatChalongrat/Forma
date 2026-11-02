@@ -299,6 +299,25 @@ def eval(
 
 
 @app.command()
+def benchmark(manifest: Path, report: Path, llm: bool = False) -> None:
+    """Frozen cold/warm/drift cases and optional supplied external baseline. --llm enables paid generation."""
+    from forma.eval.benchmark import run as run_benchmark
+
+    client, settings = None, None
+    if llm:
+        from forma.services.context import get_context
+
+        context = get_context()
+        client, settings = context.llm, context.settings
+        if client.is_mock:
+            raise typer.BadParameter("Configure a real provider before using --llm")
+    result = run_benchmark(manifest, client=client, settings=settings)
+    report.parent.mkdir(parents=True, exist_ok=True)
+    report.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
+    typer.echo(json.dumps(result["summary"], ensure_ascii=False, indent=2))
+
+
+@app.command()
 def seed(corpus: Path = Path("../data/synthetic"), run: bool = True) -> None:
     """Load the synthetic corpus into the database as customers/rounds (demo data)."""
     from forma.synth.seed import seed_database

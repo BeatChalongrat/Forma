@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Warehouse dispatch contract",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["dispatch_id", "destination", "cartons", "declared_value", "invoice_value"],
+  "properties": {
+    "dispatch_id": {"type": "string", "description": "Dispatch reference; retain leading zeros.", "x-forma": {"risk": "critical", "synonyms_en": ["Dispatch Ref"]}},
+    "destination": {"type": "string", "description": "Destination warehouse code, not a customer or item name.", "x-forma": {"synonyms_en": ["Destination"]}},
+    "cartons": {"type": "integer", "minimum": 0, "description": "Number of cartons shipped, not units per carton.", "x-forma": {"risk": "high", "synonyms_en": ["Cartons"]}},
+    "declared_value": {"type": "number", "minimum": 0, "description": "Total declared value, in THB. Do not multiply by carton count.", "x-forma": {"risk": "high", "synonyms_en": ["Declared THB"]}},
+    "invoice_value": {"type": "number", "minimum": 0, "description": "Invoice value, in THB, for reconciliation.", "x-forma": {"risk": "high", "synonyms_en": ["Invoice THB"]}}
+  },
+  "x-forma": {
+    "schema_id": "dispatch", "version": 1, "identity_keys": ["/dispatch_id"],
+    "checks": [{"id": "declared-matches-invoice", "rule": "sum_equals", "left": "/declared_value", "right": "/invoice_value", "tolerance": 0.01}]
+  }
+}
