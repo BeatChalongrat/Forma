@@ -1,0 +1,293 @@
+{
+  "evaluator": "Fresh-context coding-agent assisted mapping; not a literal ChatGPT or Claude product run.",
+  "phase": "Initial predictions preserved; controlled human replies applied separately to four affected tasks.",
+  "input_access": "Only index.json, task.md, schema.json, and index-listed source data under this blind directory; no expected data, oracle, project source, or reports read.",
+  "tools": [
+    "PowerShell via exec_command",
+    "Bundled Python runtime",
+    "openpyxl for read-only Excel parsing",
+    "Python csv, json, decimal, datetime, hashlib",
+    "Custom recursive checks of the supplied schemas: types, required fields, additionalProperties, enum, min/max, patterns and date format (jsonschema library unavailable)"
+  ],
+  "assumptions": [
+    "Optional missing facts are omitted; schema defaults are not applied as business evidence.",
+    "Repeated source groups are parsed from each round input, with round-specific rules taken from task.md.",
+    "Tax percentages are fixture values, normalized to fractions without adjusting amounts.",
+    "No internet, API, connector publishing, or external business facts used."
+  ],
+  "tasks": [
+    {
+      "id": "B01_r1",
+      "status": "mapped",
+      "record_count": 12,
+      "questions": [],
+      "prediction_file": "B01_r1/prediction-before.json",
+      "schema_validation_errors": []
+    },
+    {
+      "id": "B02_r1",
+      "status": "mapped",
+      "record_count": 12,
+      "questions": [],
+      "prediction_file": "B02_r1/prediction-before.json",
+      "schema_validation_errors": []
+    },
+    {
+      "id": "B03_r1",
+      "status": "mapped",
+      "record_count": 12,
+      "questions": [],
+      "prediction_file": "B03_r1/prediction-before.json",
+      "schema_validation_errors": []
+    },
+    {
+      "id": "B04_r1",
+      "status": "mapped",
+      "record_count": 12,
+      "questions": [],
+      "prediction_file": "B04_r1/prediction-before.json",
+      "schema_validation_errors": []
+    },
+    {
+      "id": "B05_r1",
+      "status": "mapped",
+      "record_count": 12,
+      "questions": [],
+      "prediction_file": "B05_r1/prediction-before.json",
+      "schema_validation_errors": []
+    },
+    {
+      "id": "B06_r1",
+      "status": "mapped",
+      "record_count": 12,
+      "questions": [],
+      "prediction_file": "B06_r1/prediction-before.json",
+      "schema_validation_errors": []
+    },
+    {
+      "id": "B07_r1",
+      "status": "mapped",
+      "record_count": 12,
+      "questions": [],
+      "prediction_file": "B07_r1/prediction-before.json",
+      "schema_validation_errors": []
+    },
+    {
+      "id": "B08_r1",
+      "status": "mapped",
+      "record_count": 12,
+      "questions": [],
+      "prediction_file": "B08_r1/prediction-before.json",
+      "schema_validation_errors": []
+    },
+    {
+      "id": "B09_r1",
+      "status": "mapped",
+      "record_count": 12,
+      "questions": [],
+      "prediction_file": "B09_r1/prediction-before.json",
+      "schema_validation_errors": []
+    },
+    {
+      "id": "B10_r1",
+      "status": "mapped",
+      "record_count": 12,
+      "questions": [],
+      "prediction_file": "B10_r1/prediction-before.json",
+      "schema_validation_errors": []
+    },
+    {
+      "id": "B11_r1",
+      "status": "mapped",
+      "record_count": 12,
+      "questions": [],
+      "prediction_file": "B11_r1/prediction-before.json",
+      "schema_validation_errors": []
+    },
+    {
+      "id": "B12_r1",
+      "status": "mapped",
+      "record_count": 12,
+      "questions": [],
+      "prediction_file": "B12_r1/prediction-before.json",
+      "schema_validation_errors": []
+    },
+    {
+      "id": "B13_r1",
+      "status": "mapped_after_controlled_reply",
+      "record_count": 12,
+      "questions": [],
+      "prediction_file": "B13_r1/prediction-before.json",
+      "schema_validation_errors": [],
+      "before_status": "awaiting_clarification",
+      "before_questions": [
+        {
+          "id": "B13-date-order",
+          "question": "For Effective date = 03/04/2026, is the format DD/MM/YYYY (3 April 2026) or MM/DD/YYYY (March 4, 2026)? Does that format apply to all rows?",
+          "field": "prices[].effective_from",
+          "scope": {
+            "file": "export.csv",
+            "rows": "all 12 products"
+          }
+        }
+      ],
+      "prediction_after_file": "B13_r1/prediction-after.json",
+      "after_validation": "Custom recursive structural schema checks passed: types, required fields, additionalProperties, enum, bounds, patterns and date format; initial file SHA-256 unchanged.",
+      "after_schema_validation_errors": []
+    },
+    {
+      "id": "B14_r1",
+      "status": "mapped_after_controlled_reply",
+      "record_count": 12,
+      "questions": [],
+      "prediction_file": "B14_r1/prediction-before.json",
+      "schema_validation_errors": [],
+      "before_status": "awaiting_clarification",
+      "before_questions": [
+        {
+          "id": "B14-dollar-currency",
+          "question": "Which three-letter ISO currency does the $ symbol in Net price mean, and does it apply to every row (for example USD, SGD, AUD, or another currency)?",
+          "field": "currency",
+          "scope": {
+            "file": "export.csv",
+            "rows": "all 12 products"
+          }
+        }
+      ],
+      "prediction_after_file": "B14_r1/prediction-after.json",
+      "after_validation": "Custom recursive structural schema checks passed: types, required fields, additionalProperties, enum, bounds, patterns and date format; initial file SHA-256 unchanged.",
+      "after_schema_validation_errors": []
+    },
+    {
+      "id": "B15_r1",
+      "status": "mapped_after_controlled_reply",
+      "record_count": 12,
+      "questions": [],
+      "prediction_file": "B15_r1/prediction-before.json",
+      "schema_validation_errors": [],
+      "before_status": "awaiting_clarification",
+      "before_questions": [
+        {
+          "id": "B15-unit-BT",
+          "question": "What does Sales unit code BT mean in this export, and what target sell_unit should represent it?",
+          "field": "unit.sell_unit",
+          "scope": {
+            "file": "export.csv",
+            "rows": "all 12 products",
+            "source_value": "BT"
+          }
+        }
+      ],
+      "prediction_after_file": "B15_r1/prediction-after.json",
+      "after_validation": "Custom recursive structural schema checks passed: types, required fields, additionalProperties, enum, bounds, patterns and date format; initial file SHA-256 unchanged.",
+      "after_schema_validation_errors": []
+    },
+    {
+      "id": "B16_r1",
+      "status": "mapped_after_controlled_reply",
+      "record_count": 12,
+      "questions": [],
+      "prediction_file": "B16_r1/prediction-before.json",
+      "schema_validation_errors": [],
+      "before_status": "awaiting_clarification",
+      "before_questions": [
+        {
+          "id": "B16-price-conflict",
+          "question": "For SKU 00470001 and price list standard, source rows give 1234.56 and 9999 with no dates or priority. Which price is authoritative, or do these represent distinct price periods or tiers requiring additional identifying information?",
+          "field": "prices[].amount",
+          "scope": {
+            "file": "export.csv",
+            "sku": "00470001",
+            "price_list": "standard",
+            "source_rows": [
+              2,
+              14
+            ]
+          }
+        }
+      ],
+      "prediction_after_file": "B16_r1/prediction-after.json",
+      "after_validation": "Custom recursive structural schema checks passed: types, required fields, additionalProperties, enum, bounds, patterns and date format; initial file SHA-256 unchanged.",
+      "after_schema_validation_errors": []
+    },
+    {
+      "id": "B02_r2",
+      "status": "mapped",
+      "record_count": 12,
+      "questions": [],
+      "prediction_file": "B02_r2/prediction-before.json",
+      "schema_validation_errors": []
+    },
+    {
+      "id": "B02_r3",
+      "status": "mapped",
+      "record_count": 12,
+      "questions": [],
+      "prediction_file": "B02_r3/prediction-before.json",
+      "schema_validation_errors": []
+    },
+    {
+      "id": "B03_r2",
+      "status": "mapped",
+      "record_count": 12,
+      "questions": [],
+      "prediction_file": "B03_r2/prediction-before.json",
+      "schema_validation_errors": []
+    },
+    {
+      "id": "B03_r3",
+      "status": "mapped",
+      "record_count": 12,
+      "questions": [],
+      "prediction_file": "B03_r3/prediction-before.json",
+      "schema_validation_errors": []
+    },
+    {
+      "id": "B05_alt",
+      "status": "mapped",
+      "record_count": 12,
+      "questions": [],
+      "prediction_file": "B05_alt/prediction-before.json",
+      "schema_validation_errors": []
+    }
+  ],
+  "isolation": "Memory isolation is context/instruction-based. Shared host access is not a hardened filesystem sandbox.",
+  "controlled_reply_updates": [
+    {
+      "id": "B13_r1",
+      "question_id": "B13-date-order",
+      "reply_verbatim": "DD/MM/YYYY, 3 April 2026, all Effective date rows.",
+      "change": "Set prices[].effective_from to 2026-04-03 for all 12 records; retained original date text in attributes.",
+      "before_sha256": "7d54bbca6090e034f206b086aabc0bd292639e4aab8311192a2067e596c318e6",
+      "before_unchanged": true,
+      "output_file": "B13_r1/prediction-after.json"
+    },
+    {
+      "id": "B14_r1",
+      "question_id": "B14-dollar-currency",
+      "reply_verbatim": "SGD, all rows in this source.",
+      "change": "Set currency to SGD for all 12 records; no amounts converted.",
+      "before_sha256": "5a059573e91144985e641b031f451d380dca25c882cd84888b01aa05ae2e7825",
+      "before_unchanged": true,
+      "output_file": "B14_r1/prediction-after.json"
+    },
+    {
+      "id": "B15_r1",
+      "question_id": "B15-unit-BT",
+      "reply_verbatim": "BT means BOTTLE in this source only, not a global alias.",
+      "change": "Set unit.sell_unit to BOTTLE for all 12 records; retained original BT code in attributes; mapping scoped to this source only.",
+      "before_sha256": "b75fff6fff07fe385bd118311c6e54018ec22eb2e469f063e7bc016fc29faa32",
+      "before_unchanged": true,
+      "output_file": "B15_r1/prediction-after.json"
+    },
+    {
+      "id": "B16_r1",
+      "question_id": "B16-price-conflict",
+      "reply_verbatim": "for SKU 00470001 standard use 1234.56; the 9999 row is an erroneous duplicate to exclude.",
+      "change": "Restore one standard price of 1234.56 for SKU 00470001, retaining source tax flag false and tax rate 0.05; exclude erroneous 9999 duplicate.",
+      "before_sha256": "cb85c61817ee77918b81fe43154540ad3557a0e11f0e46ae5092810e9545947f",
+      "before_unchanged": true,
+      "output_file": "B16_r1/prediction-after.json"
+    }
+  ]
+}

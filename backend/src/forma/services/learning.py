@@ -22,7 +22,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from forma.core.errors import NotFound, ValidationFailed
-from forma.db.models import Correction, MappingVersion
+from forma.db.models import Correction, ImportRound, MappingVersion
 from forma.fingerprint.fingerprint import Fingerprint, compare, norm_header
 from forma.mapping_dsl.models import MappingDocument
 from forma.schema_registry import TargetSchema
@@ -44,10 +44,11 @@ class Learned:
     ids: dict[str, list[str]] = field(default_factory=dict)  # pointer → correction ids (to count uses)
     anchors: list[dict[str, Any]] = field(default_factory=list)  # other customers' pairs below the share bar
     anchored: int = 0  # pairs that became aliases because enough customers approved them (ADR-059)
+    rules: list[dict[str, Any]] = field(default_factory=list)
 
     @property
     def empty(self) -> bool:
-        return not self.aliases and not self.constants and not self.anchors
+        return not self.aliases and not self.constants and not self.anchors and not self.rules
 
     def alias_for(self, pointer: str, header: str) -> str | None:
         return self.aliases.get(pointer, {}).get(norm_header(header))
@@ -72,6 +73,7 @@ class Learned:
                 {"target": p, "value": v, "why": why} for p, (v, why) in sorted(self.constants.items())
             ][:20],
             "anchors_from_other_customers": self.anchors[:40],
+            "approved_interpretation_rules": self.rules[:40],
         }
 
     def absorb(self, anchors: Anchors, headers: set[str], share_after: int) -> None:
@@ -177,6 +179,10 @@ def _columns(reads: list[str]) -> list[str]:
 
 def record_from_approval(session: Session, m: MappingVersion, actor: str) -> list[Correction]:
     """Called when a mapping is approved: diff it against FORMA's own proposal and keep what changed."""
+    from forma.services import decision_memory
+
+    decisions = decision_memory.record(session, m, actor)
+    decided = {d["target"] for d in (m.policy or {}).get("confirmed_decisions", [])}
     if m.created_by in PROPOSED_BY:
         row = Correction(
             customer_id=m.customer_id,
@@ -190,14 +196,16 @@ def record_from_approval(session: Session, m: MappingVersion, actor: str) -> lis
             round_id=m.round_id,
         )
         session.add(row)
-        return [row]
+        return [*decisions, row]
     base = _proposed_ancestor(session, m)
     if base is None:
-        return []
+        return decisions
     old = MappingDocument.model_validate(base.document)
     new = MappingDocument.model_validate(m.document)
     out: list[Correction] = []
     for ch in field_changes(old, new):
+        if ch["pointer"] in decided:
+            continue  # Typed decisions retain their scope; do not also learn a global constant.
         if ch["status"] not in ("changed", "added"):
             continue
         after = ch["after"] or {}
@@ -255,7 +263,7 @@ def record_from_approval(session: Session, m: MappingVersion, actor: str) -> lis
         )
     for row in out:
         session.add(row)
-    return out
+    return [*decisions, *out]
 
 
 # --------------------------------------------------------------------------------------------
@@ -267,9 +275,11 @@ def learned_for(
     schema: TargetSchema,
     *,
     current_format: Fingerprint | None = None,
+    requirements: str | None = None,
 ) -> Learned:
     """This customer's confirmed aliases and constants plus the promoted (global) aliases."""
     out = Learned()
+    conflicted_constants: set[str] = set()
     known = {f.pointer for f in schema.fields(include_system=True)}
     rows = session.scalars(
         select(Correction)
@@ -285,6 +295,12 @@ def learned_for(
             continue
         when = r.created_at.date().isoformat() if r.created_at else ""
         if r.kind == "constant":
+            origin = session.get(MappingVersion, r.mapping_version_id) if r.mapping_version_id else None
+            origin_round = session.get(ImportRound, origin.round_id) if origin and origin.round_id else None
+            if requirements is not None and requirements != (
+                origin_round.notes or "" if origin_round else ""
+            ):
+                continue
             if current_format is not None:
                 from forma.services.format_memory import mapping_fingerprint
 
@@ -295,6 +311,13 @@ def learned_for(
                     "header_moved",
                 ):
                     continue  # A value confirmed for one file layout is not a universal business fact.
+            if r.target in conflicted_constants:
+                continue
+            if r.target in out.constants and out.constants[r.target][0] != r.after:
+                conflicted_constants.add(r.target)
+                out.constants.pop(r.target, None)
+                out.ids.pop(r.target, None)
+                continue
             if r.target not in out.constants:
                 out.constants[r.target] = (r.after, f"learned: confirmed by {r.actor} on {when}")
                 out.ids.setdefault(r.target, []).append(r.id)
@@ -427,7 +450,7 @@ def stats(session: Session, *, months: int = 6, customers: frozenset[str] | None
     series = []
     for mth in months_seen:
         c = by_month.get(mth, Counter())
-        corrections = c["alias"] + c["constant"]
+        corrections = c["alias"] + c["constant"] + c["decision"]
         decided = c["accepted"] + corrections
         series.append(
             {
@@ -447,8 +470,9 @@ def stats(session: Session, *, months: int = 6, customers: frozenset[str] | None
         "aliases": sum(1 for r in active if r.kind == "alias"),
         "constants": sum(1 for r in active if r.kind == "constant"),
         "promoted": sum(1 for r in active if r.kind == "promoted"),
+        "decisions": sum(1 for r in active if r.kind == "decision"),
         "customers_taught": len(
-            {r.customer_id for r in active if r.customer_id and r.kind in ("alias", "constant")}
+            {r.customer_id for r in active if r.customer_id and r.kind in ("alias", "constant", "decision")}
         ),
         "uses": sum(int(r.uses or 0) for r in active),
     }
@@ -463,7 +487,7 @@ def list_learned(
     customers: frozenset[str] | None = None,
 ) -> dict[str, Any]:
     q = select(Correction).where(
-        Correction.status == "confirmed", Correction.kind.in_(("alias", "constant", "promoted"))
+        Correction.status == "confirmed", Correction.kind.in_(("alias", "constant", "promoted", "decision"))
     )
     if customer_id:
         q = q.where(Correction.customer_id == customer_id)
@@ -481,6 +505,7 @@ def list_learned(
                 "header": r.header,
                 "column": (r.after or {}).get("column") if isinstance(r.after, dict) else None,
                 "value": r.after if r.kind == "constant" else None,
+                "decision": r.after if r.kind == "decision" else None,
                 "actor": r.actor,
                 "round_id": r.round_id,
                 "uses": int(r.uses or 0),

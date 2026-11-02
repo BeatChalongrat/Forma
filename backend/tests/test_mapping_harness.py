@@ -261,11 +261,17 @@ def test_structured_answer_changes_one_field_and_keeps_other_questions(schema: T
         "kind": "enum",
         "options": ["Retail", "Wholesale"],
     }
+    document = _doc().model_dump(mode="json")
+    # A file-wide answer is valid for a missing constant, not a row-varying name.
+    next(f for f in document["fields"] if f["target"] == "/product_name")["expr"] = {
+        "op": "const",
+        "value": None,
+    }
     mapping = MappingVersion(
         id="test",
         status="proposed",
         target_schema=schema.ref,
-        document=_doc().model_dump(mode="json"),
+        document=document,
         policy={"clarifications": [clarification]},
         open_questions=[clarification["question"], "Confirm the currency with the owner"],
     )
@@ -276,7 +282,11 @@ def test_structured_answer_changes_one_field_and_keeps_other_questions(schema: T
     field = next(f for f in document["fields"] if f["target"] == "/product_name")
     assert field["expr"] == {"op": "const", "value": "Retail"}
     assert remaining == ["Confirm the currency with the owner"]
-    assert mapping.document == _doc().model_dump(mode="json")  # original version is immutable
+    assert mapping.document["fields"] != document["fields"]  # answered copy differs
+    assert next(f for f in mapping.document["fields"] if f["target"] == "/product_name")["expr"] == {
+        "op": "const",
+        "value": None,
+    }  # original version is immutable
 
 
 def test_mapping_sandbox_only_receives_the_round_files(tmp_path: Path, schema: TargetSchema, monkeypatch):

@@ -98,9 +98,10 @@ def test_schema_agent(profile: WorkbookProfile, schema: TargetSchema) -> None:
     client = LLMClient(
         MockProvider(lambda s, u, sc: {"tables": [{"table_index": 0, "role": "products"}]}), model="m"
     )
-    res = agents.schema_agent(client, profile, schema)
+    res = agents.schema_agent(client, profile, schema, instructions="Dates use MM/DD/YYYY")
     assert res.name == "schema" and res.data["tables"][0]["role"] == "products" and res.attempts == 1
     sent = json.loads(client.provider.calls[0]["user"])  # type: ignore[attr-defined]
+    assert sent["operator_requirements"] == "Dates use MM/DD/YYYY"
     assert "workbook_profile" in sent and sent["output_schema"] == agents.SCHEMA_AGENT_SCHEMA
     assert res.to_dict()["agent"] == "schema"
     bad = LLMClient(MockProvider(lambda s, u, sc: {"tables": "nope"}), model="m", max_retries=0)
@@ -131,7 +132,13 @@ def test_mapping_agent_accepts_valid_mapping_and_retries_invalid(
 
     client = LLMClient(MockProvider(responder), model="gpt-4.1-mini", max_retries=2)
     doc, res = agents.mapping_agent(
-        client, profile, schema, _draft(), schema_analysis={"tables": []}, examples=[{"similarity": 0.5}]
+        client,
+        profile,
+        schema,
+        _draft(),
+        schema_analysis={"tables": []},
+        examples=[{"similarity": 0.5}],
+        instructions="Stock is in cartons of 12",
     )
     assert res.attempts == 3 and res.name == "mapping"
     assert "does not match the DSL" in prompts[1] and "missing_required" in prompts[2]
@@ -139,6 +146,7 @@ def test_mapping_agent_accepts_valid_mapping_and_retries_invalid(
     assert any(f.target == "/brand" for f in doc.fields)
     assert res.data["open_questions"] == ["vat?"] and "mapping" not in res.data
     first = json.loads(prompts[0])
+    assert first["operator_requirements"] == "Stock is in cartons of 12"
     assert first["schema_analysis"] == {"tables": []} and first["approved_examples_from_similar_files"] == [
         {"similarity": 0.5}
     ]
@@ -162,7 +170,13 @@ def test_adaptation_agent(profile: WorkbookProfile, schema: TargetSchema) -> Non
         MockProvider(lambda s, u, sc: {"mapping": good, "changes_from_draft": ["re-pointed qty"]}), model="m"
     )
     doc, res = agents.adaptation_agent(
-        client, _doc(), schema, profile, {"classification": "columns_renamed"}, _draft()
+        client,
+        _doc(),
+        schema,
+        profile,
+        {"classification": "columns_renamed"},
+        _draft(),
+        instructions="Stock is now in pieces",
     )
     assert (
         res.name == "adaptation"
@@ -171,6 +185,7 @@ def test_adaptation_agent(profile: WorkbookProfile, schema: TargetSchema) -> Non
     )
     sent = json.loads(client.provider.calls[0]["user"])  # type: ignore[attr-defined]
     assert sent["drift_report"] == {"classification": "columns_renamed"} and "approved_mapping" in sent
+    assert sent["operator_requirements"] == "Stock is now in pieces"
     failing = LLMClient(MockProvider(lambda s, u, sc: {}), model="m", max_retries=0)
     draft = _draft()
     doc2, res2 = agents.adaptation_agent(failing, _doc(), schema, profile, {}, draft)

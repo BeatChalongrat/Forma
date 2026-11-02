@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Commercial offer",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "item_code",
+    "description",
+    "money",
+    "valid_from"
+  ],
+  "properties": {
+    "item_code": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "money": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "iso_currency",
+        "net_amount",
+        "tax_fraction"
+      ],
+      "properties": {
+        "iso_currency": {
+          "type": "string"
+        },
+        "net_amount": {
+          "type": "number"
+        },
+        "tax_fraction": {
+          "type": "number"
+        }
+      }
+    },
+    "valid_from": {
+      "type": "string",
+      "format": "date"
+    }
+  }
+}

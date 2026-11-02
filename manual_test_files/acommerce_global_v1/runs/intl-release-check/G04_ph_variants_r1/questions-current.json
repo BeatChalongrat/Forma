@@ -1,0 +1,1718 @@
+{
+  "mapping_id": "map_01M6EVSHMJPPGNBNEV150DQ34P",
+  "round_id": "rnd_01M6EVNX7GMNBW35Y66B8XNKKA",
+  "status": "proposed",
+  "blocked": false,
+  "questions": [
+    {
+      "id": "/sku",
+      "field": {
+        "pointer": "/sku",
+        "name": "sku",
+        "json_type": [
+          "string"
+        ],
+        "semantic": "sku",
+        "risk": "critical",
+        "required": true,
+        "nullable": false,
+        "enum": null,
+        "format": null,
+        "synonyms_en": [
+          "sku",
+          "item code",
+          "item no",
+          "product code",
+          "material",
+          "matnr",
+          "article",
+          "part no",
+          "code",
+          "id",
+          "internal reference",
+          "item number",
+          "material number",
+          "default code"
+        ],
+        "synonyms_th": [
+          "รหัสสินค้า",
+          "รหัส",
+          "เลขที่สินค้า",
+          "โค้ด",
+          "รหัสวัสดุ"
+        ],
+        "description": null,
+        "description_th": "รหัสสินค้าหลักของลูกค้า",
+        "in_collection": null,
+        "is_collection": false,
+        "system": false,
+        "default": null,
+        "examples": [
+          "A001",
+          "SKU-10021",
+          "000123"
+        ]
+      },
+      "kind": "choice",
+      "options": [
+        "SKU",
+        "Parent style",
+        "Color",
+        "EU size"
+      ],
+      "current": {
+        "op": "cast",
+        "args": [
+          {
+            "op": "trim",
+            "args": [
+              {
+                "op": "col",
+                "name": "SKU"
+              }
+            ],
+            "params": {}
+          }
+        ],
+        "params": {
+          "to": "string"
+        }
+      },
+      "evidence": [
+        "header 'SKU' == synonym 'sku'; column hint sku_like",
+        "values STYLE-1-BLK-40 … STYLE-3-WHT-41, 12/12 unique, no nulls",
+        "cast to string only — no leading-zero stripping or numeric cast, per operator requirement",
+        "FORMA's matcher read Variants.SKU instead: confidence 0.99 → 0.70",
+        "FORMA's matcher read SKU for this field"
+      ],
+      "note": null,
+      "contested": true
+    },
+    {
+      "id": "/currency",
+      "field": {
+        "pointer": "/currency",
+        "name": "currency",
+        "json_type": [
+          "string"
+        ],
+        "semantic": "currency",
+        "risk": "critical",
+        "required": false,
+        "nullable": false,
+        "enum": null,
+        "format": null,
+        "synonyms_en": [
+          "currency",
+          "curr",
+          "ccy",
+          "currency code",
+          "waers",
+          "konwa"
+        ],
+        "synonyms_th": [
+          "สกุลเงิน",
+          "เงินตรา"
+        ],
+        "description": null,
+        "description_th": null,
+        "in_collection": null,
+        "is_collection": false,
+        "system": false,
+        "default": "THB",
+        "examples": []
+      },
+      "kind": "choice",
+      "options": [
+        "Currency",
+        "Parent style",
+        "Color",
+        "EU size"
+      ],
+      "current": {
+        "op": "upper",
+        "args": [
+          {
+            "op": "trim",
+            "args": [
+              {
+                "op": "col",
+                "name": "Currency"
+              }
+            ],
+            "params": {}
+          }
+        ],
+        "params": {}
+      },
+      "evidence": [
+        "header 'Currency' == synonym 'currency'",
+        "single explicit value 'PHP' on 12/12 rows — taken from the file, not from brand/country; overrides schema default THB",
+        "no FX conversion performed",
+        "FORMA's matcher read Variants.Currency instead: confidence 0.97 → 0.70",
+        "FORMA's matcher read Currency for this field"
+      ],
+      "note": null,
+      "contested": true
+    },
+    {
+      "id": "/prices/*/amount",
+      "field": {
+        "pointer": "/prices/*/amount",
+        "name": "amount",
+        "json_type": [
+          "number"
+        ],
+        "semantic": "price.amount",
+        "risk": "critical",
+        "required": true,
+        "nullable": false,
+        "enum": null,
+        "format": null,
+        "synonyms_en": [
+          "price",
+          "unit price",
+          "selling price",
+          "sale price",
+          "retail price",
+          "list price",
+          "amount",
+          "net price",
+          "cost",
+          "kbetr",
+          "condition amount",
+          "sales price",
+          "price amount"
+        ],
+        "synonyms_th": [
+          "ราคา",
+          "ราคาขาย",
+          "ราคาต่อหน่วย",
+          "ราคาปลีก",
+          "ราคาตั้ง",
+          "ราคาสุทธิ"
+        ],
+        "description": null,
+        "description_th": null,
+        "in_collection": "/prices",
+        "is_collection": false,
+        "system": false,
+        "default": null,
+        "examples": []
+      },
+      "kind": "choice",
+      "options": [
+        "Net price",
+        "EU size"
+      ],
+      "current": {
+        "op": "parse_number_th",
+        "args": [
+          {
+            "op": "col",
+            "name": "Net price"
+          }
+        ],
+        "params": {}
+      },
+      "evidence": [
+        "header 'Net price' == synonym price.amount / 'net price'",
+        "12 distinct values 1234.56–1356.77, one per SKU, never null; parsed with Thai/format handling, precision preserved (no rounding added)",
+        "FORMA's matcher read Variants.Net price instead: confidence 0.97 → 0.70",
+        "FORMA's matcher read Net price for this field"
+      ],
+      "note": null,
+      "contested": true
+    },
+    {
+      "id": "/prices/*/vat_included",
+      "field": {
+        "pointer": "/prices/*/vat_included",
+        "name": "vat_included",
+        "json_type": [
+          "boolean"
+        ],
+        "semantic": "price.vat_included",
+        "risk": "critical",
+        "required": true,
+        "nullable": false,
+        "enum": null,
+        "format": null,
+        "synonyms_en": [
+          "vat included",
+          "incl vat",
+          "inc. vat",
+          "ex vat"
+        ],
+        "synonyms_th": [
+          "รวม vat",
+          "รวมภาษี",
+          "ไม่รวมภาษี",
+          "ก่อน vat"
+        ],
+        "description": null,
+        "description_th": null,
+        "in_collection": "/prices",
+        "is_collection": false,
+        "system": false,
+        "default": null,
+        "examples": []
+      },
+      "kind": "choice",
+      "options": [
+        "Tax included",
+        "Parent style",
+        "Color"
+      ],
+      "current": {
+        "op": "default",
+        "args": [
+          {
+            "op": "parse_bool",
+            "args": [
+              {
+                "op": "col",
+                "name": "Tax included"
+              }
+            ],
+            "params": {}
+          }
+        ],
+        "params": {
+          "value": false
+        }
+      },
+      "evidence": [
+        "header 'Tax included' == synonym vat_included",
+        "explicit value 'No' on 12/12 rows → false, i.e. the stated price is VAT-exclusive; explicit source flag, not a retail convention",
+        "FORMA's matcher read {\"op\": \"const\", \"value\": false} instead: confidence 0.96 → 0.70",
+        "FORMA's matcher read {\"op\": \"const\", \"value\": false} for this field"
+      ],
+      "note": null,
+      "contested": true
+    },
+    {
+      "id": "/product_name",
+      "field": {
+        "pointer": "/product_name",
+        "name": "product_name",
+        "json_type": [
+          "string"
+        ],
+        "semantic": "product_name",
+        "risk": "high",
+        "required": true,
+        "nullable": false,
+        "enum": null,
+        "format": null,
+        "synonyms_en": [
+          "product name",
+          "name",
+          "description",
+          "item name",
+          "maktx",
+          "title",
+          "material description",
+          "item description"
+        ],
+        "synonyms_th": [
+          "ชื่อสินค้า",
+          "รายการ",
+          "ชื่อ",
+          "รายละเอียดสินค้า"
+        ],
+        "description": null,
+        "description_th": "ชื่อสินค้าที่แสดงให้ลูกค้าเห็น",
+        "in_collection": null,
+        "is_collection": false,
+        "system": false,
+        "default": null,
+        "examples": []
+      },
+      "kind": "choice",
+      "options": [
+        "Product name",
+        "Parent style",
+        "Color",
+        "EU size"
+      ],
+      "current": {
+        "op": "normalize_whitespace",
+        "args": [
+          {
+            "op": "col",
+            "name": "Product name"
+          }
+        ],
+        "params": {}
+      },
+      "evidence": [
+        "header 'Product name' == synonym 'product_name'",
+        "3 distinct values (SIM court shoe 1/2/3), each shared by the 4 variants of a style; no nulls",
+        "cell text treated as data only",
+        "FORMA's matcher read Variants.Product name instead: confidence 0.97 → 0.70",
+        "FORMA's matcher read Product name for this field"
+      ],
+      "note": null,
+      "contested": true
+    },
+    {
+      "id": "/unit/sell_unit",
+      "field": {
+        "pointer": "/unit/sell_unit",
+        "name": "sell_unit",
+        "json_type": [
+          "string"
+        ],
+        "semantic": "unit.sell",
+        "risk": "high",
+        "required": false,
+        "nullable": false,
+        "enum": null,
+        "format": null,
+        "synonyms_en": [
+          "unit",
+          "uom",
+          "sales unit",
+          "base unit",
+          "meins",
+          "base unit of measure",
+          "unit of measure"
+        ],
+        "synonyms_th": [
+          "หน่วย",
+          "หน่วยนับ",
+          "หน่วยขาย"
+        ],
+        "description": null,
+        "description_th": null,
+        "in_collection": null,
+        "is_collection": false,
+        "system": false,
+        "default": null,
+        "examples": []
+      },
+      "kind": "choice",
+      "options": [
+        "Sales unit",
+        "Parent style",
+        "Color",
+        "EU size"
+      ],
+      "current": {
+        "op": "unit_normalize",
+        "args": [
+          {
+            "op": "col",
+            "name": "Sales unit"
+          }
+        ],
+        "params": {}
+      },
+      "evidence": [
+        "header 'Sales unit' == synonym 'unit.sell'",
+        "single explicit value 'PAIR' on 12/12 rows; PAIR is in the target enum_hint and is resolved by the built-in unit table",
+        "no pack-size evidence anywhere in the file, so /unit/pack_size is left unmapped",
+        "FORMA's matcher read Variants.Sales unit instead: confidence 0.95 → 0.70",
+        "FORMA's matcher read Sales unit for this field"
+      ],
+      "note": null,
+      "contested": true
+    },
+    {
+      "id": "/prices/*/price_list",
+      "field": {
+        "pointer": "/prices/*/price_list",
+        "name": "price_list",
+        "json_type": [
+          "string"
+        ],
+        "semantic": "price.list_name",
+        "risk": "high",
+        "required": true,
+        "nullable": false,
+        "enum": null,
+        "format": null,
+        "synonyms_en": [
+          "price list",
+          "price group",
+          "channel",
+          "tier",
+          "kschl",
+          "condition type",
+          "sales code",
+          "pricelist",
+          "customer price group"
+        ],
+        "synonyms_th": [
+          "ราคาขายกลุ่ม",
+          "ประเภทราคา",
+          "ช่องทาง"
+        ],
+        "description": null,
+        "description_th": null,
+        "in_collection": "/prices",
+        "is_collection": false,
+        "system": false,
+        "default": "standard",
+        "examples": []
+      },
+      "kind": "choice",
+      "options": [
+        "Price list",
+        "Parent style",
+        "Color",
+        "EU size"
+      ],
+      "current": {
+        "op": "trim",
+        "args": [
+          {
+            "op": "col",
+            "name": "Price list"
+          }
+        ],
+        "params": {}
+      },
+      "evidence": [
+        "header 'Price list' == synonym 'price.list_name'",
+        "single explicit value 'standard' on 12/12 rows — read from the source column, not assumed from a default",
+        "FORMA's matcher read {\"op\": \"const\", \"value\": \"standard\"} instead: confidence 0.97 → 0.70",
+        "FORMA's matcher read {\"op\": \"const\", \"value\": \"standard\"} for this field"
+      ],
+      "note": null,
+      "contested": true
+    }
+  ],
+  "open_questions": [],
+  "reasons": [
+    "low confidence on critical fields: /sku (0.70), /currency (0.70), /prices/*/amount (0.70), /prices/*/vat_included (0.70)",
+    "low confidence on high-risk fields: /product_name (0.70), /unit/sell_unit (0.70), /prices/*/price_list (0.70)",
+    "first time this customer/format is seen",
+    "the model selects rows differently from FORMA's matcher (records: dedupe; records: root; items of /prices)"
+  ],
+  "sample": [
+    {
+      "sku": "STYLE-1-BLK-40",
+      "unit": {
+        "sell_unit": "PAIR"
+      },
+      "prices": [
+        {
+          "amount": 1234.56,
+          "vat_rate": 0.05,
+          "price_list": "standard",
+          "vat_included": false
+        }
+      ],
+      "status": "active",
+      "currency": "PHP",
+      "attributes": {
+        "size": "40",
+        "color": "BLK",
+        "parent_style": "STYLE-1"
+      },
+      "source_meta": {
+        "file": "variants.xlsx",
+        "lineage": {
+          "items": {
+            "/prices": [
+              0
+            ]
+          },
+          "source": "products",
+          "root_row": 0
+        }
+      },
+      "product_name": "SIM court shoe 1"
+    },
+    {
+      "sku": "STYLE-1-BLK-41",
+      "unit": {
+        "sell_unit": "PAIR"
+      },
+      "prices": [
+        {
+          "amount": 1245.67,
+          "vat_rate": 0.05,
+          "price_list": "standard",
+          "vat_included": false
+        }
+      ],
+      "status": "active",
+      "currency": "PHP",
+      "attributes": {
+        "size": "41",
+        "color": "BLK",
+        "parent_style": "STYLE-1"
+      },
+      "source_meta": {
+        "file": "variants.xlsx",
+        "lineage": {
+          "items": {
+            "/prices": [
+              1
+            ]
+          },
+          "source": "products",
+          "root_row": 1
+        }
+      },
+      "product_name": "SIM court shoe 1"
+    },
+    {
+      "sku": "STYLE-1-WHT-40",
+      "unit": {
+        "sell_unit": "PAIR"
+      },
+      "prices": [
+        {
+          "amount": 1256.78,
+          "vat_rate": 0.05,
+          "price_list": "standard",
+          "vat_included": false
+        }
+      ],
+      "status": "active",
+      "currency": "PHP",
+      "attributes": {
+        "size": "40",
+        "color": "WHT",
+        "parent_style": "STYLE-1"
+      },
+      "source_meta": {
+        "file": "variants.xlsx",
+        "lineage": {
+          "items": {
+            "/prices": [
+              2
+            ]
+          },
+          "source": "products",
+          "root_row": 2
+        }
+      },
+      "product_name": "SIM court shoe 1"
+    }
+  ],
+  "context": {
+    "customer": {
+      "code": "EVAL-intl-release-check-G04_ph_variants",
+      "name": "EVAL-intl-release-check-G04_ph_variants"
+    },
+    "round_label": "EVAL intl-release-check G04_ph_variants_r1",
+    "files": [
+      {
+        "id": "fil_01M6EVNXD0X85RZHX1WB1XK6TB",
+        "name": "variants.xlsx"
+      }
+    ],
+    "mapping_version": 1
+  },
+  "changes": [],
+  "comparison_dataset_id": null,
+  "checks": {
+    "drift": null,
+    "errors": 0,
+    "rows_out": 12,
+    "warnings": 0,
+    "agreement": {
+      "ops": 0,
+      "agree": 0,
+      "record": 2,
+      "dropped": 0,
+      "disagree": 7,
+      "collection": 1,
+      "model_only": 1
+    },
+    "llm_fallback": false,
+    "reused_approved": false,
+    "full_verification": true,
+    "mapping_confidence": 0.95,
+    "data_checks_trusted": false,
+    "low_confidence_high": [
+      "/product_name (0.70)",
+      "/unit/sell_unit (0.70)",
+      "/prices/*/price_list (0.70)"
+    ],
+    "plausibility_warnings": 0,
+    "low_confidence_critical": [
+      "/sku (0.70)",
+      "/currency (0.70)",
+      "/prices/*/amount (0.70)",
+      "/prices/*/vat_included (0.70)"
+    ]
+  },
+  "impact": {},
+  "fields": [
+    {
+      "pointer": "/sku",
+      "name": "sku",
+      "json_type": [
+        "string"
+      ],
+      "semantic": "sku",
+      "risk": "critical",
+      "required": true,
+      "nullable": false,
+      "enum": null,
+      "format": null,
+      "synonyms_en": [
+        "sku",
+        "item code",
+        "item no",
+        "product code",
+        "material",
+        "matnr",
+        "article",
+        "part no",
+        "code",
+        "id",
+        "internal reference",
+        "item number",
+        "material number",
+        "default code"
+      ],
+      "synonyms_th": [
+        "รหัสสินค้า",
+        "รหัส",
+        "เลขที่สินค้า",
+        "โค้ด",
+        "รหัสวัสดุ"
+      ],
+      "description": null,
+      "description_th": "รหัสสินค้าหลักของลูกค้า",
+      "in_collection": null,
+      "is_collection": false,
+      "system": false,
+      "default": null,
+      "examples": [
+        "A001",
+        "SKU-10021",
+        "000123"
+      ]
+    },
+    {
+      "pointer": "/unit/pack_size",
+      "name": "pack_size",
+      "json_type": [
+        "integer",
+        "null"
+      ],
+      "semantic": "unit.pack_size",
+      "risk": "high",
+      "required": false,
+      "nullable": true,
+      "enum": null,
+      "format": null,
+      "synonyms_en": [
+        "pack size",
+        "qty per pack",
+        "units per case",
+        "pcs/ctn"
+      ],
+      "synonyms_th": [
+        "จำนวนต่อแพ็ค",
+        "ชิ้นต่อลัง",
+        "บรรจุ"
+      ],
+      "description": null,
+      "description_th": null,
+      "in_collection": null,
+      "is_collection": false,
+      "system": false,
+      "default": null,
+      "examples": []
+    },
+    {
+      "pointer": "/unit/sell_unit",
+      "name": "sell_unit",
+      "json_type": [
+        "string"
+      ],
+      "semantic": "unit.sell",
+      "risk": "high",
+      "required": false,
+      "nullable": false,
+      "enum": null,
+      "format": null,
+      "synonyms_en": [
+        "unit",
+        "uom",
+        "sales unit",
+        "base unit",
+        "meins",
+        "base unit of measure",
+        "unit of measure"
+      ],
+      "synonyms_th": [
+        "หน่วย",
+        "หน่วยนับ",
+        "หน่วยขาย"
+      ],
+      "description": null,
+      "description_th": null,
+      "in_collection": null,
+      "is_collection": false,
+      "system": false,
+      "default": null,
+      "examples": []
+    },
+    {
+      "pointer": "/brand",
+      "name": "brand",
+      "json_type": [
+        "string",
+        "null"
+      ],
+      "semantic": "brand",
+      "risk": "low",
+      "required": false,
+      "nullable": true,
+      "enum": null,
+      "format": null,
+      "synonyms_en": [
+        "brand",
+        "manufacturer",
+        "vendor"
+      ],
+      "synonyms_th": [
+        "ยี่ห้อ",
+        "แบรนด์",
+        "ผู้ผลิต"
+      ],
+      "description": null,
+      "description_th": null,
+      "in_collection": null,
+      "is_collection": false,
+      "system": false,
+      "default": null,
+      "examples": []
+    },
+    {
+      "pointer": "/prices/*/amount",
+      "name": "amount",
+      "json_type": [
+        "number"
+      ],
+      "semantic": "price.amount",
+      "risk": "critical",
+      "required": true,
+      "nullable": false,
+      "enum": null,
+      "format": null,
+      "synonyms_en": [
+        "price",
+        "unit price",
+        "selling price",
+        "sale price",
+        "retail price",
+        "list price",
+        "amount",
+        "net price",
+        "cost",
+        "kbetr",
+        "condition amount",
+        "sales price",
+        "price amount"
+      ],
+      "synonyms_th": [
+        "ราคา",
+        "ราคาขาย",
+        "ราคาต่อหน่วย",
+        "ราคาปลีก",
+        "ราคาตั้ง",
+        "ราคาสุทธิ"
+      ],
+      "description": null,
+      "description_th": null,
+      "in_collection": "/prices",
+      "is_collection": false,
+      "system": false,
+      "default": null,
+      "examples": []
+    },
+    {
+      "pointer": "/prices/*/vat_rate",
+      "name": "vat_rate",
+      "json_type": [
+        "number",
+        "null"
+      ],
+      "semantic": "price.vat_rate",
+      "risk": "high",
+      "required": false,
+      "nullable": true,
+      "enum": null,
+      "format": null,
+      "synonyms_en": [],
+      "synonyms_th": [],
+      "description": null,
+      "description_th": null,
+      "in_collection": "/prices",
+      "is_collection": false,
+      "system": false,
+      "default": 0.07,
+      "examples": []
+    },
+    {
+      "pointer": "/prices/*/price_list",
+      "name": "price_list",
+      "json_type": [
+        "string"
+      ],
+      "semantic": "price.list_name",
+      "risk": "high",
+      "required": true,
+      "nullable": false,
+      "enum": null,
+      "format": null,
+      "synonyms_en": [
+        "price list",
+        "price group",
+        "channel",
+        "tier",
+        "kschl",
+        "condition type",
+        "sales code",
+        "pricelist",
+        "customer price group"
+      ],
+      "synonyms_th": [
+        "ราคาขายกลุ่ม",
+        "ประเภทราคา",
+        "ช่องทาง"
+      ],
+      "description": null,
+      "description_th": null,
+      "in_collection": "/prices",
+      "is_collection": false,
+      "system": false,
+      "default": "standard",
+      "examples": []
+    },
+    {
+      "pointer": "/prices/*/effective_to",
+      "name": "effective_to",
+      "json_type": [
+        "string",
+        "null"
+      ],
+      "semantic": "price.effective_to",
+      "risk": "high",
+      "required": false,
+      "nullable": true,
+      "enum": null,
+      "format": "date",
+      "synonyms_en": [
+        "valid to",
+        "end date",
+        "expire",
+        "datbi",
+        "ending date"
+      ],
+      "synonyms_th": [
+        "สิ้นสุด",
+        "ถึงวันที่",
+        "หมดอายุ"
+      ],
+      "description": null,
+      "description_th": null,
+      "in_collection": "/prices",
+      "is_collection": false,
+      "system": false,
+      "default": null,
+      "examples": []
+    },
+    {
+      "pointer": "/prices/*/vat_included",
+      "name": "vat_included",
+      "json_type": [
+        "boolean"
+      ],
+      "semantic": "price.vat_included",
+      "risk": "critical",
+      "required": true,
+      "nullable": false,
+      "enum": null,
+      "format": null,
+      "synonyms_en": [
+        "vat included",
+        "incl vat",
+        "inc. vat",
+        "ex vat"
+      ],
+      "synonyms_th": [
+        "รวม vat",
+        "รวมภาษี",
+        "ไม่รวมภาษี",
+        "ก่อน vat"
+      ],
+      "description": null,
+      "description_th": null,
+      "in_collection": "/prices",
+      "is_collection": false,
+      "system": false,
+      "default": null,
+      "examples": []
+    },
+    {
+      "pointer": "/prices/*/effective_from",
+      "name": "effective_from",
+      "json_type": [
+        "string",
+        "null"
+      ],
+      "semantic": "price.effective_from",
+      "risk": "high",
+      "required": false,
+      "nullable": true,
+      "enum": null,
+      "format": "date",
+      "synonyms_en": [
+        "effective date",
+        "valid from",
+        "start date",
+        "datab",
+        "starting date",
+        "effective"
+      ],
+      "synonyms_th": [
+        "วันที่มีผล",
+        "เริ่ม",
+        "ตั้งแต่"
+      ],
+      "description": null,
+      "description_th": null,
+      "in_collection": "/prices",
+      "is_collection": false,
+      "system": false,
+      "default": null,
+      "examples": []
+    },
+    {
+      "pointer": "/status",
+      "name": "status",
+      "json_type": [
+        "string"
+      ],
+      "semantic": "status",
+      "risk": "medium",
+      "required": false,
+      "nullable": false,
+      "enum": [
+        "active",
+        "inactive",
+        "discontinued"
+      ],
+      "format": null,
+      "synonyms_en": [
+        "status",
+        "active",
+        "state",
+        "lvorm",
+        "blocked",
+        "deletion flag",
+        "is active"
+      ],
+      "synonyms_th": [
+        "สถานะ",
+        "ใช้งาน",
+        "เลิกขาย"
+      ],
+      "description": null,
+      "description_th": null,
+      "in_collection": null,
+      "is_collection": false,
+      "system": false,
+      "default": "active",
+      "examples": []
+    },
+    {
+      "pointer": "/barcode",
+      "name": "barcode",
+      "json_type": [
+        "string",
+        "null"
+      ],
+      "semantic": "barcode",
+      "risk": "medium",
+      "required": false,
+      "nullable": true,
+      "enum": null,
+      "format": null,
+      "synonyms_en": [
+        "barcode",
+        "ean",
+        "upc",
+        "gtin",
+        "ean13",
+        "ean11"
+      ],
+      "synonyms_th": [
+        "บาร์โค้ด",
+        "รหัสแท่ง"
+      ],
+      "description": null,
+      "description_th": null,
+      "in_collection": null,
+      "is_collection": false,
+      "system": false,
+      "default": null,
+      "examples": []
+    },
+    {
+      "pointer": "/category",
+      "name": "category",
+      "json_type": [
+        "array"
+      ],
+      "semantic": "category_path",
+      "risk": "medium",
+      "required": false,
+      "nullable": false,
+      "enum": null,
+      "format": null,
+      "synonyms_en": [
+        "category",
+        "group",
+        "product group",
+        "class",
+        "department",
+        "sub category",
+        "matkl",
+        "material group",
+        "item category code",
+        "category code",
+        "section"
+      ],
+      "synonyms_th": [
+        "หมวด",
+        "หมวดหมู่",
+        "กลุ่มสินค้า",
+        "ประเภท",
+        "แผนก",
+        "หมวดย่อย"
+      ],
+      "description": null,
+      "description_th": "ลำดับหมวดหมู่จากกว้างไปแคบ",
+      "in_collection": null,
+      "is_collection": false,
+      "system": false,
+      "default": null,
+      "examples": []
+    },
+    {
+      "pointer": "/currency",
+      "name": "currency",
+      "json_type": [
+        "string"
+      ],
+      "semantic": "currency",
+      "risk": "critical",
+      "required": false,
+      "nullable": false,
+      "enum": null,
+      "format": null,
+      "synonyms_en": [
+        "currency",
+        "curr",
+        "ccy",
+        "currency code",
+        "waers",
+        "konwa"
+      ],
+      "synonyms_th": [
+        "สกุลเงิน",
+        "เงินตรา"
+      ],
+      "description": null,
+      "description_th": null,
+      "in_collection": null,
+      "is_collection": false,
+      "system": false,
+      "default": "THB",
+      "examples": []
+    },
+    {
+      "pointer": "/inventory/*/qty",
+      "name": "qty",
+      "json_type": [
+        "number"
+      ],
+      "semantic": "stock.qty",
+      "risk": "high",
+      "required": true,
+      "nullable": false,
+      "enum": null,
+      "format": null,
+      "synonyms_en": [
+        "stock",
+        "qty",
+        "quantity",
+        "on hand",
+        "available",
+        "balance",
+        "inventory",
+        "labst",
+        "unrestricted stock",
+        "quantity on hand",
+        "qty on hand",
+        "qty available",
+        "stock qty"
+      ],
+      "synonyms_th": [
+        "คงเหลือ",
+        "สต็อก",
+        "จำนวน",
+        "ยอดคงเหลือ",
+        "คงคลัง"
+      ],
+      "description": null,
+      "description_th": null,
+      "in_collection": "/inventory",
+      "is_collection": false,
+      "system": false,
+      "default": null,
+      "examples": []
+    },
+    {
+      "pointer": "/inventory/*/reserved",
+      "name": "reserved",
+      "json_type": [
+        "number",
+        "null"
+      ],
+      "semantic": "stock.reserved",
+      "risk": "medium",
+      "required": false,
+      "nullable": true,
+      "enum": null,
+      "format": null,
+      "synonyms_en": [
+        "reserved",
+        "allocated",
+        "committed"
+      ],
+      "synonyms_th": [
+        "จอง",
+        "สำรอง"
+      ],
+      "description": null,
+      "description_th": null,
+      "in_collection": "/inventory",
+      "is_collection": false,
+      "system": false,
+      "default": null,
+      "examples": []
+    },
+    {
+      "pointer": "/inventory/*/warehouse_code",
+      "name": "warehouse_code",
+      "json_type": [
+        "string"
+      ],
+      "semantic": "stock.warehouse",
+      "risk": "high",
+      "required": true,
+      "nullable": false,
+      "enum": null,
+      "format": null,
+      "synonyms_en": [
+        "warehouse",
+        "wh",
+        "location",
+        "plant",
+        "branch",
+        "store",
+        "werks",
+        "location code",
+        "lgort",
+        "storage location",
+        "site"
+      ],
+      "synonyms_th": [
+        "คลัง",
+        "คลังสินค้า",
+        "สาขา",
+        "ที่เก็บ"
+      ],
+      "description": null,
+      "description_th": null,
+      "in_collection": "/inventory",
+      "is_collection": false,
+      "system": false,
+      "default": "MAIN",
+      "examples": []
+    },
+    {
+      "pointer": "/promotions/*/name",
+      "name": "name",
+      "json_type": [
+        "string",
+        "null"
+      ],
+      "semantic": "promo.name",
+      "risk": "low",
+      "required": false,
+      "nullable": true,
+      "enum": null,
+      "format": null,
+      "synonyms_en": [
+        "promotion name",
+        "campaign name"
+      ],
+      "synonyms_th": [
+        "ชื่อโปรโมชั่น"
+      ],
+      "description": null,
+      "description_th": null,
+      "in_collection": "/promotions",
+      "is_collection": false,
+      "system": false,
+      "default": null,
+      "examples": []
+    },
+    {
+      "pointer": "/promotions/*/type",
+      "name": "type",
+      "json_type": [
+        "string"
+      ],
+      "semantic": "promo.type",
+      "risk": "critical",
+      "required": true,
+      "nullable": false,
+      "enum": [
+        "percent_off",
+        "amount_off",
+        "fixed_price",
+        "tiered",
+        "buy_x_get_y",
+        "bundle"
+      ],
+      "format": null,
+      "synonyms_en": [
+        "promo type",
+        "discount type"
+      ],
+      "synonyms_th": [
+        "ประเภทโปร",
+        "ประเภทส่วนลด"
+      ],
+      "description": null,
+      "description_th": null,
+      "in_collection": "/promotions",
+      "is_collection": false,
+      "system": false,
+      "default": null,
+      "examples": []
+    },
+    {
+      "pointer": "/promotions/*/buy_qty",
+      "name": "buy_qty",
+      "json_type": [
+        "integer",
+        "null"
+      ],
+      "semantic": "promo.buy_qty",
+      "risk": "high",
+      "required": false,
+      "nullable": true,
+      "enum": null,
+      "format": null,
+      "synonyms_en": [
+        "buy",
+        "buy qty"
+      ],
+      "synonyms_th": [
+        "ซื้อ"
+      ],
+      "description": null,
+      "description_th": null,
+      "in_collection": "/promotions",
+      "is_collection": false,
+      "system": false,
+      "default": null,
+      "examples": []
+    },
+    {
+      "pointer": "/promotions/*/get_qty",
+      "name": "get_qty",
+      "json_type": [
+        "integer",
+        "null"
+      ],
+      "semantic": "promo.get_qty",
+      "risk": "high",
+      "required": false,
+      "nullable": true,
+      "enum": null,
+      "format": null,
+      "synonyms_en": [
+        "get",
+        "free qty",
+        "get free"
+      ],
+      "synonyms_th": [
+        "แถม",
+        "ฟรี"
+      ],
+      "description": null,
+      "description_th": null,
+      "in_collection": "/promotions",
+      "is_collection": false,
+      "system": false,
+      "default": null,
+      "examples": []
+    },
+    {
+      "pointer": "/promotions/*/min_qty",
+      "name": "min_qty",
+      "json_type": [
+        "integer",
+        "null"
+      ],
+      "semantic": "promo.min_qty",
+      "risk": "high",
+      "required": false,
+      "nullable": true,
+      "enum": null,
+      "format": null,
+      "synonyms_en": [
+        "min qty",
+        "minimum quantity",
+        "from qty"
+      ],
+      "synonyms_th": [
+        "ซื้อขั้นต่ำ",
+        "จำนวนขั้นต่ำ",
+        "ตั้งแต่"
+      ],
+      "description": null,
+      "description_th": null,
+      "in_collection": "/promotions",
+      "is_collection": false,
+      "system": false,
+      "default": null,
+      "examples": []
+    },
+    {
+      "pointer": "/promotions/*/channels",
+      "name": "channels",
+      "json_type": [
+        "array"
+      ],
+      "semantic": "promo.channels",
+      "risk": "medium",
+      "required": false,
+      "nullable": false,
+      "enum": null,
+      "format": null,
+      "synonyms_en": [
+        "channel",
+        "store",
+        "branch"
+      ],
+      "synonyms_th": [
+        "ช่องทาง",
+        "สาขา"
+      ],
+      "description": null,
+      "description_th": null,
+      "in_collection": "/promotions",
+      "is_collection": false,
+      "system": false,
+      "default": null,
+      "examples": []
+    },
+    {
+      "pointer": "/promotions/*/end_date",
+      "name": "end_date",
+      "json_type": [
+        "string",
+        "null"
+      ],
+      "semantic": "promo.end_date",
+      "risk": "critical",
+      "required": false,
+      "nullable": true,
+      "enum": null,
+      "format": "date",
+      "synonyms_en": [
+        "end",
+        "end date",
+        "to",
+        "valid to",
+        "until"
+      ],
+      "synonyms_th": [
+        "สิ้นสุด",
+        "ถึง",
+        "หมดโปร",
+        "วันสิ้นสุด"
+      ],
+      "description": null,
+      "description_th": null,
+      "in_collection": "/promotions",
+      "is_collection": false,
+      "system": false,
+      "default": null,
+      "examples": []
+    },
+    {
+      "pointer": "/promotions/*/promo_code",
+      "name": "promo_code",
+      "json_type": [
+        "string"
+      ],
+      "semantic": "promo.code",
+      "risk": "high",
+      "required": true,
+      "nullable": false,
+      "enum": null,
+      "format": null,
+      "synonyms_en": [
+        "promo code",
+        "promotion id",
+        "campaign"
+      ],
+      "synonyms_th": [
+        "รหัสโปรโมชั่น",
+        "โปรโมชั่น",
+        "แคมเปญ"
+      ],
+      "description": null,
+      "description_th": null,
+      "in_collection": "/promotions",
+      "is_collection": false,
+      "system": false,
+      "default": null,
+      "examples": []
+    },
+    {
+      "pointer": "/promotions/*/start_date",
+      "name": "start_date",
+      "json_type": [
+        "string",
+        "null"
+      ],
+      "semantic": "promo.start_date",
+      "risk": "critical",
+      "required": false,
+      "nullable": true,
+      "enum": null,
+      "format": "date",
+      "synonyms_en": [
+        "start",
+        "start date",
+        "from",
+        "valid from"
+      ],
+      "synonyms_th": [
+        "เริ่ม",
+        "วันเริ่ม",
+        "ตั้งแต่",
+        "เริ่มโปร"
+      ],
+      "description": null,
+      "description_th": null,
+      "in_collection": "/promotions",
+      "is_collection": false,
+      "system": false,
+      "default": null,
+      "examples": []
+    },
+    {
+      "pointer": "/promotions/*/bundle_skus",
+      "name": "bundle_skus",
+      "json_type": [
+        "array"
+      ],
+      "semantic": "promo.bundle_skus",
+      "risk": "high",
+      "required": false,
+      "nullable": false,
+      "enum": null,
+      "format": null,
+      "synonyms_en": [
+        "bundle items",
+        "bundle skus"
+      ],
+      "synonyms_th": [
+        "สินค้าในชุด"
+      ],
+      "description": null,
+      "description_th": null,
+      "in_collection": "/promotions",
+      "is_collection": false,
+      "system": false,
+      "default": null,
+      "examples": []
+    },
+    {
+      "pointer": "/promotions/*/promo_price",
+      "name": "promo_price",
+      "json_type": [
+        "number",
+        "null"
+      ],
+      "semantic": "promo.price",
+      "risk": "critical",
+      "required": false,
+      "nullable": true,
+      "enum": null,
+      "format": null,
+      "synonyms_en": [
+        "promo price",
+        "special price",
+        "sale price"
+      ],
+      "synonyms_th": [
+        "ราคาโปร",
+        "ราคาพิเศษ",
+        "ราคาลด"
+      ],
+      "description": null,
+      "description_th": null,
+      "in_collection": "/promotions",
+      "is_collection": false,
+      "system": false,
+      "default": null,
+      "examples": []
+    },
+    {
+      "pointer": "/promotions/*/discount_amount",
+      "name": "discount_amount",
+      "json_type": [
+        "number",
+        "null"
+      ],
+      "semantic": "discount.amount",
+      "risk": "critical",
+      "required": false,
+      "nullable": true,
+      "enum": null,
+      "format": null,
+      "synonyms_en": [
+        "discount amount",
+        "disc amt",
+        "off"
+      ],
+      "synonyms_th": [
+        "ส่วนลด(บาท)",
+        "ลดบาท",
+        "จำนวนส่วนลด"
+      ],
+      "description": null,
+      "description_th": null,
+      "in_collection": "/promotions",
+      "is_collection": false,
+      "system": false,
+      "default": null,
+      "examples": []
+    },
+    {
+      "pointer": "/promotions/*/discount_percent",
+      "name": "discount_percent",
+      "json_type": [
+        "number",
+        "null"
+      ],
+      "semantic": "discount.percent",
+      "risk": "critical",
+      "required": false,
+      "nullable": true,
+      "enum": null,
+      "format": null,
+      "synonyms_en": [
+        "discount %",
+        "disc%",
+        "percent off",
+        "discount percentage"
+      ],
+      "synonyms_th": [
+        "ส่วนลด %",
+        "ส่วนลด(%)",
+        "เปอร์เซ็นต์ส่วนลด",
+        "ลด%"
+      ],
+      "description": null,
+      "description_th": null,
+      "in_collection": "/promotions",
+      "is_collection": false,
+      "system": false,
+      "default": null,
+      "examples": []
+    },
+    {
+      "pointer": "/description",
+      "name": "description",
+      "json_type": [
+        "string",
+        "null"
+      ],
+      "semantic": "description",
+      "risk": "low",
+      "required": false,
+      "nullable": true,
+      "enum": null,
+      "format": null,
+      "synonyms_en": [
+        "long description",
+        "details",
+        "remarks",
+        "spec"
+      ],
+      "synonyms_th": [
+        "รายละเอียด",
+        "คำอธิบาย",
+        "หมายเหตุ",
+        "สเปค"
+      ],
+      "description": null,
+      "description_th": null,
+      "in_collection": null,
+      "is_collection": false,
+      "system": false,
+      "default": null,
+      "examples": []
+    },
+    {
+      "pointer": "/product_name",
+      "name": "product_name",
+      "json_type": [
+        "string"
+      ],
+      "semantic": "product_name",
+      "risk": "high",
+      "required": true,
+      "nullable": false,
+      "enum": null,
+      "format": null,
+      "synonyms_en": [
+        "product name",
+        "name",
+        "description",
+        "item name",
+        "maktx",
+        "title",
+        "material description",
+        "item description"
+      ],
+      "synonyms_th": [
+        "ชื่อสินค้า",
+        "รายการ",
+        "ชื่อ",
+        "รายละเอียดสินค้า"
+      ],
+      "description": null,
+      "description_th": "ชื่อสินค้าที่แสดงให้ลูกค้าเห็น",
+      "in_collection": null,
+      "is_collection": false,
+      "system": false,
+      "default": null,
+      "examples": []
+    }
+  ]
+}

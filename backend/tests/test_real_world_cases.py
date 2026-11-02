@@ -173,7 +173,12 @@ def test_leading_zeros_survive_and_duplicate_codes_are_reported(
     ]
     r = _round(client, _customer(client, "ZERO1"), _sheet(isolated_env / "zeros.xlsx", [HEADER, *rows]))
     m = _mapping(client, r)
-    out = _approve_and_transform(client, r)
+    # Conflicting alternatives must now be resolved before approval (ADR-062).
+    rejected = client.post(f"/api/mappings/{m['id']}/approve", json={})
+    assert rejected.status_code == 422
+    out = client.post(f"/api/rounds/{r['id']}/mapping-preview", json={"document": m["document"]}).json()[
+        "records"
+    ]
     assert {row["sku"] for row in out} == {"000123", "000124"}  # text codes keep their zeros
     sim = m["policy"]["simulation"]
     assert sim["rows_out"] == 2 and sim["rows_in"] == 3
@@ -468,7 +473,7 @@ def test_a_typed_clarification_becomes_a_control_and_its_answer_a_constant(
     assert m["policy"]["clarifications"] == [clarification] and r["status"] == "review"
     qs = client.get(f"/api/mappings/{m['id']}/questions").json()["questions"]
     q = next(x for x in qs if x["id"] == "/currency")
-    assert q["kind"] == "enum" and q["options"] == ["THB", "USD"] and q["scope"] == "constant_for_this_file"
+    assert q["kind"] == "text" and q["allow_custom"] and q["scope"] == "constant_for_this_file"
     assert (
         q["question"] == clarification["question"]
         and q["note"] == clarification["why"]
@@ -477,12 +482,14 @@ def test_a_typed_clarification_becomes_a_control_and_its_answer_a_constant(
     verdict = client.get(f"/api/rounds/{r['id']}/verdict").json()["verdict"]
     decision = next(d for d in verdict["must_decide"] if d["id"] == "/currency")
     assert (
-        decision["kind"] == "enum"
+        decision["kind"] == "text"
         and decision["options"] == ["THB", "USD"]
         and decision["scope"] == "constant_for_this_file"
     )
-    bad = client.post(f"/api/mappings/{m['id']}/answers/preview", json={"answers": {"/currency": "EUR"}})
-    assert bad.status_code == 422
+    extra = client.post(f"/api/mappings/{m['id']}/answers/preview", json={"answers": {"/currency": "EUR"}})
+    assert (
+        extra.status_code == 200 and extra.json()["preview"]["ok"]
+    )  # The schema permits it; suggestions are not an enum.
     preview = client.post(f"/api/mappings/{m['id']}/answers/preview", json={"answers": {"/currency": "USD"}})
     assert preview.status_code == 200, preview.text
     assert clarification["question"] not in preview.json()["remaining_questions"]

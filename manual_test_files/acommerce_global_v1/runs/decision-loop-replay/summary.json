@@ -1,0 +1,73 @@
+[
+  {
+    "case": "G13_ask_date",
+    "field_accuracy": 1.0,
+    "rows": 12,
+    "validation": {
+      "complete": true,
+      "passed": true,
+      "records_checked": 12,
+      "remaining_errors": 0
+    },
+    "remaining_questions": [
+      "Dates in ['Effective date'] could be day-first or month-first; read as day-first: confirm",
+      "Effective-date day/month order is undetermined for '03/04/2026' (day-first assumed provisionally).",
+      "No status, category, barcode, inventory or promotion columns are present; those targets are left empty (status only carries the schema default 'active', which the file does not state).",
+      "Pack size for the 'PCS' sales unit is not stated anywhere in the file, so /unit/pack_size is left null."
+    ],
+    "policy": "review"
+  },
+  {
+    "case": "G14_ask_currency",
+    "field_accuracy": 1.0,
+    "rows": 12,
+    "validation": {
+      "complete": true,
+      "passed": true,
+      "records_checked": 12,
+      "remaining_errors": 0
+    },
+    "remaining_questions": [
+      "/currency unresolved: no currency column; 'Net price' values are formatted with '$' while the target default is THB. Mapped provisionally to the THB default at low confidence; awaiting the operator answer (no FX conversion performed).",
+      "/prices/*/vat_rate is taken from the file's explicit 'Tax rate' = 5% (0.05), which differs from the schema default 0.07. It is a fixture value in the source and is used as stated; confirm if the operator intends a different statutory rate.",
+      "/prices/*/effective_from and /prices/*/effective_to: the file contains no validity dates, so both are omitted (null).",
+      "/unit/pack_size: 'Sales unit' is only 'PCS' and there is no per-pack/packaging column; pack size left null rather than derived from the product name.",
+      "/status, /brand, /barcode, /category, /description, /inventory and /promotions have no corresponding source columns and are omitted rather than fabricated; /status falls back to the schema default 'active'."
+    ],
+    "policy": "review"
+  },
+  {
+    "case": "G15_ask_unit",
+    "field_accuracy": 1.0,
+    "rows": 12,
+    "validation": {
+      "complete": true,
+      "passed": true,
+      "records_checked": 12,
+      "remaining_errors": 0
+    },
+    "remaining_questions": [
+      "No pack-size column exists in export.csv, so /unit/pack_size is intentionally left unmapped rather than filled with a guess. If a pack size exists elsewhere for these SKUs, provide that file or confirm BT means a single bottle with no pack configuration.",
+      "The source unit code 'BT' is mapped through the built-in unit table to the canonical sell-unit enum; confirm the customer's canonical value for BT (e.g. BOTTLE) if their downstream system expects a different label."
+    ],
+    "policy": "review"
+  },
+  {
+    "case": "G16_ask_conflict",
+    "field_accuracy": 1.0,
+    "rows": 12,
+    "validation": {
+      "complete": true,
+      "passed": true,
+      "records_checked": 12,
+      "remaining_errors": 0
+    },
+    "remaining_questions": [
+      "SKU 00470001 appears twice (row 1 and row 13) with identical name/currency/unit/price list/tax but different Net price: 1234.56 vs 9999. The product record keeps the first row and, because /prices has no dedupe keys, both amounts would be emitted under price list 'standard'. Which amount is the real standard price, or is the second row an alternative/erroneous entry that should be dropped?",
+      "'Tax included' = No on every row while 'Tax rate' = 5%: the 5% is carried as vat_rate 0.05 verbatim and the amount is not grossed up. If 5% is instead meant to be embedded in the net price, the amount would need vat_adjust(mode=add, rate=0.05) — the source contains no formula or note to decide this.",
+      "Currency is explicitly 'MYR' and no conversion was applied (schema default THB intentionally not used). Confirm MYR output is intended.",
+      "No source columns exist for /status, /barcode, /brand, /category, /inventory or /promotions; they are left absent rather than filled with invented values."
+    ],
+    "policy": "review"
+  }
+]

@@ -8,7 +8,7 @@ column, a new sheet or an unrelated spreadsheet produce a measurable, classified
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any
 
 from rapidfuzz import fuzz
@@ -172,6 +172,19 @@ def _type_changes(previous: Fingerprint, current: Fingerprint) -> list[dict[str,
 
 
 def compare(previous: Fingerprint, current: Fingerprint, *, unrelated_threshold: float = 0.35) -> DriftReport:
+    # A single CSV has no workbook sheet: the reader uses its filename as a display label.
+    # Renaming that file must not look like deleting a sheet. Multiple-source ambiguity is unchanged.
+    if previous.kind == current.kind == "csv" and len(previous.tables) == len(current.tables) == 1:
+        previous = replace(
+            previous,
+            strict=stable_hash(["csv", previous.tables[0].headers]),
+            tables=[replace(previous.tables[0], sheet="csv")],
+        )
+        current = replace(
+            current,
+            strict=stable_hash(["csv", current.tables[0].headers]),
+            tables=[replace(current.tables[0], sheet="csv")],
+        )
     if previous.strict == current.strict:
         # same sheets and headers, but a column that now holds other data must not reuse the mapping
         retyped = _type_changes(previous, current)

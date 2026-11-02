@@ -561,6 +561,8 @@ def for_mapping(
                     else list(q.get("options") or []),
                     "default": None,
                     "scope": q.get("scope"),
+                    "option_labels": q.get("option_labels"),
+                    "allow_custom": q.get("allow_custom", False),
                     "evidence_ids": [e["id"] for e in evidence if e["kind"] == "questions"],
                 }
             )

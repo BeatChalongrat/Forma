@@ -29,6 +29,7 @@ class RoundIn(BaseModel):
     customer_id: str
     label: str | None = None
     target_schema: str | None = None  # None → the customer's format, else the default format
+    instructions: str | None = Field(default=None, max_length=12000)
 
 
 class CloseIn(BaseModel):

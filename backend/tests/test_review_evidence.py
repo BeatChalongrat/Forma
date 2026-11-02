@@ -55,7 +55,7 @@ def test_preview_compares_actual_versions_without_mutation(client: TestClient, i
     result = client.post(f"/api/mappings/{mid}/answers/preview", json={"answers": {vat: False}})
     assert result.status_code == 200, result.text
     comparison = result.json()["comparison"]
-    assert comparison["reliable"]
+    assert comparison["reliable"], comparison
     assert comparison["before_records"] == comparison["after_records"] == 12
     assert comparison["counts"]["changed_records"] == 12
     assert comparison["counts"]["lost"] == comparison["counts"]["gained"] == 0
@@ -87,3 +87,115 @@ def test_missing_sources_never_fabricate_examples(client: TestClient, isolated_e
         file.status = "ignored"
     data = client.get(f"/api/mappings/{mid}/questions/evidence", params={"field": vat}).json()
     assert data["unavailable"] and data["examples"] == []
+
+
+def test_answer_gate_detects_unrelated_change_beyond_ui_sample(schema, monkeypatch):
+    from types import SimpleNamespace
+    from unittest.mock import Mock
+
+    from tests.test_decision_actions import document
+
+    from forma.core.errors import ValidationFailed
+    from forma.services import mapping, review_evidence
+
+    records = [{"sku": f"{i:04d}", "product_name": "unchanged", "currency": "THB"} for i in range(70)]
+    changed = [dict(r) for r in records]
+    changed[65]["product_name"] = "unexpected overwrite"
+    results = iter(
+        [
+            SimpleNamespace(records=records, errors=[], stats={}),
+            SimpleNamespace(records=changed, errors=[], stats={}),
+        ]
+    )
+
+    def simulate(*args, limit):
+        assert limit is None  # The UI's first 50 rows would miss record 65.
+        return next(results), []
+
+    monkeypatch.setattr(mapping, "simulate", simulate)
+    session = Mock()
+    session.get.return_value = SimpleNamespace(files=[])
+    ctx = SimpleNamespace(registry=SimpleNamespace(get_ref=lambda _: schema))
+    doc = document().model_dump(mode="json")
+    m = SimpleNamespace(round_id="round", target_schema=schema.ref, document=doc)
+    with pytest.raises(ValidationFailed, match="unrelated field"):
+        review_evidence.validate_answer_effects(ctx, session, m, doc, [{"field": {"pointer": "/currency"}}])
+
+
+def test_answer_gate_rejects_moving_an_existing_error_to_another_record(schema, monkeypatch):
+    from types import SimpleNamespace
+    from unittest.mock import Mock
+
+    from tests.test_decision_actions import document
+
+    from forma.core.errors import ValidationFailed
+    from forma.services import mapping, review_evidence
+
+    before = [
+        {"sku": "A", "product_name": "A", "currency": "bad"},
+        {"sku": "B", "product_name": "B", "currency": "THB"},
+    ]
+    after = [{**before[0], "currency": "THB"}, {**before[1], "currency": "bad"}]
+    results = iter(
+        [
+            SimpleNamespace(records=before, errors=[], stats={"invalid_records": 1}),
+            SimpleNamespace(records=after, errors=[], stats={"invalid_records": 1}),
+        ]
+    )
+    monkeypatch.setattr(mapping, "simulate", lambda *args, **kwargs: (next(results), []))
+    session = Mock()
+    session.get.return_value = SimpleNamespace(files=[])
+    ctx = SimpleNamespace(registry=SimpleNamespace(get_ref=lambda _: schema))
+    doc = document().model_dump(mode="json")
+    m = SimpleNamespace(round_id="round", target_schema=schema.ref, document=doc)
+    with pytest.raises(ValidationFailed, match="previously valid record"):
+        review_evidence.validate_answer_effects(ctx, session, m, doc, [{"field": {"pointer": "/currency"}}])
+
+
+def test_additional_note_acknowledgement_is_explicit_audited_and_cannot_skip_typed_question(
+    client, isolated_env
+):
+    from forma.db.models import MappingVersion
+    from forma.db.session import session_scope
+
+    _, mid, vat = uncertain_mapping(client, isolated_env)
+    with session_scope() as s:
+        m = s.get(MappingVersion, mid)
+        m.open_questions = ["Is VAT included?", "Optional missing fields reviewed"]
+        m.policy = {
+            **m.policy,
+            "clarifications": [
+                {
+                    "target": vat,
+                    "kind": "boolean",
+                    "question": "Is VAT included?",
+                    "why": "Missing business fact",
+                }
+            ],
+        }
+    assert (
+        client.post(
+            f"/api/mappings/{mid}/answers/preview", json={"answers": {}, "acknowledged": ["Is VAT included?"]}
+        ).status_code
+        == 422
+    )
+    assert (
+        client.post(
+            f"/api/mappings/{mid}/answers/preview",
+            json={"answers": {}, "acknowledged": ["not an existing note"]},
+        ).status_code
+        == 422
+    )
+    body = {"answers": {}, "acknowledged": ["Optional missing fields reviewed"]}
+    preview = client.post(f"/api/mappings/{mid}/answers/preview", json=body)
+    assert preview.status_code == 200, preview.text
+    assert preview.json()["remaining_questions"] == ["Is VAT included?"]
+    assert preview.json()["comparison"]["counts"]["changed_records"] == 0
+    saved = client.post(
+        f"/api/mappings/{mid}/answers/apply", json={**body, "digest": preview.json()["digest"]}
+    )
+    assert saved.status_code == 201, saved.text
+    assert (
+        saved.json()["policy"]["acknowledged_questions"][0]["question"] == "Optional missing fields reviewed"
+    )
+    assert saved.json()["open_questions"] == ["Is VAT included?"]

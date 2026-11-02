@@ -1,0 +1,892 @@
+{
+  "id": "map_01M6EWCDDJ8DARZD5WWSPCEJEZ",
+  "customer_id": "cus_01M6EVVJMVX3BV74PVWB9EFGZ0",
+  "round_id": "rnd_01M6EVVKTC7VTDREWP0GK0R6W0",
+  "version": 3,
+  "status": "proposed",
+  "target_schema": "eval_intl-release-b_g13_ask_date@1",
+  "confidence": 0.9,
+  "created_by": "human",
+  "model": null,
+  "policy": {
+    "checks": {
+      "drift": null,
+      "errors": 0,
+      "rows_out": 12,
+      "warnings": 0,
+      "llm_fallback": false,
+      "reused_approved": false,
+      "full_verification": true,
+      "mapping_confidence": 0.9,
+      "data_checks_trusted": false,
+      "low_confidence_high": [
+        "/prices/*/price_list (0.70)"
+      ],
+      "unresolved_questions": 1,
+      "plausibility_warnings": 0,
+      "low_confidence_critical": [
+        "/prices/*/vat_included (0.70)"
+      ]
+    },
+    "impact": {},
+    "source": "human_edit",
+    "reasons": [
+      "low confidence on critical fields: /prices/*/vat_included (0.70)",
+      "low confidence on high-risk fields: /prices/*/price_list (0.70)",
+      "mapping confidence 0.90 < 0.95",
+      "1 questions still need operator confirmation"
+    ],
+    "sandbox": null,
+    "verdict": {
+      "word": "likely",
+      "stage": "mapping",
+      "digest": "956a6c676827512fb5e6b26810b57264",
+      "outcome": "answer",
+      "subject": {
+        "id": "map_01M6EWCDDJ8DARZD5WWSPCEJEZ",
+        "kind": "mapping",
+        "round_id": "rnd_01M6EVVKTC7VTDREWP0GK0R6W0"
+      },
+      "evidence": [
+        {
+          "id": 1,
+          "kind": "rows",
+          "link": "/rounds/rnd_01M6EVVKTC7VTDREWP0GK0R6W0",
+          "text": {
+            "en": "12 records produced",
+            "th": "สร้างได้ 12 รายการ"
+          },
+          "numbers": {
+            "rows_out": 12
+          }
+        },
+        {
+          "id": 2,
+          "kind": "questions",
+          "link": "/review?round=rnd_01M6EVVKTC7VTDREWP0GK0R6W0",
+          "text": {
+            "en": "1 fields below the confidence bar",
+            "th": "1 ฟิลด์ยังไม่ถึงเกณฑ์ความมั่นใจ"
+          },
+          "numbers": {
+            "count": 1
+          }
+        }
+      ],
+      "narrative": null,
+      "conclusion": {
+        "en": "First file from EVAL-intl-release-b-G13_ask_date; 1 fields need a confirmation",
+        "th": "ไฟล์แรกของ EVAL-intl-release-b-G13_ask_date มี 1 ฟิลด์ที่ต้องยืนยัน"
+      },
+      "confidence": 0.8,
+      "suppressed": {
+        "count": 0,
+        "groups": [
+          {
+            "text": {
+              "en": "1 notes from the mapper",
+              "th": "หมายเหตุจากตัวจับคู่ 1 ข้อ"
+            },
+            "reason": "open_questions",
+            "pointers": []
+          }
+        ]
+      },
+      "must_decide": [
+        {
+          "id": "/prices/*/vat_included",
+          "why": {
+            "en": "Below the confidence bar for its risk",
+            "th": "ความมั่นใจต่ำกว่าเกณฑ์ของระดับความเสี่ยงนี้"
+          },
+          "kind": "confirm",
+          "scope": null,
+          "default": null,
+          "options": [
+            "confirm"
+          ],
+          "question": {
+            "en": "Is vat included read correctly?",
+            "th": "การรวม VAT อ่านถูกต้องไหม?"
+          },
+          "semantic": "price.vat_included",
+          "allow_custom": false,
+          "evidence_ids": [
+            2
+          ],
+          "option_labels": null
+        }
+      ],
+      "rules_fired": [
+        "first_time"
+      ],
+      "round_status": "review",
+      "rules_version": "2026.10.4",
+      "mapping_status": "proposed",
+      "policy_decision": "review"
+    },
+    "decision": "review",
+    "priority": 76,
+    "risk_level": "high",
+    "risk_score": 0.855,
+    "simulation": {
+      "rows_in": 12,
+      "sources": {
+        "products": 12
+      },
+      "complete": true,
+      "findings": {
+        "info": 0,
+        "error": 0,
+        "warning": 0
+      },
+      "rows_out": 12,
+      "collections": {
+        "/prices": 12
+      },
+      "duration_ms": 155.3,
+      "identity_keys": [
+        "/sku"
+      ],
+      "invalid_records": 0
+    },
+    "risk_factors": [
+      "ambiguous critical field (price, discount, identity …)"
+    ],
+    "verification": {
+      "scope": "Execution and contract checks; business ambiguities require operator answers",
+      "passed": true,
+      "version": 1,
+      "complete": true,
+      "coverage": {
+        "fields": {
+          "/sku": {
+            "risk": "critical",
+            "records": 12,
+            "records_filled": 12
+          },
+          "/brand": {
+            "risk": "low",
+            "records": 12,
+            "records_filled": 0
+          },
+          "/status": {
+            "risk": "medium",
+            "records": 12,
+            "records_filled": 12
+          },
+          "/barcode": {
+            "risk": "medium",
+            "records": 12,
+            "records_filled": 0
+          },
+          "/category": {
+            "risk": "medium",
+            "records": 12,
+            "records_filled": 0
+          },
+          "/currency": {
+            "risk": "critical",
+            "records": 12,
+            "records_filled": 12
+          },
+          "/description": {
+            "risk": "low",
+            "records": 12,
+            "records_filled": 0
+          },
+          "/product_name": {
+            "risk": "high",
+            "records": 12,
+            "records_filled": 12
+          },
+          "/unit/pack_size": {
+            "risk": "high",
+            "records": 12,
+            "records_filled": 0
+          },
+          "/unit/sell_unit": {
+            "risk": "high",
+            "records": 12,
+            "records_filled": 12
+          },
+          "/inventory/*/qty": {
+            "risk": "high",
+            "records": 12,
+            "records_filled": 0
+          },
+          "/prices/*/amount": {
+            "risk": "critical",
+            "records": 12,
+            "records_filled": 12
+          },
+          "/prices/*/vat_rate": {
+            "risk": "high",
+            "records": 12,
+            "records_filled": 12
+          },
+          "/promotions/*/name": {
+            "risk": "low",
+            "records": 12,
+            "records_filled": 0
+          },
+          "/promotions/*/type": {
+            "risk": "critical",
+            "records": 12,
+            "records_filled": 0
+          },
+          "/prices/*/price_list": {
+            "risk": "high",
+            "records": 12,
+            "records_filled": 12
+          },
+          "/inventory/*/reserved": {
+            "risk": "medium",
+            "records": 12,
+            "records_filled": 0
+          },
+          "/promotions/*/buy_qty": {
+            "risk": "high",
+            "records": 12,
+            "records_filled": 0
+          },
+          "/promotions/*/get_qty": {
+            "risk": "high",
+            "records": 12,
+            "records_filled": 0
+          },
+          "/promotions/*/min_qty": {
+            "risk": "high",
+            "records": 12,
+            "records_filled": 0
+          },
+          "/prices/*/effective_to": {
+            "risk": "high",
+            "records": 12,
+            "records_filled": 0
+          },
+          "/prices/*/vat_included": {
+            "risk": "critical",
+            "records": 12,
+            "records_filled": 12
+          },
+          "/promotions/*/channels": {
+            "risk": "medium",
+            "records": 12,
+            "records_filled": 0
+          },
+          "/promotions/*/end_date": {
+            "risk": "critical",
+            "records": 12,
+            "records_filled": 0
+          },
+          "/prices/*/effective_from": {
+            "risk": "high",
+            "records": 12,
+            "records_filled": 12
+          },
+          "/promotions/*/promo_code": {
+            "risk": "high",
+            "records": 12,
+            "records_filled": 0
+          },
+          "/promotions/*/start_date": {
+            "risk": "critical",
+            "records": 12,
+            "records_filled": 0
+          },
+          "/promotions/*/bundle_skus": {
+            "risk": "high",
+            "records": 12,
+            "records_filled": 0
+          },
+          "/promotions/*/promo_price": {
+            "risk": "critical",
+            "records": 12,
+            "records_filled": 0
+          },
+          "/inventory/*/warehouse_code": {
+            "risk": "high",
+            "records": 12,
+            "records_filled": 0
+          },
+          "/promotions/*/discount_amount": {
+            "risk": "critical",
+            "records": 12,
+            "records_filled": 0
+          },
+          "/promotions/*/discount_percent": {
+            "risk": "critical",
+            "records": 12,
+            "records_filled": 0
+          }
+        },
+        "sources": {
+          "products": 12
+        },
+        "collections": {
+          "/prices": 12,
+          "/inventory": 0,
+          "/promotions": 0
+        },
+        "invalid_records": 0
+      },
+      "problems": [],
+      "rows_out": 12,
+      "warnings": [],
+      "rows_checked": 12
+    },
+    "clarifications": [],
+    "review_decisions": [],
+    "target_schema_hash": "f7d71aafa4b9ae84",
+    "confirmed_decisions": [
+      {
+        "actor": "operator",
+        "after": {
+          "op": "parse_date_th",
+          "args": [
+            {
+              "op": "col",
+              "name": "Effective date",
+              "source": null
+            }
+          ],
+          "params": {
+            "formats": [
+              "%d/%m/%Y"
+            ],
+            "dayfirst": true
+          }
+        },
+        "scope": "source_column",
+        "action": "date_format",
+        "answer": "DMY",
+        "before": {
+          "op": "parse_date_th",
+          "args": [
+            {
+              "op": "col",
+              "name": "Effective date",
+              "source": null
+            }
+          ],
+          "params": {
+            "formats": [
+              "%d/%m/%Y",
+              "%m/%d/%Y",
+              "%Y-%m-%d"
+            ],
+            "dayfirst": true,
+            "assume_year": "ce"
+          }
+        },
+        "target": "/prices/*/effective_from",
+        "question": "The Effective date column holds only '03/04/2026'. Is this day-first (3 April 2026) or month-first (4 March 2026)?",
+        "remember": false,
+        "question_id": "/prices/*/effective_from",
+        "origin_round": "rnd_01M6EVVKTC7VTDREWP0GK0R6W0",
+        "source_value": "03/04/2026"
+      }
+    ],
+    "acknowledged_questions": []
+  },
+  "open_questions": [
+    "Dates in ['Effective date'] could be day-first or month-first; read as day-first: confirm"
+  ],
+  "validation": {
+    "ok": true,
+    "issues": []
+  },
+  "parent_id": "map_01M6EWCC8YEP1XFZDNKNQ3C55D",
+  "approved_by": null,
+  "approved_at": null,
+  "comment": null,
+  "created_at": "2026-11-02T19:39:35.234985+00:00",
+  "agent_log": [
+    {
+      "actor": "operator",
+      "agent": "human",
+      "parent": "map_01M6EWCC8YEP1XFZDNKNQ3C55D"
+    }
+  ],
+  "sample": [
+    {
+      "sku": "00470001",
+      "unit": {
+        "sell_unit": "PCS"
+      },
+      "prices": [
+        {
+          "amount": 1234.56,
+          "vat_rate": 0.05,
+          "price_list": "standard",
+          "vat_included": false,
+          "effective_from": "2026-04-03"
+        }
+      ],
+      "status": "active",
+      "currency": "SGD",
+      "source_meta": {
+        "file": "export.csv",
+        "lineage": {
+          "items": {
+            "/prices": [
+              0
+            ]
+          },
+          "source": "products",
+          "root_row": 0
+        }
+      },
+      "product_name": "SIM neutral 1"
+    },
+    {
+      "sku": "00470002",
+      "unit": {
+        "sell_unit": "PCS"
+      },
+      "prices": [
+        {
+          "amount": 1245.67,
+          "vat_rate": 0.05,
+          "price_list": "standard",
+          "vat_included": false,
+          "effective_from": "2026-04-03"
+        }
+      ],
+      "status": "active",
+      "currency": "SGD",
+      "source_meta": {
+        "file": "export.csv",
+        "lineage": {
+          "items": {
+            "/prices": [
+              1
+            ]
+          },
+          "source": "products",
+          "root_row": 1
+        }
+      },
+      "product_name": "SIM neutral 2"
+    },
+    {
+      "sku": "00470003",
+      "unit": {
+        "sell_unit": "PCS"
+      },
+      "prices": [
+        {
+          "amount": 1256.78,
+          "vat_rate": 0.05,
+          "price_list": "standard",
+          "vat_included": false,
+          "effective_from": "2026-04-03"
+        }
+      ],
+      "status": "active",
+      "currency": "SGD",
+      "source_meta": {
+        "file": "export.csv",
+        "lineage": {
+          "items": {
+            "/prices": [
+              2
+            ]
+          },
+          "source": "products",
+          "root_row": 2
+        }
+      },
+      "product_name": "SIM neutral 3"
+    },
+    {
+      "sku": "00470004",
+      "unit": {
+        "sell_unit": "PCS"
+      },
+      "prices": [
+        {
+          "amount": 1267.89,
+          "vat_rate": 0.05,
+          "price_list": "standard",
+          "vat_included": false,
+          "effective_from": "2026-04-03"
+        }
+      ],
+      "status": "active",
+      "currency": "SGD",
+      "source_meta": {
+        "file": "export.csv",
+        "lineage": {
+          "items": {
+            "/prices": [
+              3
+            ]
+          },
+          "source": "products",
+          "root_row": 3
+        }
+      },
+      "product_name": "SIM neutral 4"
+    },
+    {
+      "sku": "00470005",
+      "unit": {
+        "sell_unit": "PCS"
+      },
+      "prices": [
+        {
+          "amount": 1279.0,
+          "vat_rate": 0.05,
+          "price_list": "standard",
+          "vat_included": false,
+          "effective_from": "2026-04-03"
+        }
+      ],
+      "status": "active",
+      "currency": "SGD",
+      "source_meta": {
+        "file": "export.csv",
+        "lineage": {
+          "items": {
+            "/prices": [
+              4
+            ]
+          },
+          "source": "products",
+          "root_row": 4
+        }
+      },
+      "product_name": "SIM neutral 5"
+    }
+  ],
+  "document": {
+    "meta": {
+      "model": "deepseek-flash",
+      "version": 3,
+      "evidence": [
+        "root table: sheet 'export' (12 data rows, 9 columns) classified as products",
+        "SKU distinct values 00470001–00470012 (one per row) read as text",
+        "Currency single explicit value SGD; Tax included 'No'; Tax rate '5%'; Price list 'standard'; Sales unit 'PCS'",
+        "Single ambiguous date value 03/04/2026 in Effective date"
+      ],
+      "confidence": 0.9,
+      "created_by": "human",
+      "customer_id": "cus_01M6EVVJMVX3BV74PVWB9EFGZ0",
+      "fingerprints": {
+        "products": "6dfd82ec9e9813f3"
+      },
+      "target_schema": "eval_intl-release-b_g13_ask_date@1"
+    },
+    "joins": [],
+    "fields": [
+      {
+        "expr": {
+          "op": "cast",
+          "args": [
+            {
+              "op": "trim",
+              "args": [
+                {
+                  "op": "col",
+                  "name": "SKU"
+                }
+              ],
+              "params": {}
+            }
+          ],
+          "params": {
+            "to": "string"
+          }
+        },
+        "note": "Profiler typed the column as int (470001..470012); the cell values are zero-padded text, so keep them as strings.",
+        "target": "/sku",
+        "evidence": [
+          "header 'SKU' == synonym 'sku'",
+          "distinct values read as text '00470001'..'00470012' (12 distinct for 12 rows, unique_ratio 1.0); cast to string only — no leading-zero stripping or numeric cast, per operator requirement"
+        ],
+        "confidence": 0.92
+      },
+      {
+        "expr": {
+          "op": "normalize_whitespace",
+          "args": [
+            {
+              "op": "col",
+              "name": "Product name"
+            }
+          ],
+          "params": {}
+        },
+        "target": "/product_name",
+        "evidence": [
+          "header 'Product name' == synonym 'product_name'",
+          "12 distinct values 'SIM neutral 1'..'SIM neutral 12', no nulls"
+        ],
+        "confidence": 0.97
+      },
+      {
+        "expr": {
+          "op": "map_values",
+          "args": [
+            {
+              "op": "col",
+              "name": "Currency"
+            }
+          ],
+          "params": {
+            "mapping": {
+              "$": "USD",
+              "¥": "JPY",
+              "aud": "AUD",
+              "cny": "CNY",
+              "eur": "EUR",
+              "gbp": "GBP",
+              "hkd": "HKD",
+              "jpy": "JPY",
+              "myr": "MYR",
+              "rmb": "CNY",
+              "sgd": "SGD",
+              "thb": "THB",
+              "us$": "USD",
+              "usd": "USD",
+              "฿": "THB",
+              "€": "EUR",
+              "baht": "THB",
+              "dollar": "USD",
+              "บาท": "THB",
+              "เยน": "JPY",
+              "ยูโร": "EUR",
+              "หยวน": "CNY",
+              "ดอลลาร์": "USD"
+            },
+            "keep_unmapped": true
+          }
+        },
+        "target": "/currency",
+        "evidence": [
+          "header 'Currency' == synonym 'currency'",
+          "single explicit value 'SGD' in all 12 rows — taken from the file, no FX conversion, no inference from product name"
+        ],
+        "confidence": 0.95
+      },
+      {
+        "expr": {
+          "op": "unit_normalize",
+          "args": [
+            {
+              "op": "col",
+              "name": "Sales unit"
+            }
+          ],
+          "params": {}
+        },
+        "target": "/unit/sell_unit",
+        "evidence": [
+          "header 'Sales unit' == synonym 'unit.sell'",
+          "single value 'PCS' in all 12 rows, matches the sell_unit enum_hint",
+          "no pack-size evidence in the file, so /unit/pack_size stays unmapped"
+        ],
+        "confidence": 0.93
+      }
+    ],
+    "record": {
+      "dedupe": {
+        "keep": "first",
+        "keys": [
+          "/sku"
+        ]
+      },
+      "filters": [],
+      "root_source": "products"
+    },
+    "quality": [
+      {
+        "rule": "unique",
+        "params": {},
+        "target": "/sku",
+        "severity": "warning"
+      },
+      {
+        "rule": "not_null",
+        "params": {},
+        "target": "/sku",
+        "severity": "error"
+      },
+      {
+        "rule": "not_null",
+        "params": {},
+        "target": "/product_name",
+        "severity": "error"
+      },
+      {
+        "rule": "positive",
+        "params": {},
+        "target": "/prices/*/amount",
+        "severity": "warning"
+      }
+    ],
+    "sources": [
+      {
+        "id": "products",
+        "csv": {
+          "encoding": "auto",
+          "delimiter": "auto",
+          "quote_char": "\""
+        },
+        "file": {
+          "name_pattern": "(?i)^export",
+          "sheet_names_any": []
+        },
+        "role": "products",
+        "table": {
+          "fill_down": [],
+          "header_row": 0,
+          "header_rows": 1,
+          "last_column": 9,
+          "first_column": 0,
+          "drop_total_rows": true,
+          "drop_empty_columns": true,
+          "stop_at_blank_rows": 2,
+          "drop_repeated_headers": true
+        },
+        "rename": {},
+        "description": "Single CSV export: one row per SKU with embedded standard price row"
+      }
+    ],
+    "provenance": true,
+    "collections": [
+      {
+        "link": [
+          {
+            "left": "SKU",
+            "right": "SKU"
+          }
+        ],
+        "fields": [
+          {
+            "expr": {
+              "op": "normalize_whitespace",
+              "args": [
+                {
+                  "op": "col",
+                  "name": "Price list"
+                }
+              ],
+              "params": {}
+            },
+            "target": "/prices/*/price_list",
+            "evidence": [
+              "header 'Price list' == synonym 'price.list_name'",
+              "single explicit value 'standard' in all 12 rows — read from the source column rather than assumed from the schema default",
+              "FORMA's matcher read {\"op\": \"const\", \"value\": \"standard\"} instead: confidence 0.90 → 0.70"
+            ],
+            "confidence": 0.7
+          },
+          {
+            "expr": {
+              "op": "parse_number_th",
+              "args": [
+                {
+                  "op": "col",
+                  "name": "Net price"
+                }
+              ],
+              "params": {}
+            },
+            "target": "/prices/*/amount",
+            "evidence": [
+              "header 'Net price' == synonym price.amount",
+              "12 numeric values 1234.56–1356.77, one per SKU, never null; parsed without added rounding (1234.56 keeps its decimals)"
+            ],
+            "confidence": 0.95
+          },
+          {
+            "expr": {
+              "op": "default",
+              "args": [
+                {
+                  "op": "parse_bool",
+                  "args": [
+                    {
+                      "op": "col",
+                      "name": "Tax included"
+                    }
+                  ],
+                  "params": {}
+                }
+              ],
+              "params": {
+                "value": false
+              }
+            },
+            "target": "/prices/*/vat_included",
+            "evidence": [
+              "header 'Tax included' == synonym vat_included",
+              "value 'No' in all 12 rows → false: the stated net price is tax-exclusive; explicit source flag, not a retail convention",
+              "FORMA's matcher read {\"op\": \"const\", \"value\": false} instead: confidence 0.93 → 0.70"
+            ],
+            "confidence": 0.7
+          },
+          {
+            "expr": {
+              "op": "parse_number_th",
+              "args": [
+                {
+                  "op": "col",
+                  "name": "Tax rate"
+                }
+              ],
+              "params": {
+                "percent_to_fraction": true
+              }
+            },
+            "target": "/prices/*/vat_rate",
+            "evidence": [
+              "header 'Tax rate' == synonym price.vat_rate",
+              "single value '5%' in all 12 rows → 0.05; explicit fixture rate from the file, overriding the schema default 0.07"
+            ],
+            "confidence": 0.9
+          },
+          {
+            "expr": {
+              "op": "parse_date_th",
+              "args": [
+                {
+                  "op": "col",
+                  "name": "Effective date"
+                }
+              ],
+              "params": {
+                "formats": [
+                  "%d/%m/%Y"
+                ],
+                "dayfirst": true
+              }
+            },
+            "target": "/prices/*/effective_from",
+            "evidence": [
+              "header 'Effective date' == synonym 'effective date'",
+              "single repeated value '03/04/2026' — day-first read gives 2026-04-03; month-first would give 2026-03-04, and no other date in the file disambiguates it. Provisional DMY parse, pending operator confirmation",
+              "FORMA's matcher reads this field the same way: confidence 0.70 → 0.90",
+              "Confirmed by operator in question review"
+            ],
+            "confidence": 1.0
+          }
+        ],
+        "source": "products",
+        "target": "/prices",
+        "dedupe_keys": [
+          "/price_list",
+          "/effective_from"
+        ],
+        "normalize_keys": [
+          "trim",
+          "upper"
+        ]
+      }
+    ],
+    "attributes_passthrough": true
+  }
+}

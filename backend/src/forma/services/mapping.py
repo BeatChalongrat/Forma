@@ -299,10 +299,28 @@ def propose_for_round(
     open_questions: list[str] = []
     llm_fallback = False
     learning_note: dict[str, Any] | None = None
+    prior_decisions: list[dict[str, Any]] = []
     file_fps = {f.id: f.fingerprint for f in r.files if f.fingerprint}
+    # Requirements are round-scoped: an unchanged layout is not sufficient for reuse
+    # when the operator explicitly changed the interpretation of its values.
+    previous_round = session.get(ImportRound, previous.round_id) if previous and previous.round_id else None
+    requirements_changed = bool(previous) and (r.notes or "") != (
+        previous_round.notes or "" if previous_round else ""
+    )
+    if r.notes:
+        import hashlib
+
+        agent_log.append(
+            {
+                "agent": "operator_requirements",
+                "sha256": hashlib.sha256(r.notes.encode("utf-8")).hexdigest(),
+                "characters": len(r.notes),
+                "changed_since_approved": requirements_changed,
+            }
+        )
 
     # 1) Mapping memory: identical structure → reuse the approved mapping verbatim
-    if previous is not None and drift in ("identical", "header_moved"):
+    if previous is not None and drift in ("identical", "header_moved") and not requirements_changed:
         doc = format_memory.rebind_approved(previous, r.files)
         doc.meta.version = next_version
         doc.meta.confidence = 1.0
@@ -316,7 +334,9 @@ def propose_for_round(
         # 2) deterministic draft, reading what this customer's operators taught FORMA before (ADR-038)
         from forma.services import learning
 
-        learned = learning.learned_for(session, r.customer_id, schema, current_format=current_fp)
+        learned = learning.learned_for(
+            session, r.customer_id, schema, current_format=current_fp, requirements=r.notes or ""
+        )
         # ... and what other customers' approved mappings say these headers mean (ADR-059)
         learned.absorb(
             learning.anchors_for(session, r.customer_id, schema),
@@ -326,6 +346,10 @@ def propose_for_round(
         draft: HeuristicProposal = propose_mapping(
             profile, schema, customer_id=r.customer_id, learned=None if learned.empty else learned
         )
+        from forma.services import decision_memory
+
+        prior_decisions = decision_memory.recall(session, r, schema, draft.mapping)
+        learned.rules = prior_decisions
         open_questions.extend(draft.open_questions)
         agent_log.append(
             {
@@ -370,10 +394,11 @@ def propose_for_round(
                         draft,
                         learned=None if learned.empty else learned.for_prompt(),
                         workbench=workbench,
+                        instructions=r.notes,
                     )
                     source_kind = "ai_adaptation"
                 else:
-                    sa = schema_agent(ctx.llm, profile, schema)
+                    sa = schema_agent(ctx.llm, profile, schema, instructions=r.notes)
                     _record_llm(session, r.id, sa)
                     agent_log.append(sa.to_dict())
                     examples = _examples(session, r.customer_id, profile)
@@ -386,6 +411,7 @@ def propose_for_round(
                         examples=examples,
                         learned=None if learned.empty else learned.for_prompt(),
                         workbench=workbench,
+                        instructions=r.notes,
                     )
                     source_kind = "ai"
                 _record_llm(session, r.id, res)
@@ -412,6 +438,43 @@ def propose_for_round(
     doc.meta.fingerprints = {
         s.id: (file_fps.get(_bound_file_id(s, r.files)) or {}).get("strict", "") for s in doc.sources
     }
+    from forma.services import decision_memory
+
+    recalled = (
+        decision_memory.recall(session, r, schema, doc)
+        if source_kind != "memory"
+        else [
+            {**d, "knowledge_mapping_id": d.get("knowledge_mapping_id", previous.id)}
+            for d in (previous.policy or {}).get("confirmed_decisions", [])
+        ]
+        if previous
+        else []
+    )
+    from forma.services.decision_actions import field_mapping
+
+    for known in prior_decisions:
+        field = field_mapping(doc, known["target"])
+        if (
+            field is not None
+            and field.expr.model_dump(mode="json") == known.get("after")
+            and known not in recalled
+        ):
+            recalled.append(known)
+    if recalled:
+        settled = {d.get("question") for d in recalled}
+        for entry in agent_log:
+            for question in (entry.get("data") or {}).get("clarifications", []):
+                if any(
+                    d["target"] == question["target"]
+                    and d.get("action") == question.get("action", "constant")
+                    and d.get("source_value") == question.get("source_value")
+                    for d in recalled
+                ):
+                    settled.add(question["question"])
+        open_questions = [q for q in open_questions if q not in settled]
+        agent_log.append(
+            {"agent": "decision_memory", "rules": len(recalled), "targets": [d["target"] for d in recalled]}
+        )
 
     # 4) validate + simulate
     rep = validate_mapping(doc, schema)
@@ -426,6 +489,39 @@ def propose_for_round(
         else [{"kind": "binding", "severity": "error", "message": p} for p in problems]
     )
     prev_sim = (previous.policy or {}).get("simulation") if previous else None
+    if sim and not problems:
+        # A fully populated row flag read through an explicitly matching boolean header supersedes
+        # the heuristic's blanket VAT assumption. Confidence prose alone is never sufficient.
+        from forma.ai.heuristics import VAT_ASSUMED_QUESTION_RE
+        from forma.ai.plausibility import values_at
+        from forma.services.decision_actions import column
+
+        explicit_flags = set()
+        for fm in [*doc.fields, *(f for c in doc.collections for f in c.fields)]:
+            spec = schema.field(fm.target)
+            source_col = column(fm.expr)
+            names = {norm_header(n) for n in (*spec.synonyms_en, *spec.synonyms_th, spec.name)}
+            values = [v for record in sim.records for v in values_at(record, fm.target)]
+            if (
+                spec.semantic == "price.vat_included"
+                and fm.expr.op == "parse_bool"
+                and source_col
+                and (
+                    norm_header(source_col.name) in names
+                    or norm_header(re.sub(r"\btax\b", "vat", source_col.name, flags=re.IGNORECASE)) in names
+                )
+                and values
+                and all(isinstance(v, bool) for v in values)
+            ):
+                explicit_flags.add(fm.target)
+                if agreement and fm.target in agreement.get("disagree", {}):
+                    disagreement = agreement["disagree"][fm.target]
+                    if all('"op": "const"' in read for read in disagreement.get("matcher", [])):
+                        agreement.setdefault("resolved_by_evidence", {})[fm.target] = agreement[
+                            "disagree"
+                        ].pop(fm.target)
+        if explicit_flags and set(schema.semantic_pointers("price.vat_included")) <= explicit_flags:
+            open_questions = [q for q in open_questions if not VAT_ASSUMED_QUESTION_RE.fullmatch(q)]
     implausible: list[str] = []
     if (
         sim
@@ -485,6 +581,14 @@ def propose_for_round(
     )
     if review is not None and previous is not None and source_kind != "memory":
         _inherit_confidence(doc, review, previous)  # a person approved these exact field mappings before
+    from forma.services.decision_actions import conflicting_items
+    from forma.services.review_questions import _table_columns, unit_questions
+
+    review_decisions = conflicting_items(doc, schema, sim.records if sim else [])
+    review_decisions.extend(
+        unit_questions(doc, schema, _table_columns(MappingVersion(round_id=r.id), doc, session))
+    )
+    open_questions.extend(q["question"] for q in review_decisions if q["question"] not in open_questions)
     decision = ctx.policy.for_customer(r.customer.policy_overrides if r.customer else None).evaluate(
         doc,
         schema,
@@ -538,6 +642,8 @@ def propose_for_round(
             "agreement": agreement,
             "confidence_basis": confidence_basis,
             "verification": verified,
+            "review_decisions": review_decisions,
+            "confirmed_decisions": recalled,
             "clarifications": [
                 q for entry in agent_log for q in (entry.get("data") or {}).get("clarifications", [])
             ],
@@ -850,6 +956,17 @@ def approve_mapping(
     m = get_mapping(session, mapping_id)
     if m.status not in ("proposed", "approved"):
         raise Conflict(f"mapping is {m.status}; cannot approve")
+    if m.status == "approved":
+        return m  # An idempotent approval must not teach the same answer twice.
+    unresolved = [
+        q for q in (m.policy or {}).get("clarifications", []) if q.get("question") in (m.open_questions or [])
+    ]
+    unresolved.extend((m.policy or {}).get("review_decisions", []))
+    if unresolved:
+        raise ValidationFailed(
+            "Answer the unresolved business decisions before approving",
+            details={"questions": [q.get("question") for q in unresolved]},
+        )
     # a policy block (wrong file, zero rows) is not an ordinary review: approving it is an explicit,
     # justified override that the audit log records
     blocked = m.status == "proposed" and (m.policy or {}).get("decision") == "block"
@@ -958,6 +1075,14 @@ def save_mapping_edit(
     # Saving a production candidate always verifies the entire input. Preview endpoints may sample.
     sim, problems = simulate(ctx, doc, schema, r.files if r else [], limit=None) if r else (None, [])
     remaining_questions = parent.open_questions if remaining_questions is None else remaining_questions
+    from forma.services.decision_actions import conflicting_items
+    from forma.services.review_questions import _table_columns, unit_questions
+
+    review_decisions = conflicting_items(doc, schema, sim.records if sim else [])
+    review_decisions.extend(unit_questions(doc, schema, _table_columns(parent, doc, session)))
+    remaining_questions = list(
+        dict.fromkeys([*(remaining_questions or []), *(q["question"] for q in review_decisions)])
+    )
     findings = (
         [f.to_dict() for f in sim.findings]
         if sim
@@ -1008,6 +1133,8 @@ def save_mapping_edit(
             "file_fingerprints": (parent.policy or {}).get("file_fingerprints", {}),
             "simulation": {**sim.summary(), "complete": True} if sim else None,
             "verification": verified,
+            "review_decisions": review_decisions,
+            "confirmed_decisions": (parent.policy or {}).get("confirmed_decisions", []),
             "clarifications": [
                 q
                 for q in (parent.policy or {}).get("clarifications", [])

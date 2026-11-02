@@ -1,0 +1,38 @@
+{
+  "field_accuracy": 1.0,
+  "penalized_accuracy": 0.96,
+  "exact_record_accuracy": 0.9166666666666666,
+  "correct_fields": 96,
+  "expected_fields": 96,
+  "rows_got": 12,
+  "rows_expected": 12,
+  "identity_precision": 1.0,
+  "identity_recall": 1.0,
+  "duplicate_records": 0,
+  "missing_rows": [],
+  "extra_rows": [],
+  "wrong": [],
+  "extra_values": [
+    {
+      "key": "'00470001'",
+      "path": "/prices",
+      "value": {
+        "price_list": "standard",
+        "amount": 9999.0,
+        "vat_included": false,
+        "vat_rate": 0.05
+      },
+      "reason": "extra collection member"
+    }
+  ],
+  "phase": "before clarification; gold-dependent unresolved fields are not necessarily mapper errors",
+  "expected_questions": [
+    {
+      "topic": "duplicate_conflict",
+      "field": "/prices/*/amount",
+      "question": "SKU 00470001 ราคา 1234.56 กับ 9999 ควรใช้รายการใด?",
+      "answer": "Keep 1234.56; the 9999 record is an erroneous duplicate.",
+      "scope": "SKU 00470001, this file"
+    }
+  ]
+}
