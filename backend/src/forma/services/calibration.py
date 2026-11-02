@@ -27,6 +27,7 @@ from forma.db.models import (
     DatasetVersion,
     ImportRound,
     MappingVersion,
+    ReviewTask,
 )
 from forma.services.context import ServiceContext
 from forma.services.rounds import audit
@@ -121,6 +122,10 @@ def outcomes(session: Session, *, since: dt.datetime | None = None) -> list[dict
                 "drift": (r.summary or {}).get("drift") if r else None,
                 "row_change": _row_change(pol),
                 "low_high": list((pol.get("checks") or {}).get("low_confidence_high") or []),
+                "agreement": pol.get("agreement"),
+                "corrected_targets": sorted(
+                    {c.target for c in [*own, *descendants] if c.kind in ("alias", "constant") and c.target}
+                ),
                 "outcome": outcome,
                 "at": (m.approved_at or m.created_at).isoformat()
                 if (m.approved_at or m.created_at)
@@ -202,7 +207,48 @@ def report(session: Session, *, months: int = 6) -> dict[str, Any]:
             k: summarise(v) for k, v in sorted(per_rule.items(), key=lambda kv: -sum(kv[1].values()))
         },
         "per_decision": {k: summarise(v) for k, v in per_decision.items()},
+        "per_signal": per_signal(rows),
+        "audit": audit_outcomes(session, since=since),
         "customers": customers[:50],
+    }
+
+
+SIGNALS = ("agree", "disagree", "model_only")
+
+
+def per_signal(rows: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    """How often a person corrected a field, by what FORMA knew about it at proposal time (ADR-059): the
+    matcher and the model agreed, disagreed, or only the model mapped it. The correction rate per signal is
+    the evidence a confidence floor or cap stands on."""
+    out: dict[str, dict[str, Any]] = {}
+    for name in SIGNALS:
+        fields = corrected = 0
+        for r in rows:
+            ag = r.get("agreement") or {}
+            pointers = ag.get(name) or []
+            hit = set(r.get("corrected_targets") or [])
+            fields += len(pointers)
+            corrected += sum(1 for ptr in pointers if ptr in hit)
+        out[name] = {
+            "fields": fields,
+            "corrected": corrected,
+            "correction_rate": round(corrected / fields, 3) if fields else None,
+        }
+    return out
+
+
+def audit_outcomes(session: Session, *, since: dt.datetime | None = None) -> dict[str, int]:
+    """Spot checks of automatic approvals (ADR-059): sampled, confirmed as right, replaced by a person's
+    version (dismissed), still open. The honest accuracy of automation is confirmed / (confirmed + corrected)."""
+    q = select(ReviewTask).where(ReviewTask.kind == "audit")
+    if since is not None:
+        q = q.where(ReviewTask.created_at >= since)
+    tasks = list(session.scalars(q))
+    return {
+        "sampled": len(tasks),
+        "confirmed": sum(1 for t in tasks if t.status == "approved"),
+        "corrected": sum(1 for t in tasks if t.status in ("dismissed", "rejected")),
+        "open": sum(1 for t in tasks if t.status in ("open", "waiting")),
     }
 
 
@@ -308,8 +354,64 @@ def proposals(session: Session, policy: dict[str, Any], *, months: int = 6) -> l
                 evidence=[r["mapping_id"] for r in fine][:10],
             )
         )
+    out.extend(confidence_proposals(rows, policy))
     out.extend(anomaly_proposals(session, policy))
     return out
+
+
+AGREE_MIN_FIELDS = 20  # agreed fields with an outcome before the floor may move
+AGREE_TIGHT = 0.02  # corrected at most this often: the floor may rise
+AGREE_LOOSE = 0.10  # corrected at least this often: the floor must fall
+
+
+def confidence_proposals(rows: list[dict[str, Any]], policy: dict[str, Any]) -> list[dict[str, Any]]:
+    """The agreement floor follows what people did with agreed fields (ADR-059): rarely corrected → it may
+    rise by 0.05 (up to 0.95); often corrected → it falls by 0.05 (down to 0.80). Thresholds come from outcomes,
+    not from a rule of thumb."""
+    sig = per_signal(rows)["agree"]
+    floor = float((policy.get("confidence") or {}).get("agree_floor", 0.9))
+    rate = sig["correction_rate"]
+    if sig["fields"] < AGREE_MIN_FIELDS or rate is None:
+        return []
+    if rate <= AGREE_TIGHT and floor < 0.95:
+        value, title, why = (
+            round(min(0.95, floor + 0.05), 2),
+            (
+                "Trust fields the matcher and the model agree on a little more",
+                "เชื่อฟิลด์ที่ matcher กับโมเดลเห็นตรงกันมากขึ้นอีกนิด",
+            ),
+            (
+                f"of {sig['fields']} agreed fields people corrected {sig['corrected']} ({rate:.1%})",
+                f"จาก {sig['fields']} ฟิลด์ที่เห็นตรงกัน คนแก้ {sig['corrected']} ฟิลด์ ({rate:.1%})",
+            ),
+        )
+    elif rate >= AGREE_LOOSE and floor > 0.8:
+        value, title, why = (
+            round(max(0.8, floor - 0.05), 2),
+            (
+                "Trust fields the matcher and the model agree on less",
+                "เชื่อฟิลด์ที่ matcher กับโมเดลเห็นตรงกันน้อยลง",
+            ),
+            (
+                f"of {sig['fields']} agreed fields people corrected {sig['corrected']} ({rate:.1%})",
+                f"จาก {sig['fields']} ฟิลด์ที่เห็นตรงกัน คนแก้ {sig['corrected']} ฟิลด์ ({rate:.1%})",
+            ),
+        )
+    else:
+        return []
+    return [
+        _proposal(
+            "agree_floor",
+            scope="policy",
+            path="confidence.agree_floor",
+            value=value,
+            current=floor,
+            title=title,
+            why=why,
+            saves=0,
+            evidence=[r["mapping_id"] for r in rows if (r.get("agreement") or {}).get("agree")][:10],
+        )
+    ]
 
 
 def anomaly_proposals(session: Session, policy: dict[str, Any]) -> list[dict[str, Any]]:

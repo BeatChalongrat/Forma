@@ -612,6 +612,10 @@ cancelled comes back as `open` if the round is reopened (ADR-053).
 | A model writes an option the engine does not know (`day_first`) | repaired when it is a known spelling, otherwise refused by the validator and sent back to the model — never ignored | ADR-057 |
 | A mapping yields 0 records, or dates in the year 9456 | the engine runs the model's mapping on the first rows before the model is done; the report goes back to it and it fixes the mapping; what is left is a warning on the card | ADR-058 |
 | A heading row sits inside the data ("เครื่องดื่ม") | a section row: it becomes a column filled down to the next heading and leaves the data; never a product, never a header | ADR-058 |
+| The model is sure of a column FORMA's own matcher read differently | the field's confidence is capped and it is asked on the card as a choice with the matcher's column first; a person decides, not the model's number | ADR-059 |
+| A field that was always filled last round comes out empty | a history plausibility warning on the card and in the self-check report; the model fixes it or a person sees it | ADR-059 |
+| A new customer's headers match what two other customers approved | the pair is an alias with evidence that names them; fewer than two: the model sees it as an anchor | ADR-059 |
+| An automatic approval nobody would ever look at | a deterministic sample (5 %) gets a spot-check task; the approval stands; what the person finds is the measured accuracy of automation | ADR-059 |
 | Records break the contract | approval and export refused; Data Editor shows them; a save is refused only for errors it adds | ADR-026 |
 | Worker dies mid-job | stale recovery re-queues; stages already recorded are skipped; dataset objects are never partial | ADR-010, 015 |
 | Queue was full or Redis down at upload time | bulk items detected as stuck; Resume re-enqueues; startup reconciliation marks jobs done when results exist | ADR-027, 044 |

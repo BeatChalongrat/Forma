@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useSearchParams } from 'react-router-dom'
 import { ArrowRight } from 'lucide-react'
-import { api, type ReviewTask } from '../lib/api'
+import { api, type FieldSpec, type ReviewTask } from '../lib/api'
 import { AssistantIcon } from '../lib/icons'
 import { usePreferences } from '../lib/preferences'
 import { Badge, Empty, Modal, PageHeader, Spinner } from '../components/ui'
@@ -30,10 +30,36 @@ function WaitDialog({ task, onClose }: { task: ReviewTask; onClose: () => void }
   </Modal>
 }
 
+const semanticLabels: Record<string, string> = { 'price.vat_included': 'ราคารวม VAT', 'unit.pack_size': 'จำนวนต่อแพ็ก' }
+const fieldName = (f: FieldSpec, th: boolean) => (th ? f.description_th || semanticLabels[f.semantic || ''] : f.description) || f.description || f.name
+
+/** One answer for the same question asked by several files (ADR-059). Shown above the queue: it teaches the most per click. */
+function QuestionGroups() {
+  const { t, prefs } = usePreferences(), qc = useQueryClient(), toast = useToast(), th = prefs.language === 'th'
+  const q = useQuery({ queryKey: ['review', 'groups'], queryFn: api.questionGroups, refetchInterval: 15000 })
+  const answer = useMutation({
+    mutationFn: api.answerQuestionGroup,
+    onSuccess: (r) => { void qc.invalidateQueries({ queryKey: ['review'] }); void qc.invalidateQueries({ queryKey: ['dashboard'] }); toast.push({ kind: 'ok', title: t(`Answered for ${r.answered} files`, `ตอบให้ ${r.answered} ไฟล์แล้ว`) }) },
+    onError: (e: Error) => toast.push({ kind: 'bad', title: t('Not saved', 'ยังบันทึกไม่ได้'), detail: e.message }),
+  })
+  const groups = q.data ?? []
+  if (!groups.length) return null
+  return <section className="card p-5 mb-4 border-signal/30" aria-label={t('Same question in several files', 'คำถามเดียวกันในหลายไฟล์')}>
+    <h2 className="font-semibold text-navy">{t('The same question in several files', 'คำถามเดียวกันในหลายไฟล์')}</h2>
+    <p className="text-sm text-ink-2 mt-1">{t('One answer settles every file listed. Each file still gets its own new version, previewed and rechecked by the policy.', 'ตอบครั้งเดียวใช้กับทุกไฟล์ที่ระบุ แต่ละไฟล์ยังได้เวอร์ชันใหม่ของตัวเอง ผ่านการตรวจของกฎเหมือนเดิม')}</p>
+    <ul className="mt-3 divide-y divide-line">{groups.map(g => <li key={g.key} className="py-3 flex flex-wrap items-center gap-3">
+      <div className="flex-1 min-w-[220px]"><div className="font-medium">{g.kind === 'choice' ? t(`Which column holds ${fieldName(g.field, false)}?`, `คอลัมน์ไหนคือ${fieldName(g.field, true)}?`) : fieldName(g.field, th)}</div><div className="text-xs text-muted mt-1 break-words">{g.members.map(m => m.customer_code).join(' · ')} · {t(`${g.members.length} files`, `${g.members.length} ไฟล์`)}</div></div>
+      <div className="flex flex-wrap gap-2">{g.kind === 'choice' ? g.options.map(o => <button key={o} className="btn btn-sm" disabled={answer.isPending} onClick={() => answer.mutate({ key: g.key, answer: o })}>{o}</button>)
+        : [true, false].map(v => <button key={String(v)} className="btn btn-sm" disabled={answer.isPending} onClick={() => answer.mutate({ key: g.key, answer: v })}>{g.field.semantic === 'price.vat_included' ? v ? t('VAT included', 'รวม VAT แล้ว') : t('VAT excluded', 'ยังไม่รวม VAT') : v ? t('Yes', 'ใช่') : t('No', 'ไม่ใช่')}</button>)}</div>
+    </li>)}</ul>
+  </section>
+}
+
 export function ReviewCenter() {
   const { t, date } = usePreferences()
   const qc = useQueryClient(), toast = useToast()
   const [waiting, setWaiting] = useState<ReviewTask | null>(null)
+  const confirm = useMutation({ mutationFn: (id: string) => api.confirmAudit(id), onSuccess: () => { void qc.invalidateQueries({ queryKey: ['review'] }); void qc.invalidateQueries({ queryKey: ['dashboard'] }); toast.push({ kind: 'ok', title: t('Spot check recorded', 'บันทึกการสุ่มตรวจแล้ว') }) }, onError: (e: Error) => toast.push({ kind: 'bad', title: t('Not saved', 'ยังบันทึกไม่ได้'), detail: e.message }) })
   const resume = useMutation({ mutationFn: api.resumeReview, onSuccess: () => { void qc.invalidateQueries({ queryKey: ['review'] }); void qc.invalidateQueries({ queryKey: ['dashboard'] }) }, onError: (e: Error) => toast.push({ kind: 'bad', title: t('Not saved', 'ยังบันทึกไม่ได้'), detail: e.message }) })
   const [params, setParams] = useSearchParams()
   const tab = params.get('status') || 'open'
@@ -53,12 +79,13 @@ export function ReviewCenter() {
     {query.error && <p role="alert" className="text-bad">{t('Could not load the queue.', 'โหลดรายการไม่ได้')} <button className="btn btn-sm" onClick={() => void query.refetch()}>{t('Try again', 'ลองใหม่')}</button></p>}
     {!query.isPending && !query.error && !items.length && <Empty title={t('No items here', 'ไม่มีรายการในหมวดนี้')} />}
     {waiting && <WaitDialog key={waiting.id} task={waiting} onClose={() => setWaiting(null)} />}
+    {tab === 'open' && !round && <QuestionGroups />}
     <ul className="space-y-3">{items.map(task => <li key={task.id} className="card p-5">
-      <div className="flex flex-wrap gap-3 items-start"><div className="flex-1 min-w-[180px]"><div className="font-semibold text-navy break-words">{task.customer?.name?.startsWith(task.customer.code) ? task.customer.name : `${task.customer?.code ?? ''} · ${task.customer?.name ?? ''}`}</div><div className="text-xs text-muted mt-1 break-words">{task.round?.label} · {date(task.created_at)}</div></div>{task.status === 'open' && <Badge tone={task.age_days >= 7 ? 'warn' : 'neutral'}>{task.age_days ? t(`Waiting ${task.age_days} days`, `รอมา ${task.age_days} วัน`) : t('New today', 'มาวันนี้')}</Badge>}<Badge tone={task.details.decision === 'block' ? 'bad' : 'warn'}>{task.details.decision === 'block' ? t('Check the source file', 'ต้องตรวจไฟล์ต้นทาง') : t('Needs confirmation', 'ต้องยืนยันข้อมูล')}</Badge></div>
+      <div className="flex flex-wrap gap-3 items-start"><div className="flex-1 min-w-[180px]"><div className="font-semibold text-navy break-words">{task.customer?.name?.startsWith(task.customer.code) ? task.customer.name : `${task.customer?.code ?? ''} · ${task.customer?.name ?? ''}`}</div><div className="text-xs text-muted mt-1 break-words">{task.round?.label} · {date(task.created_at)}</div></div>{task.status === 'open' && <Badge tone={task.age_days >= 7 ? 'warn' : 'neutral'}>{task.age_days ? t(`Waiting ${task.age_days} days`, `รอมา ${task.age_days} วัน`) : t('New today', 'มาวันนี้')}</Badge>}<Badge tone={task.kind === 'audit' ? 'neutral' : task.details.decision === 'block' ? 'bad' : 'warn'}>{task.kind === 'audit' ? t('Spot check', 'สุ่มตรวจ') : task.details.decision === 'block' ? t('Check the source file', 'ต้องตรวจไฟล์ต้นทาง') : t('Needs confirmation', 'ต้องยืนยันข้อมูล')}</Badge></div>
       <p className="text-sm text-ink-2 mt-3 leading-6">{task.details.verdict ? <span className="font-medium text-navy"><VerdictLine v={task.details.verdict} /></span> : issueSummary(task, t)}</p>
       <ul className="mt-3 space-y-1.5 text-sm text-ink-2 leading-6 break-words list-disc pl-5">{(task.explanations?.length ? task.explanations : [{ en: 'Open the questions to inspect the source and confirm the matching.', th: 'เปิดคำถามเพื่อตรวจต้นทางและยืนยันการจับคู่คอลัมน์' }]).map((r, i) => <li key={i}>{t(r.en, r.th)}</li>)}</ul>
       {task.status === 'waiting' && <p className="mt-3 text-sm rounded-lg bg-surface-2 px-3 py-2">{t('Waiting for the customer', 'รอลูกค้าตอบ')}: {task.waiting_note}{task.waiting_until && <span className="text-muted"> · {t('comes back', 'กลับมาวันที่')} {date(task.waiting_until)}</span>}</p>}
-      <div className="flex flex-wrap items-center justify-end gap-2 mt-4">{task.status === 'open' && <button className="btn btn-sm" onClick={() => setWaiting(task)}>{t('Wait for the customer', 'รอลูกค้าตอบ')}</button>}{task.status === 'waiting' && <button className="btn btn-sm" disabled={resume.isPending} onClick={() => resume.mutate(task.id)}>{t('Bring it back now', 'กลับมาตรวจตอนนี้')}</button>}{task.mapping_version_id ? <button className="btn btn-sm" onClick={() => { choose({ mapping: task.mapping_version_id!, round: task.round_id }) }}>{t('Open questions', 'เปิดคำถาม')} <ArrowRight size={14} /></button> : <Link className="btn btn-sm" to={task.dataset_version_id ? `/datasets/${task.dataset_version_id}?tab=findings` : `/rounds/${task.round_id}`}>{t('Check results', 'ตรวจผลลัพธ์')} →</Link>}</div>
+      <div className="flex flex-wrap items-center justify-end gap-2 mt-4">{task.status === 'open' && <button className="btn btn-sm" onClick={() => setWaiting(task)}>{t('Wait for the customer', 'รอลูกค้าตอบ')}</button>}{task.status === 'waiting' && <button className="btn btn-sm" disabled={resume.isPending} onClick={() => resume.mutate(task.id)}>{t('Bring it back now', 'กลับมาตรวจตอนนี้')}</button>}{task.kind === 'audit' && task.status === 'open' && <button className="btn btn-sm btn-primary" disabled={confirm.isPending} onClick={() => confirm.mutate(task.id)}>{t('Looks right', 'ถูกต้องแล้ว')}</button>}{task.mapping_version_id ? <button className="btn btn-sm" onClick={() => { choose({ mapping: task.mapping_version_id!, round: task.round_id }) }}>{t('Open questions', 'เปิดคำถาม')} <ArrowRight size={14} /></button> : <Link className="btn btn-sm" to={task.dataset_version_id ? `/datasets/${task.dataset_version_id}?tab=findings` : `/rounds/${task.round_id}`}>{t('Check results', 'ตรวจผลลัพธ์')} →</Link>}</div>
     </li>)}</ul>
     <div className="flex justify-between mt-4"><button className="btn btn-sm" disabled={!offset} onClick={() => choose({ offset: String(Math.max(0, offset - 50)) })}>{t('Previous', 'ก่อนหน้า')}</button><button className="btn btn-sm" disabled={items.length < 50} onClick={() => choose({ offset: String(offset + 50) })}>{t('Next', 'ถัดไป')}</button></div>
 
@@ -66,6 +93,7 @@ export function ReviewCenter() {
 }
 
 function issueSummary(task: ReviewTask, t: (en: string, th: string) => string) {
+  if (task.kind === 'audit') return t('This file was approved automatically. It was picked for a spot check: look at the matching and a sample, then confirm it or correct it in the mapping editor.', 'ไฟล์นี้ผ่านอัตโนมัติ ระบบสุ่มมาให้ตรวจ ดูการจับคู่กับตัวอย่างผล แล้วยืนยันว่าถูก หรือแก้ในตัวแก้การจับคู่')
   if (task.details.decision === 'block' || task.kind === 'blocked') return t('The file may not belong to this customer, or its data could not pass the checks. Confirm the source file first.', 'ไฟล์อาจไม่ตรงกับลูกค้ารายนี้ หรือข้อมูลยังไม่ผ่านการตรวจ เริ่มจากตรวจว่าเลือกไฟล์ถูกต้องหรือไม่')
   if (task.details.open_questions?.length) return t('The source file leaves some details unclear. Please confirm them before we use the results.', 'ไฟล์ต้นทางยังบอกข้อมูลบางอย่างไม่ชัดเจน ต้องให้คุณยืนยันก่อนนำผลลัพธ์ไปใช้')
   if (task.kind === 'drift') return t('This file differs from the previous format. Check that the new column matching still means the same thing.', 'รูปแบบไฟล์เปลี่ยนจากครั้งก่อน ตรวจว่าคอลัมน์ที่จับคู่ใหม่ยังหมายถึงข้อมูลเดิม')

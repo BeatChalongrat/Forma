@@ -21,7 +21,7 @@ from forma.mapping_dsl.validate import validate_mapping
 from forma.profiling.profile import WorkbookProfile
 from forma.schema_registry import TargetSchema
 
-PROMPT_VERSION = "2026.11.02"
+PROMPT_VERSION = "2026.11.02.2"
 
 SYSTEM_BASE = """You are FORMA's mapping intelligence. FORMA converts messy ERP exports (Excel/CSV, Thai and English,
 multi-sheet) into the target JSON contract supplied for this request. There is no fixed product contract.
@@ -43,6 +43,13 @@ Rules you must follow:
 - Do not infer VAT inclusion, rate, currency, units or other business facts from retail conventions.
   Use explicit source evidence, contract defaults or confirmed operator decisions. Otherwise ask.
 - Every field mapping must carry confidence (0-1) and evidence (why: header, samples, rules).
+- Each column card shows the most frequent values with their counts (top_values), the share of empty cells,
+  the number of distinct values and the range. Read them before you choose a column: a status column with
+  three values, a price column that is never empty, a code column with one value per row.
+- forma_looked_at_the_file_for_you holds the full distinct values of the columns the draft was least sure
+  about and of the columns that could hold the same field instead. Decide between them from those values.
+- anchors_from_other_customers are header → field pairs that other customers' approved mappings use for
+  the same header. Follow an anchor unless this file's values contradict it, and say so in evidence.
 - You may look at the file before you answer: return {{"inspect": [requests], "mapping": null}} with up to
   {max_inspect} requests, each {{table_index, what: columns | distinct | rows | find, column?, pattern?, start?, limit?}}.
   FORMA answers under earlier_turns and asks again. Do this when the samples cannot settle a point (which values
@@ -68,7 +75,14 @@ def _ops_list() -> str:
         arity = f"{lo}" if hi == lo else f"{lo}+" if hi is None else f"{lo}-{hi}"
         params = OP_PARAMS.get(o)
         ps = "; params: " + ", ".join(f"{k} ({v})" for k, v in params.items()) if params else ""
-        lines.append(f"  {o.value}(args: {arity}{ps})")
+        note = (
+            " — a built-in table already knows the common Thai, English and SAP codes (ST, PAK, KAR, KI, FL, DO,"
+            " BT, bottle, ขวด …) and returns the canonical values the field's enum_hint lists; pass synonyms only"
+            " for codes the table cannot know, never to remap a code it knows"
+            if o is Op.UNIT_NORMALIZE
+            else ""
+        )
+        lines.append(f"  {o.value}(args: {arity}{ps}){note}")
     return (
         "\n".join(lines)
         + "\n  Every call node is {op, args: [child nodes], params: {literal options}}; a column is"
@@ -149,6 +163,27 @@ def _guarded(schema: TargetSchema | None, inner: Any = None) -> Any:
     return _v
 
 
+def _column_card(c: Any, rows: int, chars: int) -> dict[str, Any]:
+    """What a model sees of a column before it maps (ADR-059): the most frequent values with their counts,
+    how many are empty and distinct, the range of a number — not five values in file order. A profile stored
+    before top values existed still shows its samples."""
+    card: dict[str, Any] = {
+        "name": c.name,
+        "type": c.inferred_type,
+        "null_ratio": c.null_ratio,
+        "distinct": c.unique_count,
+        "unique_ratio": c.unique_ratio,
+        "hints": c.hints,
+    }
+    if c.top_values:
+        card["top_values"] = [[_clip(v, chars), n] for v, n in c.top_values]
+    else:
+        card["samples"] = [_clip(x, chars) for x in c.samples[:rows]]
+    if c.min is not None:
+        card["min"], card["max"] = c.min, c.max
+    return card
+
+
 def _profile_digest(profile: WorkbookProfile, *, max_cols: int = 60) -> dict[str, Any]:
     rows, chars = _caps()
     tables = []
@@ -161,17 +196,7 @@ def _profile_digest(profile: WorkbookProfile, *, max_cols: int = 60) -> dict[str
                 "n_rows": t.n_rows,
                 "title": t.table.title,
                 "key_candidates": t.key_candidates,
-                "columns": [
-                    {
-                        "name": c.name,
-                        "type": c.inferred_type,
-                        "null_ratio": c.null_ratio,
-                        "unique_ratio": c.unique_ratio,
-                        "samples": [_clip(x, chars) for x in c.samples[:rows]],
-                        "hints": c.hints,
-                    }
-                    for c in t.columns[:max_cols]
-                ],
+                "columns": [_column_card(c, rows, chars) for c in t.columns[:max_cols]],
             }
         )
     return {
@@ -353,11 +378,23 @@ def _agent_loop(
     validate_doc: Callable[[dict[str, Any]], list[str]],
     workbench: Workbench | None,
     n_tables: int,
+    ground: MappingDocument | None = None,
+    usage: Usage | None = None,
 ) -> _Loop:
     inspect_rounds, check_rounds = _rounds() if workbench is not None else (0, 0)
     turns: list[dict[str, Any]] = []
     history: list[dict[str, Any]] = []
-    usage, attempts, inspections, checks = Usage(), 0, 0, 0
+    usage = usage if usage is not None else Usage()  # the caller's, so a failed loop still reports its cost
+    attempts, inspections, checks = 0, 0, 0
+    grounded = 0
+    if workbench is not None and ground is not None:
+        # FORMA looks at the uncertain columns before the model's first turn (ADR-059): the model does not
+        # have to decide to look, and what it sees is the whole value set, not five samples
+        looked = workbench.ground(ground)
+        if looked:
+            payload = {**payload, "forma_looked_at_the_file_for_you": looked}
+            grounded = len(looked)
+            history.append({"turn": "ground", "columns": grounded})
     best: tuple[int, MappingDocument, dict[str, Any], RunReport] | None = None
     while True:
         may_inspect = workbench is not None and inspections < inspect_rounds
@@ -380,12 +417,27 @@ def _agent_loop(
         }
         if turns:
             body["earlier_turns"] = turns
-        res = client.structured(
-            system=system,
-            user=json.dumps(body, ensure_ascii=False),
-            schema=MAPPING_AGENT_SCHEMA,
-            validate=_guarded(schema, _validate),
-        )
+        t = client.total_usage
+        before = (t.input_tokens, t.output_tokens, t.calls, t.latency_ms)
+        try:
+            res = client.structured(
+                system=system,
+                user=json.dumps(body, ensure_ascii=False),
+                schema=MAPPING_AGENT_SCHEMA,
+                validate=_guarded(schema, _validate),
+            )
+        except LLMError:
+            # the calls a failed turn made are still this agent's spend (the client counted them)
+            usage.add(
+                Usage(
+                    input_tokens=t.input_tokens - before[0],
+                    output_tokens=t.output_tokens - before[1],
+                    calls=t.calls - before[2],
+                    latency_ms=t.latency_ms - before[3],
+                    model=t.model,
+                )
+            )
+            raise
         usage.add(res.usage)
         attempts += res.attempts
         d = res.data
@@ -399,7 +451,7 @@ def _agent_loop(
             continue
         doc = MappingDocument.model_validate(d["mapping"])
         if workbench is None:
-            return _Loop(doc, d, usage, attempts, None)
+            return _Loop(doc, d, usage, attempts, {"grounded": grounded} if grounded else None)
         report = workbench.run(doc)
         history.append({"turn": "mapping", "rows_out": report.rows_out, "problems": report.problems[:6]})
         if best is None or len(report.problems) < best[0]:
@@ -422,6 +474,7 @@ def _agent_loop(
         "rows_out": report.rows_out,
         "fix_rounds": checks,
         "inspections": inspections,
+        "grounded": grounded,
         "problems_left": report.problems[:10],
         "history": history,
     }
@@ -458,7 +511,9 @@ def mapping_agent(
         payload["approved_examples_from_similar_files"] = examples[:3]
     if learned:
         # decisions this customer's operators made before (ADR-038): keep them unless the file contradicts them
-        payload["what_the_operator_taught_before"] = learned
+        payload["what_the_operator_taught_before"] = _without_anchors(learned)
+        if learned.get("anchors_from_other_customers"):
+            payload["anchors_from_other_customers"] = learned["anchors_from_other_customers"]
 
     def _validate(d: dict[str, Any]) -> list[str]:
         try:
@@ -469,6 +524,7 @@ def mapping_agent(
         return [f"{i.code} at {i.path}: {i.message}" for i in rep.issues if i.level == "error"]
 
     set_agent("mapping")
+    spent = Usage()
     try:
         loop = _agent_loop(
             client,
@@ -478,13 +534,16 @@ def mapping_agent(
             validate_doc=_validate,
             workbench=workbench,
             n_tables=len(profile.tables),
+            ground=draft.mapping,
+            usage=spent,
         )
     except LLMError as e:
         # Fall back to the deterministic draft but record the failure as a note (policy → review).
+        spent.model = spent.model or client.model
         r = AgentResult(
             "mapping",
             {"mapping": draft.mapping.model_dump(mode="json")},
-            client.total_usage,
+            spent,  # what this agent spent, not the client's lifetime total (ADR-059)
             0,
             [f"llm_failed: {e}"],
         )
@@ -497,12 +556,16 @@ def mapping_agent(
     return doc, _agent_result("mapping", loop)
 
 
+def _without_anchors(learned: dict[str, Any]) -> dict[str, Any]:
+    return {k: v for k, v in learned.items() if k != "anchors_from_other_customers"}
+
+
 def _agent_result(name: str, loop: _Loop) -> AgentResult:
     data = {k: v for k, v in loop.data.items() if k not in ("mapping", "inspect")}
     notes: list[str] = []
     if loop.self_check is not None:
         data["self_check"] = loop.self_check
-        if loop.self_check["problems_left"]:
+        if loop.self_check.get("problems_left"):
             notes.append(f"self_check_unresolved: {len(loop.self_check['problems_left'])} problem(s) left")
     return AgentResult(name, data, loop.usage, loop.attempts, notes)
 
@@ -612,7 +675,9 @@ def adaptation_agent(
         "target_json_schema": schema.document,
     }
     if learned:
-        payload["what_the_operator_taught_before"] = learned
+        payload["what_the_operator_taught_before"] = _without_anchors(learned)
+        if learned.get("anchors_from_other_customers"):
+            payload["anchors_from_other_customers"] = learned["anchors_from_other_customers"]
 
     def _validate(d: dict[str, Any]) -> list[str]:
         try:
@@ -622,6 +687,7 @@ def adaptation_agent(
         return [f"{i.code}: {i.message}" for i in validate_mapping(doc, schema).issues if i.level == "error"]
 
     set_agent("adaptation")
+    spent = Usage()
     try:
         loop = _agent_loop(
             client,
@@ -631,9 +697,12 @@ def adaptation_agent(
             validate_doc=_validate,
             workbench=workbench,
             n_tables=len(profile.tables),
+            ground=draft.mapping,
+            usage=spent,
         )
     except LLMError as e:
-        return draft.mapping, AgentResult("adaptation", {}, client.total_usage, 0, [f"llm_failed: {e}"])
+        spent.model = spent.model or client.model
+        return draft.mapping, AgentResult("adaptation", {}, spent, 0, [f"llm_failed: {e}"])
     doc = loop.doc
     doc.meta.created_by = "ai"
     doc.meta.model = loop.usage.model or client.model  # the route that answered (ADR-025)

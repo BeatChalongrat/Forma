@@ -42,16 +42,23 @@ class Learned:
     )  # pointer → {normalized header: evidence}
     constants: dict[str, tuple[Any, str]] = field(default_factory=dict)  # pointer → (value, evidence)
     ids: dict[str, list[str]] = field(default_factory=dict)  # pointer → correction ids (to count uses)
+    anchors: list[dict[str, Any]] = field(default_factory=list)  # other customers' pairs below the share bar
+    anchored: int = 0  # pairs that became aliases because enough customers approved them (ADR-059)
 
     @property
     def empty(self) -> bool:
-        return not self.aliases and not self.constants
+        return not self.aliases and not self.constants and not self.anchors
 
     def alias_for(self, pointer: str, header: str) -> str | None:
         return self.aliases.get(pointer, {}).get(norm_header(header))
 
     def summary(self) -> dict[str, Any]:
-        return {"aliases": sum(len(v) for v in self.aliases.values()), "constants": len(self.constants)}
+        return {
+            "aliases": sum(len(v) for v in self.aliases.values()),
+            "constants": len(self.constants),
+            "anchored": self.anchored,
+            "anchors": len(self.anchors),
+        }
 
     def for_prompt(self) -> dict[str, Any]:
         """Bounded, model-facing view: what the operator taught FORMA before (data, not instructions)."""
@@ -64,7 +71,87 @@ class Learned:
             "confirmed_constants": [
                 {"target": p, "value": v, "why": why} for p, (v, why) in sorted(self.constants.items())
             ][:20],
+            "anchors_from_other_customers": self.anchors[:40],
         }
+
+    def absorb(self, anchors: Anchors, headers: set[str], share_after: int) -> None:
+        """Other customers' approved header → field pairs for the headers of this file (ADR-059). A pair that
+        ``share_after`` customers approved independently is an alias for this customer too (it wins in the
+        matcher, with evidence that says why); a pair fewer approved is shown to the model as an anchor."""
+        for (header, target), customers in sorted(anchors.pairs.items(), key=lambda kv: (-len(kv[1]), kv[0])):
+            if header not in headers:
+                continue
+            n = len(customers)
+            if n >= share_after:
+                hs = self.aliases.setdefault(target, {})
+                if header not in hs:
+                    hs[header] = f"learned: {n} other customers map this header here (anchor, ADR-059)"
+                    self.anchored += 1
+            else:
+                self.anchors.append({"header": header, "target": target, "customers": n})
+
+
+@dataclass
+class Anchors:
+    """(normalized header, target pointer) → the other customers whose approved mappings read it so."""
+
+    pairs: dict[tuple[str, str], set[str]] = field(default_factory=dict)
+
+    def add(self, header: str, target: str, customer_id: str) -> None:
+        self.pairs.setdefault((header, target), set()).add(customer_id)
+
+
+def _single_column(expr: Any) -> str | None:
+    """The one column a stored expression reads, or None when it reads none or several."""
+    leaves: list[str] = []
+
+    def walk(e: Any) -> None:
+        if not isinstance(e, dict):
+            return
+        if e.get("op") == "col" and e.get("name"):
+            leaves.append(str(e["name"]))
+        for a in e.get("args") or []:
+            walk(a)
+
+    walk(expr)
+    return leaves[0] if len(leaves) == 1 else None
+
+
+def anchors_for(
+    session: Session, customer_id: str | None, schema: TargetSchema, *, limit: int = 300
+) -> Anchors:
+    """What other customers' approved mappings (and their operators' corrections) say a header means, for
+    the same target contract. Each pair counts a customer once; the newest ``limit`` approved versions are
+    read. Deterministic and cheap enough to run on every proposal."""
+    from forma.services.format_memory import approved_history
+
+    out = Anchors()
+    known = {f.pointer for f in schema.fields(include_system=True)}
+    seen: set[str] = set()
+    for m in approved_history(session, None, schema.ref)[:limit]:
+        if m.customer_id == customer_id or m.customer_id in seen:
+            continue
+        seen.add(m.customer_id)  # the newest approved layout speaks for a customer
+        doc = m.document or {}
+        fields = list(doc.get("fields") or [])
+        for c in doc.get("collections") or []:
+            fields.extend(c.get("fields") or [])
+        for f in fields:
+            target, col = str(f.get("target") or ""), _single_column(f.get("expr"))
+            if target in known and col and (h := norm_header(col)):
+                out.add(h, target, m.customer_id)
+    for c in session.scalars(
+        select(Correction).where(
+            Correction.status == "confirmed",
+            Correction.kind == "alias",
+            Correction.header.is_not(None),
+            Correction.customer_id.is_not(None),
+            Correction.customer_id != customer_id,
+        )
+    ):
+        if c.target in known and c.header and c.customer_id:
+            out.add(c.header, c.target, c.customer_id)
+    return out
 
 
 # --------------------------------------------------------------------------------------------
@@ -218,12 +305,9 @@ def count_uses(session: Session, learned: Learned, used_pointers: set[str]) -> N
 # share: aliases several customers taught become everyone's
 # --------------------------------------------------------------------------------------------
 def suggestions(session: Session, schema: TargetSchema, *, min_customers: int = 3) -> list[dict[str, Any]]:
-    """Headers mapped to the same field by at least ``min_customers`` customers, not yet a synonym."""
-    rows = session.execute(
-        select(Correction.header, Correction.target, func.count(func.distinct(Correction.customer_id)))
-        .where(Correction.kind == "alias", Correction.status == "confirmed", Correction.header.is_not(None))
-        .group_by(Correction.header, Correction.target)
-    ).all()
+    """Headers mapped to the same field by at least ``min_customers`` customers, not yet a synonym. A customer
+    counts whether its operator taught the pair or accepted it from an anchor (ADR-059): both are approvals."""
+    rows = [(h, t, len(cs)) for (h, t), cs in anchors_for(session, None, schema).pairs.items()]
     promoted = {
         (r.header, r.target)
         for r in session.scalars(

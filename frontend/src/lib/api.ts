@@ -125,7 +125,9 @@ export type LearningSuggestion = { header: string; target: string; field: FieldS
 export type LearningView = { stats: LearningStats; learned: { total: number; items: LearnedItem[] }; suggestions: LearningSuggestion[] }
 /** policy calibration from outcomes (ADR-037) */
 export type OutcomeCounts = { n: number; right: number; precision: number | null; accepted_unchanged?: number; corrected?: number; rejected?: number; auto_ok?: number; auto_then_edited?: number; auto_then_rolled_back?: number }
-export type CalibrationReport = { since: string; decisions: number; per_rule: Record<string, OutcomeCounts>; per_decision: Record<string, OutcomeCounts>; customers: (OutcomeCounts & { customer_id: string; code: string; auto: number; review: number })[] }
+export type SignalCounts = { fields: number; corrected: number; correction_rate: number | null }
+export type AuditCounts = { sampled: number; confirmed: number; corrected: number; open: number }
+export type CalibrationReport = { since: string; decisions: number; per_rule: Record<string, OutcomeCounts>; per_decision: Record<string, OutcomeCounts>; per_signal?: Record<'agree' | 'disagree' | 'model_only', SignalCounts>; audit?: AuditCounts; customers: (OutcomeCounts & { customer_id: string; code: string; auto: number; review: number })[] }
 export type Proposal = { id: string; digest: string; scope: 'policy' | 'customer'; customer_id?: string; customer_code?: string; path: string; value: unknown; current: unknown; title: Bilingual; why: Bilingual; saves: number; evidence: string[] }
 /** proactive intelligence (ADR-039) */
 export type Cadence = { status: 'overdue' | 'due' | 'ahead' | 'unknown'; rounds: number; every_days?: number; last?: string | null; expected?: string; late_days?: number; grace_days?: number }
@@ -187,6 +189,8 @@ export type MappingVersion = {
   confidence: number | null; created_by: string; model: string | null; policy: PolicyDecision; open_questions: string[]; validation: { ok: boolean; issues: { level: string; code: string; message: string; path: string }[] } | null
   parent_id: string | null; approved_by: string | null; approved_at: string | null; comment: string | null; created_at: string; agent_log: Record<string, unknown>[]; sample: Record<string, unknown>[]; document?: MappingDocument
 }
+/** The same question across several open files (ADR-059): one answer settles them all. */
+export type QuestionGroup = { key: string; kind: 'choice' | 'boolean'; field: FieldSpec; options: string[]; current: Expr; members: { task_id: string; mapping_id: string; round_id: string; customer_code: string }[] }
 export type ReviewTask = {
   explanations?: { en: string; th: string }[]
   age_days: number; waiting_until: string | null; waiting_note: string | null
@@ -287,7 +291,7 @@ export type Preferences = { display_name: string; avatar?: string; language: 'th
 export type MemoryItem = { id: string; topic: string; content: string; origin: 'chat' | 'user'; sensitive: boolean; source_chat_id: string | null; created_at: string; updated_at: string }
 export type MemoryChange = { action: 'save' | 'change' | 'forget'; id: string; topic: string; sensitive?: boolean }
 export type HistoryFilters = { status?: string; customer_id?: string; search?: string; start?: string; end?: string; timezone?: string; offset?: number; limit?: number }
-export type ReviewQuestions = { mapping_id: string; round_id: string; status: string; blocked: boolean; questions: { id: string; field: FieldSpec; kind: 'boolean' | 'number' | 'confirm' | 'choice'; options?: string[]; current: Expr; evidence: string[]; note?: string }[]; open_questions: string[]; reasons: string[]; sample: Record<string, unknown>[]; context: { customer: { code: string; name: string } | null; round_label: string | null; files: { id: string; name: string }[]; mapping_version: number }; changes: (FieldChange & { field: FieldSpec })[]; comparison_dataset_id: string | null; checks: Record<string, unknown>; impact: PolicyDecision['impact'] | null; fields: FieldSpec[] }
+export type ReviewQuestions = { mapping_id: string; round_id: string; status: string; blocked: boolean; questions: { id: string; field: FieldSpec; kind: 'boolean' | 'number' | 'confirm' | 'choice'; options?: string[]; current: Expr; evidence: string[]; note?: string; contested?: boolean }[]; open_questions: string[]; reasons: string[]; sample: Record<string, unknown>[]; context: { customer: { code: string; name: string } | null; round_label: string | null; files: { id: string; name: string }[]; mapping_version: number }; changes: (FieldChange & { field: FieldSpec })[]; comparison_dataset_id: string | null; checks: Record<string, unknown>; impact: PolicyDecision['impact'] | null; fields: FieldSpec[] }
 export type ReviewEvidence = { field: string; sample_limit: number; sample_records: number; constant: boolean; context_only: boolean; unavailable: boolean; examples: { identity: string; item: number | null; value: unknown; source_complete: boolean; cells: { file: string | null; sheet: string | null; row: number | null; column: string | null; header: string; raw: unknown; verified: boolean | null }[] }[] }
 export type AnswerPreview = { digest: string; remaining_questions: string[]; before: Record<string, unknown>[]; comparison: { counts: { changed_records: number; lost: number; gained: number }; rows: SandboxItem[]; sample_limit: number; before_records: number; after_records: number; reliable: boolean; confirmed_fields: string[] }; preview: { ok: boolean; records: Record<string, unknown>[]; findings: Finding[]; validation?: { ok: boolean }; stats?: Record<string, unknown>; errors?: string[] } }
 export type AssistantAction = { id: string; label: string; detail: string; url: string; kind?: 'act'; act?: { type: 'verdict.accept'; round_id: string; digest: string; decisions?: Record<string, boolean | number | string | null>; preview?: Bilingual[] } }
@@ -432,6 +436,9 @@ export const api = {
   review: (status = 'open', round_id = '', offset = 0) => get<ReviewTask[]>('/api/review' + qs({ status, round_id: round_id || undefined, offset, limit: 50 })),
   waitForCustomer: (id: string, b: { until: string; note: string }) => post<ReviewTask>(`/api/review/${encodeURIComponent(id)}/wait`, b),
   resumeReview: (id: string) => post<ReviewTask>(`/api/review/${encodeURIComponent(id)}/resume`, {}),
+  confirmAudit: (id: string, comment = '') => post<ReviewTask>(`/api/review/${encodeURIComponent(id)}/confirm`, { comment: comment || null }),
+  questionGroups: () => get<QuestionGroup[]>('/api/review/question-groups'),
+  answerQuestionGroup: (b: { key: string; answer: boolean | string }) => post<{ mapping_version_ids: string[]; answered: number }>('/api/review/question-groups/answer', b),
 
   dataset: (id: string) => get<DatasetVersion>(`/api/datasets/${id}`),
   rows: (id: string, q: { offset?: number; limit?: number; q?: string; sort?: string; desc?: boolean }) => get<RowsPage>(`/api/datasets/${id}/rows` + qs(q)),

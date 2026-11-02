@@ -125,6 +125,63 @@ def check(records: list[dict[str, Any]], schema: TargetSchema) -> list[str]:
     return out
 
 
+FILL_WAS = 0.9  # a field filled in at least this share of last round's records ...
+FILL_NOW = 0.5  # ... that is now filled in at most this share has lost its column (ADR-059)
+KEEP_RATIO = 0.5  # keeps under this share of the rows-per-source-row the approved mapping kept
+
+
+def fill_shares(records: list[dict[str, Any]], schema: TargetSchema) -> dict[str, float]:
+    """Share of records (or collection items) in which each leaf field holds a value. Stored with every
+    simulation so the next round can be held to it (ADR-059)."""
+    out: dict[str, float] = {}
+    if not records:
+        return out
+    for f in schema.leaf_fields():
+        holders = _items(records, f.pointer)
+        if not holders:
+            continue
+        rel = _relative(f.pointer)
+        filled = sum(1 for h in holders if h.get(rel) not in (None, "", []))
+        out[f.pointer] = round(filled / len(holders), 4)
+    return out
+
+
+def check_history(
+    records: list[dict[str, Any]], schema: TargetSchema, previous: dict[str, Any] | None
+) -> list[str]:
+    """What is unlike the customer's last approved round (ADR-059): a field that was nearly always filled and
+    is now mostly empty (the column moved or the wrong one is read), or a mapping that keeps far fewer rows
+    per source row than the approved one did (a filter or join that now matches little). ``previous`` is the
+    stored simulation summary of the approved mapping; without one there is nothing to compare."""
+    if not records or not previous:
+        return []
+    out: list[str] = []
+    before = previous.get("fill") or {}
+    now = fill_shares(records, schema)
+    for pointer, was in sorted(before.items()):
+        share = now.get(pointer)
+        if share is not None and float(was) >= FILL_WAS and share <= FILL_NOW:
+            out.append(
+                f"{pointer}: filled in {float(was):.0%} of records in the approved round, now {share:.0%}"
+                " (the column may have moved or the wrong one is read)"
+            )
+    return out
+
+
+def keep_ratio_problem(rows_in: int, rows_out: int, previous: dict[str, Any] | None) -> str | None:
+    """The approved mapping kept ``rows_out/rows_in`` of its source rows; this one keeps far less."""
+    if not previous or not rows_in or not previous.get("rows_in") or not previous.get("rows_out"):
+        return None
+    was = float(previous["rows_out"]) / float(previous["rows_in"])
+    now = rows_out / rows_in
+    if was > 0 and now < was * KEEP_RATIO:
+        return (
+            f"the approved mapping kept {was:.0%} of its source rows as records; this one keeps {now:.0%}"
+            " (a filter, join or identity now matches far less)"
+        )
+    return None
+
+
 def _collections(schema: TargetSchema) -> list[str]:
     return sorted({f.in_collection for f in schema.leaf_fields() if f.in_collection})
 

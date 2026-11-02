@@ -64,7 +64,10 @@ ImportRound: uploaded ─▶ profiled ─▶ ┬─ auto_approved ─▶ transfo
    (cardinality, match rate, orphan rows) and suggests key pairs; the Relationships view draws them and turns
    an accepted connection into a collection link or a join of the mapping document (ADR-019).
 6. **Policy** — `policies/approval.yaml`: confidence thresholds per risk level, allowed drift kinds,
-   warnings budget, first-time-customer rule, row-count sanity, hard blocks. Produces
+   warnings budget, first-time-customer rule, row-count sanity, hard blocks. The confidence it reads is
+   bounded by evidence first (ADR-059): where FORMA's own matcher and the model agree a field is at least the
+   `confidence.agree_floor`, where they disagree at most the `disagree_cap` (and a choice on the card), a field a
+   plausibility warning names is capped, and a mapping whose self-check left problems is capped. Produces
    `auto_approve | review | block` with reasons, a queue priority and a risk level (low / medium / high, with
    the factors and the records changed vs the approved mapping — ADR-019). A sandbox comparison that loses records or adds errors/invalid prices blocks; changed prices go to review. A `block` is not an ordinary review:
    approving it is an explicit override (`override_block`, approver role, mandatory reason, audited), and a

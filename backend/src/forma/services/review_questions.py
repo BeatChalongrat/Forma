@@ -9,17 +9,18 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session, object_session
 
+from forma.ai.fit import compatible as _compatible
 from forma.ai.heuristics import VAT_ASSUMED_QUESTION_RE
+from forma.auth import Principal
 from forma.core.errors import Conflict, ValidationFailed
 from forma.core.hashing import stable_hash
-from forma.db.models import ImportRound, MappingVersion
+from forma.db.models import Customer, ImportRound, MappingVersion, ReviewTask
 from forma.mapping_dsl.models import CallExpr, ColExpr, ConstExpr, MappingDocument
 from forma.schema_registry import FieldSpec, TargetSchema
 from forma.services import mapping as ms
 from forma.services.context import ServiceContext
 
 MAX_CHOICES = 8
-_DATE_SEMANTICS = {"price.effective_from", "price.effective_to", "promo.start_date", "promo.end_date"}
 
 
 def _vat_flags(schema: TargetSchema, policy: dict[str, Any]) -> set[str]:
@@ -52,20 +53,6 @@ def repoint(expr: Any, old: str, new: str) -> Any:
     return expr
 
 
-def _compatible(spec: FieldSpec, col: dict[str, Any]) -> bool:
-    t = str(col.get("inferred_type") or "")
-    if t == "empty":
-        return False
-    json_type = set(spec.json_type)
-    if json_type & {"number", "integer"}:
-        return t in ("int", "float") or "price_like" in (col.get("hints") or [])
-    if spec.fmt == "date" or (spec.semantic or "") in _DATE_SEMANTICS:
-        return t == "date" or "thai_date" in (col.get("hints") or []) or t == "string"
-    if "boolean" in json_type:
-        return t in ("bool", "string")
-    return t != "int" or "sku_like" not in (col.get("hints") or [])  # a stock count is not a name or a code
-
-
 def _table_columns(m: MappingVersion, doc: MappingDocument) -> dict[str, list[dict[str, Any]]]:
     """Per DSL source id, the profiled columns of the table it reads (empty when the round is gone)."""
     session = object_session(m)
@@ -96,19 +83,35 @@ def _table_columns(m: MappingVersion, doc: MappingDocument) -> dict[str, list[di
 
 
 def _choices(
-    f: Any, spec: FieldSpec, source: str, columns: dict[str, list[dict[str, Any]]], taken: set[str]
+    f: Any,
+    spec: FieldSpec,
+    source: str,
+    columns: dict[str, list[dict[str, Any]]],
+    taken: set[str],
+    first: list[str] | None = None,
 ) -> list[str]:
-    """Column names a person can pick instead: one source column read now, others of a fitting type."""
+    """Column names a person can pick instead: one source column read now, others of a fitting type.
+    ``first`` are columns offered before the rest (what FORMA's own matcher read, ADR-059)."""
     leaves = _col_leaves(f.expr)
     if len(leaves) != 1:
         return []
     current = leaves[0]
+    names = {c["name"] for c in columns.get(source, [])}
+    preferred = [n for n in (first or []) if n in names and n != current]
     others = [
         c["name"]
         for c in columns.get(source, [])
-        if c["name"] != current and c["name"] not in taken and _compatible(spec, c)
+        if c["name"] != current
+        and c["name"] not in taken
+        and c["name"] not in preferred
+        and _compatible(spec, c)
     ]
-    return [current, *others][:MAX_CHOICES] if others else []
+    return [current, *preferred, *others][:MAX_CHOICES] if others or preferred else []
+
+
+def _matcher_columns(reads: list[str]) -> list[str]:
+    """``sheet.column`` as the agreement stores it → column names."""
+    return [r.split(".", 1)[1] if "." in r else r for r in reads]
 
 
 def questions(ctx: ServiceContext, m: MappingVersion) -> dict[str, Any]:
@@ -134,12 +137,16 @@ def questions(ctx: ServiceContext, m: MappingVersion) -> dict[str, Any]:
     }
     has_checks = "low_confidence_critical" in checks or "low_confidence_high" in checks
     vat_flags = _vat_flags(schema, m.policy or {})
+    disagree = ((m.policy or {}).get("agreement") or {}).get("disagree") or {}
     items: list[dict[str, Any]] = []
     for f in fields:
         spec = specs.get(f.target)
         if spec is None:
             continue
-        if f.target not in vat_flags:
+        # FORMA's matcher and the model read this field from different columns (ADR-059): a person decides,
+        # however sure the model was — unless a person already approved this exact reading (confidence 1.0)
+        contested = f.target in disagree and spec.risk in ("critical", "high") and (f.confidence or 0) < 1.0
+        if f.target not in vat_flags and not contested:
             if not has_checks and f.confidence is not None and f.confidence >= 0.95:
                 continue
             if has_checks and f.target not in required:
@@ -148,6 +155,7 @@ def questions(ctx: ServiceContext, m: MappingVersion) -> dict[str, Any]:
                 continue
         kind = "confirm"
         options: list[str] = []
+        matcher = _matcher_columns((disagree.get(f.target) or {}).get("matcher") or []) if contested else []
         if "boolean" in spec.json_type and (f.expr.op == "const" or f.target in vat_flags):
             kind = "boolean"  # a VAT flag beside a value that moved by the rate is settled with yes/no, however it is read
         elif f.expr.op == "const" and set(spec.json_type) & {"integer", "number"}:
@@ -155,11 +163,16 @@ def questions(ctx: ServiceContext, m: MappingVersion) -> dict[str, Any]:
         else:
             src = source_of.get(f.target, doc.record.root_source)
             others = {n for n in taken_by.get(src, set()) if n not in _col_leaves(f.expr)}
-            options = _choices(f, spec, src, columns, others)
+            options = _choices(f, spec, src, columns, others, first=matcher)
             if options:
                 kind = "choice"  # a decision with alternatives (ADR-058)
-            elif spec.risk != "critical" and f.target not in vat_flags:
+            elif spec.risk != "critical" and f.target not in vat_flags and not contested:
                 continue  # nothing to decide: the field stays visible in the field review, unasked
+        evidence = list(f.evidence)
+        if contested:
+            evidence.append(
+                "FORMA's matcher read " + ", ".join(matcher or ["something else"]) + " for this field"
+            )
         items.append(
             {
                 "id": f.target,
@@ -167,11 +180,18 @@ def questions(ctx: ServiceContext, m: MappingVersion) -> dict[str, Any]:
                 "kind": kind,
                 "options": options,
                 "current": f.expr.model_dump(mode="json", exclude_none=True),
-                "evidence": f.evidence,
+                "evidence": evidence,
                 "note": f.note,
+                "contested": contested,
             }
         )
-    items.sort(key=lambda item: (item["kind"] == "confirm", item["field"]["risk"] != "critical"))
+    items.sort(
+        key=lambda item: (
+            not item["contested"],
+            item["kind"] == "confirm",
+            item["field"]["risk"] != "critical",
+        )
+    )
     return {
         "mapping_id": m.id,
         "round_id": m.round_id,
@@ -236,6 +256,88 @@ def answer_document(
     ]
     document = doc.model_dump(mode="json", exclude_none=True)
     return document, remaining, stable_hash([m.id, document, answers], 64)
+
+
+GROUPABLE = ("choice", "boolean")
+
+
+def groups(ctx: ServiceContext, session: Session, p: Principal) -> list[dict[str, Any]]:
+    """The same question asked by several files at once (ADR-059): a choice over the same columns for the
+    same field, or the same yes/no, across the open review tasks a person may see. One answer settles them all;
+    the groups go to the top of the queue because they teach the most per click."""
+    q = select(ReviewTask).where(
+        ReviewTask.status == "open",
+        ReviewTask.kind.in_(("mapping", "drift")),
+        ReviewTask.mapping_version_id.is_not(None),
+    )
+    if p.customers is not None:
+        q = q.where(ReviewTask.customer_id.in_(sorted(p.customers)))
+    tasks = list(session.scalars(q))
+    if not tasks:
+        return []
+    mappings = {
+        m.id: m
+        for m in session.scalars(
+            select(MappingVersion).where(
+                MappingVersion.id.in_([t.mapping_version_id for t in tasks if t.mapping_version_id]),
+                MappingVersion.status == "proposed",
+            )
+        )
+    }
+    codes = {
+        c.id: c.code
+        for c in session.scalars(select(Customer).where(Customer.id.in_({t.customer_id for t in tasks})))
+    }
+    buckets: dict[str, dict[str, Any]] = {}
+    for t in tasks:
+        m = mappings.get(t.mapping_version_id or "")
+        if m is None:
+            continue
+        for item in questions(ctx, m)["questions"]:
+            if item["kind"] not in GROUPABLE:
+                continue
+            same = sorted(item["options"]) if item["kind"] == "choice" else item["current"]
+            key = stable_hash([item["kind"], item["id"], same], 16)
+            b = buckets.setdefault(
+                key,
+                {
+                    "key": key,
+                    "kind": item["kind"],
+                    "field": item["field"],
+                    "options": item["options"],
+                    "current": item["current"],
+                    "members": [],
+                },
+            )
+            b["members"].append(
+                {
+                    "task_id": t.id,
+                    "mapping_id": m.id,
+                    "round_id": t.round_id,
+                    "customer_code": codes.get(t.customer_id, "?"),
+                }
+            )
+    out = [b for b in buckets.values() if len({x["mapping_id"] for x in b["members"]}) >= 2]
+    out.sort(key=lambda b: (-len(b["members"]), b["field"]["risk"] != "critical", b["field"]["pointer"]))
+    return out
+
+
+def answer_group(
+    ctx: ServiceContext, session: Session, p: Principal, key: str, answer: Any, actor: str
+) -> list[str]:
+    """Apply one answer to every member of a question group; returns the new mapping version ids."""
+    group = next((g for g in groups(ctx, session, p) if g["key"] == key), None)
+    if group is None:
+        raise Conflict("This group no longer exists; the questions changed. Reload.")
+    out: list[str] = []
+    for member in group["members"]:
+        m = session.get(MappingVersion, member["mapping_id"])
+        if m is None or m.status != "proposed":
+            continue
+        answers = {group["field"]["pointer"]: answer}
+        _, _, digest = answer_document(ctx, m, answers, actor)
+        out.append(apply_answers(ctx, session, m, answers, digest, actor).id)
+    return out
 
 
 def apply_answers(

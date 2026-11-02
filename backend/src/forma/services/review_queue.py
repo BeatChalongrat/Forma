@@ -62,6 +62,21 @@ def resume(session: Session, p: Principal, t: ReviewTask, *, actor: str | None =
     return t
 
 
+def confirm_audit(session: Session, p: Principal, t: ReviewTask, comment: str | None) -> ReviewTask:
+    """A spot check of an automatic approval found nothing wrong (ADR-059). The approval already stood; this
+    closes the task and records the look, which calibration counts as the automatic path being right."""
+    if t.kind != "audit":
+        raise ValidationFailed("Only a spot check can be confirmed; other questions are answered on the card")
+    if t.status not in REVIEW_UNRESOLVED:
+        raise Conflict("This spot check is already closed")
+    t.status = "approved"
+    t.resolver = p.actor
+    t.comment = comment
+    t.resolved_at = dt.datetime.now(dt.UTC)
+    audit(session, "review.audit_ok", "review", t.id, actor=p.actor, round_id=t.round_id, comment=comment)
+    return t
+
+
 def _date(d: dt.date | None) -> str | None:
     return d.isoformat() if d else None
 

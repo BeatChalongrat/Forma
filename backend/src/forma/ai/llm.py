@@ -477,7 +477,12 @@ def _parse_json(text: str) -> dict[str, Any]:
     start, end = t.find("{"), t.rfind("}")
     if start < 0 or end < 0:
         raise ValueError("no JSON object found")
-    data = json.loads(t[start : end + 1])
+    try:
+        # the first complete object; a model that adds a second object or prose after it is not wrong
+        # about the mapping, only chatty (ADR-059)
+        data, _ = json.JSONDecoder().raw_decode(t, start)
+    except json.JSONDecodeError:
+        data = json.loads(t[start : end + 1])
     if not isinstance(data, dict):
         raise ValueError("top-level JSON must be an object")
     return data
