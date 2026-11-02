@@ -51,5 +51,11 @@
 
 เทียบไฟล์ทีละรอบ: `backend/.venv/Scripts/python manual_test_files/erp/tools/score.py got.json expected.json`
 
+เทียบก่อน/หลังทั้งชุด (รายงาน benchmark สองไฟล์ หรือ airun JSON):
+
+    backend/.venv/Scripts/python manual_test_files/cases/tools/compare.py manual_test_files/cases/report-heuristic.json report-llm.json
+
+`report-heuristic.json` คือตัวเลขก่อน (heuristic ล้วน ไม่มีโมเดล) ที่เก็บไว้ในโฟลเดอร์นี้ สร้างใหม่ได้ด้วยคำสั่ง benchmark ด้านบน
+
 ข้อควรรู้: `forma benchmark` เทียบทุกฟิลด์ตรงตัว รวมชื่อ `price_list` ที่สัญญาปล่อยให้คนตั้ง (C10) ส่วน `score.py` ไม่ให้คะแนนชื่อนั้น
 กรณี C13 และ C25 เป็นเรื่องตัดสิน: ระบบที่ **ถาม** ว่าควรใช้คอลัมน์ไหนถือว่าทำถูก แม้คะแนนรอบแรกจะไม่ตรงเฉลย
