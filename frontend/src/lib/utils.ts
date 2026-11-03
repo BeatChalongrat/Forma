@@ -38,15 +38,7 @@ export function shortId(id: string | null | undefined): string {
   const parts = id.split('_')
   return parts.length > 1 ? `${parts[0]}…${id.slice(-5)}` : id.slice(-6)
 }
-export function getPointer(obj: unknown, pointer: string): unknown {
-  let cur: unknown = obj
-  for (const p of pointer.split('/').filter(Boolean)) {
-    if (Array.isArray(cur)) cur = cur[Number(p)]
-    else if (cur && typeof cur === 'object') cur = (cur as Record<string, unknown>)[p]
-    else return undefined
-  }
-  return cur
-}
+export { getPointer } from './jsonPointer'
 export function cellText(v: unknown): string {
   if (v === null || v === undefined) return ''
   if (typeof v === 'number') return fmtNum(v, 4)

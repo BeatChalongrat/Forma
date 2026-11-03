@@ -362,7 +362,11 @@ def propose_for_round(
         if not learned.empty:
             used = _learned_pointers(draft.mapping)
             learning.count_uses(session, learned, used)
-            learning_note = {**learned.summary(), "used": sorted(used)}
+            learning_note = {
+                **learned.summary(),
+                "used": sorted(used),
+                "knowledge_ids": sorted({key for ptr in used for key in learned.ids.get(ptr, [])}),
+            }
             agent_log.append({"agent": "learning", **learning_note})
         doc = draft.mapping
         source_kind = "heuristic"
@@ -657,6 +661,9 @@ def propose_for_round(
     )
     session.add(mv)
     session.flush()
+    from forma.services.inspection import record_knowledge_use
+
+    record_knowledge_use(session, mv)
     r.summary = {
         **(r.summary or {}),
         "drift": drift,

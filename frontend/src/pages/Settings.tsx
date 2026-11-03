@@ -1,3 +1,4 @@
+import { KnowledgeManager, AuditBrowser } from '../components/KnowledgeManager'
 import { Localized } from '../lib/locale'
 import { usePreferences } from '../lib/preferences'
 import { providerName } from '../lib/providerName'
@@ -6,7 +7,7 @@ import { useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowDown, ArrowUp, Brain, Check, CodeXml, FileJson, FlaskConical, ImagePlus, KeyRound, Monitor, Plug, Plus, RotateCcw, Save, Scale, ScrollText, Star, Trash2, Upload, Wifi, type LucideIcon } from 'lucide-react'
 import { api, ApiError, type AISettings, type AiProbe, type BackupKey, type Policy, type SchemaPreview } from '../lib/api'
-import { PageHeader, Section, Badge, RiskDot, Json, KV, Modal, Spinner, Stat } from '../components/ui'
+import { PageHeader, Section, Badge, RiskDot, Json, KV, Modal, Spinner } from '../components/ui'
 import { cn, fmtDate } from '../lib/utils'
 import { useToast } from '../lib/toast'
 
@@ -39,9 +40,9 @@ export function SettingsPage() {
         {tab === 'ai' && <AITab />}
         {tab === 'formats' && <FormatsTab />}
         {tab === 'policy' && <PolicyTab />}
-        {tab === 'learning' && <LearningTab />}
+        {tab === 'learning' && <KnowledgeManager />}
         {tab === 'dsl' && <DslTab />}
-        {tab === 'audit' && <AuditTab />}
+        {tab === 'audit' && <AuditBrowser />}
         {tab === 'system' && <SystemTab />}
         </div>
       </div>
@@ -551,55 +552,6 @@ function DslTab() {
       <Section title={`${dsl?.ops.length ?? 0} whitelisted operations`}><div className="p-3 flex flex-wrap gap-1.5">{dsl?.ops.map((o) => <span key={o} className="chip bg-surface-2 border-line mono">{o}</span>)}</div><div className="px-4 pb-4 text-[12px] text-muted leading-relaxed">The AI can only compose these. No generated code is ever executed; every op has one deterministic compiler branch and tests.</div></Section>
       <Section title="DSL JSON Schema (what the LLM must emit)"><Json value={dsl?.json_schema} className="rounded-none border-0 max-h-[70vh]" /></Section>
     </div>
-  )
-}
-
-function LearningTab() {
-  const { t } = usePreferences(), qc = useQueryClient(), toast = useToast()
-  const { data: me } = useQuery({ queryKey: ['me'], queryFn: api.me })
-  const [customer, setCustomer] = useState('')
-  const { data: customers } = useQuery({ queryKey: ['customers'], queryFn: api.customers })
-  const q = useQuery({ queryKey: ['learning', customer], queryFn: () => api.learning(customer) })
-  const promote = useMutation({ mutationFn: (b: { header: string; target: string }) => api.promoteAlias(b), onSuccess: () => { void qc.invalidateQueries({ queryKey: ['learning'] }); toast.push({ kind: 'ok', title: t('Promoted', 'เพิ่มให้ทุกลูกค้าแล้ว') }) }, onError: (e: Error) => toast.push({ kind: 'bad', title: t('Not promoted', 'เพิ่มไม่ได้'), detail: e.message }) })
-  const forget = useMutation({ mutationFn: (id: string) => api.forgetLearned(id), onSuccess: () => void qc.invalidateQueries({ queryKey: ['learning'] }) })
-  const d = q.data, s = d?.stats
-  const names = new Map((customers ?? []).map((c) => [c.id, c.code]))
-  const canPromote = !!me?.effective_roles.includes('admin'), canForget = !!me?.effective_roles.includes('approver')
-  return (
-    <div className="space-y-5">
-      <div className="grid sm:grid-cols-2 xl:grid-cols-4 gap-3">
-        <Stat label={t('Column aliases learned', 'ชื่อคอลัมน์ที่เรียนรู้แล้ว')} value={s ? s.aliases + s.promoted : '–'} hint={s ? t(`${s.promoted} shared with everyone`, `${s.promoted} รายการใช้กับทุกลูกค้า`) : ''} />
-        <Stat label={t('Conventions confirmed', 'ค่าคงที่ที่ยืนยันแล้ว')} value={s?.constants ?? '–'} hint={t('e.g. VAT included, units per pack', 'เช่น รวม VAT, ชิ้นต่อแพ็ก')} />
-        <Stat label={t('Customers who taught FORMA', 'ลูกค้าที่ระบบเรียนจาก')} value={s?.customers_taught ?? '–'} />
-        <Stat label={t('Times a learned field was used', 'จำนวนครั้งที่ใช้สิ่งที่เรียน')} value={s?.uses ?? '–'} tone={s?.uses ? 'ok' : 'neutral'} />
-      </div>
-      <Section title={t('Corrections per approval, by month', 'การแก้ต่อการอนุมัติ รายเดือน')} hint="ยิ่งลดลงเรื่อยๆ แปลว่าระบบเดาถูกมากขึ้น">
-        {s?.series.length ? <table className="table"><thead><tr><th>{t('Month', 'เดือน')}</th><th className="text-right">{t('Approved', 'อนุมัติ')}</th><th className="text-right">{t('Accepted as proposed', 'รับตามที่เสนอ')}</th><th className="text-right">{t('Corrections', 'การแก้')}</th><th className="text-right">{t('Per approval', 'ต่อการอนุมัติ')}</th><th className="text-right">{t('Learned fields used', 'ใช้สิ่งที่เรียน')}</th></tr></thead>
-          <tbody>{s.series.map((m) => <tr key={m.month}><td className="mono">{m.month}</td><td className="text-right tnum">{m.mappings_approved}</td><td className="text-right tnum">{m.accepted_as_proposed}</td><td className="text-right tnum">{m.corrections}</td><td className="text-right tnum font-semibold">{m.corrections_per_approval ?? '–'}</td><td className="text-right tnum">{m.learned_fields_used}</td></tr>)}</tbody></table>
-          : <div className="p-5 text-sm text-muted">{q.isPending ? t('Loading…', 'กำลังโหลด…') : t('Nothing learned yet. Approve a mapping you corrected in the Studio or the review page, and it appears here.', 'ยังไม่มีอะไรให้เรียน อนุมัติ mapping ที่คุณแก้ใน Studio หรือหน้า Review แล้วจะมาแสดงที่นี่')}</div>}
-      </Section>
-      {canPromote && <Section title={t('Suggested for everyone', 'เสนอให้ใช้กับทุกลูกค้า')} hint="header เดียวกันที่ลูกค้าหลายรายแก้ไปลง field เดียวกัน">
-        {d?.suggestions.length ? <table className="table"><thead><tr><th>{t('Header', 'หัวคอลัมน์')}</th><th>{t('Field', 'ฟิลด์')}</th><th className="text-right">{t('Customers', 'ลูกค้า')}</th><th></th></tr></thead>
-          <tbody>{d.suggestions.map((x) => <tr key={x.header + x.target}><td className="font-medium">{x.header}</td><td>{x.field.description || x.field.name} <span className="text-muted mono text-[11px]">{x.target}</span></td><td className="text-right tnum">{x.customers}</td><td className="text-right"><button className="btn btn-sm btn-primary" disabled={promote.isPending} onClick={() => promote.mutate({ header: x.header, target: x.target })}><Plus size={13} />{t('Use for everyone', 'ใช้กับทุกลูกค้า')}</button></td></tr>)}</tbody></table>
-          : <div className="p-5 text-sm text-muted">{t('No header has been taught by three or more customers yet.', 'ยังไม่มีหัวคอลัมน์ที่ลูกค้าตั้งแต่ 3 รายสอนเหมือนกัน')}</div>}
-      </Section>}
-      <Section title={t('Learned so far', 'สิ่งที่เรียนรู้แล้ว')} actions={<select className="input" aria-label={t('Customer', 'ลูกค้า')} value={customer} onChange={(e) => setCustomer(e.target.value)}><option value="">{t('All customers', 'ทุกลูกค้า')}</option>{(customers ?? []).map((c) => <option key={c.id} value={c.id}>{c.code}</option>)}</select>}>
-        {d?.learned.items.length ? <table className="table"><thead><tr><th>{t('Customer', 'ลูกค้า')}</th><th>{t('What', 'อะไร')}</th><th>{t('Field', 'ฟิลด์')}</th><th>{t('Taught by', 'สอนโดย')}</th><th className="text-right">{t('Used', 'ใช้แล้ว')}</th><th></th></tr></thead>
-          <tbody>{d.learned.items.map((x) => <tr key={x.id}><td>{x.customer_id ? names.get(x.customer_id) ?? x.customer_id : <Badge tone="signal">{t('everyone', 'ทุกราย')}</Badge>}</td><td>{x.kind === 'decision' && x.decision ? <span>{JSON.stringify(x.decision.answer)}<small className="block text-muted">{x.decision.action === 'select_rows' || (x.decision.action === 'constant' && !x.decision.remember) ? t('This delivery only', 'เฉพาะรอบนี้') : t('Same customer, format and requirements', 'ลูกค้า รูปแบบ และเงื่อนไขเดิม')}</small></span> : x.kind === 'constant' ? t(`fixed value ${JSON.stringify(x.value)}`, `ค่าคงที่ ${JSON.stringify(x.value)}`) : <span>“{x.column ?? x.header}”</span>}</td><td className="mono text-[12px]">{x.target}</td><td className="text-muted">{x.actor} · {fmtDate(x.created_at ?? '')}</td><td className="text-right tnum">{x.uses}</td><td className="text-right">{canForget && <button className="btn btn-ghost btn-sm" title={t('Forget', 'ลืม')} onClick={() => forget.mutate(x.id)}><Trash2 size={13} /></button>}</td></tr>)}</tbody></table>
-          : <div className="p-5 text-sm text-muted">{t('Nothing yet.', 'ยังไม่มี')}</div>}
-        {d && d.learned.total > d.learned.items.length && <p className="px-4 py-2 text-xs text-muted">{t(`Showing ${d.learned.items.length} of ${d.learned.total}`, `แสดง ${d.learned.items.length} จาก ${d.learned.total}`)}</p>}
-      </Section>
-    </div>
-  )
-}
-
-function AuditTab() {
-  const { data: audit, error } = useQuery({ queryKey: ['audit'], queryFn: () => api.audit(200) })
-  return (
-    <Section title="Last 200 events">
-      {error ? <div className="p-5 text-sm text-muted">{error.message}</div> : <table className="table"><thead><tr><th>When</th><th>Actor</th><th>Action</th><th>Entity</th><th>Details</th></tr></thead>
-        <tbody>{audit?.map((a) => <tr key={a.id}><td className="text-muted whitespace-nowrap">{fmtDate(a.at)}</td><td>{a.actor}</td><td className="mono">{a.action}</td><td className="mono text-muted">{a.entity_id}</td><td className="text-muted text-[12px] truncate max-w-[420px]">{JSON.stringify(a.details)}</td></tr>)}</tbody></table>}
-    </Section>
   )
 }
 

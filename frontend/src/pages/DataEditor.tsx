@@ -1,3 +1,6 @@
+import { parseValue, type NumberStyle } from '../lib/valueInput'
+import { setPointerLocal } from '../lib/jsonPointer'
+import { JsonRecordEditor } from '../components/JsonRecordEditor'
 import { Localized } from '../lib/locale'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -20,22 +23,6 @@ type Cell = { r: number; c: number }
 
 const isQuestion = (t: string) => /^(ทำไม|เพราะอะไร|อะไร|ทำไง|ยังไง|why|what|how|which)/i.test(t.trim()) || t.trim().endsWith('?')
 
-// typed value from what a person typed or pasted, by the field's JSON type (null = empty)
-function parseValue(f: FieldSpec, text: string): { ok: true; value: unknown } | { ok: false; error: string } {
-  const raw = text.trim()
-  if (raw === '') return { ok: true, value: null }
-  if (f.json_type.includes('number') || f.json_type.includes('integer')) {
-    const n = Number(raw.replace(/,/g, ''))
-    if (Number.isNaN(n)) return { ok: false, error: `${f.name}: "${raw}" is not a number` }
-    return { ok: true, value: f.json_type.includes('integer') ? Math.round(n) : n }
-  }
-  if (f.json_type.includes('boolean')) return { ok: true, value: ['true', '1', 'yes', 'y'].includes(raw.toLowerCase()) }
-  let value: unknown = raw
-  if (f.json_type.includes('array')) { try { value = raw.startsWith('[') ? JSON.parse(raw) : raw.split(/[|,]/).map((x) => x.trim()).filter(Boolean) } catch { return { ok: false, error: `${f.name}: invalid list` } } }
-  if (f.enum && !f.enum.includes(value)) return { ok: false, error: `${f.name}: must be one of ${f.enum.join(', ')}` }
-  return { ok: true, value }
-}
-
 const EDITOR_TABS = ['changes', 'findings', 'versions', 'diff', 'copilot'] as const
 type EditorTab = (typeof EDITOR_TABS)[number]
 
@@ -52,6 +39,7 @@ export function DataEditor() {
   useEffect(() => { const t = setTimeout(() => { setQDebounced(q); setOffset(0) }, 300); return () => clearTimeout(t) }, [q])
   const { data: page, isLoading } = useQuery({ queryKey: ['rows', datasetId, offset, qDebounced, sort], queryFn: () => api.rows(datasetId, { offset, limit: PAGE, q: qDebounced || undefined, sort: sort?.ptr, desc: sort?.desc }), placeholderData: (prev) => prev })
 
+  const [numberStyle, setNumberStyle] = useState<NumberStyle>('plain')
   const [pending, setPending] = useState<Pending[]>([])
   const [sel, setSel] = useState<Cell | null>(null)
   const [anchor, setAnchor] = useState<Cell | null>(null) // other corner of a range (shift-click / shift-arrows)
@@ -71,23 +59,25 @@ export function DataEditor() {
   const batchSeq = useRef(0)
 
   const columns: FieldSpec[] = useMemo(() => (page?.columns ?? []).filter((f) => !f.system && !f.in_collection && !f.is_collection && !f.json_type.includes('object')).concat((page?.columns ?? []).filter((f) => f.is_collection)), [page])
-  const identityOf = useCallback((row: Record<string, unknown>) => (page?.identity_keys ?? []).map((k) => String(getPointer(row, k))).join('|'), [page])
+  const rawIdentityOf = useCallback((row: Record<string, unknown>) => (page?.identity_keys ?? []).map((k) => String(getPointer(row, k))).join('|'), [page])
 
   // overlay pending edits onto rows for display
-  const rows = useMemo(() => {
+  const overlay = useMemo(() => {
     const base = page?.rows ?? []
-    if (!pending.length) return base
+    if (!pending.length) return { rows: base, ids: new Map(base.map(r => [r, rawIdentityOf(r)])) }
     const byId = new Map<string, Record<string, unknown>>()
     const deleted = new Set<string>()
     pending.forEach((p) => { if (p.kind === 'delete_row' && p.identity) deleted.add(p.identity); if (p.kind === 'delete_rows' && p.identities) p.identities.forEach((i) => deleted.add(i)) })
-    const out = base.filter((r) => !deleted.has(identityOf(r))).map((r) => structuredClone(r))
-    out.forEach((r) => byId.set(identityOf(r), r))
+    const out = base.filter((r) => !deleted.has(rawIdentityOf(r))).map((r) => structuredClone(r))
+    out.forEach((r) => byId.set(rawIdentityOf(r), r))
     pending.forEach((p) => {
-      if (p.kind === 'set_cell' && p.identity && p.target) { const r = byId.get(p.identity); if (r) setPointerLocal(r, p.target, p.value) }
+      if ((p.kind === 'set_cell' || p.kind === 'set_item') && p.identity && p.target) { const r = byId.get(p.identity); if (r) setPointerLocal(r, p.target, p.value) }
       if (p.kind === 'set_field' && p.identities && p.target && !p.target.includes('*')) p.identities.forEach((i) => { const r = byId.get(i); if (r) setPointerLocal(r, p.target!, p.value) })
     })
-    return out
-  }, [page, pending, identityOf])
+    return { rows: out, ids: new Map([...byId].map(([id, r]) => [r, id])) }
+  }, [page, pending, rawIdentityOf])
+  const rows = overlay.rows
+  const identityOf = useCallback((row: Record<string, unknown>) => overlay.ids.get(row) ?? rawIdentityOf(row), [overlay, rawIdentityOf])
   const editedCells = useMemo(() => new Set(pending.flatMap((p) => (p.kind === 'set_cell' ? [`${p.identity}|${p.target}`] : p.kind === 'set_field' && p.identities ? p.identities.map((i) => `${i}|${p.target}`) : []))), [pending])
 
   // virtualization
@@ -135,7 +125,7 @@ export function DataEditor() {
     window.addEventListener('paste', onPaste)
     return () => window.removeEventListener('paste', onPaste)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sel, editing, drawer, saveOpen, rows, columns, pending])
+  }, [sel, editing, drawer, saveOpen, rows, columns, pending, numberStyle])
 
   const range = sel ? { r0: Math.min(sel.r, (anchor ?? sel).r), r1: Math.max(sel.r, (anchor ?? sel).r), c0: Math.min(sel.c, (anchor ?? sel).c), c1: Math.max(sel.c, (anchor ?? sel).c) } : null
   const inRange = (r: number, c: number) => !!range && (range.r0 !== range.r1 || range.c0 !== range.c1) && r >= range.r0 && r <= range.r1 && c >= range.c0 && c <= range.c1
@@ -156,7 +146,7 @@ export function DataEditor() {
       const row = rows[sel.r + i]
       const f = columns[sel.c + j]
       if (!row || !f || f.is_collection) return
-      const v = parseValue(f, text)
+      const v = parseValue(f, text, numberStyle)
       if (!v.ok) { errs.push(v.error); return }
       const before = getPointer(original(row), f.pointer)
       if (JSON.stringify(before) !== JSON.stringify(v.value)) cells.push({ identity: identityOf(row), f, value: v.value, before })
@@ -192,13 +182,13 @@ export function DataEditor() {
     const f = columns[c]
     if (!f || f.is_collection || ds?.status === 'published') return
     const v = getPointer(rows[r], f.pointer)
-    setEditing({ r, c, value: v === null || v === undefined ? '' : typeof v === 'object' ? JSON.stringify(v) : String(v) })
+    setEditing({ r, c, value: v === null || v === undefined ? '' : typeof v === 'object' ? JSON.stringify(v) : typeof v === 'number' && numberStyle === 'comma' ? String(v).replace('.', ',') : String(v) })
   }
   const commitEdit = () => {
     if (!editing) return
     const f = columns[editing.c]
     const row = rows[editing.r]
-    const v = parseValue(f, editing.value)
+    const v = parseValue(f, editing.value, numberStyle)
     if (!v.ok) { toast.push({ kind: 'bad', title: v.error }); return }
     const before = getPointer(original(row), f.pointer)
     if (JSON.stringify(before) !== JSON.stringify(v.value)) stageCells([{ identity: identityOf(row), f, value: v.value, before }])
@@ -277,6 +267,7 @@ export function DataEditor() {
             <button className="btn btn-ghost btn-sm" onClick={() => setTraceTip(false)} aria-label="Hide"><X size={13} /></button>
           </div>
         )}
+        <label className="flex flex-wrap items-center gap-2 text-xs my-2">{t('Number input format', 'รูปแบบตัวเลขที่กรอก')}<select className="input w-auto" value={numberStyle} onChange={e => setNumberStyle(e.target.value as NumberStyle)} aria-label={t('Number input format', 'รูปแบบตัวเลขที่กรอก')}><option value="plain">1234.56 · JSON</option><option value="dot">1,234.56 · decimal .</option><option value="comma">1.234,56 · decimal ,</option></select><span className="text-muted">{t('Applies to typing and pasting. No automatic rounding.', 'ใช้กับการกรอกและวางค่า ไม่ปัดตัวเลขให้อัตโนมัติ')}</span></label>
         <HelpStrip>
           Edit like Excel: double-click or <span className="kbd">↵</span> to edit, paste a block from Excel, tick rows to change many at once. Every change waits in <b>Pending</b> until you review its impact and save it as a new version. Use <b>Changes &amp; anomalies</b> before approving. <span className="text-muted">— แก้เหมือน Excel ทุกการแก้รออยู่ใน Pending จนกว่าจะกดบันทึก ดู Changes &amp; anomalies ก่อนกด Approve data</span>
         </HelpStrip>
@@ -287,7 +278,7 @@ export function DataEditor() {
         <div className={cn('min-w-0 flex-1 flex flex-col', view !== 'grid' && 'hidden')}>
           {picked.size > 0 && ds.status !== 'published' && (
             <BulkBar count={picked.size} fields={columns.filter((c) => !c.is_collection && !c.system)} pricePointer={pricePointer}
-              onSet={(fld, text) => { const v = parseValue(fld, text); if (!v.ok) { toast.push({ kind: 'bad', title: v.error }); return } stageBulk({ kind: 'set_field', target: fld.pointer, value: v.value }, `set ${fld.name} = ${cellText(v.value) || '∅'} on ${picked.size} rows`) }}
+              onSet={(fld, text) => { const v = parseValue(fld, text, numberStyle); if (!v.ok) { toast.push({ kind: 'bad', title: v.error }); return } stageBulk({ kind: 'set_field', target: fld.pointer, value: v.value }, `set ${fld.name} = ${cellText(v.value) || '∅'} on ${picked.size} rows`) }}
               onScale={(pct) => pricePointer && stageBulk({ kind: 'scale_field', target: pricePointer, factor: Math.round((1 + pct / 100) * 10000) / 10000 }, `price ${pct > 0 ? '+' : ''}${pct}% on ${picked.size} rows`)}
               onDelete={() => { stageBulk({ kind: 'delete_rows' }, `delete ${picked.size} rows`); setPicked(new Set()) }}
               onClear={() => setPicked(new Set())} />
@@ -384,7 +375,7 @@ export function DataEditor() {
         </section>}
       </div>
 
-      <RecordDrawer open={drawer?.kind === 'record'} identity={drawer?.identity ?? ''} rows={rows} identityOf={identityOf} columns={page?.columns ?? []} onClose={() => setDrawer(null)} onLineage={() => setDrawer({ kind: 'lineage', identity: drawer!.identity })} onEdit={(target, value, label) => setPending((p) => [...p, { kind: 'set_item', identity: drawer!.identity, target, value, label }])} />
+      <RecordDrawer readOnly={ds.status === 'published'} numberStyle={numberStyle} open={drawer?.kind === 'record'} identity={drawer?.identity ?? ''} rows={rows} identityOf={identityOf} columns={page?.columns ?? []} onClose={() => setDrawer(null)} onLineage={(pointer) => setDrawer({ kind: 'lineage', identity: drawer!.identity, pointer })} onEdit={(target, value, label) => setPending((p) => [...p, { kind: 'set_item', identity: drawer!.identity, target, value, label }])} />
       <TraceDrawer open={drawer?.kind === 'lineage'} datasetId={datasetId} identity={drawer?.identity ?? ''} pointer={drawer?.pointer} onPointer={(p) => setDrawer((d) => d && { ...d, pointer: p })} onClose={() => setDrawer(null)} />
 
       <Modal open={saveOpen} onClose={() => setSaveOpen(false)} title="Review changes before saving" width="max-w-3xl"
@@ -397,17 +388,7 @@ export function DataEditor() {
 }
 
 function strip(p: Pending): Operation { const { label: _l, ...op } = p; return op }
-function setPointerLocal(obj: Record<string, unknown>, pointer: string, value: unknown) {
-  const parts = pointer.split('/').filter(Boolean)
-  let cur: Record<string, unknown> | unknown[] = obj
-  for (const p of parts.slice(0, -1)) {
-    if (Array.isArray(cur)) cur = cur[Number(p)] as Record<string, unknown>
-    else { if (cur[p] === undefined || cur[p] === null) cur[p] = {}; cur = cur[p] as Record<string, unknown> }
-  }
-  const last = parts[parts.length - 1]
-  if (Array.isArray(cur)) cur[Number(last)] = value
-  else cur[last] = value
-}
+
 
 // Field names come from the target schema, so a collection cell summarises each item by its fields'
 // meaning (amount, quantity, VAT flag, end date …) instead of by hard-coded names.
@@ -548,45 +529,12 @@ function AnswerPanel({ answer, pending, onTrace }: { answer: Answer | null; pend
   )
 }
 
-function RecordDrawer({ open, identity, rows, identityOf, columns, onClose, onLineage, onEdit }: { open: boolean; identity: string; rows: Record<string, unknown>[]; identityOf: (r: Record<string, unknown>) => string; columns: FieldSpec[]; onClose: () => void; onLineage: () => void; onEdit: (target: string, value: unknown, label: string) => void }) {
-  const rec = rows.find((r) => identityOf(r) === identity)
-  const colls = columns.filter((f) => f.is_collection)
+function RecordDrawer({ open, identity, rows, identityOf, columns, onClose, onLineage, onEdit, readOnly, numberStyle }: { open: boolean; identity: string; rows: Record<string, unknown>[]; identityOf: (r: Record<string, unknown>) => string; columns: FieldSpec[]; onClose: () => void; onLineage: (pointer?: string) => void; onEdit: (target: string, value: unknown, label: string) => void; readOnly: boolean; numberStyle: NumberStyle }) {
+  const rec = rows.find(r => identityOf(r) === identity)
   if (!open || !rec) return null
-  return (
-    <Drawer open={open} onClose={onClose} title={<span className="flex items-center gap-2">Record <span className="mono text-muted">{identity}</span><button className="btn btn-ghost btn-sm ml-2" onClick={onLineage}><Route size={13} /> Lineage</button></span>} width="w-[640px]">
-      <div className="flex flex-col gap-4 text-[13px]">
-        {colls.map((c) => {
-          const items = (getPointer(rec, c.pointer) as Record<string, unknown>[] | undefined) ?? []
-          const itemFields = columns.filter((f) => f.in_collection === c.pointer && !f.is_collection)
-          return (
-            <div key={c.pointer}>
-              <div className="font-medium mb-1.5">{c.pointer.slice(1)} <span className="text-muted">({items.length})</span></div>
-              {items.length ? (
-                <table className="table text-[12.5px]"><thead><tr>{itemFields.map((f) => <th key={f.pointer}>{f.name}</th>)}</tr></thead>
-                  <tbody>{items.map((it, i) => <tr key={i}>{itemFields.map((f) => { const key = f.pointer.split('/*/')[1]; const v = it[key]; return <td key={f.pointer}><EditableCell value={v} field={f} onCommit={(nv) => onEdit(`${c.pointer}/${i}/${key}`, nv, `${identity} · ${c.pointer.slice(1)}[${i}].${key}: ${cellText(v) || '∅'} → ${cellText(nv) || '∅'}`)} /></td> })}</tr>)}</tbody></table>
-              ) : <div className="text-muted">none</div>}
-            </div>
-          )
-        })}
-        <div><div className="font-medium mb-1.5">Full record</div><pre className="mono text-[11.5px] bg-surface-2 rounded-[var(--radius-md)] p-3 whitespace-pre-wrap">{JSON.stringify(rec, null, 2)}</pre></div>
-      </div>
-    </Drawer>
-  )
-}
-
-function EditableCell({ value, field, onCommit }: { value: unknown; field: FieldSpec; onCommit: (v: unknown) => void }) {
-  const [ed, setEd] = useState<string | null>(null)
-  if (ed === null) return <span className="cursor-text hover:bg-signal-soft rounded px-1 -mx-1" onDoubleClick={() => setEd(value === null || value === undefined ? '' : typeof value === 'object' ? JSON.stringify(value) : String(value))}>{cellText(value) || <span className="text-muted">∅</span>}</span>
-  const commit = () => {
-    let v: unknown = ed.trim()
-    if (v === '') v = null
-    else if (field.json_type.includes('number') || field.json_type.includes('integer')) v = Number(String(v).replace(/,/g, ''))
-    else if (field.json_type.includes('boolean')) v = ['true', '1', 'yes'].includes(String(v).toLowerCase())
-    else if (field.json_type.includes('array')) v = String(v).startsWith('[') ? JSON.parse(String(v)) : String(v).split(/[|,]/).map((s) => s.trim()).filter(Boolean)
-    if (JSON.stringify(v) !== JSON.stringify(value)) onCommit(v)
-    setEd(null)
-  }
-  return <input autoFocus className="input h-6 text-[12.5px] py-0" value={ed} onChange={(e) => setEd(e.target.value)} onBlur={commit} onKeyDown={(e) => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') setEd(null) }} />
+  return <Drawer open={open} onClose={onClose} title={<span className="flex items-center gap-2">JSON · {identity}</span>} width="w-[760px]">
+    <JsonRecordEditor value={rec} fields={columns} readOnly={readOnly} numberStyle={numberStyle} onTrace={onLineage} onEdit={(target, value) => onEdit(target, value, `${identity} · ${target}: ${cellText(getPointer(rec, target))} → ${cellText(value)}`)} />
+  </Drawer>
 }
 
 const cellRef = (c: { sheet: string | null; source: string; column: string | null; row: number | null }) => `${c.sheet ?? c.source}!${c.column ?? '?'}${c.row ?? ''}`

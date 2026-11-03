@@ -47,6 +47,70 @@ from forma.services.workspace_tools import connection_status
 router = APIRouter(prefix="/api")
 
 
+@router.get("/rounds/{round_id}/history")
+def round_history(
+    round_id: str,
+    offset: int = Query(0, ge=0),
+    action: str = Query("", max_length=200),
+    session: Session = Depends(get_session),
+    p: Principal = Depends(require_role("importer")),
+) -> dict[str, Any]:
+    from forma.services import inspection
+
+    _round_scoped(session, p, round_id)
+    return inspection.events(session, round_id=round_id, offset=offset, action=action)
+
+
+@router.get("/mappings/{mapping_id}/trace")
+def mapping_trace(
+    mapping_id: str,
+    offset: int = Query(0, ge=0),
+    session: Session = Depends(get_session),
+    p: Principal = Depends(require_role("importer")),
+) -> dict[str, Any]:
+    from forma.services import inspection
+
+    return inspection.mapping_trace(session, _mapping_scoped(session, p, mapping_id), offset=offset)
+
+
+@router.get("/learning/{correction_id}")
+def knowledge_detail(
+    correction_id: str,
+    offset: int = Query(0, ge=0),
+    session: Session = Depends(get_session),
+    p: Principal = Depends(require_role("importer")),
+) -> dict[str, Any]:
+    from forma.services import inspection
+
+    row = learning.get_correction(session, correction_id)
+    if row.customer_id is None:
+        ensure_all_customers(p)
+    else:
+        ensure_customer(p, row.customer_id)
+    return inspection.knowledge_detail(session, row, offset=offset)
+
+
+@router.get("/audit/events")
+def audit_events(
+    offset: int = Query(0, ge=0),
+    entity_id: str = Query("", max_length=100),
+    actor: str = Query("", max_length=200),
+    action: str = Query("", max_length=200),
+    start: date | None = None,
+    end: date | None = None,
+    session: Session = Depends(get_session),
+    p: Principal = Depends(require_role("admin")),
+) -> dict[str, Any]:
+    from forma.services import inspection
+
+    ensure_all_customers(p)
+    if start and end and start > end:
+        raise ValidationFailed("Start date must not be after end date")
+    return inspection.events(
+        session, offset=offset, entity_id=entity_id, actor=actor, action=action, start=start, end=end
+    )
+
+
 @router.get("/me/preferences")
 def preferences(
     session: Session = Depends(get_session), p: Principal = Depends(require_role("importer"))
@@ -158,6 +222,8 @@ def accept_verdict(
 @router.get("/learning")
 def learning_view(
     customer_id: str = "",
+    search: str = Query("", max_length=200),
+    status: Literal["confirmed", "retired", "all"] = "confirmed",
     offset: int = Query(0, ge=0),
     session: Session = Depends(get_session),
     ctx: ServiceContext = Depends(ctx_dep),
@@ -169,7 +235,12 @@ def learning_view(
     return {
         "stats": learning.stats(session, customers=p.customers),
         "learned": learning.list_learned(
-            session, customer_id=customer_id or None, offset=offset, customers=p.customers
+            session,
+            customer_id=customer_id or None,
+            offset=offset,
+            search=search,
+            status=status,
+            customers=p.customers,
         ),
         "suggestions": learning.suggestions(session, schema) if p.has_role("admin") and everyone else [],
     }
