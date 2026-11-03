@@ -6,6 +6,7 @@ import { api, waitForJob, type SourceFile, type TableProfile } from '../lib/api'
 import { AssistantIcon } from '../lib/icons'
 import { formatLabel, fmtBytes, fmtDate, fmtInt, cn } from '../lib/utils'
 import { PageHeader, StatusBadge, Section, Badge, Confidence, Drawer, KV, Spinner, FindingRow, Empty } from '../components/ui'
+import { RoundHistory } from '../components/Inspection'
 import { RoundSteps } from '../components/RoundSteps'
 import { ClosedNote, RoundMenu } from '../components/RoundMenu'
 import { useToast } from '../lib/toast'
@@ -20,6 +21,7 @@ export function RoundPage() {
   const toast = useToast()
   const nav = useNavigate()
   const { data: r, isLoading } = useQuery({ queryKey: ['round', roundId], queryFn: () => api.round(roundId), refetchInterval: (q) => (['uploaded', 'profiled'].includes(q.state.data?.status ?? '') ? 2000 : false) })
+  const [historyOpen, setHistoryOpen] = useState(false)
   const [fileOpen, setFileOpen] = useState<SourceFile | null>(null), [moveRequest, setMoveRequest] = useState(0)
 
   const runJob = useMutation({
@@ -155,6 +157,7 @@ export function RoundPage() {
               <div className="p-3">{latestDataset.findings.length ? latestDataset.findings.slice(0, 10).map((f, i) => <FindingRow key={i} f={f} />) : <div className="text-muted text-center py-3">No findings.</div>}</div>
             </Section>
           )}
+          <Section title={t('Decision and AI history', 'ประวัติการตัดสินใจและ AI')}><div className="p-4 space-y-4"><button className="btn" aria-expanded={historyOpen} onClick={() => setHistoryOpen(v => !v)}>{historyOpen ? t('Close history', 'ปิดประวัติ') : t('Inspect this round', 'ดูประวัติรอบนี้')}</button>{historyOpen && <RoundHistory key={roundId} roundId={roundId} />}</div></Section>
           <Section title="Processing history">
             <ul className="p-3 text-[12.5px] flex flex-col gap-1">
               {r.jobs?.map((j) => (

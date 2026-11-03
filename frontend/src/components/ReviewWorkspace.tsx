@@ -1,11 +1,12 @@
 import { useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { ArrowLeft, ArrowRight, Check, CircleHelp, FileText, TriangleAlert } from 'lucide-react'
 import { api, type AnswerPreview, type Expr, type FieldSpec, type ReviewQuestions } from '../lib/api'
 import { AssistantIcon } from '../lib/icons'
 import { usePreferences } from '../lib/preferences'
 import { Badge, Spinner } from './ui'
+import { EffectResult, RoundHistory } from './Inspection'
 import { VerdictCard } from './VerdictCard'
 
 type T = (en: string, th: string) => string
@@ -39,6 +40,7 @@ function rule(expr: Expr, t: T): string {
 
 export function ReviewWorkspace({ id, onSaved, onDone }: { id: string; onSaved: (id: string) => void; onDone: () => void }) {
   const nav = useNavigate()
+  const [params] = useSearchParams()
   const { prefs, t } = usePreferences(), th = prefs.language === 'th', qc = useQueryClient()
   const query = useQuery({ queryKey: ['questions', id], queryFn: () => api.reviewQuestions(id) })
   const explain = useMutation({
@@ -57,7 +59,7 @@ export function ReviewWorkspace({ id, onSaved, onDone }: { id: string; onSaved: 
     onSuccess: (res) => { void qc.invalidateQueries(); if (res.did === 'apply_answers' && res.mapping_id) onSaved(res.mapping_id); else onDone() },
   })
   const { data: me } = useQuery({ queryKey: ['me'], queryFn: api.me })
-  const [selected, setSelectedState] = useState<string | null>(null)
+  const [selected, setSelectedState] = useState<string | null>(params.get('section') === 'history' ? 'history' : null)
   const content = useRef<HTMLElement>(null)
   const setSelected = (value: string) => { setSelectedState(value); requestAnimationFrame(() => content.current?.scrollIntoView({ block: 'start' })) }
   const [acknowledged, setAcknowledged] = useState<string[]>([])
@@ -82,14 +84,14 @@ export function ReviewWorkspace({ id, onSaved, onDone }: { id: string; onSaved: 
   return <div className="space-y-5 pb-8">
     <button className="btn btn-ghost btn-sm" onClick={onDone} disabled={busy}><ArrowLeft size={15} />{t('Review queue', 'กลับรายการที่รอตรวจ')}</button>
     <header className="flex flex-wrap justify-between gap-4 items-start">
-      <div className="min-w-0"><div className="flex gap-3 items-center flex-wrap"><h1 className="text-2xl font-semibold text-navy">{t('Check this file', 'ตรวจไฟล์นี้')}</h1><Badge tone={q.blocked ? 'bad' : 'warn'}>{q.blocked ? t('Source check required', 'ต้องตรวจต้นทางก่อน') : t('Waiting for review', 'รอตรวจ')}</Badge></div><p className="mt-2 break-words">{q.context.customer?.name.startsWith(q.context.customer.code) ? q.context.customer.name : `${q.context.customer?.code} · ${q.context.customer?.name}`} <span className="text-muted">/ {q.context.round_label}</span></p><p className="text-xs text-muted mt-1">{t('Mapping version', 'การจับคู่เวอร์ชัน')} {q.context.mapping_version} · {t('Answer → preview → save and recheck', 'ตอบคำถาม → ดูผลที่จะเปลี่ยน → บันทึกและตรวจอีกครั้ง')}</p></div>
+      <div className="min-w-0"><div className="flex gap-3 items-center flex-wrap"><h1 className="text-2xl font-semibold text-navy">{t('Check this file', 'ตรวจไฟล์นี้')}</h1><Badge tone={q.status === 'approved' ? 'ok' : q.status === 'rejected' || q.blocked ? 'bad' : 'warn'}>{q.status !== 'proposed' ? q.status : q.blocked ? t('Source check required', 'ต้องตรวจต้นทางก่อน') : t('Waiting for review', 'รอตรวจ')}</Badge></div><p className="mt-2 break-words">{q.context.customer?.name.startsWith(q.context.customer.code) ? q.context.customer.name : `${q.context.customer?.code} · ${q.context.customer?.name}`} <span className="text-muted">/ {q.context.round_label}</span></p><p className="text-xs text-muted mt-1">{t('Mapping version', 'การจับคู่เวอร์ชัน')} {q.context.mapping_version} · {t('Answer → preview → save and recheck', 'ตอบคำถาม → ดูผลที่จะเปลี่ยน → บันทึกและตรวจอีกครั้ง')}</p></div>
       <button className="btn btn-sm" disabled={explain.isPending} onClick={() => explain.mutate({ round_id: q.round_id, mapping_id: id })}>{explain.isPending ? <Spinner /> : <AssistantIcon size={16} />}{t('Explain this file', 'ให้ผู้ช่วยอธิบายไฟล์นี้')}</button>
     </header>
     {explain.isError && <p role="alert" className="text-bad text-sm">{t('Could not open the assistant. Please try again.', 'ยังเปิดผู้ช่วยไม่ได้ ลองกดอีกครั้ง')}</p>}
     <div className="flex flex-wrap gap-2">{q.context.files.map(f => <Link key={f.id} className="btn btn-sm max-w-full text-left" to={`/rounds/${q.round_id}`}><FileText size={14} className="shrink-0" /><span className="break-all">{f.name}</span></Link>)}</div>
-    {verdictQuery.data?.verdict && verdictQuery.data.verdict.stage === 'mapping' && verdictQuery.data.verdict.subject.id === q.mapping_id
+    {current !== 'history' && verdictQuery.data?.verdict && verdictQuery.data.verdict.stage === 'mapping' && verdictQuery.data.verdict.subject.id === q.mapping_id
       ? <VerdictCard v={verdictQuery.data.verdict} editable={editable} busy={busy} onAccept={(d) => accepting.mutate(d)} onOpenDecision={(fid) => { if (q.questions.some(x => x.id === fid)) setSelected(fid) }} error={accepting.error?.message} />
-      : verdictQuery.isPending && <div className="card p-4 flex gap-2 items-center text-sm text-muted"><Spinner />{t('Weighing the evidence…', 'กำลังชั่งน้ำหนักหลักฐาน…')}</div>}
+      : current !== 'history' && verdictQuery.isPending && <div className="card p-4 flex gap-2 items-center text-sm text-muted"><Spinner />{t('Weighing the evidence…', 'กำลังชั่งน้ำหนักหลักฐาน…')}</div>}
     {!editable && <p className="bg-surface-2 border border-line rounded-xl p-3 text-sm">{t('Read-only: this version is already reviewed, or your role cannot change it.', 'ดูข้อมูลได้อย่างเดียว: เวอร์ชันนี้ตรวจไปแล้ว หรือสิทธิ์ของคุณไม่สามารถแก้ไขได้')}</p>}
     <div className="grid lg:grid-cols-[250px_minmax(0,1fr)] gap-5 items-start">
       <nav aria-label={t('Review sections', 'หัวข้อที่ต้องตรวจ')} className="card p-2 space-y-1 lg:sticky lg:top-20 min-w-0">
@@ -97,7 +99,7 @@ export function ReviewWorkspace({ id, onSaved, onDone }: { id: string; onSaved: 
         <p className="text-xs text-muted px-3 pt-4 pb-2">{t('2. Answer what you can confirm', '2. ตอบสิ่งที่ยืนยันได้')} · {Object.keys(answers).length}/{q.questions.length}</p>
         {q.questions.map((x, i) => <Nav key={x.id} active={current === x.id} onClick={() => setSelected(x.id)}><span className="text-muted text-xs shrink-0">{i + 1}</span><span className="flex-1">{title(x, t, th)}{unsure[x.id] && <small className="block text-warn mt-1">{t('Awaiting information', 'รอข้อมูลเพิ่มเติม')}</small>}</span>{answers[x.id] !== undefined ? <Check size={16} className="text-ok shrink-0" /> : <CircleHelp size={15} className="text-muted shrink-0" />}</Nav>)}
         {!q.questions.length && <p className="text-sm text-muted px-3 py-2">{t('No field questions remain', 'ไม่มีคำถามเกี่ยวกับฟิลด์ค้างอยู่')}</p>}
-        <div className="border-t border-line mt-3 pt-2"><Nav active={current === 'finish'} onClick={() => setSelected('finish')}>{t('3. Preview & save', '3. ตรวจผลและบันทึก')}</Nav><Nav active={current === 'technical'} onClick={() => setSelected('technical')}>{t('Technical data', 'ข้อมูลเทคนิค')}</Nav></div>
+        <div className="border-t border-line mt-3 pt-2"><Nav active={current === 'finish'} onClick={() => setSelected('finish')}>{t('3. Preview & save', '3. ตรวจผลและบันทึก')}</Nav><Nav active={current === 'history'} onClick={() => setSelected('history')}>{t('Decision & AI history', 'ประวัติการตัดสินใจและ AI')}</Nav><Nav active={current === 'technical'} onClick={() => setSelected('technical')}>{t('Technical data', 'ข้อมูลเทคนิค')}</Nav></div>
         <p className="px-3 py-2 text-xs text-muted">{t('Answers are drafts until saved. Unknown answers stay unresolved.', 'คำตอบยังเป็นฉบับร่างจนกว่าจะบันทึก ข้อที่ไม่ทราบจะยังค้างให้ตรวจ')}</p>
       </nav>
       <main ref={content} className="min-w-0 space-y-4 scroll-mt-20">
@@ -131,13 +133,14 @@ export function ReviewWorkspace({ id, onSaved, onDone }: { id: string; onSaved: 
           {q.open_questions.filter(note => !q.questions.some(x => x.question === note)).length > 0 && <div className="space-y-3 border-t border-line pt-4"><h3 className="font-medium">{t('Additional notes to review', 'ตรวจข้อสงสัยเพิ่มเติม')}</h3><p className="text-sm text-muted">{t('Check only after verifying that the current mapping and output are correct. This records your review; it does not change data. Leave uncertain items unchecked and ask the file owner.', 'เลือกเฉพาะข้อที่ตรวจแล้วว่าการอ่านและผลลัพธ์ปัจจุบันถูกต้อง การเลือกนี้บันทึกการตรวจ ไม่ได้เปลี่ยนข้อมูล ถ้ายังไม่แน่ใจให้เว้นไว้และถามเจ้าของไฟล์')}</p>{q.open_questions.filter(note => !q.questions.some(x => x.question === note)).map(note => <label key={note} className="flex items-start gap-2 text-sm"><input type="checkbox" disabled={!editable || busy} checked={acknowledged.includes(note)} onChange={e => { setAcknowledged(v => e.target.checked ? [...v, note] : v.filter(n => n !== note)); setPreview(null) }} /><span className="break-words">{note}</span></label>)}</div>}
           {!preview && (!!Object.keys(answers).length || !!acknowledged.length) && <button className="btn btn-primary" disabled={!editable || busy} onClick={() => previewing.mutate()}>{previewing.isPending ? t('Comparing…', 'กำลังเปรียบเทียบ…') : t('Preview changes', 'ดูผลที่จะเปลี่ยน')}</button>}
           {preview && <Impact preview={preview} q={q} t={t} th={th} />}
-          {preview && <button className="btn btn-primary" disabled={!editable || busy || !preview.preview.ok || !preview.comparison.reliable} onClick={() => saving.mutate()}>{saving.isPending ? t('Saving…', 'กำลังบันทึก…') : t('Save answers & recheck', 'บันทึกคำตอบและตรวจอีกครั้ง')}</button>}
+          {preview && <button className="btn btn-primary" disabled={!editable || busy || !preview.preview.ok || !preview.comparison.reliable || !preview.comparison.validation?.passed} onClick={() => saving.mutate()}>{saving.isPending ? t('Saving…', 'กำลังบันทึก…') : t('Save answers & recheck', 'บันทึกคำตอบและตรวจอีกครั้ง')}</button>}
           {!!q.open_questions.length && <div className="bg-warn-soft p-4 rounded-xl text-sm"><strong>{t('Other clarification may remain', 'อาจยังมีข้อสงสัยที่ต้องตรวจเพิ่ม')}</strong><p className="mt-1">{t('Saving these answers does not automatically resolve all file issues.', 'การบันทึกคำตอบไม่ได้ปิดทุกปัญหาของไฟล์โดยอัตโนมัติ')}</p><Link className="btn btn-sm mt-3" to={editor(q, undefined, 'changes')}>{t('Inspect all fields', 'เปิดตรวจทุกฟิลด์')}<ArrowRight size={14} /></Link></div>}
           {q.blocked && <p className="text-bad text-sm">{t('Source restrictions still apply; answering questions cannot approve this file.', 'ข้อจำกัดของไฟล์ต้นทางยังคงอยู่ การตอบคำถามไม่ใช่การอนุมัติไฟล์')}</p>}
           {editable && !q.blocked && !q.questions.length && !q.open_questions.length && <div className="border-t border-line pt-4 space-y-3"><label className="flex gap-2 text-sm"><input type="checkbox" checked={checked} onChange={e => setChecked(e.target.checked)} />{t('I reviewed the source, matching and all issues.', 'ฉันตรวจไฟล์ต้นทาง การจับคู่ และปัญหาทั้งหมดแล้ว')}</label><label className="grid gap-2 text-sm">{t('Review note', 'บันทึกการตรวจ')}<textarea className="input" value={comment} maxLength={2000} onChange={e => setComment(e.target.value)} /></label><button className="btn btn-primary" disabled={!checked || busy} onClick={() => approve.mutate()}>{t('Approve field matching', 'อนุมัติการจับคู่ข้อมูล')}</button></div>}
         </section>}
+        {current === 'history' && <section className="card p-4 sm:p-6"><RoundHistory key={id} roundId={q.round_id} mappingId={id} /></section>}
         {current === 'technical' && <section className="card p-4 sm:p-6 space-y-6 text-xs text-ink-2"><h2 className="text-xl font-semibold text-navy">{t('Technical data', 'ข้อมูลเทคนิค')}</h2>
-          <div><h3 className="text-sm font-semibold text-ink">{t('Original system messages', 'ข้อความระบบต้นฉบับ')}</h3><ul className="space-y-2 mt-2 break-words">{[...q.reasons, ...q.open_questions].map((r, i) => <li key={i}>{r}</li>)}</ul></div>
+          <div><h3 className="text-sm font-semibold text-ink">{t('Original evaluation messages (historical)', 'ข้อความจากการประเมินเดิม (ประวัติ)')}</h3><ul className="space-y-2 mt-2 break-words">{q.reasons.map((r, i) => <li key={i}>{r}</li>)}</ul></div>
           {q.questions.map(x => <div key={x.id}><h3 className="text-sm font-semibold text-ink">{title(x, t, th)}</h3><p className="my-2 break-words">{x.note}</p><ul className="space-y-1">{x.evidence.map((e, i) => <li key={i}>{e}</li>)}</ul><pre className="whitespace-pre-wrap break-all mt-2">{JSON.stringify(x.current, null, 2)}</pre></div>)}
           {preview && <div><h3 className="text-sm font-semibold text-ink">{t('Preview and validation', 'ผลทดลองและข้อผิดพลาด')}</h3><pre className="whitespace-pre-wrap break-all max-h-96 overflow-auto mt-2">{JSON.stringify({ findings: preview.preview.findings, errors: preview.preview.errors, sample: preview.preview.records?.slice(0, 3) }, null, 2)}</pre></div>}
         </section>}
@@ -191,6 +194,8 @@ function Impact({ preview: p, q, t, th }: { preview: AnswerPreview; q: ReviewQue
   const changes = c.rows.flatMap(r => (r.changes || []).map(d => ({ identity: r.identity, ...d })))
   return <div className="space-y-4"><div className="bg-surface-2 rounded-xl p-4 space-y-2"><h3 className="font-semibold">{t('Preview only — not saved', 'ผลทดลอง — ยังไม่ได้บันทึก')}</h3><p className="text-sm">{t(`Compared ${c.before_records} previous and ${c.after_records} new sample records. ${c.counts.changed_records} records change; ${c.counts.lost} disappear; ${c.counts.gained} appear.`, `เทียบตัวอย่างก่อน ${c.before_records} รายการ กับหลัง ${c.after_records} รายการ เปลี่ยนค่า ${c.counts.changed_records} รายการ หายไป ${c.counts.lost} รายการ เพิ่มมา ${c.counts.gained} รายการ`)}</p><p className="text-xs text-muted">{t(`Limited to ${c.sample_limit} source rows per source. These are sample counts, not the total impact on the file.`, `ทดลองไม่เกิน ${c.sample_limit} แถวต่อแหล่งข้อมูล จำนวนนี้เป็นผลในตัวอย่าง ไม่ใช่จำนวนที่กระทบทั้งไฟล์`)}</p></div>
     {!c.reliable && <p role="alert" className="text-bad">{t('The comparison could not complete. Inspect source fields before saving.', 'เปรียบเทียบไม่สำเร็จ ต้องตรวจต้นทางก่อนบันทึก')}</p>}
+    <EffectResult check={c.validation} />
+    <p className="text-sm">{t(`Questions remaining after save: ${p.remaining_questions.length}`, `คำถามที่ยังเหลือหลังบันทึก: ${p.remaining_questions.length}`)}</p>
     {changes.length > 0 ? <div className="overflow-auto max-h-96 border border-line rounded-xl"><table className="table text-sm"><thead className="sticky top-0 bg-surface"><tr><th>{t('Record', 'รายการ')}</th><th>{t('Field', 'ข้อมูล')}</th><th>{t('Before', 'ก่อน')}</th><th>{t('After', 'หลัง')}</th></tr></thead><tbody>{changes.map((d, i) => <tr key={i}><td className="break-all">{d.identity}</td><td className="break-words">{label(d.pointer)}</td><td className="break-all">{valueLabel(d.before, spec(d.pointer)?.semantic, t)}</td><td className="font-medium text-signal break-all">{valueLabel(d.after, spec(d.pointer)?.semantic, t)}</td></tr>)}</tbody></table></div> : c.reliable && <p className="text-sm">{t('No values change in this sample. Confirming a mapping records your decision without changing its values.', 'ไม่พบค่าที่เปลี่ยนในตัวอย่างนี้ การยืนยันการอ่านค่าจะบันทึกการตัดสินใจโดยไม่ได้เปลี่ยนค่า')}</p>}
     {!!p.preview.findings?.filter(f => f.severity === 'error').length && <p className="text-bad text-sm">{t('Some validation errors remain. Saving rechecks the policy and does not approve the file.', 'ยังพบข้อผิดพลาดในการตรวจข้อมูล การบันทึกจะตรวจตามกฎอีกครั้ง ไม่ใช่การอนุมัติไฟล์')}</p>}
   </div>

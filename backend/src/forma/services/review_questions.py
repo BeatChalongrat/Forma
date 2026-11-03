@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import datetime as dt
 import math
 import re
 from typing import Any
@@ -587,7 +588,7 @@ def apply_answers(
     from forma.services.review_evidence import validate_answer_effects
 
     catalogue = {q["id"]: q for q in questions(ctx, m)["questions"]}
-    validate_answer_effects(ctx, session, m, document, [catalogue[k] for k in answers])
+    effect_check = validate_answer_effects(ctx, session, m, document, [catalogue[k] for k in answers])
     new = ms.save_mapping_edit(ctx, session, m.id, document, actor, remaining_questions=remaining)
     history = list((m.policy or {}).get("confirmed_decisions", []))
     for key, value in answers.items():
@@ -598,6 +599,8 @@ def apply_answers(
         history.append(
             {
                 "question_id": key,
+                "mapping_id": new.id,
+                "answered_at": dt.datetime.now(dt.UTC).isoformat(),
                 "target": target,
                 "action": q.get(
                     "action",
@@ -621,11 +624,33 @@ def apply_answers(
     new.policy = {
         **(new.policy or {}),
         "confirmed_decisions": history,
+        "answer_effect_check": {
+            **effect_check,
+            "checked_at": dt.datetime.now(dt.UTC).isoformat(),
+            "before_mapping_id": m.id,
+            "mapping_id": new.id,
+            "actor": actor,
+            "digest": expected,
+        },
         "acknowledged_questions": [
             *(m.policy or {}).get("acknowledged_questions", []),
             *[{"question": q, "actor": actor, "origin_round": m.round_id} for q in acknowledged or []],
         ],
     }
+    from forma.services.rounds import audit
+
+    audit(
+        session,
+        "review.answers",
+        "mapping",
+        new.id,
+        actor=actor,
+        round_id=m.round_id,
+        parent_id=m.id,
+        answers=len(answers),
+        acknowledged=len(acknowledged or []),
+        effect_check=new.policy["answer_effect_check"],
+    )
     r = session.get(ImportRound, m.round_id)
     if r:
         r.summary = {**(r.summary or {}), "mapping_version_id": new.id}

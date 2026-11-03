@@ -29,6 +29,7 @@
 | 8 Review explanations & clarification | policy reasons explained in Thai and English; the assistant asks clarification questions before assuming, with the review context carried into the chat | **done** | ADR-042 |
 | 8 Input contract readiness | full OOXML scan, strict CSV decoding, formula and error-cell gates, table detection across the whole sheet, unsupported schema shapes refused, the full target schema in AI prompts | **done** | ADR-043 |
 | 8 Durable queue reconciliation | on startup, queued jobs are checked against durable results before recovery and resubmission | **done** | ADR-044 |
+| 12 Review and knowledge management | Per-file decision timeline, recorded AI runs, scoped searchable knowledge and retirement, paginated audit, retrieval snapshots, typed nested JSON editing | **done**; older missing events are not backfilled | ADR-063 |
 | 12 Housekeeping and the review clock | retention on a schedule and visible, nightly backups, question age, waiting for the customer, idle rounds | **done** | ADR-053 |
 | 13 Backups that restore | every file in the nightly backup, restore proven on this stack, health page says what a backup holds | **done** | ADR-054 |
 | 14 Files that went wrong quietly | printed reports keep every page, a second price sheet is a question, currency columns are read, one date order per delivery | **done** | ADR-055 |

@@ -482,18 +482,32 @@ def list_learned(
     session: Session,
     *,
     customer_id: str | None = None,
+    search: str = "",
+    status: str = "confirmed",
     offset: int = 0,
     limit: int = 50,
     customers: frozenset[str] | None = None,
 ) -> dict[str, Any]:
-    q = select(Correction).where(
-        Correction.status == "confirmed", Correction.kind.in_(("alias", "constant", "promoted", "decision"))
-    )
+    q = select(Correction).where(Correction.kind.in_(("alias", "constant", "promoted", "decision")))
+    if status != "all":
+        q = q.where(Correction.status == status)
+    if search:
+        from sqlalchemy import or_
+
+        q = q.where(
+            or_(
+                Correction.target.icontains(search, autoescape=True),
+                Correction.header.icontains(search, autoescape=True),
+                Correction.actor.icontains(search, autoescape=True),
+            )
+        )
     if customer_id:
         q = q.where(Correction.customer_id == customer_id)
     q = _only(q, Correction.customer_id, customers)
     total = session.scalar(select(func.count()).select_from(q.subquery())) or 0
-    rows = session.scalars(q.order_by(Correction.created_at.desc()).offset(offset).limit(limit)).all()
+    rows = session.scalars(
+        q.order_by(Correction.created_at.desc(), Correction.id.desc()).offset(offset).limit(limit)
+    ).all()
     return {
         "total": int(total),
         "items": [
@@ -501,6 +515,8 @@ def list_learned(
                 "id": r.id,
                 "customer_id": r.customer_id,
                 "kind": r.kind,
+                "status": r.status,
+                "mapping_id": r.mapping_version_id,
                 "target": r.target,
                 "header": r.header,
                 "column": (r.after or {}).get("column") if isinstance(r.after, dict) else None,
