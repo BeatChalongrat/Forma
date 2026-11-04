@@ -296,6 +296,10 @@ def learned_for(
         when = r.created_at.date().isoformat() if r.created_at else ""
         if r.kind == "constant":
             origin = session.get(MappingVersion, r.mapping_version_id) if r.mapping_version_id else None
+            from forma.services.decision_memory import verification_allows_recall
+
+            if origin is None or origin.approved_at is None or not verification_allows_recall(origin):
+                continue
             origin_round = session.get(ImportRound, origin.round_id) if origin and origin.round_id else None
             if requirements is not None and requirements != (
                 origin_round.notes or "" if origin_round else ""

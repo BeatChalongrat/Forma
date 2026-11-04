@@ -83,12 +83,18 @@ def test_arq_retry_uses_new_generation_without_duplicate_current_job(client, mon
     with session_scope() as s:
         s.get(Job, "job_generation_test").attempts = 1
     asyncio.run(backend._enqueue("job_generation_test"))
-    assert [c.kwargs["_job_id"] for c in pool.enqueue_job.call_args_list] == [
+    deliveries = [c.kwargs["_job_id"] for c in pool.enqueue_job.call_args_list]
+    assert deliveries == [
         "job_generation_test:0",
         "job_generation_test:0",
         "job_generation_test:1",
     ]
-    assert all(c.args == ("arq_run_job", "job_generation_test") for c in pool.enqueue_job.call_args_list)
+    assert pool.eval.call_count == 3  # repair lost membership / retained result, not duplicate live delivery
+    assert [c.args for c in pool.enqueue_job.call_args_list] == [
+        ("arq_run_job", "job_generation_test", 0),
+        ("arq_run_job", "job_generation_test", 0),
+        ("arq_run_job", "job_generation_test", 1),
+    ]
 
 
 def test_worker_refreshes_configuration_before_handler(client, isolated_env, monkeypatch):

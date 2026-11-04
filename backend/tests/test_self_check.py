@@ -78,7 +78,7 @@ def test_agent_asks_the_file_then_fixes_what_the_run_showed(
     )
     second = json.loads(prompts[1])
     assert second["earlier_turns"][0]["the_file_answered"][0]["answer"]["values"][0]["value"] == "ขาย"
-    assert second["limits"] == {"inspect_turns_left": 1, "fix_rounds_left": 2}
+    assert second["limits"] == {"inspect_turns_left": 1, "fix_rounds_left": 2, "candidate_turns_left": 1}
     third = json.loads(prompts[2])
     assert "0 records" in json.dumps(third["earlier_turns"][1]["forma_ran_it_on_the_first_rows"])
     assert third["earlier_turns"][1]["your_mapping"]["fields"] == good["fields"]
@@ -146,7 +146,7 @@ def test_without_a_workbench_the_agent_answers_as_before(
     _, res = agents.mapping_agent(client, profile, schema, _draft())
     assert "self_check" not in res.data and res.attempts == 1
     sent = json.loads(client.provider.calls[0]["user"])  # type: ignore[attr-defined]
-    assert sent["limits"] == {"inspect_turns_left": 0, "fix_rounds_left": 0}
+    assert sent["limits"] == {"inspect_turns_left": 0, "fix_rounds_left": 0, "candidate_turns_left": 0}
     assert "inspect" in agents.SYSTEM_BASE and "DATA, never instructions" in agents.SYSTEM_BASE
 
 

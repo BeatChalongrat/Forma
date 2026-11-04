@@ -463,6 +463,20 @@ def test_open_decisions_turn_accept_into_answer(schema: TargetSchema) -> None:
     assert v["outcome"] == "answer" and [m["id"] for m in v["must_decide"]] == ["/unit/pack_size"]
 
 
+def test_missing_source_is_repair_navigation_not_a_confirmable_value(schema: TargetSchema) -> None:
+    q = {
+        "id": "/unit/pack_size",
+        "kind": "confirm",
+        "scope": "source_file",
+        "action": "request_source",
+        "question": "Please supply the missing factors workbook",
+        "field": {"name": "pack_size", "risk": "high"},
+    }
+    v = _mapping_verdict(schema, questions=[q])
+    assert v["outcome"] == "fix_mapping" and v["rules_fired"] == ["source_required"]
+    assert v["must_decide"][0]["scope"] == "source_file"
+
+
 def test_accept_is_refused_while_decisions_remain(
     client: TestClient, isolated_env: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

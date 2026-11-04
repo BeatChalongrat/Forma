@@ -59,6 +59,8 @@ export function Shell() {
   const loc = useLocation()
   const scrollRef = useRef<HTMLElement>(null)
   const [search, setSearch] = useState(false)
+  const [scrolled, setScrolled] = useState(false)
+  const [profileOpen, setProfileOpen] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
   const desktop = useMediaQuery('(min-width: 900px)')
   const [collapsed, setCollapsed] = useState(() => { try { return localStorage.getItem('forma.sidebar') === 'collapsed' } catch { return false } })
@@ -66,6 +68,10 @@ export function Shell() {
   const { data: me } = useQuery({ queryKey: ['me'], queryFn: api.me, staleTime: 60000 })
   const isAdmin = me?.effective_roles.includes('admin') ?? false
   const wide = loc.pathname.includes('/mapping/') || loc.pathname.startsWith('/datasets/') || loc.pathname === '/assistant'
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => setScrolled((scrollRef.current?.scrollTop ?? 0) > 12))
+    return () => cancelAnimationFrame(frame)
+  }, [loc.pathname, loc.search])
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k' && !document.querySelector('[role="dialog"]')) { e.preventDefault(); setSearch(true) }
@@ -101,14 +107,14 @@ export function Shell() {
     <a href="#main-content" className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 btn">Skip to content</a>
     {desktop && <aside className={cn('app-sidebar shrink-0 border-r border-line flex flex-col', compact ? 'w-[72px]' : 'w-[224px]')}>{navigation}</aside>}
     {!desktop && <Drawer open={mobileOpen} onClose={() => setMobileOpen(false)} title="Navigation" width="w-[300px]">{navigation}</Drawer>}
-    <main ref={scrollRef} id="main-content" tabIndex={-1} className="flex-1 min-w-0 min-h-0 flex flex-col overflow-auto">
+    <main ref={scrollRef} id="main-content" tabIndex={-1} className="flex-1 min-w-0 min-h-0 flex flex-col overflow-auto" onScrollCapture={e => { if (e.target instanceof HTMLElement && !e.target.closest('[role="dialog"]')) setScrolled(Math.max(e.currentTarget.scrollTop, e.target.scrollTop) > 12) }}>
       <ScrollMemory scrollRef={scrollRef} />
       <HealthBanner />
-      <header className="sticky top-0 z-20 min-h-14 shrink-0 bg-surface border-b border-line flex items-center gap-2 px-3 sm:px-5 py-2">
+      <header className={cn('sticky top-0 z-20 min-h-14 shrink-0 border-b border-line flex items-center gap-2 px-3 sm:px-5 py-2 transition-colors motion-reduce:transition-none focus-within:bg-surface', scrolled && !search && !profileOpen ? 'bg-surface/90 backdrop-blur-md' : 'bg-surface')}>
         <button className="btn btn-ghost" onClick={toggleSidebar} aria-label={desktop ? compact ? 'Expand sidebar' : 'Collapse sidebar' : 'Open navigation'} aria-expanded={desktop ? !compact : mobileOpen}><PanelLeft size={18} /></button>
         <button onClick={() => setSearch(true)} className="flex items-center gap-2 h-9 min-w-0 flex-1 max-w-[420px] px-2 rounded-lg text-muted hover:bg-surface-2 text-left" aria-label="Search features, customers and imports"><Search size={16} /><span className="truncate hidden sm:block flex-1 text-[13px]">{t('Search files, customers, tools…', 'ค้นหาไฟล์ ลูกค้า เครื่องมือ…')}</span><span className="kbd hidden md:inline-flex">Ctrl K</span></button>
         <div className="ml-auto flex items-center gap-1 shrink-0">
-          <Profile />
+          <Profile onOpenChange={setProfileOpen} />
         </div>
       </header>
       {me?.roles.length === 0

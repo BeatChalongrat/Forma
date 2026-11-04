@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 from datetime import date
 from typing import Any
 
 from fastapi import APIRouter, Depends, File, Form, Query, UploadFile
 from fastapi.responses import Response
 from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import update
+from sqlalchemy import select, text, update
 from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 
@@ -16,7 +18,7 @@ from forma.api.routes import ctx_dep, read_upload
 from forma.api.schemas import BatchAssignIn
 from forma.auth import Principal, current_principal, llm_rate_limited, require_role
 from forma.core.errors import Conflict, Forbidden, ValidationFailed
-from forma.db.models import Batch
+from forma.db.models import AuditLog, Batch, BatchItem
 from forma.db.session import get_session
 from forma.jobs import runner
 from forma.services import batches as bs
@@ -40,14 +42,28 @@ def _all_customers(p: Principal) -> None:
 
 
 def _process(items: list[str], p: Principal, *, sync: bool, use_llm: bool | None) -> None:
-    if items:
-        runner.enqueue_batch(
-            "process_batch_item",
-            [{"item_id": i, "actor": p.actor, "use_llm": use_llm} for i in items],
-            round_ids=[None] * len(items),
-            sync=sync,
-            request_id=p.request_id,
+    runner.deliver_jobs(items, sync=sync)
+
+
+def _stage(
+    session: Session, items: list[str], p: Principal, *, sync: bool, use_llm: bool | None
+) -> list[str]:
+    ids = []
+    for item_id in items:
+        item = session.get(BatchItem, item_id)
+        assert item is not None
+        ids.append(
+            runner.stage_job(
+                session,
+                "process_batch_item",
+                {"item_id": item_id, "actor": p.actor, "use_llm": use_llm},
+                round_id=item.round_id,
+                batch_id=item.batch_id,
+                request_id=p.request_id,
+                sync=sync,
+            )
         )
+    return ids
 
 
 @router.post("/batches", status_code=201)
@@ -58,6 +74,7 @@ async def create_batch(
     expected_files: int | None = Form(None, ge=1, le=1000000),
     auto_publish: bool = Form(True),
     use_llm: bool | None = Form(None),
+    upload_key: str | None = Form(None, min_length=1, max_length=100),
     sync: bool = Query(False),
     session: Session = Depends(get_session),
     ctx: ServiceContext = Depends(ctx_dep),
@@ -69,6 +86,38 @@ async def create_batch(
     if use_llm:
         llm_rate_limited(p)
     data = [(up.filename or "upload.xlsx", await read_upload(up, ctx.settings.max_upload_mb)) for up in files]
+    receipt_id = hashlib.sha256(f"{p.actor}\0{upload_key}".encode()).hexdigest()[:40] if upload_key else None
+    digest = hashlib.sha256(
+        json.dumps(
+            {
+                "files": [(name, hashlib.sha256(content).hexdigest()) for name, content in data],
+                "label": label,
+                "date": str(work_date),
+                "expected": expected_files,
+                "auto": auto_publish,
+                "llm": use_llm,
+            },
+            sort_keys=True,
+        ).encode()
+    ).hexdigest()
+    if receipt_id:
+        if session.get_bind().dialect.name == "postgresql":
+            session.execute(
+                text("SELECT pg_advisory_xact_lock(:key)"),
+                {"key": int.from_bytes(bytes.fromhex(receipt_id)[:8], "big", signed=True)},
+            )
+        elif not getattr(session.connection().connection.driver_connection, "in_transaction", False):
+            session.execute(text("BEGIN IMMEDIATE"))
+        receipt = session.scalar(
+            select(AuditLog).where(
+                AuditLog.action == "batch.upload_receipt", AuditLog.entity_id == receipt_id
+            )
+        )
+        if receipt:
+            if receipt.details["digest"] != digest:
+                raise Conflict("This upload request changed. Start a new upload request.")
+            existing = bs.get_batch(session, receipt.details["batch_id"])
+            return {**bs.batch_view(session, existing), "added": 0, "skipped": len(files), "replayed": True}
     b = bs.create_batch(
         ctx,
         session,
@@ -80,11 +129,28 @@ async def create_batch(
         expected_files=expected_files,
     )
     todo = [i.id for i in b.items if i.status == "received"]
+    jobs = _stage(session, todo, p, sync=sync, use_llm=use_llm)
+    added = len(b.items)
+    if receipt_id:
+        rs.audit(
+            session,
+            "batch.upload_receipt",
+            "upload_request",
+            receipt_id,
+            actor=p.actor,
+            digest=digest,
+            batch_id=b.id,
+        )
     session.commit()
     # off the event loop: the arq backend submits with asyncio.run, which cannot nest in this async handler
-    await run_in_threadpool(_process, todo, p, sync=sync, use_llm=use_llm)
+    await run_in_threadpool(_process, jobs, p, sync=sync, use_llm=use_llm)
     session.expire_all()
-    return bs.batch_view(session, bs.get_batch(session, b.id))
+    return {
+        **bs.batch_view(session, bs.get_batch(session, b.id)),
+        "added": added,
+        "skipped": len(files) - added,
+        "replayed": False,
+    }
 
 
 @router.post("/batches/{batch_id}/files")
@@ -109,8 +175,9 @@ async def append_files(
     before = len(b.items)
     todo = bs.add_files(ctx, session, b, data, p.actor)
     added = len(b.items) - before
+    jobs = _stage(session, todo, p, sync=sync, use_llm=use_llm)
     session.commit()
-    await run_in_threadpool(_process, todo, p, sync=sync, use_llm=use_llm)
+    await run_in_threadpool(_process, jobs, p, sync=sync, use_llm=use_llm)
     session.expire_all()
     return {
         **bs.batch_view(session, bs.get_batch(session, batch_id)),
@@ -206,8 +273,9 @@ def assign(
     assert customer_id is not None
     for it in picked:
         bs.attach(ctx, session, it, customer_id, p.actor)
+    jobs = _stage(session, [i.id for i in picked], p, sync=body.sync, use_llm=body.use_llm)
     session.commit()
-    _process([i.id for i in picked], p, sync=body.sync, use_llm=body.use_llm)
+    _process(jobs, p, sync=body.sync, use_llm=body.use_llm)
     session.expire_all()
     return bs.batch_view(session, bs.get_batch(session, batch_id))
 
@@ -222,9 +290,11 @@ def resume(
     """Queue again the files no job is working on (the queue was full or down at upload time)."""
     _all_customers(p)
     b = bs.get_batch(session, batch_id)
+    session.execute(update(Batch).where(Batch.id == batch_id).values(label=Batch.label))
     todo = bs.stuck_items(session, b)
+    jobs = _stage(session, todo, p, sync=sync, use_llm=None)
     session.commit()
-    _process(todo, p, sync=sync, use_llm=None)
+    _process(jobs, p, sync=sync, use_llm=None)
     session.expire_all()
     return bs.batch_view(session, bs.get_batch(session, batch_id))
 

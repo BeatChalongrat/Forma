@@ -18,6 +18,18 @@ from forma.services.decision_actions import field_mapping
 REUSABLE = {"date_format", "value_map", "choice", "confirm"}
 
 
+def verification_allows_recall(mapping: MappingVersion) -> bool:
+    """A stored failed/incomplete verification cannot become trusted memory.
+
+    Legacy approvals without a snapshot retain compatibility; new approvals already require one.
+    This is not proof of business meaning: customer, contract, layout and expression checks still apply.
+    """
+    report = (mapping.policy or {}).get("verification")
+    return report is None or (
+        isinstance(report, dict) and report.get("complete") is True and report.get("passed") is True
+    )
+
+
 def reusable(decision: dict[str, Any]) -> bool:
     return decision.get("action") in REUSABLE or (
         decision.get("action") == "constant" and decision.get("remember") is True
@@ -34,7 +46,16 @@ def record(session: Session, m: MappingVersion, actor: str) -> list[Correction]:
             kind="decision",
             target=decision["target"],
             before=decision.get("before"),
-            after={**decision, "requirements_hash": stable_hash(r.notes or "" if r else "")},
+            after={
+                **decision,
+                "requirements_hash": stable_hash(r.notes or "" if r else ""),
+                "confirmation_verification": {
+                    k: v
+                    for k, v in ((m.policy or {}).get("verification") or {}).items()
+                    if k in ("version", "passed", "complete")
+                },
+                "reuse_scope": "customer + target contract + layout + requirements + exact source expression",
+            },
             actor=actor,
             mapping_version_id=m.id,
             round_id=m.round_id,
@@ -46,6 +67,8 @@ def record(session: Session, m: MappingVersion, actor: str) -> list[Correction]:
 
 def eligible(session: Session, m: MappingVersion) -> bool:
     """An approved one-delivery exception is not a reusable format."""
+    if not verification_allows_recall(m):
+        return False
     decisions = (m.policy or {}).get("confirmed_decisions", [])
     if any(not reusable(d) for d in decisions):
         return False
@@ -121,7 +144,12 @@ def recall(
         if not reusable(data) or data.get("requirements_hash") != stable_hash(r.notes or ""):
             continue
         origin = session.get(MappingVersion, row.mapping_version_id)
-        if origin is None or origin.approved_at is None or not format_memory.compatible(origin, schema):
+        if (
+            origin is None
+            or origin.approved_at is None
+            or not verification_allows_recall(origin)
+            or not format_memory.compatible(origin, schema)
+        ):
             continue
         fingerprint = format_memory.mapping_fingerprint(origin)
         if fingerprint is None or compare(fingerprint, current).classification not in (

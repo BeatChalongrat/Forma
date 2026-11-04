@@ -139,6 +139,7 @@ export type BatchMatch = { kind: 'known' | 'unknown'; how?: 'exact' | 'same_colu
 export type BatchItemState = 'processing' | 'needs_customer' | 'needs_review' | 'needs_data_check' | 'ready' | 'failed' | 'closed'
 export type FormatMemory = { status: 'known' | 'reused' | 'changed' | 'new' | 'edited'; mapping_id: string | null; mapping_version: number | null; target_schema: string }
 export type BatchItem = {
+  source_file_id?: string | null; current_file_name?: string; current_file_size?: number
   id: string; file_name: string; size: number; match: BatchMatch | null; customer: { id: string; code: string | null; name: string | null } | null
   round_id: string | null; round_status: string | null; mapping_version_id: string | null; dataset_version_id: string | null
   publish: PublishDecision | null; export_id: string | null; json_name: string; rows: number | null
@@ -208,7 +209,8 @@ export type DatasetVersion = {
 export type ChangeSet = { id: string; dataset_version_id: string; result_version_id: string | null; kind: string; operations: Operation[]; impact: Impact; author: string; note: string | null; status: string; created_at: string }
 export type ExportArtifact = { id: string; dataset_version_id: string; fmt: string; row_count: number; sha256: string; created_at: string; path: string }
 export type Job = {
-  id: string; kind: string; status: 'queued' | 'running' | 'done' | 'failed'; progress: number; message: string | null; result?: Record<string, unknown> | null; error?: string | null
+  heartbeat_at?: string | null; can_retry?: boolean; can_cancel?: boolean
+  id: string; kind: string; status: 'queued' | 'running' | 'done' | 'failed' | 'cancelled'; progress: number; message: string | null; result?: Record<string, unknown> | null; error?: string | null
   round_id?: string | null; batch_id?: string | null; attempts?: number; worker?: string | null; created_at?: string; started_at?: string | null; finished_at?: string | null; duration_ms?: number | null
 }
 export type BatchStatus = { batch_id: string; total: number; by_status: Record<string, number>; finished: number; progress: number; done: boolean; jobs: { id: string; round_id: string | null; status: string; progress: number; error: string | null; duration_ms: number | null }[] }
@@ -379,6 +381,14 @@ export const api = {
   round: (id: string) => get<ImportRound>(`/api/rounds/${id}`),
   createRound: (b: { customer_id: string; label?: string; target_schema?: string }) => post<ImportRound>('/api/rounds', b),
   cancelRound: (id: string, reason: string) => post<ImportRound>(`/api/rounds/${encodeURIComponent(id)}/cancel`, { reason }),
+  cancelFile: (roundId: string, fileId: string, reason: string) => post<ImportRound & { job_ids: string[] }>(`/api/rounds/${encodeURIComponent(roundId)}/files/${encodeURIComponent(fileId)}/cancel`, { reason }),
+  moveFile: (roundId: string, fileId: string, customer_id: string, reason: string) => post<ImportRound & { job_ids: string[] }>(`/api/rounds/${encodeURIComponent(roundId)}/files/${encodeURIComponent(fileId)}/move`, { customer_id, reason }),
+  replaceFile: (roundId: string, fileId: string, file: File, reason: string) => {
+    const fd = new FormData()
+    fd.append('file', file)
+    fd.append('reason', reason)
+    return request<ImportRound & { job_ids: string[] }>(`/api/rounds/${encodeURIComponent(roundId)}/files/${encodeURIComponent(fileId)}/replace`, { method: 'POST', body: fd })
+  },
   reopenRound: (id: string) => post<ImportRound>(`/api/rounds/${encodeURIComponent(id)}/reopen`, {}),
   moveRound: (id: string, b: { customer_id: string; reason: string }) => post<ImportRound & { job_id: string }>(`/api/rounds/${encodeURIComponent(id)}/move`, b),
   replaceRound: (id: string, files: File[], reason: string, label?: string) => {
@@ -393,14 +403,15 @@ export const api = {
     files.forEach((f) => fd.append('files', f))
     return request<SourceFile[]>(`/api/rounds/${roundId}/files`, { method: 'POST', body: fd })
   },
-  createUpload: (files: File[], o: { label?: string; work_date?: string; expected_files?: number; auto_publish: boolean }) => {
+  createUpload: (files: File[], o: { label?: string; work_date?: string; expected_files?: number; auto_publish: boolean; upload_key?: string }) => {
     const fd = new FormData()
     files.forEach((f) => fd.append('files', f))
     if (o.label) fd.append('label', o.label)
     if (o.work_date) fd.append('work_date', o.work_date)
     if (o.expected_files !== undefined) fd.append('expected_files', String(o.expected_files))
     fd.append('auto_publish', String(o.auto_publish))
-    return request<Batch>('/api/batches', { method: 'POST', body: fd })
+    if (o.upload_key) fd.append('upload_key', o.upload_key)
+    return request<Batch & { added: number; skipped: number; replayed: boolean }>('/api/batches', { method: 'POST', body: fd })
   },
   uploads: (q?: { limit?: number; offset?: number; search?: string; start?: string; end?: string }) => get<BatchSummary[]>('/api/batches' + qs(q)),
   appendUpload: (id: string, files: File[]) => {
@@ -426,6 +437,7 @@ export const api = {
   batch: (id: string) => get<BatchStatus>(`/api/jobs/batch/${id}`),
   batchRun: (round_ids: string[], b?: { use_llm?: boolean | null; force?: boolean }) => post<{ batch_id: string; job_ids: string[]; count: number }>('/api/rounds/batch-run', { round_ids, ...(b ?? {}) }),
   retryJob: (id: string) => post<{ job_id: string }>(`/api/jobs/${id}/retry`),
+  cancelJob: (id: string) => post<{ job_id: string }>(`/api/jobs/${id}/cancel`),
   me: () => get<Me>('/api/me'),
   ready: () => get<Ready>('/ready'),
   ops: () => get<OpsSummary>('/api/ops'),
@@ -499,7 +511,7 @@ export async function waitForJob(jobId: string, onTick?: (j: Job) => void, inter
   for (;;) {
     const j = await api.job(jobId)
     onTick?.(j)
-    if (j.status === 'done' || j.status === 'failed') return j
+    if (j.status === 'done' || j.status === 'failed' || j.status === 'cancelled') return j
     await new Promise((r) => setTimeout(r, intervalMs))
   }
 }

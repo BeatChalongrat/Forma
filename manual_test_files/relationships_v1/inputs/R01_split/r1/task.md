@@ -1,0 +1,2 @@
+Map the supplied ERP export(s) to the supplied JSON Schema. Preserve the master product population and identities. Do not invent business facts. Ask a specific question if required facts cannot be established.
+All three files belong to this delivery. Use the selling price as supplied and preserve both warehouses.

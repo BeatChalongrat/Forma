@@ -61,7 +61,7 @@ from forma.export.exporter import MEDIA_TYPES
 from forma.jobs import runner
 from forma.mapping_dsl.models import MappingDocument, Op
 from forma.schema_registry import PROVENANCE_KEY, TargetSchema
-from forma.services import assistant
+from forma.services import assistant, file_actions
 from forma.services import config as cfg
 from forma.services import datasets as ds
 from forma.services import lineage as lin
@@ -447,6 +447,7 @@ def cancel_round(
 ) -> dict[str, Any]:
     """Close a round that should not count: it leaves every queue, its files and history stay (ADR-052)."""
     r = _round_scoped(session, p, round_id)
+    runner.cancel_round_jobs(round_id, actor=p.actor)
     lifecycle.cancel(session, p, r, body.reason)
     session.commit()
     return ser.import_round(r, customer_obj=session.get(Customer, r.customer_id))
@@ -473,15 +474,19 @@ def move_round(
     """The file was another customer's: the same files become that customer's round and run at once."""
     r = _round_scoped(session, p, round_id)
     ensure_customer(p, body.customer_id)
+    runner.cancel_round_jobs(round_id, actor=p.actor)
     new = lifecycle.move(session, p, r, body.customer_id, body.reason)
-    session.commit()
-    job_id = runner.enqueue(
+    job_id = runner.stage_job(
+        session,
         "run_pipeline",
         {"round_id": new.id, "actor": p.actor, "auto_publish": bool((new.summary or {}).get("auto_publish"))},
         round_id=new.id,
         sync=sync,
         request_id=p.request_id,
     )
+    session.commit()
+    runner.deliver_jobs([job_id], sync=sync)
+    session.expire_all()
     return {**ser.import_round(new, customer_obj=session.get(Customer, new.customer_id)), "job_id": job_id}
 
 
@@ -499,19 +504,100 @@ async def replace_round(
     """A corrected delivery takes the old round's place; the old JSON leaves the work round's zip."""
     r = _round_scoped(session, p, round_id)
     loaded = [(f.filename or "upload.xlsx", await read_upload(f, ctx.settings.max_upload_mb)) for f in files]
+    await run_in_threadpool(lambda: runner.cancel_round_jobs(round_id, actor=p.actor))
     new = lifecycle.replace(ctx, session, p, r, loaded, reason, label)
-    session.commit()
     payload = {
         "round_id": new.id,
         "actor": p.actor,
         "auto_publish": bool((new.summary or {}).get("auto_publish")),
     }
     # off the event loop: the arq backend submits with asyncio.run, which cannot nest in this async handler
-    job_id = await run_in_threadpool(
-        lambda: runner.enqueue("run_pipeline", payload, round_id=new.id, sync=sync, request_id=p.request_id)
+    job_id = runner.stage_job(
+        session, "run_pipeline", payload, round_id=new.id, sync=sync, request_id=p.request_id
     )
+    session.commit()
+    await run_in_threadpool(lambda: runner.deliver_jobs([job_id], sync=sync))
     session.expire_all()
     return {**ser.import_round(new, customer_obj=session.get(Customer, new.customer_id)), "job_id": job_id}
+
+
+def _file_action_result(
+    session: Session,
+    p: Principal,
+    destination: ImportRound,
+    rerun: list[ImportRound],
+    sync: bool,
+) -> dict[str, Any]:
+    jobs = [
+        runner.stage_job(
+            session,
+            "run_pipeline",
+            {"round_id": r.id, "actor": p.actor, "auto_publish": bool((r.summary or {}).get("auto_publish"))},
+            round_id=r.id,
+            sync=sync,
+            request_id=p.request_id,
+        )
+        for r in rerun
+    ]
+    session.commit()
+    runner.deliver_jobs(jobs, sync=sync)
+    session.expire_all()
+    return {
+        **ser.import_round(destination, customer_obj=session.get(Customer, destination.customer_id)),
+        "job_ids": jobs,
+    }
+
+
+@api.post("/rounds/{round_id}/files/{file_id}/replace", status_code=201)
+async def replace_file(
+    round_id: str,
+    file_id: str,
+    file: UploadFile = File(...),
+    reason: str = Form(..., min_length=1, max_length=500),
+    sync: bool = Query(False),
+    session: Session = Depends(get_session),
+    ctx: ServiceContext = Depends(ctx_dep),
+    p: Principal = Depends(require_role("importer")),
+) -> dict[str, Any]:
+    r = _round_scoped(session, p, round_id)
+    loaded = (file.filename or "upload.xlsx", await read_upload(file, ctx.settings.max_upload_mb))
+    destination, rerun = file_actions.change(
+        ctx, session, p, r, file_id, "replace", reason, replacement=loaded
+    )
+    return await run_in_threadpool(_file_action_result, session, p, destination, rerun, sync)
+
+
+@api.post("/rounds/{round_id}/files/{file_id}/move", status_code=201)
+def move_file(
+    round_id: str,
+    file_id: str,
+    body: MoveIn,
+    sync: bool = Query(False),
+    session: Session = Depends(get_session),
+    ctx: ServiceContext = Depends(ctx_dep),
+    p: Principal = Depends(require_role("importer")),
+) -> dict[str, Any]:
+    r = _round_scoped(session, p, round_id)
+    ensure_customer(p, body.customer_id)
+    destination, rerun = file_actions.change(
+        ctx, session, p, r, file_id, "move", body.reason, customer_id=body.customer_id
+    )
+    return _file_action_result(session, p, destination, rerun, sync)
+
+
+@api.post("/rounds/{round_id}/files/{file_id}/cancel")
+def cancel_file(
+    round_id: str,
+    file_id: str,
+    body: CloseIn,
+    sync: bool = Query(False),
+    session: Session = Depends(get_session),
+    ctx: ServiceContext = Depends(ctx_dep),
+    p: Principal = Depends(require_role("importer")),
+) -> dict[str, Any]:
+    r = _round_scoped(session, p, round_id)
+    destination, rerun = file_actions.change(ctx, session, p, r, file_id, "cancel", body.reason)
+    return _file_action_result(session, p, destination, rerun, sync)
 
 
 @api.post("/rounds/{round_id}/run")
@@ -613,13 +699,15 @@ def approve_mapping(
     out = ser.mapping_version(mv, document=False)
     if r is not None and (r.summary or {}).get("auto_publish"):
         # a bulk-upload round (ADR-027): once a person approves the mapping, finish it automatically
-        session.commit()
-        runner.enqueue(
+        job_id = runner.stage_job(
+            session,
             "run_pipeline",
             {"round_id": r.id, "actor": p.actor, "auto_publish": True},
             round_id=r.id,
             request_id=p.request_id,
         )
+        session.commit()
+        runner.deliver_jobs([job_id])
     return out
 
 
@@ -1436,6 +1524,15 @@ def retry_job(job_id: str, p: Principal = Depends(require_role("admin"))) -> dic
     except KeyError as e:
         raise NotFound("job not found") from e
     return {"job_id": runner.retry_job(job_id)}
+
+
+@api.post("/jobs/{job_id}/cancel")
+def cancel_job(job_id: str, p: Principal = Depends(require_role("admin"))) -> dict[str, Any]:
+    try:
+        runner.job_status(job_id, customers=p.customers)
+    except KeyError as e:
+        raise NotFound("job not found") from e
+    return {"job_id": runner.cancel_job(job_id, actor=p.actor)}
 
 
 @api.get("/ops")

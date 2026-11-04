@@ -1,0 +1,2 @@
+Map the supplied ERP export(s) to the supplied JSON Schema. Preserve the master product population and identities. Do not invent business facts. Ask a specific question if required facts cannot be established.
+Return RETAIL THB prices valid on 2026-11-03 (inclusive validity bounds). Ignore other price lists, currencies and expired periods.

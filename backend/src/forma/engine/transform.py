@@ -113,6 +113,7 @@ def load_source_frame(
     *,
     limit: int | None = None,
     expected_columns: set[str] | None = None,
+    verify_all_columns: bool = False,
 ) -> pl.DataFrame:
     sheet = resolve_sheet(spec, bound)
     raw = read_raw(
@@ -121,8 +122,10 @@ def load_source_frame(
         csv_encoding=spec.csv.encoding,
         csv_delimiter=spec.csv.delimiter,
         csv_quote_char=spec.csv.quote_char,
+        validate_cells=expected_columns is None,
     )
-    frame = extract_table(raw, spec.table, rename=spec.rename)
+    positions: dict[str, int] = {}
+    frame = extract_table(raw, spec.table, rename=spec.rename, positions=positions)
     if expected_columns and spec.table.header_row != "auto":
         have = {_norm_col(c) for c in frame.columns}
         want = {_norm_col(c) for c in expected_columns}
@@ -144,7 +147,25 @@ def load_source_frame(
                         "drop_repeated_headers": spec.table.drop_repeated_headers,
                     }
                 )
-                frame = extract_table(raw, alt, rename=spec.rename)
+                positions.clear()
+                frame = extract_table(raw, alt, rename=spec.rename, positions=positions)
+    if expected_columns is not None and bound.path.suffix.lower() in {".xlsx", ".xlsm"}:
+        from forma.ingestion.ooxml import inspect_workbook, require_cached_values
+
+        checked = inspect_workbook(bound.path)
+        info = (
+            checked[sheet or 0]
+            if sheet is None or isinstance(sheet, int)
+            else next(s for s in checked if s.name == sheet)
+        )
+        wanted = {_norm_col(n) for n in expected_columns | set(spec.table.fill_down)}
+        # Unpivot consumes multiple input columns; conservatively verify all selected columns.
+        columns = {
+            i
+            for n, i in positions.items()
+            if verify_all_columns or spec.table.unpivot or _norm_col(n) in wanted
+        }
+        require_cached_values(info, columns=columns)
     frame = frame.with_row_index(ROW_COL)
     if spec.table.filter is not None:
         ctx = CompileContext(default_source=spec.id, columns=set(_prefixed(frame, spec.id).columns))
@@ -247,13 +268,22 @@ class TransformEngine:
                     )
                 frames[spec.id] = _prefixed(
                     load_source_frame(
-                        spec, b, limit=limit, expected_columns=_source_columns(mapping, spec.id)
+                        spec,
+                        b,
+                        limit=limit,
+                        expected_columns=_source_columns(mapping, spec.id),
+                        verify_all_columns=mapping.attributes_passthrough
+                        and spec.id == mapping.record.root_source,
                     ),
                     spec.id,
                 )
             except Exception as e:
                 sev = "error" if spec.id in used_sources else "warning"
-                findings.append(Finding("compile", sev, f"source {spec.id!r}: {e}"))
+                findings.append(
+                    Finding(
+                        "compile", sev, f"source {spec.id!r}: {e}", details=getattr(e, "details", {}) or {}
+                    )
+                )
         if any(f.severity == "error" for f in findings):
             return TransformResult([], pl.DataFrame(), findings, {"rows_in": 0, "rows_out": 0})
 
@@ -296,6 +326,11 @@ class TransformEngine:
             out = out.filter(compile_expr(flt, ctx).cast(pl.Boolean, strict=False).fill_null(False))
 
         # identity + dedupe
+        from forma.engine.semantic_checks import identity_warnings
+
+        findings.extend(
+            Finding("semantic", "warning", **item) for item in identity_warnings(out, mapping, self.schema)
+        )
         identity_cols = mapping.record.dedupe.keys or self.schema.identity_keys
         identity_cols = [c for c in identity_cols if c in out.columns]
         child_columns = {
@@ -411,12 +446,15 @@ class TransformEngine:
             .filter(pl.col("len") > 1)
         )
         if dup.height and j.cardinality in ("1:1", "N:1"):
+            values = [c for c in right2.columns if c not in rtmp and not c.endswith(ROW_COL)]
+            distinct = right2.unique(subset=values, maintain_order=True)
+            conflicting = distinct.group_by(rtmp).len().filter(pl.col("len") > 1).height
             findings.append(
                 Finding(
                     "join",
-                    "warning",
+                    "error" if conflicting else "warning",
                     f"join {j.left}→{j.right}: {dup.height} right keys are duplicated but cardinality is {j.cardinality}",
-                    details={"sample_keys": dup.head(5).select(rtmp).rows()},
+                    details={"sample_keys": dup.head(5).select(rtmp).rows(), "conflicting_keys": conflicting},
                 )
             )
             if j.cardinality != "1:N":  # type: ignore[comparison-overlap]
@@ -510,6 +548,33 @@ class TransformEngine:
                 if conflicts
                 else "identical rows"
             )
+            choices = []
+            for key in disagree.head(20).select(keys).iter_rows():
+                group = out.filter(
+                    pl.all_horizontal([pl.col(k) == v for k, v in zip(keys, key, strict=True)])
+                )
+                changed = [c for c in conflicts if c.startswith("/") and group[c].n_unique() > 1]
+                row_columns = [
+                    c for c in group.columns if c.endswith("." + ROW_COL) and group[c].n_unique() > 1
+                ]
+                # One source with several alternatives can be selected safely. A many-to-many
+                # ambiguity needs a mapping repair rather than pretending a single row settles it.
+                if not changed or len(row_columns) != 1 or group.height > 30:
+                    continue
+                row_column = row_columns[0]
+                choices.append(
+                    {
+                        "source": row_column.rsplit(".", 1)[0],
+                        "identity": dict(zip(keys, key, strict=True)),
+                        "target": changed[0],
+                        "rows": [
+                            {"row": item[row_column], "values": {c: item[c] for c in changed}}
+                            for item in group.select([row_column, *changed])
+                            .unique(maintain_order=True)
+                            .to_dicts()
+                        ],
+                    }
+                )
             findings.append(
                 Finding(
                     "dedupe",
@@ -519,6 +584,7 @@ class TransformEngine:
                         "sample": sample,
                         "count": int(dups.height),
                         "conflicting": int(disagree.height),
+                        "source_choices": choices,
                     },
                 )
             )
@@ -586,6 +652,29 @@ class TransformEngine:
                 coerce.append(c.cast(pl.String, strict=False).alias(rel))
         if coerce:
             items = items.with_columns(coerce)
+        if cm.aggregate:
+            groups = [p.lstrip("/") for p in cm.aggregate.group_by]
+            sums = [p.lstrip("/") for p in cm.aggregate.sum]
+            # Identical lots are still additive. Aggregate BEFORE exact-duplicate removal.
+            # Unknown quantities must never be silently converted to zero or a partial total.
+            items = items.group_by(["__link__", *groups], maintain_order=True).agg(
+                pl.col("__src_row__"),
+                *[
+                    pl.when(pl.col(p).is_null().any()).then(None).otherwise(pl.col(p).sum()).alias(p)
+                    for p in sums
+                ],
+            )
+            incomplete = items.filter(pl.any_horizontal([pl.col(p).is_null() for p in sums])).height
+            if incomplete:
+                findings.append(
+                    Finding(
+                        "aggregate",
+                        "error",
+                        f"{cm.target}: {incomplete} totals have missing inputs; supply them before summing",
+                        target=cm.target,
+                        details={"incomplete_groups": incomplete},
+                    )
+                )
         dedupe_keys = [k.lstrip("/") for k in cm.dedupe_keys if k.lstrip("/") in rel_names]
         if not dedupe_keys:
             # default: schema-declared item identity if fully mapped, else every mapped item field
@@ -795,6 +884,7 @@ class TransformEngine:
                     continue
                 _set_segs(rec, segs, v)
             item_rows: dict[str, list[Any]] = {}
+            item_groups: dict[str, list[Any]] = {}
             for i, target, segs, idx in coll_plan:
                 linked = idx.get(row[i])
                 if linked:
@@ -802,7 +892,13 @@ class TransformEngine:
                         rec, segs, [{k: v for k, v in it.items() if not k.startswith("_")} for it in linked]
                     )
                     if provenance:
-                        item_rows[target] = [it.get("_row") for it in linked]
+                        groups = [
+                            it["_row"] if isinstance(it.get("_row"), list) else [it.get("_row")]
+                            for it in linked
+                        ]
+                        item_rows[target] = [group[0] if group else None for group in groups]
+                        if any(isinstance(it.get("_row"), list) for it in linked):
+                            item_groups[target] = groups
             if pass_plan:
                 attrs = {name: row[i] for i, name in pass_plan if row[i] is not None}
                 if attrs:
@@ -811,6 +907,8 @@ class TransformEngine:
                 lineage: dict[str, Any] = {"root_row": row[row_i], "source": root_id}
                 if item_rows:
                     lineage["items"] = item_rows  # collection → source row of each item, in order
+                if item_groups:
+                    lineage["item_groups"] = item_groups  # every contributing row, aligned to output items
                 joined = {sid: row[i] for i, sid in join_plan if row[i] is not None}
                 if joined:
                     lineage["joined"] = joined
@@ -967,8 +1065,14 @@ def _source_columns(mapping: MappingDocument, source_id: str) -> set[str]:
     cols: set[str] = set()
     default = mapping.record.root_source
     exprs: list[tuple[Expr, str]] = [(f.expr, default) for f in mapping.fields]
+    exprs.extend((e, default) for e in mapping.record.filters)
+    for source in mapping.sources:
+        if source.table.filter is not None:
+            exprs.append((source.table.filter, source.id))
     for c in mapping.collections:
         exprs.extend((f.expr, c.source) for f in c.fields)
+        if c.filter is not None:
+            exprs.append((c.filter, c.source))
         if c.source == source_id:
             cols |= {k.right for k in c.link}
         if default == source_id:

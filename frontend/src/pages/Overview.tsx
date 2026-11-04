@@ -3,7 +3,7 @@ import { Localized } from '../lib/locale'
 import type { ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
-import { ArrowRight, Upload, Download, CircleCheck } from 'lucide-react'
+import { ArrowRight, Download, CircleCheck } from 'lucide-react'
 import { api, type ImportRound } from '../lib/api'
 import { fmtInt, fmtPct, timeAgo } from '../lib/utils'
 import { nextStep } from '../lib/steps'
@@ -26,8 +26,7 @@ export function Overview() {
   const loading = roundsQuery.isPending || uploadsQuery.isPending
   const error = roundsQuery.isError || uploadsQuery.isError || dashboard.isError
   return <>
-    <PageHeader title={t("Your workspace", "งานของคุณ")} subtitle={t("Upload files. Answer questions. Download the results.", "อัปโหลดไฟล์ ตอบคำถามที่จำเป็น แล้วดาวน์โหลดผลลัพธ์")}
-      actions={<Link to="/imports/new" className="btn btn-primary btn-lg"><Upload size={16} /> {t("Upload files", "อัปโหลดไฟล์")}</Link>} />
+    <PageHeader title={t("Your workspace", "งานของคุณ")} subtitle={t("Track your work, answer questions and download the results. Add files from Upload history.", "ติดตามงาน ตอบคำถาม และดาวน์โหลดผลลัพธ์ เพิ่มไฟล์ได้ที่ประวัติไฟล์")} />
     <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3 mb-6">
       <Stat label="Handled automatically" value={d?.automation_rate != null ? fmtPct(d.automation_rate) : '–'} hint="Mappings approved by policy" />
       <Stat label="Records exported" value={fmtInt(d?.published_rows)} />

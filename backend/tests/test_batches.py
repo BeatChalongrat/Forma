@@ -207,8 +207,18 @@ def test_known_files_publish_one_json_each_and_unknown_waits(client: TestClient,
     z = c.get(f"/api/batches/{view['id']}/download")
     assert z.status_code == 200 and z.headers["content-type"] == "application/zip"
     with zipfile.ZipFile(io.BytesIO(z.content)) as zf:
-        assert zf.namelist() == ["K1 oct.json"]
+        assert zf.namelist() == ["K1 oct.json", "_forma/manifest.json"]
         records = json.loads(zf.read("K1 oct.json"))
+        manifest = json.loads(zf.read("_forma/manifest.json"))
+        assert manifest["received_files"] == 3 and manifest["exported_files"] == 1
+        assert manifest["omitted_files"] == 2 and manifest["complete"] is False
+        included = [x for x in manifest["files"] if x["included"]]
+        assert len(included) == 1 and included[0]["round_id"] == known["round_id"]
+        assert included[0]["mapping_version_id"] and included[0]["dataset_version_id"]
+        import hashlib
+
+        assert included[0]["sha256"] == hashlib.sha256(zf.read("K1 oct.json")).hexdigest()
+        assert all(x["reason"] for x in manifest["files"] if not x["included"])
     assert isinstance(records, list) and len(records) == known["rows"] and records[0]["sku"]
     assert any(b["id"] == view["id"] and b["total"] == 3 for b in c.get("/api/batches").json())
 
@@ -343,26 +353,171 @@ def test_jobs_are_submitted_off_the_event_loop(client: TestClient, monkeypatch: 
             seen.append(False)
         return "bat_x", []
 
-    monkeypatch.setattr(runner, "enqueue_batch", fake)
+    monkeypatch.setattr(runner, "deliver_jobs", fake)
     r = client.post("/api/batches", files=[("files", ("a.csv", _product_csv(), "text/csv"))])
     assert r.status_code == 201 and seen == [False]
 
 
-def test_files_left_unqueued_can_be_resumed(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
-    """The queue was full (or down) right after the files were stored: they are not lost, they resume."""
+def test_queue_full_rolls_back_files_and_jobs(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Admission failure cannot leave an accepted upload without its durable work."""
     from forma.core.errors import QueueFull
     from forma.jobs import runner
 
-    real = runner.enqueue_batch
-
-    def full(*a: Any, **kw: Any) -> tuple[str, list[str]]:
+    def full(*a: Any, **kw: Any) -> None:
         raise QueueFull("job queue is full")
 
-    monkeypatch.setattr(runner, "enqueue_batch", full)
+    monkeypatch.setattr(runner, "_capacity_in", full)
     r = client.post("/api/batches", files=[("files", ("x.csv", _product_csv(), "text/csv"))])
     assert r.status_code == 429
-    up = client.get("/api/batches").json()[0]
-    assert up["stuck"] == 1 and up["counts"] == {"processing": 1}
-    monkeypatch.setattr(runner, "enqueue_batch", real)
-    view = client.post(f"/api/batches/{up['id']}/resume", params={"sync": "true"}).json()
-    assert view["stuck"] == 0 and view["items"][0]["state"] == "needs_customer"
+    assert client.get("/api/batches").json() == []
+    from sqlalchemy import select
+
+    from forma.db.models import BatchItem, Job
+    from forma.db.session import session_scope
+
+    with session_scope() as s:
+        assert list(s.scalars(select(Job))) == []
+        assert list(s.scalars(select(BatchItem))) == []
+
+
+def test_same_name_size_and_upload_receipt(client: TestClient) -> None:
+    first = _product_csv()
+    second = first.replace(b"10.50", b"99.50")
+    assert len(first) == len(second)
+    files = [("same.csv", first), ("same.csv", second), ("same.csv", first)]
+    view = _batch(client, files, upload_key="retry-request")
+    assert view["total"] == view["added"] == 2 and view["skipped"] == 1
+    retry = _batch(client, files, upload_key="retry-request")
+    assert retry["id"] == view["id"] and retry["replayed"] and retry["added"] == 0
+    assert len(client.get("/api/batches").json()) == 1
+    conflict = client.post(
+        "/api/batches", data={"upload_key": "retry-request"}, files=[("files", ("same.csv", second))]
+    )
+    assert conflict.status_code == 409
+
+
+def test_dispatch_failure_keeps_durable_work(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    import datetime as dt
+
+    from sqlalchemy import select
+
+    from forma.db.models import Job
+    from forma.db.session import session_scope
+    from forma.jobs import runner
+
+    def down(*a: Any, **kw: Any) -> None:
+        raise ConnectionError("broker unavailable")
+
+    monkeypatch.setattr(runner, "dispatch_pending", down)
+    r = client.post("/api/batches", files=[("files", ("x.csv", _product_csv()))])
+    assert r.status_code == 201, r.text
+    with session_scope() as s:
+        jobs = list(s.scalars(select(Job)))
+        assert len(jobs) == 1 and jobs[0].status == "queued"
+        jid = jobs[0].id
+        assert jobs[0].batch_id == r.json()["id"]
+        jobs[0].created_at = dt.datetime.now(dt.UTC) - dt.timedelta(hours=2)
+    assert r.json()["stuck"] == 0
+    resumed = client.post(f"/api/batches/{r.json()['id']}/resume").json()
+    assert resumed["stuck"] == 0
+    with session_scope() as s:
+        assert len(list(s.scalars(select(Job)))) == 1
+    runner.run_job(jid)
+    view = client.get(f"/api/batches/{r.json()['id']}").json()
+    assert view["items"][0]["state"] == "needs_customer"
+
+
+def test_append_assign_capacity_failure_rolls_back(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from forma.core.errors import QueueFull
+    from forma.jobs import runner
+
+    b = _batch(client, [("one.csv", _product_csv())])
+
+    def full(*a: Any, **kw: Any) -> None:
+        raise QueueFull("job queue is full")
+
+    monkeypatch.setattr(runner, "_capacity_in", full)
+    assert (
+        client.post(
+            f"/api/batches/{b['id']}/files", files=[("files", ("two.csv", _product_csv()))]
+        ).status_code
+        == 429
+    )
+    assert client.get(f"/api/batches/{b['id']}").json()["total"] == 1
+    r = client.post(
+        f"/api/batches/{b['id']}/assign",
+        json={"item_ids": [b["items"][0]["id"]], "new_customer": {"code": "ROLLBACK", "name": "Rollback"}},
+    )
+    assert r.status_code == 429, r.text
+    view = client.get(f"/api/batches/{b['id']}").json()
+    assert view["items"][0]["state"] == "needs_customer" and view["items"][0]["round_id"] is None
+    assert client.get("/api/customers").json() == []
+
+
+def test_review_and_replacement_capacity_failure_rolls_back(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from forma.core.errors import QueueFull
+    from forma.jobs import runner
+
+    b = _batch(client, [("one.csv", _product_csv())])
+    b = client.post(
+        f"/api/batches/{b['id']}/assign",
+        json={
+            "item_ids": [b["items"][0]["id"]],
+            "new_customer": {"code": "N1", "name": "New"},
+            "sync": True,
+        },
+    ).json()
+    rid = b["items"][0]["round_id"]
+    before = client.get(f"/api/rounds/{rid}").json()
+    mid = before["mappings"][0]["id"]
+
+    def full(*a: Any, **kw: Any) -> None:
+        raise QueueFull("job queue is full")
+
+    monkeypatch.setattr(runner, "_capacity_in", full)
+    assert client.post(f"/api/mappings/{mid}/approve", json={}).status_code == 429
+    assert client.get(f"/api/mappings/{mid}").json()["status"] == "proposed"
+    replaced = client.post(
+        f"/api/rounds/{rid}/replace",
+        data={"reason": "Corrected file"},
+        files=[("files", ("fixed.csv", _product_csv()))],
+    )
+    assert replaced.status_code == 429, replaced.text
+    after = client.get(f"/api/rounds/{rid}").json()
+    assert after["status"] == before["status"] and after["successor_id"] is None
+    assert client.get(f"/api/batches/{b['id']}").json()["items"][0]["round_id"] == rid
+
+
+def test_resume_attached_legacy_gap_but_not_active_pipeline(client: TestClient) -> None:
+    from forma.db.models import ImportRound, Job
+    from forma.db.session import session_scope
+
+    b = _batch(client, [("one.csv", _product_csv())])
+    b = client.post(
+        f"/api/batches/{b['id']}/assign",
+        json={
+            "item_ids": [b["items"][0]["id"]],
+            "new_customer": {"code": "LEGACY", "name": "Legacy"},
+            "sync": True,
+        },
+    ).json()
+    rid = b["items"][0]["round_id"]
+    with session_scope() as s:
+        r = s.get(ImportRound, rid)
+        assert r
+        r.status = "uploaded"
+        job = Job(kind="run_pipeline", round_id=rid, payload={"round_id": rid}, status="running")
+        s.add(job)
+        s.flush()
+        jid = job.id
+    assert client.get(f"/api/batches/{b['id']}").json()["stuck"] == 0
+    assert client.post(f"/api/batches/{b['id']}/resume?sync=true").json()["stuck"] == 0
+    with session_scope() as s:
+        s.delete(s.get(Job, jid))
+    assert client.get(f"/api/batches/{b['id']}").json()["stuck"] == 1
+    resumed = client.post(f"/api/batches/{b['id']}/resume?sync=true").json()
+    assert resumed["stuck"] == 0 and resumed["items"][0]["state"] == "needs_review"

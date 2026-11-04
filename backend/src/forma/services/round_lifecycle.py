@@ -36,8 +36,27 @@ def _reason(reason: str) -> str:
 
 def _close(session: Session, p: Principal, r: ImportRound, kind: str, reason: str) -> list[str]:
     """Mark the round closed and set its open review tasks aside. Returns the ids of the tasks set aside."""
+    # Same lock order as publication fencing: round first, then its jobs.
+    session.refresh(r, with_for_update=True)
     if is_closed(r):
         raise Conflict(f"This round is already {r.status}", details={"status": r.status})
+    from sqlalchemy import update
+
+    from forma.db.models import Job
+
+    # Revoke ownership in the same transaction as the lifecycle change. A stale worker's
+    # business commit is rejected even if its in-memory round still looks active.
+    session.execute(
+        update(Job)
+        .where(Job.round_id == r.id, Job.status.in_(("queued", "running", "cancelled")))
+        .values(
+            status="cancelled",
+            lease_token=None,
+            lease_expires_at=None,
+            finished_at=utcnow(),
+            message=f"File {kind}: {reason}",
+        )
+    )
     tasks = list(
         session.scalars(
             select(ReviewTask).where(ReviewTask.round_id == r.id, ReviewTask.status.in_(REVIEW_UNRESOLVED))
@@ -99,6 +118,7 @@ def _successor(
         customer_id=customer_id,
         label=label or r.label,
         target_schema=r.target_schema,
+        notes=r.notes,
         predecessor_id=r.id,
         summary={k: v for k, v in (r.summary or {}).items() if k in ("batch_id", "auto_publish")}
         | {"predecessor": {"id": r.id, "kind": kind, "reason": reason}},

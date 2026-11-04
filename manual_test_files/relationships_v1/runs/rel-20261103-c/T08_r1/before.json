@@ -1,0 +1,1316 @@
+{
+  "round": {
+    "id": "rnd_01M6GBKBM1TK89BC6N7BS10ZWY",
+    "customer_id": "cus_01M6GBKB45D68N2RQ8K44T9ZKK",
+    "label": "EVAL rel-20261103-c T08_r1",
+    "status": "blocked",
+    "target_schema": "eval_rel-20261103-c_t08@1",
+    "notes": "Map the supplied ERP export(s) to the supplied JSON Schema. Preserve the master product population and identities. Do not invent business facts. Ask a specific question if required facts cannot be established.\nUse Export as the product list. Quantities must be supported by the workbook dependencies. If a referenced input is unavailable, do not infer its value.",
+    "summary": {
+      "drift": null,
+      "profile": [
+        {
+          "name": "delivery.xlsx",
+          "drift": null,
+          "tables": 3,
+          "file_id": "fil_01M6GBKBNGWW72ESWPC70WD74M",
+          "fingerprint": "ecf1de050b88661f"
+        }
+      ],
+      "verdict": {
+        "word": "likely",
+        "stage": "mapping",
+        "digest": "6c0ef677ef953c8abf79846d853c3f51",
+        "outcome": "fix_mapping",
+        "subject": {
+          "id": "map_01M6GCY0GPH0H0BXSCCW508FZK",
+          "kind": "mapping",
+          "round_id": "rnd_01M6GBKBM1TK89BC6N7BS10ZWY"
+        },
+        "evidence": [
+          {
+            "id": 1,
+            "kind": "errors",
+            "link": "/rounds/rnd_01M6GBKBM1TK89BC6N7BS10ZWY/mapping/map_01M6GCY0GPH0H0BXSCCW508FZK?tab=findings",
+            "text": {
+              "en": "1 engine or validation errors",
+              "th": "ข้อผิดพลาดของ engine/การตรวจ 1 จุด"
+            },
+            "numbers": {
+              "errors": 1
+            }
+          },
+          {
+            "id": 2,
+            "kind": "ai",
+            "link": null,
+            "text": {
+              "en": "AI was unavailable; the deterministic draft is in use",
+              "th": "AI ใช้งานไม่ได้ ใช้ร่างจากกฎแทน"
+            },
+            "numbers": {}
+          }
+        ],
+        "narrative": null,
+        "conclusion": {
+          "en": "The policy blocks this mapping: transformation produced zero records",
+          "th": "กฎระงับการจับคู่นี้: transformation produced zero records"
+        },
+        "confidence": 0.7,
+        "suppressed": {
+          "count": 0,
+          "groups": []
+        },
+        "must_decide": [],
+        "rules_fired": [
+          "blocked"
+        ],
+        "round_status": "blocked",
+        "rules_version": "2026.10.4",
+        "mapping_status": "proposed",
+        "policy_decision": "block"
+      },
+      "decision": "block",
+      "simulation": null,
+      "drift_report": null,
+      "format_memory": {
+        "status": "new",
+        "mapping_id": null,
+        "target_schema": "eval_rel-20261103-c_t08@1",
+        "mapping_version": null
+      },
+      "skipped_files": 0,
+      "profiled_files": 1,
+      "mapping_version_id": "map_01M6GCY0GPH0H0BXSCCW508FZK",
+      "has_previous_approval": false,
+      "matches_other_customer": null
+    },
+    "created_at": "2026-11-03T09:24:45.825737+00:00",
+    "updated_at": "2026-11-03T09:48:03.491875+00:00",
+    "successor_id": null,
+    "predecessor_id": null,
+    "files": [
+      {
+        "id": "fil_01M6GBKBNGWW72ESWPC70WD74M",
+        "round_id": "rnd_01M6GBKBM1TK89BC6N7BS10ZWY",
+        "name": "delivery.xlsx",
+        "size": 5134,
+        "kind": "excel",
+        "status": "profiled",
+        "sha256": "8aea9aee3923d5068ee713dfb0c4b1afe1d290168fc656ad806cf0d6542d52a4",
+        "duplicate_of": "fil_01M6G9ZEHPW8CG4FVF4N3X9NPP",
+        "error": null,
+        "created_at": "2026-11-03T09:24:45.872974+00:00",
+        "fingerprint": "ecf1de050b88661f",
+        "drift": null,
+        "tables": 3,
+        "sheets": [
+          "Export",
+          "Counts",
+          "Pack factors"
+        ]
+      }
+    ],
+    "customer": {
+      "id": "cus_01M6GBKB45D68N2RQ8K44T9ZKK",
+      "code": "EVAL-rel-20261103-c-T08",
+      "name": "EVAL-rel-20261103-c-T08"
+    },
+    "successor": null,
+    "predecessor": null,
+    "mappings": [
+      {
+        "id": "map_01M6GCY0GPH0H0BXSCCW508FZK",
+        "customer_id": "cus_01M6GBKB45D68N2RQ8K44T9ZKK",
+        "round_id": "rnd_01M6GBKBM1TK89BC6N7BS10ZWY",
+        "version": 1,
+        "status": "proposed",
+        "target_schema": "eval_rel-20261103-c_t08@1",
+        "confidence": 1.0,
+        "created_by": "system",
+        "model": null,
+        "policy": {
+          "checks": {
+            "drift": null,
+            "errors": 1,
+            "rows_out": 0,
+            "warnings": 0,
+            "llm_fallback": true,
+            "reused_approved": false,
+            "full_verification": false,
+            "plausibility_warnings": 0
+          },
+          "impact": {},
+          "source": "heuristic",
+          "reasons": [
+            "transformation produced zero records",
+            "verification: missing_required: required target /qty is not mapped",
+            "verification: No transformation result was verified"
+          ],
+          "sandbox": null,
+          "verdict": {
+            "word": "likely",
+            "stage": "mapping",
+            "digest": "6c0ef677ef953c8abf79846d853c3f51",
+            "outcome": "fix_mapping",
+            "subject": {
+              "id": "map_01M6GCY0GPH0H0BXSCCW508FZK",
+              "kind": "mapping",
+              "round_id": "rnd_01M6GBKBM1TK89BC6N7BS10ZWY"
+            },
+            "evidence": [
+              {
+                "id": 1,
+                "kind": "errors",
+                "link": "/rounds/rnd_01M6GBKBM1TK89BC6N7BS10ZWY/mapping/map_01M6GCY0GPH0H0BXSCCW508FZK?tab=findings",
+                "text": {
+                  "en": "1 engine or validation errors",
+                  "th": "ข้อผิดพลาดของ engine/การตรวจ 1 จุด"
+                },
+                "numbers": {
+                  "errors": 1
+                }
+              },
+              {
+                "id": 2,
+                "kind": "ai",
+                "link": null,
+                "text": {
+                  "en": "AI was unavailable; the deterministic draft is in use",
+                  "th": "AI ใช้งานไม่ได้ ใช้ร่างจากกฎแทน"
+                },
+                "numbers": {}
+              }
+            ],
+            "narrative": null,
+            "conclusion": {
+              "en": "The policy blocks this mapping: transformation produced zero records",
+              "th": "กฎระงับการจับคู่นี้: transformation produced zero records"
+            },
+            "confidence": 0.7,
+            "suppressed": {
+              "count": 0,
+              "groups": []
+            },
+            "must_decide": [],
+            "rules_fired": [
+              "blocked"
+            ],
+            "round_status": "blocked",
+            "rules_version": "2026.10.4",
+            "mapping_status": "proposed",
+            "policy_decision": "block"
+          },
+          "decision": "block",
+          "learning": null,
+          "priority": 40,
+          "agreement": null,
+          "risk_level": "high",
+          "risk_score": 1.0,
+          "self_check": null,
+          "simulation": null,
+          "reused_from": null,
+          "field_review": null,
+          "risk_factors": [
+            "blocked by policy",
+            "validation or engine errors"
+          ],
+          "verification": {
+            "passed": false,
+            "version": 1,
+            "complete": false,
+            "problems": [
+              "missing_required: required target /qty is not mapped",
+              "No transformation result was verified"
+            ],
+            "warnings": []
+          },
+          "clarifications": [],
+          "confidence_basis": null,
+          "review_decisions": [],
+          "target_schema_hash": "9dab9cc61deca084",
+          "confirmed_decisions": []
+        },
+        "open_questions": [],
+        "validation": {
+          "ok": false,
+          "issues": [
+            {
+              "code": "missing_required",
+              "path": "/fields",
+              "level": "error",
+              "message": "required target /qty is not mapped"
+            }
+          ]
+        },
+        "parent_id": null,
+        "approved_by": null,
+        "approved_at": null,
+        "comment": null,
+        "created_at": "2026-11-03T09:48:03.483282+00:00",
+        "agent_log": [
+          {
+            "agent": "operator_requirements",
+            "sha256": "035610bb352a9af304d1018d577ee9b1b9febc17380fcc47f5beaea2545ec734",
+            "characters": 362,
+            "changed_since_approved": false
+          },
+          {
+            "agent": "heuristic",
+            "unmatched": {
+              "products_0": [
+                "Stock pieces"
+              ],
+              "products_1": [
+                "SKU",
+                "Cartons"
+              ]
+            },
+            "confidence": 1.0,
+            "table_roles": {
+              "0": "products",
+              "1": "products",
+              "2": "other"
+            }
+          },
+          {
+            "data": {
+              "notes": [
+                "Only /sku, /product_name and /qty exist in the target schema; Counts.Cartons and Pack factors' second column are supporting inputs, so they are classified but have target_pointer null.",
+                "Export.'Stock pieces' contains 12 external formula cells all caching the constant 999, which is not a plausible stock figure across 12 different products; it was treated as an unresolved reference, not as evidence of stock. The defensible quantity is Counts.Cartons multiplied by the Pack factors conversion factor per SKU.",
+                "The second column of 'Pack factors' was not surfaced by column detection (blank header). Its meaning must be confirmed before it is used as a multiplier."
+              ],
+              "tables": [
+                {
+                  "role": "products",
+                  "reason": "Sheet 'Export' is the master product list: one row per distinct SKU (12 distinct of 12), a human-readable product name column, and a quantity column that is a cross-sheet formula (12 external formula cells) whose cached value is a constant 999 placeholder on every row. It is the only sheet carrying both identity and product name, so it is the product master as the operator instructed ('Use Export as the product list').",
+                  "columns": [
+                    {
+                      "name": "SKU",
+                      "reason": "Header 'SKU', 12 distinct values for 12 rows, hint sku_like. Values display zero-padded (000001..000012) but are stored as numbers; the target requires the string form with the six-digit padding preserved, so it must be read as text rather than cast through an integer.",
+                      "semantic": "identity.sku",
+                      "confidence": 0.97,
+                      "target_pointer": "/sku"
+                    },
+                    {
+                      "name": "Product name",
+                      "reason": "Header 'Product name', unique per SKU (12 distinct of 12), values are descriptive product labels ('Coffee variant 01', 'Shampoo variant 02'), matching the target description 'Product name from the master list'.",
+                      "semantic": "product.name",
+                      "confidence": 0.95,
+                      "target_pointer": "/product_name"
+                    },
+                    {
+                      "name": "Stock pieces",
+                      "reason": "Name and unit ('pieces') match the target 'Stock in individual pieces', and this is the only quantity column on the product sheet. However the column holds 12 external formula cells whose cached value is the identical constant 999 for every SKU, i.e. an unresolved reference rather than real stock. Per the operator requirement ('quantities must be supported by the workbook dependencies') the usable quantity is the dependency chain Counts.Cartons x Pack factors.<pieces per carton> for the same SKU; the cached 999 must not be emitted as a business value. Confidence lowered accordingly.",
+                      "semantic": "stock.qty",
+                      "confidence": 0.4,
+                      "target_pointer": "/qty"
+                    }
+                  ],
+                  "confidence": 0.95,
+                  "key_column": "SKU",
+                  "table_index": 0
+                },
+                {
+                  "role": "inventory",
+                  "reason": "Sheet 'Counts' holds a per-SKU carton count keyed on the same 12 SKUs as the product master; it is neither a price nor a promotion table and it is a supporting quantity input consumed by the Export 'Stock pieces' formula rather than the product master itself.",
+                  "columns": [
+                    {
+                      "name": "SKU",
+                      "reason": "Header 'SKU', 12 distinct values, same value set as Export.SKU, so this is a join key to the product master, not an independent identity to be emitted.",
+                      "semantic": "identity.sku",
+                      "confidence": 0.93,
+                      "target_pointer": null
+                    },
+                    {
+                      "name": "Cartons",
+                      "reason": "Header 'Cartons' with integer values 3..14, one per SKU, distinct per row. It counts cartons, not individual pieces, so it cannot be written to /qty directly; it is the left-hand factor of the piece quantity (cartons x pieces-per-carton).",
+                      "semantic": "inventory.carton_count",
+                      "confidence": 0.8,
+                      "target_pointer": null
+                    }
+                  ],
+                  "confidence": 0.85,
+                  "key_column": "SKU",
+                  "table_index": 1
+                },
+                {
+                  "role": "inventory",
+                  "reason": "Sheet 'Pack factors' is a per-SKU reference/lookup table of packaging conversion factors, keyed on the same 12 SKUs. It supplies the missing factor needed to convert 'Counts'.Cartons into individual pieces, which is what the Export quantity formula depends on.",
+                  "columns": [
+                    {
+                      "name": "SKU",
+                      "reason": "Header 'SKU', 12 distinct values matching the other two sheets; a join key, not an output identity.",
+                      "semantic": "identity.sku",
+                      "confidence": 0.93,
+                      "target_pointer": null
+                    },
+                    {
+                      "name": "(unnamed second column)",
+                      "reason": "The sheet profile reports 2 columns but the detector surfaced only 'SKU', so the second column appears to have a blank/absent header. Given the sheet title 'Pack factors' and its role as the multiplier in the Export quantity formula, it most plausibly holds pieces per carton (or a pack conversion factor). Not mapped to any target pointer and not used until the header and values are confirmed.",
+                      "semantic": "inventory.pieces_per_carton",
+                      "confidence": 0.55,
+                      "target_pointer": null
+                    }
+                  ],
+                  "confidence": 0.8,
+                  "key_column": "SKU",
+                  "table_index": 2
+                }
+              ]
+            },
+            "agent": "schema",
+            "notes": [],
+            "usage": {
+              "calls": 2,
+              "model": "deepseek-flash",
+              "cost_usd": 0.017903,
+              "latency_ms": 11105.9,
+              "input_tokens": 8751,
+              "output_tokens": 2288
+            },
+            "attempts": 2
+          },
+          {
+            "data": {
+              "mapping": {
+                "meta": {
+                  "model": null,
+                  "notes": null,
+                  "version": 1,
+                  "evidence": [
+                    "root table: sheet 'Export' (12 rows) classified as products"
+                  ],
+                  "confidence": 1.0,
+                  "created_by": "system",
+                  "mapping_id": null,
+                  "customer_id": "cus_01M6GBKB45D68N2RQ8K44T9ZKK",
+                  "fingerprints": {},
+                  "target_schema": "eval_rel-20261103-c_t08@1"
+                },
+                "joins": [],
+                "fields": [
+                  {
+                    "expr": {
+                      "op": "normalize_whitespace",
+                      "args": [
+                        {
+                          "op": "col",
+                          "name": "SKU",
+                          "source": null
+                        }
+                      ],
+                      "params": {}
+                    },
+                    "note": null,
+                    "target": "/sku",
+                    "evidence": [
+                      "header 'SKU' == synonym 'sku'"
+                    ],
+                    "confidence": 1.0
+                  },
+                  {
+                    "expr": {
+                      "op": "normalize_whitespace",
+                      "args": [
+                        {
+                          "op": "col",
+                          "name": "Product name",
+                          "source": null
+                        }
+                      ],
+                      "params": {}
+                    },
+                    "note": null,
+                    "target": "/product_name",
+                    "evidence": [
+                      "header 'Product name' == synonym 'product name'"
+                    ],
+                    "confidence": 1.0
+                  }
+                ],
+                "record": {
+                  "dedupe": {
+                    "keep": "first",
+                    "keys": []
+                  },
+                  "filters": [],
+                  "root_source": "products_0"
+                },
+                "quality": [
+                  {
+                    "rule": "unique",
+                    "params": {},
+                    "target": "/sku",
+                    "message": null,
+                    "severity": "warning"
+                  }
+                ],
+                "sources": [
+                  {
+                    "id": "products_0",
+                    "csv": {
+                      "encoding": "auto",
+                      "delimiter": "auto",
+                      "quote_char": "\""
+                    },
+                    "file": {
+                      "fingerprint": null,
+                      "name_pattern": "(?i)^delivery",
+                      "sheet_names_any": [
+                        "Export"
+                      ]
+                    },
+                    "role": "products",
+                    "sheet": {
+                      "name": "Export",
+                      "index": null,
+                      "match": null
+                    },
+                    "table": {
+                      "filter": null,
+                      "unpivot": null,
+                      "data_end": null,
+                      "fill_down": [],
+                      "data_start": null,
+                      "header_row": 0,
+                      "header_rows": 1,
+                      "last_column": 3,
+                      "first_column": 0,
+                      "section_column": null,
+                      "drop_total_rows": true,
+                      "drop_empty_columns": true,
+                      "stop_at_blank_rows": 2,
+                      "drop_repeated_headers": true
+                    },
+                    "rename": {},
+                    "description": null
+                  },
+                  {
+                    "id": "products_1",
+                    "csv": {
+                      "encoding": "auto",
+                      "delimiter": "auto",
+                      "quote_char": "\""
+                    },
+                    "file": {
+                      "fingerprint": null,
+                      "name_pattern": "(?i)^delivery",
+                      "sheet_names_any": [
+                        "Counts"
+                      ]
+                    },
+                    "role": "products",
+                    "sheet": {
+                      "name": "Counts",
+                      "index": null,
+                      "match": null
+                    },
+                    "table": {
+                      "filter": null,
+                      "unpivot": null,
+                      "data_end": null,
+                      "fill_down": [],
+                      "data_start": null,
+                      "header_row": 0,
+                      "header_rows": 1,
+                      "last_column": 2,
+                      "first_column": 0,
+                      "section_column": null,
+                      "drop_total_rows": true,
+                      "drop_empty_columns": true,
+                      "stop_at_blank_rows": 2,
+                      "drop_repeated_headers": true
+                    },
+                    "rename": {},
+                    "description": null
+                  }
+                ],
+                "provenance": true,
+                "collections": [],
+                "attributes_passthrough": true
+              }
+            },
+            "agent": "mapping",
+            "notes": [
+              "llm_failed: TypeError: 'NoneType' object is not subscriptable"
+            ],
+            "usage": {
+              "calls": 6,
+              "model": "deepseek-flash",
+              "cost_usd": 0.152216,
+              "latency_ms": 92140.0,
+              "input_tokens": 70800,
+              "output_tokens": 20354
+            },
+            "attempts": 0
+          }
+        ],
+        "sample": []
+      }
+    ],
+    "datasets": [],
+    "review_tasks": [
+      {
+        "id": "rev_01M6GCY0H20HYXWCK11M2R7F07",
+        "round_id": "rnd_01M6GBKBM1TK89BC6N7BS10ZWY",
+        "customer_id": "cus_01M6GBKB45D68N2RQ8K44T9ZKK",
+        "mapping_version_id": "map_01M6GCY0GPH0H0BXSCCW508FZK",
+        "dataset_version_id": null,
+        "kind": "blocked",
+        "priority": 40,
+        "status": "open",
+        "reasons": [
+          "transformation produced zero records",
+          "verification: missing_required: required target /qty is not mapped",
+          "verification: No transformation result was verified"
+        ],
+        "details": {
+          "impact": {},
+          "verdict": {
+            "word": "likely",
+            "stage": "mapping",
+            "digest": "6c0ef677ef953c8abf79846d853c3f51",
+            "outcome": "fix_mapping",
+            "conclusion": {
+              "en": "The policy blocks this mapping: transformation produced zero records",
+              "th": "กฎระงับการจับคู่นี้: transformation produced zero records"
+            },
+            "confidence": 0.7,
+            "rules_fired": [
+              "blocked"
+            ]
+          },
+          "decision": "block",
+          "findings": [
+            {
+              "kind": "binding",
+              "message": "missing_required: required target /qty is not mapped",
+              "severity": "error"
+            }
+          ],
+          "risk_level": "high",
+          "risk_factors": [
+            "blocked by policy",
+            "validation or engine errors"
+          ],
+          "open_questions": []
+        },
+        "resolver": null,
+        "comment": null,
+        "created_at": "2026-11-03T09:48:03.490679+00:00",
+        "resolved_at": null,
+        "age_days": 0,
+        "waiting_until": null,
+        "waiting_note": null
+      }
+    ],
+    "jobs": [
+      {
+        "id": "job_01M6GBKEPSPVTAN72GB33JWVPH",
+        "kind": "propose_mapping",
+        "status": "done",
+        "progress": 100,
+        "message": null,
+        "error": null
+      },
+      {
+        "id": "job_01M6GBKBPSK3K60NERPQ3CTFWN",
+        "kind": "profile_round",
+        "status": "done",
+        "progress": 100,
+        "message": null,
+        "error": null
+      }
+    ]
+  },
+  "mapping": {
+    "id": "map_01M6GCY0GPH0H0BXSCCW508FZK",
+    "customer_id": "cus_01M6GBKB45D68N2RQ8K44T9ZKK",
+    "round_id": "rnd_01M6GBKBM1TK89BC6N7BS10ZWY",
+    "version": 1,
+    "status": "proposed",
+    "target_schema": "eval_rel-20261103-c_t08@1",
+    "confidence": 1.0,
+    "created_by": "system",
+    "model": null,
+    "policy": {
+      "checks": {
+        "drift": null,
+        "errors": 1,
+        "rows_out": 0,
+        "warnings": 0,
+        "llm_fallback": true,
+        "reused_approved": false,
+        "full_verification": false,
+        "plausibility_warnings": 0
+      },
+      "impact": {},
+      "source": "heuristic",
+      "reasons": [
+        "transformation produced zero records",
+        "verification: missing_required: required target /qty is not mapped",
+        "verification: No transformation result was verified"
+      ],
+      "sandbox": null,
+      "verdict": {
+        "word": "likely",
+        "stage": "mapping",
+        "digest": "6c0ef677ef953c8abf79846d853c3f51",
+        "outcome": "fix_mapping",
+        "subject": {
+          "id": "map_01M6GCY0GPH0H0BXSCCW508FZK",
+          "kind": "mapping",
+          "round_id": "rnd_01M6GBKBM1TK89BC6N7BS10ZWY"
+        },
+        "evidence": [
+          {
+            "id": 1,
+            "kind": "errors",
+            "link": "/rounds/rnd_01M6GBKBM1TK89BC6N7BS10ZWY/mapping/map_01M6GCY0GPH0H0BXSCCW508FZK?tab=findings",
+            "text": {
+              "en": "1 engine or validation errors",
+              "th": "ข้อผิดพลาดของ engine/การตรวจ 1 จุด"
+            },
+            "numbers": {
+              "errors": 1
+            }
+          },
+          {
+            "id": 2,
+            "kind": "ai",
+            "link": null,
+            "text": {
+              "en": "AI was unavailable; the deterministic draft is in use",
+              "th": "AI ใช้งานไม่ได้ ใช้ร่างจากกฎแทน"
+            },
+            "numbers": {}
+          }
+        ],
+        "narrative": null,
+        "conclusion": {
+          "en": "The policy blocks this mapping: transformation produced zero records",
+          "th": "กฎระงับการจับคู่นี้: transformation produced zero records"
+        },
+        "confidence": 0.7,
+        "suppressed": {
+          "count": 0,
+          "groups": []
+        },
+        "must_decide": [],
+        "rules_fired": [
+          "blocked"
+        ],
+        "round_status": "blocked",
+        "rules_version": "2026.10.4",
+        "mapping_status": "proposed",
+        "policy_decision": "block"
+      },
+      "decision": "block",
+      "learning": null,
+      "priority": 40,
+      "agreement": null,
+      "risk_level": "high",
+      "risk_score": 1.0,
+      "self_check": null,
+      "simulation": null,
+      "reused_from": null,
+      "field_review": null,
+      "risk_factors": [
+        "blocked by policy",
+        "validation or engine errors"
+      ],
+      "verification": {
+        "passed": false,
+        "version": 1,
+        "complete": false,
+        "problems": [
+          "missing_required: required target /qty is not mapped",
+          "No transformation result was verified"
+        ],
+        "warnings": []
+      },
+      "clarifications": [],
+      "confidence_basis": null,
+      "review_decisions": [],
+      "target_schema_hash": "9dab9cc61deca084",
+      "confirmed_decisions": []
+    },
+    "open_questions": [],
+    "validation": {
+      "ok": false,
+      "issues": [
+        {
+          "code": "missing_required",
+          "path": "/fields",
+          "level": "error",
+          "message": "required target /qty is not mapped"
+        }
+      ]
+    },
+    "parent_id": null,
+    "approved_by": null,
+    "approved_at": null,
+    "comment": null,
+    "created_at": "2026-11-03T09:48:03.483282+00:00",
+    "agent_log": [
+      {
+        "agent": "operator_requirements",
+        "sha256": "035610bb352a9af304d1018d577ee9b1b9febc17380fcc47f5beaea2545ec734",
+        "characters": 362,
+        "changed_since_approved": false
+      },
+      {
+        "agent": "heuristic",
+        "unmatched": {
+          "products_0": [
+            "Stock pieces"
+          ],
+          "products_1": [
+            "SKU",
+            "Cartons"
+          ]
+        },
+        "confidence": 1.0,
+        "table_roles": {
+          "0": "products",
+          "1": "products",
+          "2": "other"
+        }
+      },
+      {
+        "data": {
+          "notes": [
+            "Only /sku, /product_name and /qty exist in the target schema; Counts.Cartons and Pack factors' second column are supporting inputs, so they are classified but have target_pointer null.",
+            "Export.'Stock pieces' contains 12 external formula cells all caching the constant 999, which is not a plausible stock figure across 12 different products; it was treated as an unresolved reference, not as evidence of stock. The defensible quantity is Counts.Cartons multiplied by the Pack factors conversion factor per SKU.",
+            "The second column of 'Pack factors' was not surfaced by column detection (blank header). Its meaning must be confirmed before it is used as a multiplier."
+          ],
+          "tables": [
+            {
+              "role": "products",
+              "reason": "Sheet 'Export' is the master product list: one row per distinct SKU (12 distinct of 12), a human-readable product name column, and a quantity column that is a cross-sheet formula (12 external formula cells) whose cached value is a constant 999 placeholder on every row. It is the only sheet carrying both identity and product name, so it is the product master as the operator instructed ('Use Export as the product list').",
+              "columns": [
+                {
+                  "name": "SKU",
+                  "reason": "Header 'SKU', 12 distinct values for 12 rows, hint sku_like. Values display zero-padded (000001..000012) but are stored as numbers; the target requires the string form with the six-digit padding preserved, so it must be read as text rather than cast through an integer.",
+                  "semantic": "identity.sku",
+                  "confidence": 0.97,
+                  "target_pointer": "/sku"
+                },
+                {
+                  "name": "Product name",
+                  "reason": "Header 'Product name', unique per SKU (12 distinct of 12), values are descriptive product labels ('Coffee variant 01', 'Shampoo variant 02'), matching the target description 'Product name from the master list'.",
+                  "semantic": "product.name",
+                  "confidence": 0.95,
+                  "target_pointer": "/product_name"
+                },
+                {
+                  "name": "Stock pieces",
+                  "reason": "Name and unit ('pieces') match the target 'Stock in individual pieces', and this is the only quantity column on the product sheet. However the column holds 12 external formula cells whose cached value is the identical constant 999 for every SKU, i.e. an unresolved reference rather than real stock. Per the operator requirement ('quantities must be supported by the workbook dependencies') the usable quantity is the dependency chain Counts.Cartons x Pack factors.<pieces per carton> for the same SKU; the cached 999 must not be emitted as a business value. Confidence lowered accordingly.",
+                  "semantic": "stock.qty",
+                  "confidence": 0.4,
+                  "target_pointer": "/qty"
+                }
+              ],
+              "confidence": 0.95,
+              "key_column": "SKU",
+              "table_index": 0
+            },
+            {
+              "role": "inventory",
+              "reason": "Sheet 'Counts' holds a per-SKU carton count keyed on the same 12 SKUs as the product master; it is neither a price nor a promotion table and it is a supporting quantity input consumed by the Export 'Stock pieces' formula rather than the product master itself.",
+              "columns": [
+                {
+                  "name": "SKU",
+                  "reason": "Header 'SKU', 12 distinct values, same value set as Export.SKU, so this is a join key to the product master, not an independent identity to be emitted.",
+                  "semantic": "identity.sku",
+                  "confidence": 0.93,
+                  "target_pointer": null
+                },
+                {
+                  "name": "Cartons",
+                  "reason": "Header 'Cartons' with integer values 3..14, one per SKU, distinct per row. It counts cartons, not individual pieces, so it cannot be written to /qty directly; it is the left-hand factor of the piece quantity (cartons x pieces-per-carton).",
+                  "semantic": "inventory.carton_count",
+                  "confidence": 0.8,
+                  "target_pointer": null
+                }
+              ],
+              "confidence": 0.85,
+              "key_column": "SKU",
+              "table_index": 1
+            },
+            {
+              "role": "inventory",
+              "reason": "Sheet 'Pack factors' is a per-SKU reference/lookup table of packaging conversion factors, keyed on the same 12 SKUs. It supplies the missing factor needed to convert 'Counts'.Cartons into individual pieces, which is what the Export quantity formula depends on.",
+              "columns": [
+                {
+                  "name": "SKU",
+                  "reason": "Header 'SKU', 12 distinct values matching the other two sheets; a join key, not an output identity.",
+                  "semantic": "identity.sku",
+                  "confidence": 0.93,
+                  "target_pointer": null
+                },
+                {
+                  "name": "(unnamed second column)",
+                  "reason": "The sheet profile reports 2 columns but the detector surfaced only 'SKU', so the second column appears to have a blank/absent header. Given the sheet title 'Pack factors' and its role as the multiplier in the Export quantity formula, it most plausibly holds pieces per carton (or a pack conversion factor). Not mapped to any target pointer and not used until the header and values are confirmed.",
+                  "semantic": "inventory.pieces_per_carton",
+                  "confidence": 0.55,
+                  "target_pointer": null
+                }
+              ],
+              "confidence": 0.8,
+              "key_column": "SKU",
+              "table_index": 2
+            }
+          ]
+        },
+        "agent": "schema",
+        "notes": [],
+        "usage": {
+          "calls": 2,
+          "model": "deepseek-flash",
+          "cost_usd": 0.017903,
+          "latency_ms": 11105.9,
+          "input_tokens": 8751,
+          "output_tokens": 2288
+        },
+        "attempts": 2
+      },
+      {
+        "data": {
+          "mapping": {
+            "meta": {
+              "model": null,
+              "notes": null,
+              "version": 1,
+              "evidence": [
+                "root table: sheet 'Export' (12 rows) classified as products"
+              ],
+              "confidence": 1.0,
+              "created_by": "system",
+              "mapping_id": null,
+              "customer_id": "cus_01M6GBKB45D68N2RQ8K44T9ZKK",
+              "fingerprints": {},
+              "target_schema": "eval_rel-20261103-c_t08@1"
+            },
+            "joins": [],
+            "fields": [
+              {
+                "expr": {
+                  "op": "normalize_whitespace",
+                  "args": [
+                    {
+                      "op": "col",
+                      "name": "SKU",
+                      "source": null
+                    }
+                  ],
+                  "params": {}
+                },
+                "note": null,
+                "target": "/sku",
+                "evidence": [
+                  "header 'SKU' == synonym 'sku'"
+                ],
+                "confidence": 1.0
+              },
+              {
+                "expr": {
+                  "op": "normalize_whitespace",
+                  "args": [
+                    {
+                      "op": "col",
+                      "name": "Product name",
+                      "source": null
+                    }
+                  ],
+                  "params": {}
+                },
+                "note": null,
+                "target": "/product_name",
+                "evidence": [
+                  "header 'Product name' == synonym 'product name'"
+                ],
+                "confidence": 1.0
+              }
+            ],
+            "record": {
+              "dedupe": {
+                "keep": "first",
+                "keys": []
+              },
+              "filters": [],
+              "root_source": "products_0"
+            },
+            "quality": [
+              {
+                "rule": "unique",
+                "params": {},
+                "target": "/sku",
+                "message": null,
+                "severity": "warning"
+              }
+            ],
+            "sources": [
+              {
+                "id": "products_0",
+                "csv": {
+                  "encoding": "auto",
+                  "delimiter": "auto",
+                  "quote_char": "\""
+                },
+                "file": {
+                  "fingerprint": null,
+                  "name_pattern": "(?i)^delivery",
+                  "sheet_names_any": [
+                    "Export"
+                  ]
+                },
+                "role": "products",
+                "sheet": {
+                  "name": "Export",
+                  "index": null,
+                  "match": null
+                },
+                "table": {
+                  "filter": null,
+                  "unpivot": null,
+                  "data_end": null,
+                  "fill_down": [],
+                  "data_start": null,
+                  "header_row": 0,
+                  "header_rows": 1,
+                  "last_column": 3,
+                  "first_column": 0,
+                  "section_column": null,
+                  "drop_total_rows": true,
+                  "drop_empty_columns": true,
+                  "stop_at_blank_rows": 2,
+                  "drop_repeated_headers": true
+                },
+                "rename": {},
+                "description": null
+              },
+              {
+                "id": "products_1",
+                "csv": {
+                  "encoding": "auto",
+                  "delimiter": "auto",
+                  "quote_char": "\""
+                },
+                "file": {
+                  "fingerprint": null,
+                  "name_pattern": "(?i)^delivery",
+                  "sheet_names_any": [
+                    "Counts"
+                  ]
+                },
+                "role": "products",
+                "sheet": {
+                  "name": "Counts",
+                  "index": null,
+                  "match": null
+                },
+                "table": {
+                  "filter": null,
+                  "unpivot": null,
+                  "data_end": null,
+                  "fill_down": [],
+                  "data_start": null,
+                  "header_row": 0,
+                  "header_rows": 1,
+                  "last_column": 2,
+                  "first_column": 0,
+                  "section_column": null,
+                  "drop_total_rows": true,
+                  "drop_empty_columns": true,
+                  "stop_at_blank_rows": 2,
+                  "drop_repeated_headers": true
+                },
+                "rename": {},
+                "description": null
+              }
+            ],
+            "provenance": true,
+            "collections": [],
+            "attributes_passthrough": true
+          }
+        },
+        "agent": "mapping",
+        "notes": [
+          "llm_failed: TypeError: 'NoneType' object is not subscriptable"
+        ],
+        "usage": {
+          "calls": 6,
+          "model": "deepseek-flash",
+          "cost_usd": 0.152216,
+          "latency_ms": 92140.0,
+          "input_tokens": 70800,
+          "output_tokens": 20354
+        },
+        "attempts": 0
+      }
+    ],
+    "sample": [],
+    "document": {
+      "meta": {
+        "version": 1,
+        "evidence": [
+          "root table: sheet 'Export' (12 rows) classified as products"
+        ],
+        "confidence": 1.0,
+        "created_by": "system",
+        "customer_id": "cus_01M6GBKB45D68N2RQ8K44T9ZKK",
+        "fingerprints": {
+          "products_0": "ecf1de050b88661f",
+          "products_1": "ecf1de050b88661f"
+        },
+        "target_schema": "eval_rel-20261103-c_t08@1"
+      },
+      "joins": [],
+      "fields": [
+        {
+          "expr": {
+            "op": "normalize_whitespace",
+            "args": [
+              {
+                "op": "col",
+                "name": "SKU"
+              }
+            ],
+            "params": {}
+          },
+          "target": "/sku",
+          "evidence": [
+            "header 'SKU' == synonym 'sku'"
+          ],
+          "confidence": 1.0
+        },
+        {
+          "expr": {
+            "op": "normalize_whitespace",
+            "args": [
+              {
+                "op": "col",
+                "name": "Product name"
+              }
+            ],
+            "params": {}
+          },
+          "target": "/product_name",
+          "evidence": [
+            "header 'Product name' == synonym 'product name'"
+          ],
+          "confidence": 1.0
+        }
+      ],
+      "record": {
+        "dedupe": {
+          "keep": "first",
+          "keys": []
+        },
+        "filters": [],
+        "root_source": "products_0"
+      },
+      "quality": [
+        {
+          "rule": "unique",
+          "params": {},
+          "target": "/sku",
+          "severity": "warning"
+        }
+      ],
+      "sources": [
+        {
+          "id": "products_0",
+          "csv": {
+            "encoding": "auto",
+            "delimiter": "auto",
+            "quote_char": "\""
+          },
+          "file": {
+            "name_pattern": "(?i)^delivery",
+            "sheet_names_any": [
+              "Export"
+            ]
+          },
+          "role": "products",
+          "sheet": {
+            "name": "Export"
+          },
+          "table": {
+            "fill_down": [],
+            "header_row": 0,
+            "header_rows": 1,
+            "last_column": 3,
+            "first_column": 0,
+            "drop_total_rows": true,
+            "drop_empty_columns": true,
+            "stop_at_blank_rows": 2,
+            "drop_repeated_headers": true
+          },
+          "rename": {}
+        },
+        {
+          "id": "products_1",
+          "csv": {
+            "encoding": "auto",
+            "delimiter": "auto",
+            "quote_char": "\""
+          },
+          "file": {
+            "name_pattern": "(?i)^delivery",
+            "sheet_names_any": [
+              "Counts"
+            ]
+          },
+          "role": "products",
+          "sheet": {
+            "name": "Counts"
+          },
+          "table": {
+            "fill_down": [],
+            "header_row": 0,
+            "header_rows": 1,
+            "last_column": 2,
+            "first_column": 0,
+            "drop_total_rows": true,
+            "drop_empty_columns": true,
+            "stop_at_blank_rows": 2,
+            "drop_repeated_headers": true
+          },
+          "rename": {}
+        }
+      ],
+      "provenance": true,
+      "collections": [],
+      "attributes_passthrough": true
+    }
+  },
+  "questions": {
+    "mapping_id": "map_01M6GCY0GPH0H0BXSCCW508FZK",
+    "round_id": "rnd_01M6GBKBM1TK89BC6N7BS10ZWY",
+    "status": "proposed",
+    "blocked": true,
+    "questions": [],
+    "open_questions": [],
+    "reasons": [
+      "transformation produced zero records",
+      "verification: missing_required: required target /qty is not mapped",
+      "verification: No transformation result was verified"
+    ],
+    "sample": [],
+    "context": {
+      "customer": {
+        "code": "EVAL-rel-20261103-c-T08",
+        "name": "EVAL-rel-20261103-c-T08"
+      },
+      "round_label": "EVAL rel-20261103-c T08_r1",
+      "files": [
+        {
+          "id": "fil_01M6GBKBNGWW72ESWPC70WD74M",
+          "name": "delivery.xlsx"
+        }
+      ],
+      "mapping_version": 1
+    },
+    "changes": [],
+    "comparison_dataset_id": null,
+    "checks": {
+      "drift": null,
+      "errors": 1,
+      "rows_out": 0,
+      "warnings": 0,
+      "llm_fallback": true,
+      "reused_approved": false,
+      "full_verification": false,
+      "plausibility_warnings": 0
+    },
+    "impact": {},
+    "fields": [
+      {
+        "pointer": "/qty",
+        "name": "qty",
+        "json_type": [
+          "number",
+          "null"
+        ],
+        "semantic": "stock.qty",
+        "risk": "high",
+        "required": true,
+        "nullable": true,
+        "enum": null,
+        "format": null,
+        "synonyms_en": [],
+        "synonyms_th": [],
+        "description": "Stock in individual pieces. Missing evidence is null, never zero.",
+        "description_th": null,
+        "in_collection": null,
+        "is_collection": false,
+        "system": false,
+        "default": null,
+        "examples": []
+      },
+      {
+        "pointer": "/sku",
+        "name": "sku",
+        "json_type": [
+          "string"
+        ],
+        "semantic": "identity.sku",
+        "risk": "medium",
+        "required": true,
+        "nullable": false,
+        "enum": null,
+        "format": null,
+        "synonyms_en": [],
+        "synonyms_th": [],
+        "description": "Unique SKU identifier; preserve leading zeros.",
+        "description_th": null,
+        "in_collection": null,
+        "is_collection": false,
+        "system": false,
+        "default": null,
+        "examples": []
+      },
+      {
+        "pointer": "/product_name",
+        "name": "product_name",
+        "json_type": [
+          "string"
+        ],
+        "semantic": "product.name",
+        "risk": "medium",
+        "required": true,
+        "nullable": false,
+        "enum": null,
+        "format": null,
+        "synonyms_en": [],
+        "synonyms_th": [],
+        "description": "Product name from the master list.",
+        "description_th": null,
+        "in_collection": null,
+        "is_collection": false,
+        "system": false,
+        "default": null,
+        "examples": []
+      }
+    ]
+  },
+  "preview": {
+    "ok": false,
+    "validation": {
+      "ok": false,
+      "issues": [
+        {
+          "level": "error",
+          "code": "missing_required",
+          "message": "required target /qty is not mapped",
+          "path": "/fields"
+        }
+      ]
+    },
+    "records": [],
+    "findings": []
+  }
+}

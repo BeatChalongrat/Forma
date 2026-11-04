@@ -53,7 +53,9 @@ def test_profile_keeps_top_values_and_the_card_shows_them(tmp_path: Path) -> Non
     assert status.top_values == [["sell", 9], ["stop", 3]]  # by frequency, with counts
     card = _column_card(status, rows=5, chars=200)
     assert (
-        card["top_values"] == [["sell", 9], ["stop", 3]] and card["distinct"] == 2 and "samples" not in card
+        card["top_values"] == [["sell", 9], ["stop", 3]]
+        and card["distinct"] == 2
+        and card["samples"] == ["sell", "stop"]
     )
     price = next(c for c in prof.tables[0].columns if c.name == "price")
     pc = _column_card(price, rows=5, chars=200)
@@ -363,7 +365,7 @@ def test_a_contested_field_is_asked_with_the_matcher_column_first(
     qs = c.get(f"/api/mappings/{mv}/questions").json()["questions"]
     q = next(x for x in qs if x["id"] == "/product_name")
     assert q["kind"] == "choice" and q["contested"] is True and q["options"][:2] == ["ชื่อสินค้า", "ยี่ห้อ"]
-    assert q["evidence"][-1] == "FORMA's matcher read ยี่ห้อ for this field" and qs[0]["id"] == "/product_name"
+    assert "FORMA's matcher read ยี่ห้อ for this field" in q["evidence"] and qs[0]["id"] == "/product_name"
     # a contested constant (the VAT flag the matcher assumed otherwise) is a yes/no, not a choice
     with session_scope() as s:
         m = s.get(MappingVersion, mv)
@@ -382,7 +384,8 @@ def test_a_contested_field_is_asked_with_the_matcher_column_first(
         }
     qs = c.get(f"/api/mappings/{mv}/questions").json()["questions"]
     q = next(x for x in qs if x["id"].endswith("/vat_included"))
-    assert q["kind"] == "boolean" and q["contested"] is True and "matcher read" in q["evidence"][-1]
+    assert q["kind"] == "boolean" and q["contested"] is True
+    assert any("matcher read" in evidence for evidence in q["evidence"])
 
 
 # --------------------------------------------------------------------------------------------

@@ -23,16 +23,17 @@ from __future__ import annotations
 import datetime as dt
 import hashlib
 import io
+import json
 import re
 import zipfile
 from pathlib import Path
 from typing import Any
 
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from forma.core.errors import NotFound, UnsupportedFile, ValidationFailed
-from forma.db.models import Batch, BatchItem, Customer, ImportRound, Job, MappingVersion
+from forma.db.models import Batch, BatchItem, Customer, DatasetVersion, ImportRound, Job, MappingVersion
 from forma.fingerprint.fingerprint import Fingerprint, compare
 from forma.ingestion.sniff import sniff_kind
 from forma.services import config as cfg
@@ -45,7 +46,6 @@ from forma.storage import safe_name
 
 SIMILAR_MIN = 0.75  # closest approved format must be at least this similar …
 SIMILAR_MARGIN = 0.1  # … and this much closer than the next customer's, or a person decides
-QUEUED_LOST_S = 120  # a job still queued after this long was never handed to a worker (queue was down)
 
 
 def create_batch(
@@ -367,18 +367,28 @@ def item_state(item: BatchItem, r: ImportRound | None) -> dict[str, Any]:
 def stuck_items(session: Session, b: Batch) -> list[str]:
     """Files waiting to be matched with no job queued or running for them (the queue was full or down when
     they were uploaded): ``resume`` queues them again. The job is idempotent, so a duplicate is harmless."""
-    waiting = {i.id for i in b.items if i.status in ("received", "identified") and not i.round_id}
+    waiting = set()
+    for item in b.items:
+        if item.round_id:
+            rnd = session.get(ImportRound, item.round_id)
+            if rnd and rnd.status in ("uploaded", "profiled"):
+                waiting.add(item.id)
+        elif item.status in ("received", "identified"):
+            waiting.add(item.id)
     if not waiting:
         return []
-    cutoff = dt.datetime.now(dt.UTC) - dt.timedelta(seconds=QUEUED_LOST_S)
-    active = {
-        (j.payload or {}).get("item_id")
-        for j in session.scalars(
-            select(Job).where(Job.kind == "process_batch_item", Job.status.in_(("queued", "running")))
-        )
-        if j.status == "running" or (j.created_at is not None and j.created_at > cutoff)
-    }
-    return sorted(waiting - active)
+    active_jobs = list(session.scalars(select(Job).where(Job.status.in_(("queued", "running")))))
+    active_items = {(j.payload or {}).get("item_id") for j in active_jobs}
+    active_rounds = {j.round_id or (j.payload or {}).get("round_id") for j in active_jobs}
+    # Replacement, approval and manual re-runs use run_pipeline, not process_batch_item.
+    # They must also suppress Resume while the same delivery is already being worked on.
+    return sorted(
+        item.id
+        for item in b.items
+        if item.id in waiting
+        and item.id not in active_items
+        and (not item.round_id or item.round_id not in active_rounds)
+    )
 
 
 def _brief_verdict(v: dict[str, Any] | None) -> dict[str, Any] | None:
@@ -412,7 +422,9 @@ def batch_view(session: Session, b: Batch) -> dict[str, Any]:
     rounds = {
         r.id: r
         for r in session.scalars(
-            select(ImportRound).where(ImportRound.id.in_([i.round_id for i in items if i.round_id]))
+            select(ImportRound)
+            .where(ImportRound.id.in_([i.round_id for i in items if i.round_id]))
+            .options(selectinload(ImportRound.files))
         )
     }
     codes = {
@@ -430,12 +442,16 @@ def batch_view(session: Session, b: Batch) -> dict[str, Any]:
         counts[st["state"]] = counts.get(st["state"], 0) + 1
         mapped += st["step"] >= 3
         art = latest_export(session, r.id) if r is not None and r.status == "published" else None
+        source = r.files[0] if r and len(r.files) == 1 else None
         code, name = codes.get(it.customer_id or "", (None, None))
         out_items.append(
             {
                 "id": it.id,
                 "file_name": it.file_name,
                 "size": it.size,
+                "source_file_id": source.id if source else None,
+                "current_file_name": source.original_name if source else it.file_name,
+                "current_file_size": source.size if source else it.size,
                 "match": it.match,
                 "customer": {"id": it.customer_id, "code": code, "name": name} if it.customer_id else None,
                 "round_id": it.round_id,
@@ -508,20 +524,76 @@ def zip_outputs(ctx: ServiceContext, session: Session, b: Batch) -> tuple[bytes,
     buf = io.BytesIO()
     used: set[str] = set()
     n = 0
+    entries: list[dict[str, Any]] = []
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
         for it in b.items:
-            if not it.round_id:
-                continue
-            r = session.get(ImportRound, it.round_id)
-            if r is None or r.status in CLOSED:
-                continue
-            art = latest_export(session, it.round_id, FORMAT)
-            if art is None:
+            r = session.get(ImportRound, it.round_id) if it.round_id else None
+            state = item_state(it, r)
+            entry: dict[str, Any] = {
+                "item_id": it.id,
+                "uploaded_name": it.file_name,
+                "uploaded_sha256": it.sha256,
+                "round_id": it.round_id,
+                "customer_id": it.customer_id,
+                "state": state["state"],
+                "included": False,
+                "reason": state.get("message"),
+                "sources": [{"file_id": f.id, "name": f.original_name, "sha256": f.sha256} for f in r.files]
+                if r
+                else [],
+            }
+            entries.append(entry)
+            dv = (
+                session.scalar(
+                    select(DatasetVersion)
+                    .where(DatasetVersion.round_id == r.id)
+                    .order_by(DatasetVersion.version.desc())
+                )
+                if r
+                else None
+            )
+            art = (
+                latest_export(session, r.id, FORMAT, dataset_version_id=dv.id)
+                if (r and r.status == "published" and dv and dv.status in ("approved", "published"))
+                else None
+            )
+            if art is None or dv is None:
+                if state["state"] == "ready":
+                    entry["reason"] = "The current version has no approved JSON export"
                 continue
             name, k = json_name(it.file_name), 2
             while name in used:
                 name, k = f"{Path(it.file_name).stem} ({k}).json", k + 1
             used.add(name)
-            z.writestr(name, ctx.storage.local_path(art.storage_key).read_bytes())
+            content = ctx.storage.local_path(art.storage_key).read_bytes()
+            if hashlib.sha256(content).hexdigest() != art.sha256:
+                raise ValidationFailed("Export checksum mismatch; regenerate this file before downloading")
+            z.writestr(name, content)
+            entry.update(
+                included=True,
+                reason=None,
+                archive_name=name,
+                export_id=art.id,
+                dataset_version_id=dv.id,
+                dataset_version=dv.version,
+                mapping_version_id=dv.mapping_version_id,
+                target_schema=r.target_schema if r else None,
+                rows=art.row_count,
+                sha256=art.sha256,
+            )
             n += 1
+        manifest = {
+            "manifest_version": 1,
+            "batch_id": b.id,
+            "label": b.label,
+            "generated_at": dt.datetime.now(dt.UTC).isoformat(),
+            "expected_files": b.expected_files,
+            "received_files": len(entries),
+            "exported_files": n,
+            "omitted_files": len(entries) - n,
+            "not_received_files": max(0, (b.expected_files or len(entries)) - len(entries)),
+            "complete": n == len(entries) and n >= (b.expected_files or len(entries)),
+            "files": entries,
+        }
+        z.writestr("_forma/manifest.json", json.dumps(manifest, ensure_ascii=False, indent=2))
     return buf.getvalue(), n

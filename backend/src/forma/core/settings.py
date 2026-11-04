@@ -47,6 +47,14 @@ class Settings(BaseSettings):
     llm_api_key: str | None = Field(default=None, description="Provider API key (secret).")
     llm_base_url: str | None = Field(default=None, description="Gateway base URL for openai_compatible.")
     llm_timeout_s: float = Field(default=90.0, description="Per-call HTTP timeout in seconds.")
+    llm_task_budget_s: float = Field(
+        default=600.0,
+        gt=0,
+        description="Total AI task wall-clock budget across tools, provider retries and repairs, in seconds.",
+    )
+    llm_max_output_tokens: int = Field(
+        default=16000, ge=256, description="Maximum output tokens per structured provider response."
+    )
     llm_max_retries: int = Field(default=2, description="Structured-output retries on invalid JSON.")
     llm_transport_retries: int = Field(default=3, description="Attempts per provider call on timeouts/5xx.")
     llm_backoff_s: float = Field(default=1.0, description="Base backoff between transport retries (doubles).")
@@ -85,6 +93,24 @@ class Settings(BaseSettings):
     )
 
     # Engine
+    mapping_workflow: str = Field(
+        default="graph",
+        pattern="^(legacy|graph)$",
+        description="Mapping orchestration: graph (three roles) or legacy (comparison/rollback).",
+    )
+    mapping_workflow_calls: int = Field(
+        default=18,
+        ge=3,
+        le=60,
+        description="Durable provider-attempt ceiling per mapping workflow.",
+    )
+    mapping_workflow_repairs: int = Field(
+        default=1,
+        ge=0,
+        le=2,
+        description="Maximum mapper revisions requested by the semantic reviewer.",
+    )
+
     chunk_rows: int = Field(default=200_000, description="Rows per engine chunk.")
     sample_rows: int = Field(default=25, description="Sample rows kept per column profile.")
     preview_rows: int = Field(default=200, description="Rows in Mapping Studio previews.")
@@ -100,7 +126,30 @@ class Settings(BaseSettings):
     file_workers: int = Field(default=4, description="Files profiled concurrently inside one round.")
     queue_max: int = Field(default=500, description="Max queued+running jobs before the API answers 429.")
     job_stale_s: int = Field(
-        default=1800, description="A `running` job older than this is re-queued on start."
+        default=1800, description="Legacy jobs without leases are stale after this many seconds."
+    )
+    job_timeout_s: int = Field(default=1800, ge=1, description="Hard execution limit per ARQ child process.")
+    job_lease_s: int = Field(
+        default=90, ge=3, description="Worker ownership lease, renewed every third of this interval."
+    )
+    job_recovery_interval_s: float = Field(
+        default=15, gt=0, description="Seconds between stale recovery and queue reconciliation."
+    )
+    job_dispatch_retry_s: float = Field(
+        default=30, gt=0, description="Redispatch durable queued rows after this interval."
+    )
+    llm_shared_concurrency: int = Field(
+        default=4, ge=1, description="Shared simultaneous provider HTTP calls per credential and endpoint."
+    )
+    llm_shared_rpm: int = Field(
+        default=60,
+        ge=1,
+        description="Shared provider requests per rolling minute; separate from per-user API limits.",
+    )
+    llm_shared_limiter: str = Field(
+        default="auto",
+        pattern="^(auto|redis|local)$",
+        description="auto uses Redis for ARQ, otherwise process-local limits.",
     )
     job_max_attempts: int = Field(default=3, description="Attempts before a stale job is marked failed.")
     redis_url: str = Field(

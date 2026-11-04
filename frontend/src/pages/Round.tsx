@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { FileSpreadsheet, Table2 } from 'lucide-react'
 import { api, waitForJob, type SourceFile, type TableProfile } from '../lib/api'
 import { AssistantIcon } from '../lib/icons'
@@ -9,6 +9,7 @@ import { PageHeader, StatusBadge, Section, Badge, Confidence, Drawer, KV, Spinne
 import { RoundHistory } from '../components/Inspection'
 import { RoundSteps } from '../components/RoundSteps'
 import { ClosedNote, RoundMenu } from '../components/RoundMenu'
+import { FileMenu } from '../components/FileMenu'
 import { useToast } from '../lib/toast'
 import { usePreferences } from '../lib/preferences'
 
@@ -17,6 +18,7 @@ const driftTone = (d?: string | null) => (d === 'identical' || d === 'header_mov
 export function RoundPage() {
   const { t } = usePreferences()
   const { roundId = '' } = useParams()
+  const [params, setParams] = useSearchParams()
   const qc = useQueryClient()
   const toast = useToast()
   const nav = useNavigate()
@@ -29,7 +31,7 @@ export function RoundPage() {
       const { job_id } = kind === 'run' ? await api.runPipeline(roundId) : kind === 'propose' ? await api.propose(roundId) : await api.transform(roundId)
       return waitForJob(job_id)
     },
-    onSuccess: (j) => { qc.invalidateQueries(); if (j.status === 'failed') toast.push({ kind: 'bad', title: 'Job failed', detail: j.error?.split('\n')[0] }); else toast.push({ kind: 'ok', title: 'Done' }) },
+    onSuccess: (j) => { qc.invalidateQueries(); if (j.status === 'failed') toast.push({ kind: 'bad', title: 'Job failed', detail: j.error?.split('\n')[0] }); else toast.push({ kind: 'ok', title: j.status === 'cancelled' ? t('Processing stopped', 'หยุดประมวลผลแล้ว') : 'Done' }) },
     onError: (e: Error) => toast.push({ kind: 'bad', title: 'Request failed', detail: e.message }),
   })
 
@@ -76,18 +78,18 @@ export function RoundPage() {
       <div className="mt-6">
       <div className="grid lg:grid-cols-[1fr_380px] gap-4">
         <div className="flex flex-col gap-4">
-          <Section title="Files">
+          <Section title={t('Files', 'ไฟล์ในชุดนี้')}>
             <table className="table">
-              <thead><tr><th>File</th><th>Sheets</th><th>Tables</th><th>vs approved format</th><th></th></tr></thead>
+              <thead><tr><th>{t('File', 'ไฟล์')}</th><th>{t('Sheets', 'ชีต')}</th><th>{t('Tables', 'ตาราง')}</th><th>{t('Compared with previous files', 'เทียบกับไฟล์ก่อนหน้า')}</th><th></th></tr></thead>
               <tbody>
                 {r.files?.map((f) => (
                   <tr key={f.id} >
                     <td><div className="flex items-center gap-2 flex-wrap"><FileSpreadsheet size={15} className="text-muted" /><span className="font-medium break-all">{f.name}</span><span className="text-muted tnum text-[12px]">{fmtBytes(f.size)}</span>{f.duplicate_of && <Badge tone="info">seen before</Badge>}{f.error && <Badge tone="bad">error</Badge>}</div></td>
-                    <td className="text-muted">{f.sheets.join(', ')}</td>
+                    <td className="text-muted whitespace-nowrap">{f.sheets.join(', ')}</td>
                     <td className="tnum">{f.tables}</td>
 
                     <td>{f.drift ? <Badge tone={driftTone(f.drift.classification)}>{formatLabel(f.drift.classification)} · {Math.round(f.drift.similarity * 100)}%</Badge> : <span className="text-muted">first time</span>}{f.drift?.matches_other_customer && <Badge tone="bad" className="ml-1">matches {f.drift.matches_other_customer.customer_code}</Badge>}</td>
-                    <td className="text-right"><button className="btn btn-ghost btn-sm" onClick={() => setFileOpen(f)} aria-label={`Inspect ${f.name}`}>Inspect</button></td>
+                    <td className="text-right"><div className="flex items-center justify-end gap-1"><button className="btn btn-ghost btn-sm" onClick={() => setFileOpen(f)}>{t('View file', 'ดูไฟล์')}</button><FileMenu roundId={r.id} customerId={r.customer_id} status={r.status} file={f} fileCount={r.files?.length} onView={() => setFileOpen(f)} /></div></td>
                   </tr>
                 ))}
               </tbody>
@@ -173,26 +175,34 @@ export function RoundPage() {
       </div>
 
       </div>
-      <FileDrawer roundId={roundId} file={fileOpen} onClose={() => setFileOpen(null)} />
+      <FileDrawer roundId={roundId} file={fileOpen || r.files?.find(f => f.id === params.get('file')) || null} onClose={() => { setFileOpen(null); setParams(previous => { const next = new URLSearchParams(previous); next.delete('file'); return next }, { replace: true }) }} />
     </>
   )
 }
 
 export function FileDrawer({ roundId, file, onClose }: { roundId: string; file: SourceFile | null; onClose: () => void }) {
+  const { t } = usePreferences()
   const { data } = useQuery({ queryKey: ['file', roundId, file?.id], queryFn: () => api.file(roundId, file!.id), enabled: !!file })
+  const [sheet, setSheet] = useState(0)
+  const grid = useQuery({ queryKey: ['file-grid', roundId, file?.id, sheet], queryFn: () => api.fileGrid(roundId, file!.id, sheet, 60), enabled: !!file && file.status !== 'purged', retry: false })
   const [table, setTable] = useState<TableProfile | null>(null)
   const prof = data?.profile
   return (
-    <Drawer open={!!file} onClose={() => { setTable(null); onClose() }} title={file?.name ?? ''} width="w-[720px]">
+    <Drawer open={!!file} onClose={() => { setTable(null); setSheet(0); onClose() }} title={file?.name ?? ''} width="w-[900px]">
+      <section className="space-y-3 mb-6">
+        <div className="flex flex-wrap items-center justify-between gap-3"><h2 className="font-semibold">{t('Source file preview', 'ข้อมูลในไฟล์ต้นฉบับ')}</h2>{prof && prof.meta.sheets.length > 1 && <label className="flex gap-2 items-center text-sm">{t('Sheet', 'ชีต')}<select className="input w-auto" value={sheet} onChange={e => setSheet(Number(e.target.value))}>{prof.meta.sheets.map((s, i) => <option key={i} value={i}>{s.name}{s.hidden ? t(' (hidden)', ' (ซ่อนอยู่)') : ''}</option>)}</select></label>}</div>
+        <p className="text-xs text-muted">{t('Shows up to the first 60 rows and 30 columns as read from the source, before mapping or editing.', 'แสดงตัวอย่างไม่เกิน 60 แถวแรกและ 30 คอลัมน์แรก ตามที่อ่านจากไฟล์ ก่อนจับคู่หรือแก้ไขข้อมูล')}</p>
+        {file?.status === 'purged' ? <p className="text-sm text-muted">{t('This source file is no longer stored.', 'ไม่มีไฟล์ต้นฉบับนี้เก็บอยู่แล้ว')}</p> : grid.isPending ? <Spinner /> : grid.isError ? <p role="alert" className="text-sm text-bad">{t('Could not load the file preview.', 'ยังเปิดตัวอย่างไฟล์ไม่ได้')} <button className="underline" onClick={() => void grid.refetch()}>{t('Retry', 'ลองอีกครั้ง')}</button></p> : <div className="overflow-auto max-h-96 border border-line rounded-lg"><table className="table text-xs"><thead><tr><th>{t('Row', 'แถว')}</th>{Array.from({ length: Math.min(grid.data.n_cols, 30) }, (_, i) => <th key={i}>{i + 1}</th>)}</tr></thead><tbody>{grid.data.rows.map((row, i) => <tr key={i}><th className="text-muted">{i + 1}</th>{row.slice(0, 30).map((cell, j) => <td key={j} className="whitespace-pre-wrap min-w-28 max-w-80 break-words">{cell ?? ''}</td>)}</tr>)}{!grid.data.rows.length && <tr><td>{t('This sheet has no readable rows.', 'ชีตนี้ไม่มีแถวข้อมูลให้อ่าน')}</td></tr>}</tbody></table></div>}
+      </section>
       {prof && (
         <>
           <div className="grid grid-cols-2 gap-x-6 mb-4">
-            <KV k="Kind" v={prof.meta.kind} />
-            <KV k="Sheets" v={prof.meta.sheets.length} />
-            <KV k="Tables detected" v={prof.tables.length} />
-            <KV k="Hidden sheets" v={prof.meta.sheets.filter((s) => s.hidden).length} />
-            <KV k="Merged ranges" v={prof.meta.sheets.reduce((a, s) => a + s.merged_ranges.length, 0)} />
-            <KV k="Formula cells" v={prof.meta.sheets.reduce((a, s) => a + s.formula_cells, 0)} />
+            <KV k={t('File type', 'ชนิดไฟล์')} v={prof.meta.kind} />
+            <KV k={t('Sheets', 'จำนวนชีต')} v={prof.meta.sheets.length} />
+            <KV k={t('Tables found', 'ตารางที่พบ')} v={prof.tables.length} />
+            <KV k={t('Hidden sheets', 'ชีตที่ซ่อนอยู่')} v={prof.meta.sheets.filter((s) => s.hidden).length} />
+            <KV k={t('Merged cells', 'ช่วงเซลล์ที่รวมกัน')} v={prof.meta.sheets.reduce((a, s) => a + s.merged_ranges.length, 0)} />
+            <KV k={t('Formula cells', 'เซลล์ที่มีสูตร')} v={prof.meta.sheets.reduce((a, s) => a + s.formula_cells, 0)} />
           </div>
           <div className="flex flex-col gap-2">
             {prof.tables.map((t, i) => (

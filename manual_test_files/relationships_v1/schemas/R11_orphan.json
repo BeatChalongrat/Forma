@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "title": "Unmatched stock keys and missing stock",
+  "required": [
+    "sku",
+    "product_name",
+    "qty"
+  ],
+  "properties": {
+    "sku": {
+      "type": "string",
+      "description": "Unique SKU identifier; preserve leading zeros.",
+      "x-forma": {
+        "semantic": "identity.sku"
+      }
+    },
+    "product_name": {
+      "type": "string",
+      "description": "Product name from the master list.",
+      "x-forma": {
+        "semantic": "product.name"
+      }
+    },
+    "qty": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "description": "Stock in individual pieces. Missing evidence is null, never zero.",
+      "x-forma": {
+        "semantic": "stock.qty"
+      }
+    }
+  },
+  "x-forma": {
+    "identity_keys": [
+      "/sku"
+    ]
+  }
+}

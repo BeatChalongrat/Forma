@@ -38,3 +38,9 @@ Assistant icon refinement: use Lucide MessageCircleMore consistently for the sid
 review-page assistant links and assistant feature catalogue. The sidebar uses a 20px,
 1.75px stroke rounded chat outline; currentColor follows the existing theme/selection
 tokens. Keep the new-chat compose icon and history disclosure separate. No behavior changes.
+
+2026-11-03 refinement: the shared assistant icon is now Lucide MessagesSquare, using
+currentColor without sparkle or colored decoration. The full-width Assistant heading
+toggles the sidebar's New chat, search, history, work and archive controls, with a
+chevron and aria-expanded/aria-controls. Expansion is remembered locally across reloads;
+compact navigation retains a direct link to the assistant. Hidden lists stop polling.

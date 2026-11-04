@@ -134,7 +134,7 @@ def _scan_structure_openpyxl(path: Path, sheets: list[SheetMeta]) -> None:
         meta = by_name.get(inspected.name)
         if meta is not None:
             for name, value in vars(inspected).items():
-                if name not in ("name", "replacements"):
+                if name not in ("name", "replacements", "invalid_columns"):
                     setattr(meta, name, value.copy() if isinstance(value, list) else value)
             meta.structure_scan_complete = True
 

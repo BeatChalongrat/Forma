@@ -278,6 +278,12 @@ def questions(ctx: ServiceContext, m: MappingVersion) -> dict[str, Any]:
             # candidate declares one currency for the delivery; ask explicitly at that scope.
             clarification = decision_actions.normalize({**clarification, "action": "constant"}, schema)
         items = [q for q in items if q["id"] != target]
+        from forma.ai.clarifications import derived_value
+
+        if clarification.get("action") == "constant" and derived_value(matched_field.expr):
+            # Older saved proposals may ask for a multiplier but target the whole quantity.
+            # Keep the source request visible without offering a destructive constant input.
+            clarification = decision_actions.normalize({**clarification, "action": "request_source"}, schema)
         items.append(
             {
                 "id": target + ":value:" + stable_hash(str(clarification.get("source_value")), 12)
@@ -302,6 +308,14 @@ def questions(ctx: ServiceContext, m: MappingVersion) -> dict[str, Any]:
     if decisions is None:  # Existing drafts predate the full-file decision catalogue.
         decisions = decision_actions.conflicting_items(doc, schema, (m.policy or {}).get("sample", []))
     for q in decisions:
+        related = [
+            item
+            for item in items
+            if item.get("action") == "value_map"
+            and item["field"]["pointer"] == q["target"]
+            and item.get("source_value") in set(map(str, q.get("identity", {}).values()))
+        ]
+        items = [item for item in items if item not in related]
         items.append(
             {
                 **q,
@@ -310,6 +324,7 @@ def questions(ctx: ServiceContext, m: MappingVersion) -> dict[str, Any]:
                 "evidence": [q["why"]],
                 "note": q["why"],
                 "contested": True,
+                "related_questions": [item["question"] for item in related if item.get("question")],
             }
         )
     for unit_question in unit_questions(doc, schema, columns):
@@ -333,6 +348,47 @@ def questions(ctx: ServiceContext, m: MappingVersion) -> dict[str, Any]:
             values[key] = item
         unique.append(item)
     items = unique
+    # Ground the question card in stored file observations, not model-invented examples.
+    from forma.engine.semantic_checks import column_refs
+
+    field_by_target = {f.target: f for f in fields}
+    renames = {s.id: s.rename for s in doc.sources}
+    for item in items:
+        pointer = item["field"]["pointer"]
+        mapped = field_by_target.get(pointer)
+        if mapped is None:
+            continue
+        examples = []
+        for ref in column_refs(mapped.expr, source_of.get(pointer, doc.record.root_source))[:3]:
+            source, _, name = ref.partition(".")
+            observed = next(
+                (
+                    c
+                    for c in columns.get(source, [])
+                    if renames.get(source, {}).get(c["name"], c["name"]) == name
+                ),
+                None,
+            )
+            if observed is None:
+                continue
+            sample_values = (observed.get("observations") or {}).get("representative_values") or observed.get(
+                "samples", []
+            )
+            sample_values = [str(v)[:120] for v in sample_values[:3]]
+            if not sample_values:
+                continue
+            examples.append(
+                {
+                    "source": source,
+                    "column": observed["name"],
+                    "values": sample_values,
+                    "scope": "profile samples; not all rows",
+                }
+            )
+            item.setdefault("evidence", []).append(
+                f"ตัวอย่างจากคอลัมน์ {observed['name']}: " + " · ".join(sample_values)
+            )
+        item["source_examples"] = examples
     aliases = {p for q in items for p in q.get("related_questions", []) if p != q.get("question")}
     items.sort(
         key=lambda item: (

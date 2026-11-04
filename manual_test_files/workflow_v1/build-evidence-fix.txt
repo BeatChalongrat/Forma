@@ -1,0 +1,235 @@
+ Image forma-worker Building 
+ Image forma-api Building 
+ Image forma-migrate Building 
+#1 [internal] load local bake definitions
+#1 reading from stdin 1.39kB done
+#1 DONE 0.0s
+
+#2 [api internal] load build definition from Dockerfile
+#2 transferring dockerfile: 1.19kB 0.0s done
+#2 DONE 0.1s
+
+#3 [api internal] load metadata for docker.io/library/python:3.12-slim
+#3 DONE 0.1s
+
+#4 [worker internal] load .dockerignore
+#4 transferring context: 414B 0.0s done
+#4 DONE 0.1s
+
+#5 [worker  1/11] FROM docker.io/library/python:3.12-slim@sha256:c3d81d25b3154142b0b42eb1e61300024426268edeb5b5a26dd7ddf64d9daf28
+#5 resolve docker.io/library/python:3.12-slim@sha256:c3d81d25b3154142b0b42eb1e61300024426268edeb5b5a26dd7ddf64d9daf28 0.0s done
+#5 DONE 0.0s
+
+#6 [api internal] load build context
+#6 transferring context: 33.08kB 0.0s done
+#6 transferring context: 33.08kB 0.0s done
+#6 DONE 0.1s
+
+#7 [api  2/11] RUN apt-get update && apt-get install -y --no-install-recommends postgresql-client ca-certificates     && rm -rf /var/lib/apt/lists/*
+#7 CACHED
+
+#8 [api  3/11] WORKDIR /app/backend
+#8 CACHED
+
+#9 [api  4/11] COPY backend/pyproject.toml backend/README.md ./
+#9 CACHED
+
+#10 [worker  5/11] COPY backend/src ./src
+#10 DONE 0.1s
+
+#11 [api  6/11] COPY backend/alembic ./alembic
+#11 DONE 0.1s
+
+#12 [api  7/11] COPY backend/alembic.ini ./alembic.ini
+#12 DONE 0.1s
+
+#13 [worker  8/11] RUN pip install uv && uv pip install --system .
+#13 3.781 Collecting uv
+#13 3.859   Downloading uv-0.13.7-py3-none-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (11 kB)
+#13 3.884 Downloading uv-0.13.7-py3-none-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (17.2 MB)
+#13 5.364    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 17.2/17.2 MB 11.7 MB/s eta 0:00:00
+#13 5.412 Installing collected packages: uv
+#13 5.751 Successfully installed uv-0.13.7
+#13 5.751 WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager, possibly rendering your system unusable. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv. Use the --root-user-action option if you know what you are doing and want to suppress this warning.
+#13 5.905 
+#13 5.905 [notice] A new release of pip is available: 25.0.1 -> 26.3
+#13 5.905 [notice] To update, run: pip install --upgrade pip
+#13 6.176 warning: The `tool.uv.dev-dependencies` field (used in `pyproject.toml`) is deprecated and will be removed in a future release; use `dependency-groups.dev` instead
+#13 6.582 Using Python 3.12.13 environment at: /usr/local
+#13 8.810 Resolved 98 packages in 2.22s
+#13 8.874    Building forma @ file:///app/backend
+#13 8.886 Downloading duckdb (23.2MiB)
+#13 8.911 Downloading polars-runtime-32 (51.4MiB)
+#13 8.932 Downloading cryptography (4.5MiB)
+#13 8.934 Downloading pygments (1.2MiB)
+#13 8.951 Downloading sqlalchemy (4.5MiB)
+#13 8.955 Downloading botocore (15.4MiB)
+#13 8.957 Downloading uvloop (4.3MiB)
+#13 8.961 Downloading pydantic-core (2.1MiB)
+#13 8.967 Downloading rapidfuzz (3.0MiB)
+#13 8.968 Downloading fastexcel (3.6MiB)
+#13 8.971 Downloading zstandard (5.3MiB)
+#13 8.986 Downloading psycopg-binary (5.0MiB)
+#13 12.51  Downloaded pygments
+#13 13.81  Downloaded pydantic-core
+#13 14.65  Downloaded rapidfuzz
+#13 15.15  Downloaded fastexcel
+#13 15.65       Built forma @ file:///app/backend
+#13 15.65  Downloaded uvloop
+#13 15.74  Downloaded sqlalchemy
+#13 15.77  Downloaded cryptography
+#13 16.05  Downloaded psycopg-binary
+#13 16.08  Downloaded zstandard
+#13 19.12  Downloaded botocore
+#13 20.21  Downloaded duckdb
+#13 21.81  Downloaded polars-runtime-32
+#13 21.81 Prepared 98 packages in 12.99s
+#13 22.04 Installed 98 packages in 227ms
+#13 22.04  + aiosqlite==0.22.1
+#13 22.04  + alembic==1.20.1
+#13 22.04  + annotated-doc==0.0.5
+#13 22.04  + annotated-types==0.8.0
+#13 22.04  + anyio==4.16.0
+#13 22.04  + arq==0.28.0
+#13 22.04  + attrs==26.1.0
+#13 22.04  + boto3==1.43.123
+#13 22.04  + botocore==1.43.123
+#13 22.04  + certifi==2026.10.23
+#13 22.04  + cffi==2.1.1
+#13 22.04  + charset-normalizer==3.5.2
+#13 22.04  + click==8.5.0
+#13 22.04  + cryptography==50.0.2
+#13 22.04  + distro==1.9.0
+#13 22.04  + duckdb==2.0.0
+#13 22.04  + et-xmlfile==2.0.0
+#13 22.04  + fastapi==0.162.0
+#13 22.04  + fastexcel==0.21.0
+#13 22.04  + fastjsonschema==2.22.3
+#13 22.04  + forma==0.1.0 (from file:///app/backend)
+#13 22.04  + h11==0.16.0
+#13 22.04  + hiredis==3.5.0
+#13 22.04  + httpcore==1.0.9
+#13 22.04  + httpcore2==2.16.0
+#13 22.04  + httptools==0.9.0
+#13 22.04  + httpx==0.28.1
+#13 22.04  + httpx2==2.16.0
+#13 22.04  + idna==3.20
+#13 22.04  + jmespath==1.1.0
+#13 22.04  + jsonpatch==1.41
+#13 22.04  + jsonpointer==3.8
+#13 22.04  + jsonschema==4.26.0
+#13 22.04  + jsonschema-specifications==2025.9.1
+#13 22.04  + langchain-core==1.7.4
+#13 22.04  + langchain-protocol==0.0.20
+#13 22.04  + langgraph==1.2.19
+#13 22.04  + langgraph-checkpoint==4.3.1
+#13 22.04  + langgraph-checkpoint-postgres==3.2.0
+#13 22.04  + langgraph-checkpoint-sqlite==3.1.3
+#13 22.04  + langgraph-prebuilt==1.1.1
+#13 22.04  + langgraph-sdk==0.4.12
+#13 22.04  + langsmith==0.14.17
+#13 22.04  + mako==1.4.3
+#13 22.04  + markdown-it-py==4.2.0
+#13 22.04  + markupsafe==3.0.4
+#13 22.04  + mdurl==0.1.2
+#13 22.04  + openpyxl==3.1.5
+#13 22.04  + opentelemetry-api==1.45.2
+#13 22.04  + orjson==3.13.0
+#13 22.04  + ormsgpack==1.13.0
+#13 22.04  + packaging==26.3
+#13 22.04  + polars==2.1.0
+#13 22.04  + polars-runtime-32==2.1.0
+#13 22.04  + prometheus-client==0.26.0
+#13 22.04  + psutil==7.2.2
+#13 22.04  + psycopg==3.3.8
+#13 22.04  + psycopg-binary==3.3.8
+#13 22.04  + psycopg-pool==3.3.3
+#13 22.04  + pycparser==3.12
+#13 22.04  + pydantic==2.14.2
+#13 22.04  + pydantic-core==2.50.2
+#13 22.04  + pydantic-settings==2.16.2
+#13 22.04  + pygments==2.21.0
+#13 22.04  + pyjwt==2.15.1
+#13 22.04  + python-dateutil==2.9.0.post0
+#13 22.04  + python-dotenv==1.2.4
+#13 22.04  + python-multipart==0.0.33
+#13 22.04  + python-ulid==4.1.0
+#13 22.04  + pyyaml==6.0.3
+#13 22.04  + rapidfuzz==3.14.6
+#13 22.04  + redis==5.3.1
+#13 22.04  + referencing==0.37.0
+#13 22.04  + requests==2.34.2
+#13 22.04  + requests-toolbelt==1.0.0
+#13 22.04  + rich==15.0.0
+#13 22.04  + rpds-py==2026.9.1
+#13 22.04  + s3transfer==0.19.3
+#13 22.04  + shellingham==1.5.4
+#13 22.04  + six==1.17.0
+#13 22.04  + sniffio==1.3.1
+#13 22.04  + sqlalchemy==2.1.8
+#13 22.04  + sqlite-vec==0.1.9
+#13 22.04  + starlette==1.10.0
+#13 22.04  + structlog==26.1.0
+#13 22.04  + tenacity==9.2.1
+#13 22.04  + truststore==0.10.5
+#13 22.04  + typer==0.27.3
+#13 22.04  + typing-extensions==4.16.0
+#13 22.04  + typing-inspection==0.4.4
+#13 22.04  + urllib3==2.8.0
+#13 22.04  + uuid-utils==0.19.0
+#13 22.04  + uvicorn==0.54.0
+#13 22.04  + uvloop==0.23.0
+#13 22.04  + watchfiles==1.3.0
+#13 22.04  + websockets==17.4
+#13 22.04  + xxhash==4.0.2
+#13 22.04  + zstandard==0.25.0
+#13 DONE 23.5s
+
+#14 [api  9/11] COPY target_schema /app/target_schema
+#14 DONE 0.1s
+
+#15 [worker 10/11] COPY policies /app/policies
+#15 DONE 0.1s
+
+#16 [api 11/11] RUN useradd --create-home --uid 10001 forma && mkdir -p /data && chown -R forma:forma /data /app
+#16 DONE 0.8s
+
+#17 [api] exporting to image
+#17 exporting layers
+#17 ...
+
+#18 [worker] exporting to image
+#18 ...
+
+#17 [api] exporting to image
+#17 exporting layers 16.6s done
+#17 exporting manifest sha256:22719d42731a73da39d3c6047c692a73bedba2c51e1cf371166928255dcbd4b3 0.0s done
+#17 exporting config sha256:38d1e9030990eefffbc94d311fc2cb6dbc4e7e1201a4c67e03222f83fb03e5da 0.0s done
+#17 exporting attestation manifest sha256:66da0a3b06acc181ef5f391a9ea4142ef0c90015fc747d84c0b57cddcfcb741f
+#17 exporting attestation manifest sha256:66da0a3b06acc181ef5f391a9ea4142ef0c90015fc747d84c0b57cddcfcb741f 0.1s done
+#17 exporting manifest list sha256:d12f7792ea9ed465d2f7636272f12c742227920b824fe4b2f781043c41e4a435 0.0s done
+#17 naming to docker.io/library/forma-api:latest done
+#17 unpacking to docker.io/library/forma-api:latest
+#17 ...
+
+#18 [worker] exporting to image
+#18 exporting layers 16.6s done
+#18 exporting manifest sha256:96c982d4e61cea97256c8da6564dc3c72757136f87f6a27979f31ed0c59b234f 0.0s done
+#18 exporting config sha256:49fd8a851597e3e5c1a825a5fa087abd829523afbccd5d984cb83b60ec16c338 0.0s done
+#18 exporting attestation manifest sha256:70a11b2fb472a2c40e1a5e3f38ef0b829d0ffa26aebdf524d7788bc7a0c7aa3b 0.1s done
+#18 exporting manifest list sha256:0c80ecee62775cdb10de50bbd1e3a0a30b9b1439aae43ea3a72e76ae67dbfc0e 0.0s done
+#18 naming to docker.io/library/forma-worker:latest done
+#18 unpacking to docker.io/library/forma-worker:latest 7.3s done
+#18 DONE 24.2s
+
+#17 [api] exporting to image
+#17 unpacking to docker.io/library/forma-api:latest 7.3s done
+#17 DONE 24.3s
+
+#19 [worker] resolving provenance for metadata file
+#19 DONE 0.0s
+
+#20 [api] resolving provenance for metadata file
+#20 DONE 0.0s
+ Image forma-api Built 
+ Image forma-worker Built 

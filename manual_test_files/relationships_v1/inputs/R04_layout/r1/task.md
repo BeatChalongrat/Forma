@@ -1,0 +1,2 @@
+Map the supplied ERP export(s) to the supplied JSON Schema. Preserve the master product population and identities. Do not invent business facts. Ask a specific question if required facts cannot be established.
+The workbook contains the applicable currency and quantity basis. Exclude the TOTAL row; it is not a product.

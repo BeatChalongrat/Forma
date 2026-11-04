@@ -14,12 +14,24 @@ import httpx
 
 from forma.ai import guard
 from forma.ai.breaker import get_breaker
+from forma.ai.limiter import cooldown, provider_slot
 from forma.ai.llm import AnthropicProvider, LLMClient, LLMError, OpenAICompatibleProvider, Usage
 from forma.core import metrics
 
 
 class StreamCancelled(Exception):
     pass
+
+
+@contextlib.contextmanager
+def _stream_deadline(response: httpx.Response, seconds: float):  # type: ignore[no-untyped-def]
+    timer = threading.Timer(seconds, response.close)
+    timer.daemon = True
+    timer.start()
+    try:
+        yield
+    finally:
+        timer.cancel()
 
 
 @dataclass
@@ -96,13 +108,17 @@ def stream_text(
                     "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
                 }
             with (
+                provider_slot(url, headers, provider.timeout, check=stream.check),
                 httpx.Client(timeout=provider.timeout) as client,
                 client.stream("POST", url, headers=headers, json=body) as response,
+                _stream_deadline(response, provider.timeout),
             ):
                 started = True
                 stream.close_provider = response.close
                 stream.check()
                 if response.status_code >= 400:
+                    if response.status_code == 429:
+                        cooldown(url, headers, response.headers.get("Retry-After"))
                     raise LLMError(f"Streaming HTTP {response.status_code}")
                 ended = False
                 for line in response.iter_lines():

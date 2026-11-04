@@ -27,6 +27,8 @@ def _where(source: Any, files: list[Any] | None) -> dict[str, Any]:
         or (sheet.index if sheet else None),
         "data_start": table.data_start,
         "data_end": table.data_end,
+        "first_column": table.first_column,
+        "last_column": table.last_column,
         "unpivot": table.unpivot.model_dump(mode="json") if table.unpivot else None,
         "filter": table.filter.model_dump(mode="json", exclude_none=True) if table.filter else None,
         "fill_down": list(table.fill_down),
@@ -42,7 +44,12 @@ def _canonical_with(sources: dict[str, Any]) -> Any:
             return value
         out = {k: canonical(v, default) for k, v in value.items()}
         if value.get("op") == "col":
-            out["source"] = sources.get(value.get("source") or default, {"unresolved": True})
+            location = dict(sources.get(value.get("source") or default, {"unresolved": True}))
+            renames = location.pop("rename", {})
+            matches = [raw for raw, alias in renames.items() if alias == value.get("name")]
+            if len(matches) == 1:
+                out["name"] = matches[0]
+            out["source"] = location
         return out
 
     return canonical
@@ -154,8 +161,8 @@ def reading_core(doc: MappingDocument, target: str, *, files: list[Any] | None =
         "cells": sorted(cells, key=repr),
         "consts": sorted(consts, key=repr),
         "value_ops": sorted(ops, key=repr),
-        "source": sig.get("source"),
-        "root": sig.get("root"),
+        # Source location is already carried by each physical column. Root/join selection
+        # is compared separately; moving a price read into a joined source isn't a new cell.
     }
 
 

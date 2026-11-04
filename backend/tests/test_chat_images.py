@@ -106,13 +106,13 @@ class _Http:
     def __init__(self, reply: dict[str, Any]) -> None:
         self.reply = reply
 
-    def __enter__(self) -> _Http:
+    async def __aenter__(self) -> _Http:
         return self
 
-    def __exit__(self, *a: Any) -> None:
+    async def __aexit__(self, *a: Any) -> None:
         pass
 
-    def post(self, url: str, headers: Any, json: dict[str, Any]) -> Any:
+    async def post(self, url: str, headers: Any, json: dict[str, Any]) -> Any:
         _Http.sent = json
         reply = self.reply
 
@@ -130,7 +130,7 @@ def test_each_provider_gets_the_picture_in_its_own_format(monkeypatch: pytest.Mo
     args: dict[str, Any] = {"system": "s", "user": "u", "schema": {}, "model": "m", "temperature": 0.0}
 
     openai = {"choices": [{"message": {"content": "{}"}}], "usage": {}}
-    monkeypatch.setattr(llm.httpx, "Client", lambda **kw: _Http(openai))
+    monkeypatch.setattr(llm.httpx, "AsyncClient", lambda **kw: _Http(openai))
     OpenAICompatibleProvider("k").complete_json(**args, images=[picture])
     content = _Http.sent["messages"][1]["content"]
     assert content[0] == {"type": "text", "text": "u"}
@@ -139,7 +139,7 @@ def test_each_provider_gets_the_picture_in_its_own_format(monkeypatch: pytest.Mo
     assert _Http.sent["messages"][1]["content"] == "u"
 
     anthropic = {"content": [{"type": "text", "text": "{}"}], "usage": {}}
-    monkeypatch.setattr(llm.httpx, "Client", lambda **kw: _Http(anthropic))
+    monkeypatch.setattr(llm.httpx, "AsyncClient", lambda **kw: _Http(anthropic))
     AnthropicProvider("k").complete_json(**args, images=[picture])
     content = _Http.sent["messages"][0]["content"]
     assert content[0]["source"] == {"type": "base64", "media_type": "image/png", "data": "YWJj"}

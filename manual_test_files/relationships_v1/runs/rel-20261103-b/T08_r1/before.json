@@ -1,0 +1,782 @@
+{
+  "round": {
+    "id": "rnd_01M6G9ZEEP0D395084E0E3CXR5",
+    "customer_id": "cus_01M6G9ZDW484D5FDTKN4SRRE81",
+    "label": "EVAL rel-20261103-b T08_r1",
+    "status": "blocked",
+    "target_schema": "eval_rel-20261103-b_t08@1",
+    "notes": "Map the supplied ERP export(s) to the supplied JSON Schema. Preserve the master product population and identities. Do not invent business facts. Ask a specific question if required facts cannot be established.\nUse Export as the product list. Quantities must be supported by the workbook dependencies. If a referenced input is unavailable, do not infer its value.",
+    "summary": {
+      "drift": null,
+      "profile": [
+        {
+          "name": "delivery.xlsx",
+          "drift": null,
+          "tables": 3,
+          "file_id": "fil_01M6G9ZEHPW8CG4FVF4N3X9NPP",
+          "fingerprint": "ecf1de050b88661f"
+        }
+      ],
+      "verdict": {
+        "word": "likely",
+        "stage": "mapping",
+        "digest": "c5954010340bf3ef0c900640583fff65",
+        "outcome": "fix_mapping",
+        "subject": {
+          "id": "map_01M6G9ZN0C7PZYC56JZ4ESYJVW",
+          "kind": "mapping",
+          "round_id": "rnd_01M6G9ZEEP0D395084E0E3CXR5"
+        },
+        "evidence": [
+          {
+            "id": 1,
+            "kind": "errors",
+            "link": "/rounds/rnd_01M6G9ZEEP0D395084E0E3CXR5/mapping/map_01M6G9ZN0C7PZYC56JZ4ESYJVW?tab=findings",
+            "text": {
+              "en": "1 engine or validation errors",
+              "th": "ข้อผิดพลาดของ engine/การตรวจ 1 จุด"
+            },
+            "numbers": {
+              "errors": 1
+            }
+          },
+          {
+            "id": 2,
+            "kind": "ai",
+            "link": null,
+            "text": {
+              "en": "AI was unavailable; the deterministic draft is in use",
+              "th": "AI ใช้งานไม่ได้ ใช้ร่างจากกฎแทน"
+            },
+            "numbers": {}
+          }
+        ],
+        "narrative": null,
+        "conclusion": {
+          "en": "The policy blocks this mapping: transformation produced zero records",
+          "th": "กฎระงับการจับคู่นี้: transformation produced zero records"
+        },
+        "confidence": 0.7,
+        "suppressed": {
+          "count": 0,
+          "groups": []
+        },
+        "must_decide": [],
+        "rules_fired": [
+          "blocked"
+        ],
+        "round_status": "blocked",
+        "rules_version": "2026.10.4",
+        "mapping_status": "proposed",
+        "policy_decision": "block"
+      },
+      "decision": "block",
+      "simulation": null,
+      "drift_report": null,
+      "format_memory": {
+        "status": "new",
+        "mapping_id": null,
+        "target_schema": "eval_rel-20261103-b_t08@1",
+        "mapping_version": null
+      },
+      "skipped_files": 0,
+      "profiled_files": 1,
+      "mapping_version_id": "map_01M6G9ZN0C7PZYC56JZ4ESYJVW",
+      "has_previous_approval": false,
+      "matches_other_customer": null
+    },
+    "created_at": "2026-11-03T08:56:24.790940+00:00",
+    "updated_at": "2026-11-03T08:56:31.508720+00:00",
+    "successor_id": null,
+    "predecessor_id": null,
+    "files": [
+      {
+        "id": "fil_01M6G9ZEHPW8CG4FVF4N3X9NPP",
+        "round_id": "rnd_01M6G9ZEEP0D395084E0E3CXR5",
+        "name": "delivery.xlsx",
+        "size": 5134,
+        "kind": "excel",
+        "status": "profiled",
+        "sha256": "8aea9aee3923d5068ee713dfb0c4b1afe1d290168fc656ad806cf0d6542d52a4",
+        "duplicate_of": null,
+        "error": null,
+        "created_at": "2026-11-03T08:56:24.886182+00:00",
+        "fingerprint": "ecf1de050b88661f",
+        "drift": null,
+        "tables": 3,
+        "sheets": [
+          "Export",
+          "Counts",
+          "Pack factors"
+        ]
+      }
+    ],
+    "customer": {
+      "id": "cus_01M6G9ZDW484D5FDTKN4SRRE81",
+      "code": "EVAL-rel-20261103-b-T08",
+      "name": "EVAL-rel-20261103-b-T08"
+    },
+    "successor": null,
+    "predecessor": null,
+    "mappings": [
+      {
+        "id": "map_01M6G9ZN0C7PZYC56JZ4ESYJVW",
+        "customer_id": "cus_01M6G9ZDW484D5FDTKN4SRRE81",
+        "round_id": "rnd_01M6G9ZEEP0D395084E0E3CXR5",
+        "version": 1,
+        "status": "proposed",
+        "target_schema": "eval_rel-20261103-b_t08@1",
+        "confidence": 1.0,
+        "created_by": "system",
+        "model": null,
+        "policy": {
+          "checks": {
+            "drift": null,
+            "errors": 1,
+            "rows_out": 0,
+            "warnings": 0,
+            "llm_fallback": true,
+            "reused_approved": false,
+            "full_verification": false,
+            "plausibility_warnings": 0
+          },
+          "impact": {},
+          "source": "heuristic",
+          "reasons": [
+            "transformation produced zero records",
+            "verification: missing_required: required target /qty is not mapped",
+            "verification: No transformation result was verified"
+          ],
+          "sandbox": null,
+          "verdict": {
+            "word": "likely",
+            "stage": "mapping",
+            "digest": "c5954010340bf3ef0c900640583fff65",
+            "outcome": "fix_mapping",
+            "subject": {
+              "id": "map_01M6G9ZN0C7PZYC56JZ4ESYJVW",
+              "kind": "mapping",
+              "round_id": "rnd_01M6G9ZEEP0D395084E0E3CXR5"
+            },
+            "evidence": [
+              {
+                "id": 1,
+                "kind": "errors",
+                "link": "/rounds/rnd_01M6G9ZEEP0D395084E0E3CXR5/mapping/map_01M6G9ZN0C7PZYC56JZ4ESYJVW?tab=findings",
+                "text": {
+                  "en": "1 engine or validation errors",
+                  "th": "ข้อผิดพลาดของ engine/การตรวจ 1 จุด"
+                },
+                "numbers": {
+                  "errors": 1
+                }
+              },
+              {
+                "id": 2,
+                "kind": "ai",
+                "link": null,
+                "text": {
+                  "en": "AI was unavailable; the deterministic draft is in use",
+                  "th": "AI ใช้งานไม่ได้ ใช้ร่างจากกฎแทน"
+                },
+                "numbers": {}
+              }
+            ],
+            "narrative": null,
+            "conclusion": {
+              "en": "The policy blocks this mapping: transformation produced zero records",
+              "th": "กฎระงับการจับคู่นี้: transformation produced zero records"
+            },
+            "confidence": 0.7,
+            "suppressed": {
+              "count": 0,
+              "groups": []
+            },
+            "must_decide": [],
+            "rules_fired": [
+              "blocked"
+            ],
+            "round_status": "blocked",
+            "rules_version": "2026.10.4",
+            "mapping_status": "proposed",
+            "policy_decision": "block"
+          },
+          "decision": "block",
+          "learning": null,
+          "priority": 40,
+          "agreement": null,
+          "risk_level": "high",
+          "risk_score": 1.0,
+          "self_check": null,
+          "simulation": null,
+          "reused_from": null,
+          "field_review": null,
+          "risk_factors": [
+            "blocked by policy",
+            "validation or engine errors"
+          ],
+          "verification": {
+            "passed": false,
+            "version": 1,
+            "complete": false,
+            "problems": [
+              "missing_required: required target /qty is not mapped",
+              "No transformation result was verified"
+            ],
+            "warnings": []
+          },
+          "clarifications": [],
+          "confidence_basis": null,
+          "review_decisions": [],
+          "target_schema_hash": "d4c942cac89af74d",
+          "confirmed_decisions": []
+        },
+        "open_questions": [],
+        "validation": {
+          "ok": false,
+          "issues": [
+            {
+              "code": "missing_required",
+              "path": "/fields",
+              "level": "error",
+              "message": "required target /qty is not mapped"
+            }
+          ]
+        },
+        "parent_id": null,
+        "approved_by": null,
+        "approved_at": null,
+        "comment": null,
+        "created_at": "2026-11-03T08:56:31.503177+00:00",
+        "agent_log": [
+          {
+            "agent": "operator_requirements",
+            "sha256": "035610bb352a9af304d1018d577ee9b1b9febc17380fcc47f5beaea2545ec734",
+            "characters": 362,
+            "changed_since_approved": false
+          },
+          {
+            "agent": "heuristic",
+            "unmatched": {
+              "products_0": [
+                "Stock pieces"
+              ],
+              "products_1": [
+                "SKU",
+                "Cartons"
+              ]
+            },
+            "confidence": 1.0,
+            "table_roles": {
+              "0": "products",
+              "1": "products",
+              "2": "other"
+            }
+          },
+          {
+            "agent": "llm",
+            "error": "LLMError: openai HTTP 503: {\"error\":{\"message\":\"Service is too busy. We advise users to temporarily switch to alternative LLM API service providers. (request_id: 7f1ebbf0-8174-4713-b884-ada04feac25b)\",\"type\":\"service_unavailable_error\",\"param\":null,\"code\":\"service_unavailable_error\"}}",
+            "fallback": "heuristic"
+          }
+        ],
+        "sample": []
+      }
+    ],
+    "datasets": [],
+    "review_tasks": [
+      {
+        "id": "rev_01M6G9ZN0KRY57V1W4F6MNJAES",
+        "round_id": "rnd_01M6G9ZEEP0D395084E0E3CXR5",
+        "customer_id": "cus_01M6G9ZDW484D5FDTKN4SRRE81",
+        "mapping_version_id": "map_01M6G9ZN0C7PZYC56JZ4ESYJVW",
+        "dataset_version_id": null,
+        "kind": "blocked",
+        "priority": 40,
+        "status": "open",
+        "reasons": [
+          "transformation produced zero records",
+          "verification: missing_required: required target /qty is not mapped",
+          "verification: No transformation result was verified"
+        ],
+        "details": {
+          "impact": {},
+          "verdict": {
+            "word": "likely",
+            "stage": "mapping",
+            "digest": "c5954010340bf3ef0c900640583fff65",
+            "outcome": "fix_mapping",
+            "conclusion": {
+              "en": "The policy blocks this mapping: transformation produced zero records",
+              "th": "กฎระงับการจับคู่นี้: transformation produced zero records"
+            },
+            "confidence": 0.7,
+            "rules_fired": [
+              "blocked"
+            ]
+          },
+          "decision": "block",
+          "findings": [
+            {
+              "kind": "binding",
+              "message": "missing_required: required target /qty is not mapped",
+              "severity": "error"
+            }
+          ],
+          "risk_level": "high",
+          "risk_factors": [
+            "blocked by policy",
+            "validation or engine errors"
+          ],
+          "open_questions": []
+        },
+        "resolver": null,
+        "comment": null,
+        "created_at": "2026-11-03T08:56:31.507283+00:00",
+        "resolved_at": null,
+        "age_days": 0,
+        "waiting_until": null,
+        "waiting_note": null
+      }
+    ],
+    "jobs": [
+      {
+        "id": "job_01M6G9ZHJY9S9DK67RHFTGMGCG",
+        "kind": "propose_mapping",
+        "status": "done",
+        "progress": 100,
+        "message": null,
+        "error": null
+      },
+      {
+        "id": "job_01M6G9ZEJYF4VVPH607EWEXGD7",
+        "kind": "profile_round",
+        "status": "done",
+        "progress": 100,
+        "message": null,
+        "error": null
+      }
+    ]
+  },
+  "mapping": {
+    "id": "map_01M6G9ZN0C7PZYC56JZ4ESYJVW",
+    "customer_id": "cus_01M6G9ZDW484D5FDTKN4SRRE81",
+    "round_id": "rnd_01M6G9ZEEP0D395084E0E3CXR5",
+    "version": 1,
+    "status": "proposed",
+    "target_schema": "eval_rel-20261103-b_t08@1",
+    "confidence": 1.0,
+    "created_by": "system",
+    "model": null,
+    "policy": {
+      "checks": {
+        "drift": null,
+        "errors": 1,
+        "rows_out": 0,
+        "warnings": 0,
+        "llm_fallback": true,
+        "reused_approved": false,
+        "full_verification": false,
+        "plausibility_warnings": 0
+      },
+      "impact": {},
+      "source": "heuristic",
+      "reasons": [
+        "transformation produced zero records",
+        "verification: missing_required: required target /qty is not mapped",
+        "verification: No transformation result was verified"
+      ],
+      "sandbox": null,
+      "verdict": {
+        "word": "likely",
+        "stage": "mapping",
+        "digest": "c5954010340bf3ef0c900640583fff65",
+        "outcome": "fix_mapping",
+        "subject": {
+          "id": "map_01M6G9ZN0C7PZYC56JZ4ESYJVW",
+          "kind": "mapping",
+          "round_id": "rnd_01M6G9ZEEP0D395084E0E3CXR5"
+        },
+        "evidence": [
+          {
+            "id": 1,
+            "kind": "errors",
+            "link": "/rounds/rnd_01M6G9ZEEP0D395084E0E3CXR5/mapping/map_01M6G9ZN0C7PZYC56JZ4ESYJVW?tab=findings",
+            "text": {
+              "en": "1 engine or validation errors",
+              "th": "ข้อผิดพลาดของ engine/การตรวจ 1 จุด"
+            },
+            "numbers": {
+              "errors": 1
+            }
+          },
+          {
+            "id": 2,
+            "kind": "ai",
+            "link": null,
+            "text": {
+              "en": "AI was unavailable; the deterministic draft is in use",
+              "th": "AI ใช้งานไม่ได้ ใช้ร่างจากกฎแทน"
+            },
+            "numbers": {}
+          }
+        ],
+        "narrative": null,
+        "conclusion": {
+          "en": "The policy blocks this mapping: transformation produced zero records",
+          "th": "กฎระงับการจับคู่นี้: transformation produced zero records"
+        },
+        "confidence": 0.7,
+        "suppressed": {
+          "count": 0,
+          "groups": []
+        },
+        "must_decide": [],
+        "rules_fired": [
+          "blocked"
+        ],
+        "round_status": "blocked",
+        "rules_version": "2026.10.4",
+        "mapping_status": "proposed",
+        "policy_decision": "block"
+      },
+      "decision": "block",
+      "learning": null,
+      "priority": 40,
+      "agreement": null,
+      "risk_level": "high",
+      "risk_score": 1.0,
+      "self_check": null,
+      "simulation": null,
+      "reused_from": null,
+      "field_review": null,
+      "risk_factors": [
+        "blocked by policy",
+        "validation or engine errors"
+      ],
+      "verification": {
+        "passed": false,
+        "version": 1,
+        "complete": false,
+        "problems": [
+          "missing_required: required target /qty is not mapped",
+          "No transformation result was verified"
+        ],
+        "warnings": []
+      },
+      "clarifications": [],
+      "confidence_basis": null,
+      "review_decisions": [],
+      "target_schema_hash": "d4c942cac89af74d",
+      "confirmed_decisions": []
+    },
+    "open_questions": [],
+    "validation": {
+      "ok": false,
+      "issues": [
+        {
+          "code": "missing_required",
+          "path": "/fields",
+          "level": "error",
+          "message": "required target /qty is not mapped"
+        }
+      ]
+    },
+    "parent_id": null,
+    "approved_by": null,
+    "approved_at": null,
+    "comment": null,
+    "created_at": "2026-11-03T08:56:31.503177+00:00",
+    "agent_log": [
+      {
+        "agent": "operator_requirements",
+        "sha256": "035610bb352a9af304d1018d577ee9b1b9febc17380fcc47f5beaea2545ec734",
+        "characters": 362,
+        "changed_since_approved": false
+      },
+      {
+        "agent": "heuristic",
+        "unmatched": {
+          "products_0": [
+            "Stock pieces"
+          ],
+          "products_1": [
+            "SKU",
+            "Cartons"
+          ]
+        },
+        "confidence": 1.0,
+        "table_roles": {
+          "0": "products",
+          "1": "products",
+          "2": "other"
+        }
+      },
+      {
+        "agent": "llm",
+        "error": "LLMError: openai HTTP 503: {\"error\":{\"message\":\"Service is too busy. We advise users to temporarily switch to alternative LLM API service providers. (request_id: 7f1ebbf0-8174-4713-b884-ada04feac25b)\",\"type\":\"service_unavailable_error\",\"param\":null,\"code\":\"service_unavailable_error\"}}",
+        "fallback": "heuristic"
+      }
+    ],
+    "sample": [],
+    "document": {
+      "meta": {
+        "version": 1,
+        "evidence": [
+          "root table: sheet 'Export' (12 rows) classified as products"
+        ],
+        "confidence": 1.0,
+        "created_by": "system",
+        "customer_id": "cus_01M6G9ZDW484D5FDTKN4SRRE81",
+        "fingerprints": {
+          "products_0": "ecf1de050b88661f",
+          "products_1": "ecf1de050b88661f"
+        },
+        "target_schema": "eval_rel-20261103-b_t08@1"
+      },
+      "joins": [],
+      "fields": [
+        {
+          "expr": {
+            "op": "normalize_whitespace",
+            "args": [
+              {
+                "op": "col",
+                "name": "SKU"
+              }
+            ],
+            "params": {}
+          },
+          "target": "/sku",
+          "evidence": [
+            "header 'SKU' == synonym 'sku'"
+          ],
+          "confidence": 1.0
+        },
+        {
+          "expr": {
+            "op": "normalize_whitespace",
+            "args": [
+              {
+                "op": "col",
+                "name": "Product name"
+              }
+            ],
+            "params": {}
+          },
+          "target": "/product_name",
+          "evidence": [
+            "header 'Product name' == synonym 'product name'"
+          ],
+          "confidence": 1.0
+        }
+      ],
+      "record": {
+        "dedupe": {
+          "keep": "first",
+          "keys": []
+        },
+        "filters": [],
+        "root_source": "products_0"
+      },
+      "quality": [
+        {
+          "rule": "unique",
+          "params": {},
+          "target": "/sku",
+          "severity": "warning"
+        }
+      ],
+      "sources": [
+        {
+          "id": "products_0",
+          "csv": {
+            "encoding": "auto",
+            "delimiter": "auto",
+            "quote_char": "\""
+          },
+          "file": {
+            "name_pattern": "(?i)^delivery",
+            "sheet_names_any": [
+              "Export"
+            ]
+          },
+          "role": "products",
+          "sheet": {
+            "name": "Export"
+          },
+          "table": {
+            "fill_down": [],
+            "header_row": 0,
+            "header_rows": 1,
+            "last_column": 3,
+            "first_column": 0,
+            "drop_total_rows": true,
+            "drop_empty_columns": true,
+            "stop_at_blank_rows": 2,
+            "drop_repeated_headers": true
+          },
+          "rename": {}
+        },
+        {
+          "id": "products_1",
+          "csv": {
+            "encoding": "auto",
+            "delimiter": "auto",
+            "quote_char": "\""
+          },
+          "file": {
+            "name_pattern": "(?i)^delivery",
+            "sheet_names_any": [
+              "Counts"
+            ]
+          },
+          "role": "products",
+          "sheet": {
+            "name": "Counts"
+          },
+          "table": {
+            "fill_down": [],
+            "header_row": 0,
+            "header_rows": 1,
+            "last_column": 2,
+            "first_column": 0,
+            "drop_total_rows": true,
+            "drop_empty_columns": true,
+            "stop_at_blank_rows": 2,
+            "drop_repeated_headers": true
+          },
+          "rename": {}
+        }
+      ],
+      "provenance": true,
+      "collections": [],
+      "attributes_passthrough": true
+    }
+  },
+  "questions": {
+    "mapping_id": "map_01M6G9ZN0C7PZYC56JZ4ESYJVW",
+    "round_id": "rnd_01M6G9ZEEP0D395084E0E3CXR5",
+    "status": "proposed",
+    "blocked": true,
+    "questions": [],
+    "open_questions": [],
+    "reasons": [
+      "transformation produced zero records",
+      "verification: missing_required: required target /qty is not mapped",
+      "verification: No transformation result was verified"
+    ],
+    "sample": [],
+    "context": {
+      "customer": {
+        "code": "EVAL-rel-20261103-b-T08",
+        "name": "EVAL-rel-20261103-b-T08"
+      },
+      "round_label": "EVAL rel-20261103-b T08_r1",
+      "files": [
+        {
+          "id": "fil_01M6G9ZEHPW8CG4FVF4N3X9NPP",
+          "name": "delivery.xlsx"
+        }
+      ],
+      "mapping_version": 1
+    },
+    "changes": [],
+    "comparison_dataset_id": null,
+    "checks": {
+      "drift": null,
+      "errors": 1,
+      "rows_out": 0,
+      "warnings": 0,
+      "llm_fallback": true,
+      "reused_approved": false,
+      "full_verification": false,
+      "plausibility_warnings": 0
+    },
+    "impact": {},
+    "fields": [
+      {
+        "pointer": "/qty",
+        "name": "qty",
+        "json_type": [
+          "number",
+          "null"
+        ],
+        "semantic": "stock.qty",
+        "risk": "high",
+        "required": true,
+        "nullable": true,
+        "enum": null,
+        "format": null,
+        "synonyms_en": [],
+        "synonyms_th": [],
+        "description": "Stock in individual pieces. Missing evidence is null, never zero.",
+        "description_th": null,
+        "in_collection": null,
+        "is_collection": false,
+        "system": false,
+        "default": null,
+        "examples": []
+      },
+      {
+        "pointer": "/sku",
+        "name": "sku",
+        "json_type": [
+          "string"
+        ],
+        "semantic": "identity.sku",
+        "risk": "medium",
+        "required": true,
+        "nullable": false,
+        "enum": null,
+        "format": null,
+        "synonyms_en": [],
+        "synonyms_th": [],
+        "description": "Unique SKU identifier; preserve leading zeros.",
+        "description_th": null,
+        "in_collection": null,
+        "is_collection": false,
+        "system": false,
+        "default": null,
+        "examples": []
+      },
+      {
+        "pointer": "/product_name",
+        "name": "product_name",
+        "json_type": [
+          "string"
+        ],
+        "semantic": "product.name",
+        "risk": "medium",
+        "required": true,
+        "nullable": false,
+        "enum": null,
+        "format": null,
+        "synonyms_en": [],
+        "synonyms_th": [],
+        "description": "Product name from the master list.",
+        "description_th": null,
+        "in_collection": null,
+        "is_collection": false,
+        "system": false,
+        "default": null,
+        "examples": []
+      }
+    ]
+  },
+  "preview": {
+    "ok": false,
+    "validation": {
+      "ok": false,
+      "issues": [
+        {
+          "level": "error",
+          "code": "missing_required",
+          "message": "required target /qty is not mapped",
+          "path": "/fields"
+        }
+      ]
+    },
+    "records": [],
+    "findings": []
+  }
+}

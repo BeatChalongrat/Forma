@@ -96,3 +96,14 @@ Errors: unknown target pointer, collection field mapped at root, duplicate targe
 required root field or identity key not mapped, required collection item field not mapped, bad or unknown op
 params.
 Warnings: critical field unmapped, critical field mapped to a constant.
+# Additive collection rows
+
+`collections[].aggregate` can sum several rows that contribute to one item, for example stock lots
+per parent product and warehouse. Expressions run first, so convert each row to the requested unit
+before summing. Example: `{"group_by":["/warehouse_code"],"sum":["/qty"]}`.
+
+Pointers are relative to the collection item. All mapped fields must be grouped or summed, identity
+fields must be grouped, and sums must be numeric. Identical additive rows are counted separately.
+Any missing sum input produces an unknown total and a validation error, never an implicit zero.
+All contributing source rows remain in provenance. Do not use aggregation to resolve conflicting
+prices or competing business facts; those need a rule from the source/contract or a human answer.

@@ -12,6 +12,7 @@ import polars as pl
 from forma.engine.thai import THAI_DIGITS, looks_like_thai_date, parse_number_th_py
 from forma.ingestion.readers import WorkbookMeta, read_meta, read_raw
 from forma.profiling.tables import SECTION_COLUMN, TableCandidate, detect_tables, extract_table
+from forma.profiling.value_evidence import column_observations, spread_indices, table_observations
 
 _THAI_RE = re.compile(r"[฀-๿]")
 _BARCODE_RE = re.compile(r"^\d{8}$|^\d{12,14}$")
@@ -38,6 +39,7 @@ class ColumnProfile:
         default_factory=list
     )  # sku_like, barcode_like, price_like, thai_date, percent, ...
     top_values: list[list[Any]] = field(default_factory=list)  # [value, count] by frequency (ADR-059)
+    observations: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         return self.__dict__.copy()
@@ -54,6 +56,8 @@ class TableProfile:
     key_candidates: list[str] = field(default_factory=list)
     file_id: str | None = None
     file_name: str | None = None
+    observations: dict[str, Any] = field(default_factory=dict)
+    total_rows: int | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -66,6 +70,8 @@ class TableProfile:
             "n_rows": self.n_rows,
             "key_candidates": self.key_candidates,
             "duplicate_key_candidates": self.duplicate_key_candidates,
+            "observations": self.observations,
+            "total_rows": self.total_rows,
         }
 
 
@@ -104,6 +110,8 @@ class WorkbookProfile:
                     t.get("key_candidates", []),
                     t.get("file_id"),
                     t.get("file_name"),
+                    t.get("observations", {}),
+                    t.get("total_rows"),
                 )
             )
         return cls(meta, tables)
@@ -132,6 +140,8 @@ def merge_profiles(profiles: list[tuple[str, str, WorkbookProfile]]) -> Workbook
                     t.key_candidates,
                     file_id,
                     file_name,
+                    t.observations,
+                    t.total_rows,
                 )
             )
     kind = "excel" if any(p.meta.kind == "excel" for _, _, p in profiles) else "csv"
@@ -187,7 +197,7 @@ def profile_column(s: pl.Series, position: int, *, sample_n: int = 8) -> ColumnP
     nn = non_null.len()
     null_ratio = 1.0 if n == 0 else 1 - nn / n
     uniques = non_null.n_unique() if nn else 0
-    vals = non_null.head(400).to_list()
+    vals = [non_null[i] for i in spread_indices(nn, 400)]
     hints: list[str] = []
     inferred = "empty"
     mn = mx = None
@@ -222,7 +232,7 @@ def profile_column(s: pl.Series, position: int, *, sample_n: int = 8) -> ColumnP
             if all(0 <= x <= 100 for x in nums) and any("%" in str(v) for v in vals):
                 hints.append("percent")
             if max(nums) > 0 and inferred == "float":
-                hints.append("price_like")
+                hints.append("decimal_numeric")
         if inferred == "string" or inferred == "int":
             if sum(bool(_BARCODE_RE.match(str(v))) for v in vals) / total > 0.8:
                 hints.append("barcode_like")
@@ -260,6 +270,7 @@ def profile_column(s: pl.Series, position: int, *, sample_n: int = 8) -> ColumnP
         header_lang=_header_lang(s.name),
         hints=hints,
         top_values=top_values,
+        observations=column_observations(s),
     )
 
 
@@ -281,7 +292,17 @@ def profile_table(frame: pl.DataFrame, cand: TableCandidate, sheet: str, sheet_i
         and 0.5 <= c.unique_ratio < 0.98
         and ("sku_like" in c.hints or "barcode_like" in c.hints)
     ]
-    return TableProfile(sheet, sheet_index, cand, cols, frame.height, dup_candidates, key_candidates)
+    return TableProfile(
+        sheet,
+        sheet_index,
+        cand,
+        cols,
+        frame.height,
+        dup_candidates,
+        key_candidates,
+        observations=table_observations(frame),
+        total_rows=frame.height,
+    )
 
 
 def profile_workbook(path: Path, *, max_rows_per_table: int = 50_000) -> WorkbookProfile:
@@ -301,6 +322,11 @@ def profile_workbook(path: Path, *, max_rows_per_table: int = 50_000) -> Workboo
                 continue
             if frame.width == 0 or frame.height == 0:
                 continue
+            total_rows = frame.height
             frame = frame.head(max_rows_per_table)
-            tables.append(profile_table(frame, cand, sh.name, sh.index))
+            table = profile_table(frame, cand, sh.name, sh.index)
+            table.total_rows = total_rows
+            table.observations["scope"]["source_rows_total"] = total_rows
+            table.observations["scope"]["complete"] &= frame.height == total_rows
+            tables.append(table)
     return WorkbookProfile(meta, tables)

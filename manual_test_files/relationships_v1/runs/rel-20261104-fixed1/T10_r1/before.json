@@ -1,0 +1,2980 @@
+{
+  "round": {
+    "id": "rnd_01M6JTDY5FQXGZQ5FRPHD30XMS",
+    "customer_id": "cus_01M6JTDXH281XPECNE63AV3Z1T",
+    "label": "EVAL rel-20261104-fixed1 T10_r1",
+    "status": "review",
+    "target_schema": "eval_rel-20261104-fixed1_t10@1",
+    "notes": "Map the supplied ERP export(s) to the supplied JSON Schema. Preserve the master product population and identities. Do not invent business facts. Ask a specific question if required facts cannot be established.\nThese are current RETAIL prices for one delivery. No precedence rule exists for conflicting records.",
+    "summary": {
+      "drift": null,
+      "profile": [
+        {
+          "name": "delivery.xlsx",
+          "drift": null,
+          "tables": 2,
+          "file_id": "fil_01M6JTDY82WAJQ2984NPE7APDP",
+          "fingerprint": "37a86ed9e7ac715e"
+        }
+      ],
+      "verdict": {
+        "word": "sure",
+        "stage": "mapping",
+        "digest": "d50f26b81aa540e788e0a6f8b87b4c04",
+        "outcome": "fix_mapping",
+        "subject": {
+          "id": "map_01M6JTM93DMD5MXK2FBWE0WHCW",
+          "kind": "mapping",
+          "round_id": "rnd_01M6JTDY5FQXGZQ5FRPHD30XMS"
+        },
+        "evidence": [
+          {
+            "id": 1,
+            "kind": "rows",
+            "link": "/rounds/rnd_01M6JTDY5FQXGZQ5FRPHD30XMS",
+            "text": {
+              "en": "12 records produced",
+              "th": "สร้างได้ 12 รายการ"
+            },
+            "numbers": {
+              "rows_out": 12
+            }
+          },
+          {
+            "id": 2,
+            "kind": "errors",
+            "link": "/rounds/rnd_01M6JTDY5FQXGZQ5FRPHD30XMS/mapping/map_01M6JTM93DMD5MXK2FBWE0WHCW?tab=findings",
+            "text": {
+              "en": "1 engine or validation errors",
+              "th": "ข้อผิดพลาดของ engine/การตรวจ 1 จุด"
+            },
+            "numbers": {
+              "errors": 1
+            }
+          },
+          {
+            "id": 3,
+            "kind": "self_check",
+            "link": null,
+            "text": {
+              "en": "The AI ran its mapping on the first 12 rows (1 look(s) at the file, 2 fix round(s)): 1 problem(s) left",
+              "th": "AI ลองรัน mapping กับ 12 แถวแรก (ดูไฟล์ 1 ครั้ง แก้ 2 รอบ): เหลือปัญหา 1 ข้อ"
+            },
+            "numbers": {
+              "rows": 12,
+              "fix_rounds": 2,
+              "inspections": 1,
+              "problems_left": 1
+            }
+          },
+          {
+            "id": 4,
+            "kind": "questions",
+            "link": "/review?round=rnd_01M6JTDY5FQXGZQ5FRPHD30XMS",
+            "text": {
+              "en": "1 fields below the confidence bar",
+              "th": "1 ฟิลด์ยังไม่ถึงเกณฑ์ความมั่นใจ"
+            },
+            "numbers": {
+              "count": 1
+            }
+          }
+        ],
+        "narrative": null,
+        "conclusion": {
+          "en": "1 errors stop records from being produced",
+          "th": "ข้อผิดพลาด 1 จุดทำให้สร้างบางรายการไม่ได้"
+        },
+        "confidence": 0.9,
+        "suppressed": {
+          "count": 0,
+          "groups": [
+            {
+              "text": {
+                "en": "2 notes from the mapper",
+                "th": "หมายเหตุจากตัวจับคู่ 2 ข้อ"
+              },
+              "reason": "open_questions",
+              "pointers": []
+            }
+          ]
+        },
+        "must_decide": [
+          {
+            "id": "/price:value:03cc69a0db45",
+            "why": {
+              "en": "The target schema allows only one /price per SKU and the source gives no precedence rule. Choosing one of the two prices silently would fabricate a business decision.",
+              "th": "The target schema allows only one /price per SKU and the source gives no precedence rule. Choosing one of the two prices silently would fabricate a business decision."
+            },
+            "kind": "text",
+            "scope": "source_value",
+            "default": null,
+            "options": [
+              "152",
+              "9999"
+            ],
+            "question": {
+              "en": "Material code 000004 appears twice in Prices with selling prices 9999 and 152 THB (9999 is a strong outlier). Which price should be delivered for this SKU?",
+              "th": "Material code 000004 appears twice in Prices with selling prices 9999 and 152 THB (9999 is a strong outlier). Which price should be delivered for this SKU?"
+            },
+            "semantic": "price.amount",
+            "allow_custom": true,
+            "evidence_ids": [
+              4
+            ],
+            "option_labels": null
+          }
+        ],
+        "rules_fired": [
+          "engine_errors"
+        ],
+        "round_status": "review",
+        "rules_version": "2026.10.4",
+        "mapping_status": "proposed",
+        "policy_decision": "review"
+      },
+      "decision": "review",
+      "simulation": {
+        "rows_in": 12,
+        "sources": {
+          "prices": 13,
+          "products": 12
+        },
+        "findings": {
+          "info": 0,
+          "error": 1,
+          "warning": 0
+        },
+        "rows_out": 12,
+        "collections": {},
+        "duration_ms": 200.0,
+        "identity_keys": [
+          "/sku"
+        ],
+        "invalid_records": 0
+      },
+      "drift_report": null,
+      "format_memory": {
+        "status": "new",
+        "mapping_id": null,
+        "target_schema": "eval_rel-20261104-fixed1_t10@1",
+        "mapping_version": null
+      },
+      "skipped_files": 0,
+      "profiled_files": 1,
+      "mapping_version_id": "map_01M6JTM93DMD5MXK2FBWE0WHCW",
+      "has_previous_approval": false,
+      "matches_other_customer": null
+    },
+    "created_at": "2026-11-04T08:22:25.711933+00:00",
+    "updated_at": "2026-11-04T08:25:53.543774+00:00",
+    "successor_id": null,
+    "predecessor_id": null,
+    "files": [
+      {
+        "id": "fil_01M6JTDY82WAJQ2984NPE7APDP",
+        "round_id": "rnd_01M6JTDY5FQXGZQ5FRPHD30XMS",
+        "name": "delivery.xlsx",
+        "size": 4559,
+        "kind": "excel",
+        "status": "profiled",
+        "sha256": "532d1f418ac2815641c394f55a3790bf451dfe1f5f3e0da847633abea5b56f1c",
+        "duplicate_of": "fil_01M6GA7XSMGWFQT374QSZCQ5BG",
+        "error": null,
+        "created_at": "2026-11-04T08:22:25.794470+00:00",
+        "fingerprint": "37a86ed9e7ac715e",
+        "drift": null,
+        "tables": 2,
+        "sheets": [
+          "Material",
+          "Prices"
+        ]
+      }
+    ],
+    "customer": {
+      "id": "cus_01M6JTDXH281XPECNE63AV3Z1T",
+      "code": "EVAL-rel-20261104-fixed1-T10",
+      "name": "EVAL-rel-20261104-fixed1-T10"
+    },
+    "successor": null,
+    "predecessor": null,
+    "mappings": [
+      {
+        "id": "map_01M6JTM93DMD5MXK2FBWE0WHCW",
+        "customer_id": "cus_01M6JTDXH281XPECNE63AV3Z1T",
+        "round_id": "rnd_01M6JTDY5FQXGZQ5FRPHD30XMS",
+        "version": 1,
+        "status": "proposed",
+        "target_schema": "eval_rel-20261104-fixed1_t10@1",
+        "confidence": 0.72,
+        "created_by": "ai",
+        "model": "deepseek-flash",
+        "policy": {
+          "checks": {
+            "drift": null,
+            "errors": 1,
+            "rows_out": 12,
+            "warnings": 0,
+            "agreement": {
+              "ops": 2,
+              "agree": 2,
+              "record": 3,
+              "dropped": 0,
+              "disagree": 1,
+              "model_only": 1
+            },
+            "llm_fallback": false,
+            "reused_approved": false,
+            "full_verification": false,
+            "mapping_confidence": 0.72,
+            "data_checks_trusted": false,
+            "low_confidence_high": [],
+            "unresolved_questions": 2,
+            "plausibility_warnings": 0,
+            "low_confidence_critical": []
+          },
+          "impact": {},
+          "source": "ai",
+          "reasons": [
+            "mapping confidence 0.72 < 0.95",
+            "1 engine/validation errors",
+            "first time this customer/format is seen",
+            "2 questions still need operator confirmation",
+            "the model selects rows differently from FORMA's matcher (records: dedupe; records: joins; records: root)",
+            "verification: 1 duplicate identities on ['/sku'] (1 of them with different values in Selling price, /price; keep=review)",
+            "verification: dedupe: 1 duplicate identities on ['/sku'] (1 of them with different values in Selling price, /price; keep=review)"
+          ],
+          "sandbox": null,
+          "verdict": {
+            "word": "sure",
+            "stage": "mapping",
+            "digest": "d50f26b81aa540e788e0a6f8b87b4c04",
+            "outcome": "fix_mapping",
+            "subject": {
+              "id": "map_01M6JTM93DMD5MXK2FBWE0WHCW",
+              "kind": "mapping",
+              "round_id": "rnd_01M6JTDY5FQXGZQ5FRPHD30XMS"
+            },
+            "evidence": [
+              {
+                "id": 1,
+                "kind": "rows",
+                "link": "/rounds/rnd_01M6JTDY5FQXGZQ5FRPHD30XMS",
+                "text": {
+                  "en": "12 records produced",
+                  "th": "สร้างได้ 12 รายการ"
+                },
+                "numbers": {
+                  "rows_out": 12
+                }
+              },
+              {
+                "id": 2,
+                "kind": "errors",
+                "link": "/rounds/rnd_01M6JTDY5FQXGZQ5FRPHD30XMS/mapping/map_01M6JTM93DMD5MXK2FBWE0WHCW?tab=findings",
+                "text": {
+                  "en": "1 engine or validation errors",
+                  "th": "ข้อผิดพลาดของ engine/การตรวจ 1 จุด"
+                },
+                "numbers": {
+                  "errors": 1
+                }
+              },
+              {
+                "id": 3,
+                "kind": "self_check",
+                "link": null,
+                "text": {
+                  "en": "The AI ran its mapping on the first 12 rows (1 look(s) at the file, 2 fix round(s)): 1 problem(s) left",
+                  "th": "AI ลองรัน mapping กับ 12 แถวแรก (ดูไฟล์ 1 ครั้ง แก้ 2 รอบ): เหลือปัญหา 1 ข้อ"
+                },
+                "numbers": {
+                  "rows": 12,
+                  "fix_rounds": 2,
+                  "inspections": 1,
+                  "problems_left": 1
+                }
+              },
+              {
+                "id": 4,
+                "kind": "questions",
+                "link": "/review?round=rnd_01M6JTDY5FQXGZQ5FRPHD30XMS",
+                "text": {
+                  "en": "1 fields below the confidence bar",
+                  "th": "1 ฟิลด์ยังไม่ถึงเกณฑ์ความมั่นใจ"
+                },
+                "numbers": {
+                  "count": 1
+                }
+              }
+            ],
+            "narrative": null,
+            "conclusion": {
+              "en": "1 errors stop records from being produced",
+              "th": "ข้อผิดพลาด 1 จุดทำให้สร้างบางรายการไม่ได้"
+            },
+            "confidence": 0.9,
+            "suppressed": {
+              "count": 0,
+              "groups": [
+                {
+                  "text": {
+                    "en": "2 notes from the mapper",
+                    "th": "หมายเหตุจากตัวจับคู่ 2 ข้อ"
+                  },
+                  "reason": "open_questions",
+                  "pointers": []
+                }
+              ]
+            },
+            "must_decide": [
+              {
+                "id": "/price:value:03cc69a0db45",
+                "why": {
+                  "en": "The target schema allows only one /price per SKU and the source gives no precedence rule. Choosing one of the two prices silently would fabricate a business decision.",
+                  "th": "The target schema allows only one /price per SKU and the source gives no precedence rule. Choosing one of the two prices silently would fabricate a business decision."
+                },
+                "kind": "text",
+                "scope": "source_value",
+                "default": null,
+                "options": [
+                  "152",
+                  "9999"
+                ],
+                "question": {
+                  "en": "Material code 000004 appears twice in Prices with selling prices 9999 and 152 THB (9999 is a strong outlier). Which price should be delivered for this SKU?",
+                  "th": "Material code 000004 appears twice in Prices with selling prices 9999 and 152 THB (9999 is a strong outlier). Which price should be delivered for this SKU?"
+                },
+                "semantic": "price.amount",
+                "allow_custom": true,
+                "evidence_ids": [
+                  4
+                ],
+                "option_labels": null
+              }
+            ],
+            "rules_fired": [
+              "engine_errors"
+            ],
+            "round_status": "review",
+            "rules_version": "2026.10.4",
+            "mapping_status": "proposed",
+            "policy_decision": "review"
+          },
+          "decision": "review",
+          "learning": null,
+          "priority": 65,
+          "agreement": {
+            "ops": [
+              "/currency",
+              "/price"
+            ],
+            "agree": [
+              "/currency",
+              "/price"
+            ],
+            "record": {
+              "root": {
+                "model": {
+                  "file": "fil_01M6JTDY82WAJQ2984NPE7APDP",
+                  "sheet": "material",
+                  "filter": null,
+                  "rename": {},
+                  "unpivot": null,
+                  "data_end": null,
+                  "fill_down": [],
+                  "data_start": null,
+                  "last_column": 2,
+                  "first_column": 0
+                },
+                "matcher": {
+                  "file": "fil_01M6JTDY82WAJQ2984NPE7APDP",
+                  "sheet": "prices",
+                  "filter": null,
+                  "rename": {},
+                  "unpivot": null,
+                  "data_end": null,
+                  "fill_down": [],
+                  "data_start": null,
+                  "last_column": 3,
+                  "first_column": 0
+                }
+              },
+              "joins": {
+                "model": [
+                  {
+                    "on": [
+                      {
+                        "left": "Material code",
+                        "right": "Material code"
+                      }
+                    ],
+                    "how": "left",
+                    "left": {
+                      "file": "fil_01M6JTDY82WAJQ2984NPE7APDP",
+                      "sheet": "material",
+                      "filter": null,
+                      "rename": {},
+                      "unpivot": null,
+                      "data_end": null,
+                      "fill_down": [],
+                      "data_start": null,
+                      "last_column": 2,
+                      "first_column": 0
+                    },
+                    "right": {
+                      "file": "fil_01M6JTDY82WAJQ2984NPE7APDP",
+                      "sheet": "prices",
+                      "filter": null,
+                      "rename": {},
+                      "unpivot": null,
+                      "data_end": null,
+                      "fill_down": [],
+                      "data_start": null,
+                      "last_column": 3,
+                      "first_column": 0
+                    },
+                    "cardinality": "1:N",
+                    "on_unmatched": "keep",
+                    "normalize_keys": [
+                      "trim",
+                      "strip_leading_zeros"
+                    ]
+                  }
+                ],
+                "matcher": []
+              },
+              "dedupe": {
+                "model": {
+                  "keep": "review",
+                  "keys": [
+                    "/sku"
+                  ]
+                },
+                "matcher": {
+                  "keep": "first",
+                  "keys": []
+                }
+              }
+            },
+            "dropped": [],
+            "disagree": {
+              "/sku": {
+                "model": [
+                  "products.Material code"
+                ],
+                "matcher": [
+                  "Prices.Selling price"
+                ]
+              }
+            },
+            "model_only": [
+              "/product_name"
+            ]
+          },
+          "risk_level": "high",
+          "risk_score": 0.62,
+          "self_check": {
+            "errors": 1,
+            "history": [
+              {
+                "turn": "ground",
+                "columns": 3
+              },
+              {
+                "turn": "inspect",
+                "requests": 2
+              },
+              {
+                "turn": "mapping",
+                "complete": true,
+                "coverage": {
+                  "fields": {
+                    "/sku": {
+                      "risk": "medium",
+                      "records": 12,
+                      "records_filled": 12
+                    },
+                    "/price": {
+                      "risk": "critical",
+                      "records": 12,
+                      "records_filled": 12
+                    },
+                    "/currency": {
+                      "risk": "critical",
+                      "records": 12,
+                      "records_filled": 12
+                    },
+                    "/product_name": {
+                      "risk": "medium",
+                      "records": 12,
+                      "records_filled": 12
+                    }
+                  },
+                  "sources": {
+                    "prices": 13,
+                    "products": 12
+                  },
+                  "collections": {},
+                  "invalid_records": 0
+                },
+                "problems": [
+                  "dedupe: 1 duplicate identities on ['/sku'] (1 of them with different values in Selling price, /price; keep=review)"
+                ],
+                "rows_out": 12
+              },
+              {
+                "turn": "mapping",
+                "complete": true,
+                "coverage": {
+                  "fields": {
+                    "/sku": {
+                      "risk": "medium",
+                      "records": 12,
+                      "records_filled": 12
+                    },
+                    "/price": {
+                      "risk": "critical",
+                      "records": 12,
+                      "records_filled": 12
+                    },
+                    "/currency": {
+                      "risk": "critical",
+                      "records": 12,
+                      "records_filled": 12
+                    },
+                    "/product_name": {
+                      "risk": "medium",
+                      "records": 12,
+                      "records_filled": 12
+                    }
+                  },
+                  "sources": {
+                    "prices": 13,
+                    "products": 12
+                  },
+                  "collections": {},
+                  "invalid_records": 0
+                },
+                "problems": [
+                  "dedupe: 1 duplicate identities on ['/sku'] (1 of them with different values in Selling price, /price; keep=review)"
+                ],
+                "rows_out": 12
+              },
+              {
+                "turn": "mapping",
+                "complete": true,
+                "coverage": {
+                  "fields": {
+                    "/sku": {
+                      "risk": "medium",
+                      "records": 12,
+                      "records_filled": 12
+                    },
+                    "/price": {
+                      "risk": "critical",
+                      "records": 12,
+                      "records_filled": 12
+                    },
+                    "/currency": {
+                      "risk": "critical",
+                      "records": 12,
+                      "records_filled": 12
+                    },
+                    "/product_name": {
+                      "risk": "medium",
+                      "records": 12,
+                      "records_filled": 12
+                    }
+                  },
+                  "sources": {
+                    "prices": 13,
+                    "products": 12
+                  },
+                  "collections": {},
+                  "invalid_records": 0
+                },
+                "problems": [
+                  "dedupe: 1 duplicate identities on ['/sku'] (1 of them with different values in Selling price, /price; keep=last)"
+                ],
+                "rows_out": 12
+              }
+            ],
+            "complete": true,
+            "coverage": {
+              "fields": {
+                "/sku": {
+                  "risk": "medium",
+                  "records": 12,
+                  "records_filled": 12
+                },
+                "/price": {
+                  "risk": "critical",
+                  "records": 12,
+                  "records_filled": 12
+                },
+                "/currency": {
+                  "risk": "critical",
+                  "records": 12,
+                  "records_filled": 12
+                },
+                "/product_name": {
+                  "risk": "medium",
+                  "records": 12,
+                  "records_filled": 12
+                }
+              },
+              "sources": {
+                "prices": 13,
+                "products": 12
+              },
+              "collections": {},
+              "invalid_records": 0
+            },
+            "grounded": 3,
+            "rows_out": 12,
+            "fix_rounds": 2,
+            "inspections": 1,
+            "python_turns": 0,
+            "rows_checked": 12,
+            "problems_left": [
+              "dedupe: 1 duplicate identities on ['/sku'] (1 of them with different values in Selling price, /price; keep=review)"
+            ]
+          },
+          "simulation": {
+            "fill": {
+              "/sku": 1.0,
+              "/price": 1.0,
+              "/currency": 1.0,
+              "/product_name": 1.0
+            },
+            "rows_in": 12,
+            "sources": {
+              "prices": 13,
+              "products": 12
+            },
+            "complete": true,
+            "findings": {
+              "info": 0,
+              "error": 1,
+              "warning": 0
+            },
+            "rows_out": 12,
+            "collections": {},
+            "duration_ms": 200.0,
+            "identity_keys": [
+              "/sku"
+            ],
+            "invalid_records": 0
+          },
+          "reused_from": null,
+          "field_review": null,
+          "risk_factors": [
+            "validation or engine errors",
+            "join cardinality / duplicate keys"
+          ],
+          "verification": {
+            "scope": "Execution and contract checks; business ambiguities require operator answers",
+            "passed": false,
+            "version": 1,
+            "complete": true,
+            "coverage": {
+              "fields": {
+                "/sku": {
+                  "risk": "medium",
+                  "records": 12,
+                  "records_filled": 12
+                },
+                "/price": {
+                  "risk": "critical",
+                  "records": 12,
+                  "records_filled": 12
+                },
+                "/currency": {
+                  "risk": "critical",
+                  "records": 12,
+                  "records_filled": 12
+                },
+                "/product_name": {
+                  "risk": "medium",
+                  "records": 12,
+                  "records_filled": 12
+                }
+              },
+              "sources": {
+                "prices": 13,
+                "products": 12
+              },
+              "collections": {},
+              "invalid_records": 0
+            },
+            "problems": [
+              "1 duplicate identities on ['/sku'] (1 of them with different values in Selling price, /price; keep=review)",
+              "dedupe: 1 duplicate identities on ['/sku'] (1 of them with different values in Selling price, /price; keep=review)"
+            ],
+            "rows_out": 12,
+            "warnings": [],
+            "rows_checked": 12
+          },
+          "clarifications": [
+            {
+              "why": "The target schema allows only one /price per SKU and the source gives no precedence rule. Choosing one of the two prices silently would fabricate a business decision.",
+              "kind": "number",
+              "action": "value_map",
+              "target": "/price",
+              "options": [
+                "152",
+                "9999"
+              ],
+              "question": "Material code 000004 appears twice in Prices with selling prices 9999 and 152 THB (9999 is a strong outlier). Which price should be delivered for this SKU?",
+              "source_value": "000004"
+            }
+          ],
+          "confidence_basis": {
+            "capped": [
+              "/sku"
+            ],
+            "raised": [
+              "/price"
+            ],
+            "mapping_capped": false
+          },
+          "review_decisions": [],
+          "target_schema_hash": "1336e2efaba28b2a",
+          "confirmed_decisions": []
+        },
+        "open_questions": [
+          "No SKU-like header found in root table; using 'Selling price' as identity — confirm",
+          "Material code 000004 appears twice in Prices with selling prices 9999 and 152 THB (9999 is a strong outlier). Which price should be delivered for this SKU?"
+        ],
+        "validation": {
+          "ok": true,
+          "issues": []
+        },
+        "parent_id": null,
+        "approved_by": null,
+        "approved_at": null,
+        "comment": null,
+        "created_at": "2026-11-04T08:25:53.524909+00:00",
+        "agent_log": [
+          {
+            "agent": "operator_requirements",
+            "sha256": "626bdcb9d0d5e1a1c6c33597d2c369969fc41935b8d2b740d14a2f0b6b27ed9d",
+            "characters": 310,
+            "changed_since_approved": false
+          },
+          {
+            "agent": "heuristic",
+            "unmatched": {
+              "products": [
+                "Material code"
+              ]
+            },
+            "confidence": 0.723,
+            "table_roles": {
+              "0": "other",
+              "1": "products"
+            }
+          },
+          {
+            "data": {
+              "notes": [
+                "Table 0 is the product population (identity + name); table 1 supplies price and currency keyed by the same material codes, so delivery records must be joined on material code rather than emitted per sheet.",
+                "Material code is reported by the profiler as int with values like '000001'; the source stores/display these zero-padded, so the mapping must emit sku as text to satisfy the contract's leading-zero requirement.",
+                "Table 1 has 13 rows but only 12 distinct material codes: code '000004' occurs twice. Prices for '000004' conflict and the operator states no precedence rule exists, so this needs a business decision rather than a silent pick.",
+                "Selling price '9999' is a strong outlier against a 113–256 range; it may be a placeholder/sentinel price but the source gives no flag column to verify this, so it has not been treated as null.",
+                "Both sheets have zero formulas, zero error cells and no hidden rows/columns, so all values are directly readable."
+              ],
+              "tables": [
+                {
+                  "role": "products",
+                  "reason": "Sheet 'Material' is a two-column master list: one unique identity code per row (12 distinct in 12 rows) and one human-readable product description (12 distinct). No price, quantity or status attributes, so it is the product master, not pricing or inventory.",
+                  "columns": [
+                    {
+                      "name": "Material code",
+                      "reason": "Unique per row (unique_ratio 1.0) with sku_like hint; displayed values such as '000001' are zero-padded, so it must be read as text and not cast to int, per the contract's 'preserve leading zeros'.",
+                      "semantic": "sku",
+                      "confidence": 0.95,
+                      "target_pointer": "/sku"
+                    },
+                    {
+                      "name": "Description",
+                      "reason": "Free-text label describing each material ('Coffee variant 01', 'Soap variant 11'); matches the contract's 'Product name from the master list'.",
+                      "semantic": "product_name",
+                      "confidence": 0.92,
+                      "target_pointer": "/product_name"
+                    }
+                  ],
+                  "confidence": 0.95,
+                  "key_column": "Material code",
+                  "table_index": 0
+                },
+                {
+                  "role": "pricing",
+                  "reason": "Sheet 'Prices' pairs a material reference code with a single numeric amount column and a currency column constant at THB — a per-material price list. It links to the products table by material code rather than defining products itself.",
+                  "columns": [
+                    {
+                      "name": "Material code",
+                      "reason": "Values 1–12 overlap the Material master's codes (zero-padded text such as '000001'); acts as a foreign key to the product population and the natural join key for the price.",
+                      "semantic": "sku",
+                      "confidence": 0.9,
+                      "target_pointer": "/sku"
+                    },
+                    {
+                      "name": "Selling price",
+                      "reason": "Only monetary-looking numeric column, never null, range 113–256 with one outlier at 9999; matches the contract's 'requested selling price'. Confidence reduced because material code 000004 appears on two rows with different amounts and no source precedence rule exists.",
+                      "semantic": "price.amount",
+                      "confidence": 0.8,
+                      "target_pointer": "/price"
+                    },
+                    {
+                      "name": "Currency",
+                      "reason": "Constant single value 'THB' across all 13 rows — an explicit ISO 4217 code stated by the source, not inferred from locale.",
+                      "semantic": "currency",
+                      "confidence": 0.97,
+                      "target_pointer": "/currency"
+                    }
+                  ],
+                  "confidence": 0.9,
+                  "key_column": "Material code",
+                  "table_index": 1
+                }
+              ]
+            },
+            "agent": "schema",
+            "notes": [],
+            "usage": {
+              "calls": 1,
+              "model": "deepseek-flash",
+              "cost_usd": 0.008025,
+              "latency_ms": 6776.8,
+              "input_tokens": 4261,
+              "output_tokens": 941
+            },
+            "attempts": 1
+          },
+          {
+            "data": {
+              "confidence": 0.72,
+              "self_check": {
+                "errors": 1,
+                "history": [
+                  {
+                    "turn": "ground",
+                    "columns": 3
+                  },
+                  {
+                    "turn": "inspect",
+                    "requests": 2
+                  },
+                  {
+                    "turn": "mapping",
+                    "complete": true,
+                    "coverage": {
+                      "fields": {
+                        "/sku": {
+                          "risk": "medium",
+                          "records": 12,
+                          "records_filled": 12
+                        },
+                        "/price": {
+                          "risk": "critical",
+                          "records": 12,
+                          "records_filled": 12
+                        },
+                        "/currency": {
+                          "risk": "critical",
+                          "records": 12,
+                          "records_filled": 12
+                        },
+                        "/product_name": {
+                          "risk": "medium",
+                          "records": 12,
+                          "records_filled": 12
+                        }
+                      },
+                      "sources": {
+                        "prices": 13,
+                        "products": 12
+                      },
+                      "collections": {},
+                      "invalid_records": 0
+                    },
+                    "problems": [
+                      "dedupe: 1 duplicate identities on ['/sku'] (1 of them with different values in Selling price, /price; keep=review)"
+                    ],
+                    "rows_out": 12
+                  },
+                  {
+                    "turn": "mapping",
+                    "complete": true,
+                    "coverage": {
+                      "fields": {
+                        "/sku": {
+                          "risk": "medium",
+                          "records": 12,
+                          "records_filled": 12
+                        },
+                        "/price": {
+                          "risk": "critical",
+                          "records": 12,
+                          "records_filled": 12
+                        },
+                        "/currency": {
+                          "risk": "critical",
+                          "records": 12,
+                          "records_filled": 12
+                        },
+                        "/product_name": {
+                          "risk": "medium",
+                          "records": 12,
+                          "records_filled": 12
+                        }
+                      },
+                      "sources": {
+                        "prices": 13,
+                        "products": 12
+                      },
+                      "collections": {},
+                      "invalid_records": 0
+                    },
+                    "problems": [
+                      "dedupe: 1 duplicate identities on ['/sku'] (1 of them with different values in Selling price, /price; keep=review)"
+                    ],
+                    "rows_out": 12
+                  },
+                  {
+                    "turn": "mapping",
+                    "complete": true,
+                    "coverage": {
+                      "fields": {
+                        "/sku": {
+                          "risk": "medium",
+                          "records": 12,
+                          "records_filled": 12
+                        },
+                        "/price": {
+                          "risk": "critical",
+                          "records": 12,
+                          "records_filled": 12
+                        },
+                        "/currency": {
+                          "risk": "critical",
+                          "records": 12,
+                          "records_filled": 12
+                        },
+                        "/product_name": {
+                          "risk": "medium",
+                          "records": 12,
+                          "records_filled": 12
+                        }
+                      },
+                      "sources": {
+                        "prices": 13,
+                        "products": 12
+                      },
+                      "collections": {},
+                      "invalid_records": 0
+                    },
+                    "problems": [
+                      "dedupe: 1 duplicate identities on ['/sku'] (1 of them with different values in Selling price, /price; keep=last)"
+                    ],
+                    "rows_out": 12
+                  }
+                ],
+                "complete": true,
+                "coverage": {
+                  "fields": {
+                    "/sku": {
+                      "risk": "medium",
+                      "records": 12,
+                      "records_filled": 12
+                    },
+                    "/price": {
+                      "risk": "critical",
+                      "records": 12,
+                      "records_filled": 12
+                    },
+                    "/currency": {
+                      "risk": "critical",
+                      "records": 12,
+                      "records_filled": 12
+                    },
+                    "/product_name": {
+                      "risk": "medium",
+                      "records": 12,
+                      "records_filled": 12
+                    }
+                  },
+                  "sources": {
+                    "prices": 13,
+                    "products": 12
+                  },
+                  "collections": {},
+                  "invalid_records": 0
+                },
+                "grounded": 3,
+                "rows_out": 12,
+                "fix_rounds": 2,
+                "inspections": 1,
+                "python_turns": 0,
+                "rows_checked": 12,
+                "problems_left": [
+                  "dedupe: 1 duplicate identities on ['/sku'] (1 of them with different values in Selling price, /price; keep=review)"
+                ]
+              },
+              "clarifications": [
+                {
+                  "why": "The target schema allows only one /price per SKU and the source gives no precedence rule. Choosing one of the two prices silently would fabricate a business decision.",
+                  "kind": "number",
+                  "action": "value_map",
+                  "target": "/price",
+                  "options": [
+                    "152",
+                    "9999"
+                  ],
+                  "question": "Material code 000004 appears twice in Prices with selling prices 9999 and 152 THB (9999 is a strong outlier). Which price should be delivered for this SKU?",
+                  "source_value": "000004"
+                }
+              ],
+              "changes_from_draft": [
+                "Reclassified the sources: 'products' now reads sheet Material (the product master) and 'prices' reads sheet Prices (the price list); the draft had used Prices as the product source.",
+                "Replaced the bogus /sku mapping from 'Selling price' with 'Material code' from the Material master, preserving zero-padded identifiers as text.",
+                "Added a left join from Material to Prices on Material code, normalising keys with trim and strip_leading_zeros.",
+                "Mapped /product_name from Material.Description.",
+                "Mapped /price from Prices.'Selling price' using parse_number_th.",
+                "Mapped /currency from Prices.Currency with trim/upper; the source explicitly states THB on every row.",
+                "Set record dedupe to /sku with keep='review' so the conflicting 000004 price rows are surfaced rather than silently choosing first/last.",
+                "Set attributes_passthrough=false because the target schema has additionalProperties=false and all needed root fields are mapped.",
+                "Added a clarification for the conflicting 000004 price.",
+                "The 9999 value is treated as a source value under review, not as null or a placeholder without evidence."
+              ]
+            },
+            "agent": "mapping",
+            "notes": [
+              "self_check_unresolved: 1 problem(s) left"
+            ],
+            "usage": {
+              "calls": 8,
+              "model": "deepseek-flash",
+              "cost_usd": 0.2332,
+              "latency_ms": 195526.4,
+              "input_tokens": 101572,
+              "output_tokens": 32907
+            },
+            "attempts": 8
+          },
+          {
+            "ops": 2,
+            "agent": "agreement",
+            "agree": 2,
+            "record": 3,
+            "dropped": 0,
+            "disagree": 1,
+            "model_only": 1
+          }
+        ],
+        "sample": [
+          {
+            "sku": "000001",
+            "price": 113.0,
+            "currency": "THB",
+            "source_meta": {
+              "file": "delivery.xlsx",
+              "lineage": {
+                "joined": {
+                  "prices": 4
+                },
+                "source": "products",
+                "root_row": 0
+              }
+            },
+            "product_name": "Coffee variant 01"
+          },
+          {
+            "sku": "000011",
+            "price": 243.0,
+            "currency": "THB",
+            "source_meta": {
+              "file": "delivery.xlsx",
+              "lineage": {
+                "joined": {
+                  "prices": 3
+                },
+                "source": "products",
+                "root_row": 1
+              }
+            },
+            "product_name": "Soap variant 11"
+          },
+          {
+            "sku": "000002",
+            "price": 126.0,
+            "currency": "THB",
+            "source_meta": {
+              "file": "delivery.xlsx",
+              "lineage": {
+                "joined": {
+                  "prices": 6
+                },
+                "source": "products",
+                "root_row": 2
+              }
+            },
+            "product_name": "Shampoo variant 02"
+          },
+          {
+            "sku": "000012",
+            "price": 256.0,
+            "currency": "THB",
+            "source_meta": {
+              "file": "delivery.xlsx",
+              "lineage": {
+                "joined": {
+                  "prices": 9
+                },
+                "source": "products",
+                "root_row": 3
+              }
+            },
+            "product_name": "Tea variant 12"
+          },
+          {
+            "sku": "000009",
+            "price": 217.0,
+            "currency": "THB",
+            "source_meta": {
+              "file": "delivery.xlsx",
+              "lineage": {
+                "joined": {
+                  "prices": 5
+                },
+                "source": "products",
+                "root_row": 4
+              }
+            },
+            "product_name": "Coffee variant 09"
+          }
+        ]
+      }
+    ],
+    "datasets": [],
+    "review_tasks": [
+      {
+        "id": "rev_01M6JTM9450PHT157YKVKEGX5A",
+        "round_id": "rnd_01M6JTDY5FQXGZQ5FRPHD30XMS",
+        "customer_id": "cus_01M6JTDXH281XPECNE63AV3Z1T",
+        "mapping_version_id": "map_01M6JTM93DMD5MXK2FBWE0WHCW",
+        "dataset_version_id": null,
+        "kind": "mapping",
+        "priority": 65,
+        "status": "open",
+        "reasons": [
+          "mapping confidence 0.72 < 0.95",
+          "1 engine/validation errors",
+          "first time this customer/format is seen",
+          "2 questions still need operator confirmation",
+          "the model selects rows differently from FORMA's matcher (records: dedupe; records: joins; records: root)",
+          "verification: 1 duplicate identities on ['/sku'] (1 of them with different values in Selling price, /price; keep=review)",
+          "verification: dedupe: 1 duplicate identities on ['/sku'] (1 of them with different values in Selling price, /price; keep=review)"
+        ],
+        "details": {
+          "impact": {},
+          "verdict": {
+            "word": "sure",
+            "stage": "mapping",
+            "digest": "d50f26b81aa540e788e0a6f8b87b4c04",
+            "outcome": "fix_mapping",
+            "conclusion": {
+              "en": "1 errors stop records from being produced",
+              "th": "ข้อผิดพลาด 1 จุดทำให้สร้างบางรายการไม่ได้"
+            },
+            "confidence": 0.9,
+            "rules_fired": [
+              "engine_errors"
+            ]
+          },
+          "decision": "review",
+          "findings": [
+            {
+              "row": null,
+              "kind": "dedupe",
+              "target": null,
+              "details": {
+                "count": 1,
+                "sample": [
+                  "000004"
+                ],
+                "conflicting": 1
+              },
+              "message": "1 duplicate identities on ['/sku'] (1 of them with different values in Selling price, /price; keep=review)",
+              "identity": null,
+              "severity": "error"
+            }
+          ],
+          "risk_level": "high",
+          "risk_factors": [
+            "validation or engine errors",
+            "join cardinality / duplicate keys"
+          ],
+          "open_questions": [
+            "No SKU-like header found in root table; using 'Selling price' as identity — confirm",
+            "Material code 000004 appears twice in Prices with selling prices 9999 and 152 THB (9999 is a strong outlier). Which price should be delivered for this SKU?"
+          ]
+        },
+        "resolver": null,
+        "comment": null,
+        "created_at": "2026-11-04T08:25:53.541394+00:00",
+        "resolved_at": null,
+        "age_days": 0,
+        "waiting_until": null,
+        "waiting_note": null
+      }
+    ],
+    "jobs": [
+      {
+        "id": "job_01M6JTE1BAFJZPY2RN1YV2DCPF",
+        "kind": "propose_mapping",
+        "status": "done",
+        "progress": 100,
+        "message": null,
+        "error": null
+      },
+      {
+        "id": "job_01M6JTDYA1TB0THPBVGS9WDQ91",
+        "kind": "profile_round",
+        "status": "done",
+        "progress": 100,
+        "message": null,
+        "error": null
+      }
+    ]
+  },
+  "mapping": {
+    "id": "map_01M6JTM93DMD5MXK2FBWE0WHCW",
+    "customer_id": "cus_01M6JTDXH281XPECNE63AV3Z1T",
+    "round_id": "rnd_01M6JTDY5FQXGZQ5FRPHD30XMS",
+    "version": 1,
+    "status": "proposed",
+    "target_schema": "eval_rel-20261104-fixed1_t10@1",
+    "confidence": 0.72,
+    "created_by": "ai",
+    "model": "deepseek-flash",
+    "policy": {
+      "checks": {
+        "drift": null,
+        "errors": 1,
+        "rows_out": 12,
+        "warnings": 0,
+        "agreement": {
+          "ops": 2,
+          "agree": 2,
+          "record": 3,
+          "dropped": 0,
+          "disagree": 1,
+          "model_only": 1
+        },
+        "llm_fallback": false,
+        "reused_approved": false,
+        "full_verification": false,
+        "mapping_confidence": 0.72,
+        "data_checks_trusted": false,
+        "low_confidence_high": [],
+        "unresolved_questions": 2,
+        "plausibility_warnings": 0,
+        "low_confidence_critical": []
+      },
+      "impact": {},
+      "source": "ai",
+      "reasons": [
+        "mapping confidence 0.72 < 0.95",
+        "1 engine/validation errors",
+        "first time this customer/format is seen",
+        "2 questions still need operator confirmation",
+        "the model selects rows differently from FORMA's matcher (records: dedupe; records: joins; records: root)",
+        "verification: 1 duplicate identities on ['/sku'] (1 of them with different values in Selling price, /price; keep=review)",
+        "verification: dedupe: 1 duplicate identities on ['/sku'] (1 of them with different values in Selling price, /price; keep=review)"
+      ],
+      "sandbox": null,
+      "verdict": {
+        "word": "sure",
+        "stage": "mapping",
+        "digest": "d50f26b81aa540e788e0a6f8b87b4c04",
+        "outcome": "fix_mapping",
+        "subject": {
+          "id": "map_01M6JTM93DMD5MXK2FBWE0WHCW",
+          "kind": "mapping",
+          "round_id": "rnd_01M6JTDY5FQXGZQ5FRPHD30XMS"
+        },
+        "evidence": [
+          {
+            "id": 1,
+            "kind": "rows",
+            "link": "/rounds/rnd_01M6JTDY5FQXGZQ5FRPHD30XMS",
+            "text": {
+              "en": "12 records produced",
+              "th": "สร้างได้ 12 รายการ"
+            },
+            "numbers": {
+              "rows_out": 12
+            }
+          },
+          {
+            "id": 2,
+            "kind": "errors",
+            "link": "/rounds/rnd_01M6JTDY5FQXGZQ5FRPHD30XMS/mapping/map_01M6JTM93DMD5MXK2FBWE0WHCW?tab=findings",
+            "text": {
+              "en": "1 engine or validation errors",
+              "th": "ข้อผิดพลาดของ engine/การตรวจ 1 จุด"
+            },
+            "numbers": {
+              "errors": 1
+            }
+          },
+          {
+            "id": 3,
+            "kind": "self_check",
+            "link": null,
+            "text": {
+              "en": "The AI ran its mapping on the first 12 rows (1 look(s) at the file, 2 fix round(s)): 1 problem(s) left",
+              "th": "AI ลองรัน mapping กับ 12 แถวแรก (ดูไฟล์ 1 ครั้ง แก้ 2 รอบ): เหลือปัญหา 1 ข้อ"
+            },
+            "numbers": {
+              "rows": 12,
+              "fix_rounds": 2,
+              "inspections": 1,
+              "problems_left": 1
+            }
+          },
+          {
+            "id": 4,
+            "kind": "questions",
+            "link": "/review?round=rnd_01M6JTDY5FQXGZQ5FRPHD30XMS",
+            "text": {
+              "en": "1 fields below the confidence bar",
+              "th": "1 ฟิลด์ยังไม่ถึงเกณฑ์ความมั่นใจ"
+            },
+            "numbers": {
+              "count": 1
+            }
+          }
+        ],
+        "narrative": null,
+        "conclusion": {
+          "en": "1 errors stop records from being produced",
+          "th": "ข้อผิดพลาด 1 จุดทำให้สร้างบางรายการไม่ได้"
+        },
+        "confidence": 0.9,
+        "suppressed": {
+          "count": 0,
+          "groups": [
+            {
+              "text": {
+                "en": "2 notes from the mapper",
+                "th": "หมายเหตุจากตัวจับคู่ 2 ข้อ"
+              },
+              "reason": "open_questions",
+              "pointers": []
+            }
+          ]
+        },
+        "must_decide": [
+          {
+            "id": "/price:value:03cc69a0db45",
+            "why": {
+              "en": "The target schema allows only one /price per SKU and the source gives no precedence rule. Choosing one of the two prices silently would fabricate a business decision.",
+              "th": "The target schema allows only one /price per SKU and the source gives no precedence rule. Choosing one of the two prices silently would fabricate a business decision."
+            },
+            "kind": "text",
+            "scope": "source_value",
+            "default": null,
+            "options": [
+              "152",
+              "9999"
+            ],
+            "question": {
+              "en": "Material code 000004 appears twice in Prices with selling prices 9999 and 152 THB (9999 is a strong outlier). Which price should be delivered for this SKU?",
+              "th": "Material code 000004 appears twice in Prices with selling prices 9999 and 152 THB (9999 is a strong outlier). Which price should be delivered for this SKU?"
+            },
+            "semantic": "price.amount",
+            "allow_custom": true,
+            "evidence_ids": [
+              4
+            ],
+            "option_labels": null
+          }
+        ],
+        "rules_fired": [
+          "engine_errors"
+        ],
+        "round_status": "review",
+        "rules_version": "2026.10.4",
+        "mapping_status": "proposed",
+        "policy_decision": "review"
+      },
+      "decision": "review",
+      "learning": null,
+      "priority": 65,
+      "agreement": {
+        "ops": [
+          "/currency",
+          "/price"
+        ],
+        "agree": [
+          "/currency",
+          "/price"
+        ],
+        "record": {
+          "root": {
+            "model": {
+              "file": "fil_01M6JTDY82WAJQ2984NPE7APDP",
+              "sheet": "material",
+              "filter": null,
+              "rename": {},
+              "unpivot": null,
+              "data_end": null,
+              "fill_down": [],
+              "data_start": null,
+              "last_column": 2,
+              "first_column": 0
+            },
+            "matcher": {
+              "file": "fil_01M6JTDY82WAJQ2984NPE7APDP",
+              "sheet": "prices",
+              "filter": null,
+              "rename": {},
+              "unpivot": null,
+              "data_end": null,
+              "fill_down": [],
+              "data_start": null,
+              "last_column": 3,
+              "first_column": 0
+            }
+          },
+          "joins": {
+            "model": [
+              {
+                "on": [
+                  {
+                    "left": "Material code",
+                    "right": "Material code"
+                  }
+                ],
+                "how": "left",
+                "left": {
+                  "file": "fil_01M6JTDY82WAJQ2984NPE7APDP",
+                  "sheet": "material",
+                  "filter": null,
+                  "rename": {},
+                  "unpivot": null,
+                  "data_end": null,
+                  "fill_down": [],
+                  "data_start": null,
+                  "last_column": 2,
+                  "first_column": 0
+                },
+                "right": {
+                  "file": "fil_01M6JTDY82WAJQ2984NPE7APDP",
+                  "sheet": "prices",
+                  "filter": null,
+                  "rename": {},
+                  "unpivot": null,
+                  "data_end": null,
+                  "fill_down": [],
+                  "data_start": null,
+                  "last_column": 3,
+                  "first_column": 0
+                },
+                "cardinality": "1:N",
+                "on_unmatched": "keep",
+                "normalize_keys": [
+                  "trim",
+                  "strip_leading_zeros"
+                ]
+              }
+            ],
+            "matcher": []
+          },
+          "dedupe": {
+            "model": {
+              "keep": "review",
+              "keys": [
+                "/sku"
+              ]
+            },
+            "matcher": {
+              "keep": "first",
+              "keys": []
+            }
+          }
+        },
+        "dropped": [],
+        "disagree": {
+          "/sku": {
+            "model": [
+              "products.Material code"
+            ],
+            "matcher": [
+              "Prices.Selling price"
+            ]
+          }
+        },
+        "model_only": [
+          "/product_name"
+        ]
+      },
+      "risk_level": "high",
+      "risk_score": 0.62,
+      "self_check": {
+        "errors": 1,
+        "history": [
+          {
+            "turn": "ground",
+            "columns": 3
+          },
+          {
+            "turn": "inspect",
+            "requests": 2
+          },
+          {
+            "turn": "mapping",
+            "complete": true,
+            "coverage": {
+              "fields": {
+                "/sku": {
+                  "risk": "medium",
+                  "records": 12,
+                  "records_filled": 12
+                },
+                "/price": {
+                  "risk": "critical",
+                  "records": 12,
+                  "records_filled": 12
+                },
+                "/currency": {
+                  "risk": "critical",
+                  "records": 12,
+                  "records_filled": 12
+                },
+                "/product_name": {
+                  "risk": "medium",
+                  "records": 12,
+                  "records_filled": 12
+                }
+              },
+              "sources": {
+                "prices": 13,
+                "products": 12
+              },
+              "collections": {},
+              "invalid_records": 0
+            },
+            "problems": [
+              "dedupe: 1 duplicate identities on ['/sku'] (1 of them with different values in Selling price, /price; keep=review)"
+            ],
+            "rows_out": 12
+          },
+          {
+            "turn": "mapping",
+            "complete": true,
+            "coverage": {
+              "fields": {
+                "/sku": {
+                  "risk": "medium",
+                  "records": 12,
+                  "records_filled": 12
+                },
+                "/price": {
+                  "risk": "critical",
+                  "records": 12,
+                  "records_filled": 12
+                },
+                "/currency": {
+                  "risk": "critical",
+                  "records": 12,
+                  "records_filled": 12
+                },
+                "/product_name": {
+                  "risk": "medium",
+                  "records": 12,
+                  "records_filled": 12
+                }
+              },
+              "sources": {
+                "prices": 13,
+                "products": 12
+              },
+              "collections": {},
+              "invalid_records": 0
+            },
+            "problems": [
+              "dedupe: 1 duplicate identities on ['/sku'] (1 of them with different values in Selling price, /price; keep=review)"
+            ],
+            "rows_out": 12
+          },
+          {
+            "turn": "mapping",
+            "complete": true,
+            "coverage": {
+              "fields": {
+                "/sku": {
+                  "risk": "medium",
+                  "records": 12,
+                  "records_filled": 12
+                },
+                "/price": {
+                  "risk": "critical",
+                  "records": 12,
+                  "records_filled": 12
+                },
+                "/currency": {
+                  "risk": "critical",
+                  "records": 12,
+                  "records_filled": 12
+                },
+                "/product_name": {
+                  "risk": "medium",
+                  "records": 12,
+                  "records_filled": 12
+                }
+              },
+              "sources": {
+                "prices": 13,
+                "products": 12
+              },
+              "collections": {},
+              "invalid_records": 0
+            },
+            "problems": [
+              "dedupe: 1 duplicate identities on ['/sku'] (1 of them with different values in Selling price, /price; keep=last)"
+            ],
+            "rows_out": 12
+          }
+        ],
+        "complete": true,
+        "coverage": {
+          "fields": {
+            "/sku": {
+              "risk": "medium",
+              "records": 12,
+              "records_filled": 12
+            },
+            "/price": {
+              "risk": "critical",
+              "records": 12,
+              "records_filled": 12
+            },
+            "/currency": {
+              "risk": "critical",
+              "records": 12,
+              "records_filled": 12
+            },
+            "/product_name": {
+              "risk": "medium",
+              "records": 12,
+              "records_filled": 12
+            }
+          },
+          "sources": {
+            "prices": 13,
+            "products": 12
+          },
+          "collections": {},
+          "invalid_records": 0
+        },
+        "grounded": 3,
+        "rows_out": 12,
+        "fix_rounds": 2,
+        "inspections": 1,
+        "python_turns": 0,
+        "rows_checked": 12,
+        "problems_left": [
+          "dedupe: 1 duplicate identities on ['/sku'] (1 of them with different values in Selling price, /price; keep=review)"
+        ]
+      },
+      "simulation": {
+        "fill": {
+          "/sku": 1.0,
+          "/price": 1.0,
+          "/currency": 1.0,
+          "/product_name": 1.0
+        },
+        "rows_in": 12,
+        "sources": {
+          "prices": 13,
+          "products": 12
+        },
+        "complete": true,
+        "findings": {
+          "info": 0,
+          "error": 1,
+          "warning": 0
+        },
+        "rows_out": 12,
+        "collections": {},
+        "duration_ms": 200.0,
+        "identity_keys": [
+          "/sku"
+        ],
+        "invalid_records": 0
+      },
+      "reused_from": null,
+      "field_review": null,
+      "risk_factors": [
+        "validation or engine errors",
+        "join cardinality / duplicate keys"
+      ],
+      "verification": {
+        "scope": "Execution and contract checks; business ambiguities require operator answers",
+        "passed": false,
+        "version": 1,
+        "complete": true,
+        "coverage": {
+          "fields": {
+            "/sku": {
+              "risk": "medium",
+              "records": 12,
+              "records_filled": 12
+            },
+            "/price": {
+              "risk": "critical",
+              "records": 12,
+              "records_filled": 12
+            },
+            "/currency": {
+              "risk": "critical",
+              "records": 12,
+              "records_filled": 12
+            },
+            "/product_name": {
+              "risk": "medium",
+              "records": 12,
+              "records_filled": 12
+            }
+          },
+          "sources": {
+            "prices": 13,
+            "products": 12
+          },
+          "collections": {},
+          "invalid_records": 0
+        },
+        "problems": [
+          "1 duplicate identities on ['/sku'] (1 of them with different values in Selling price, /price; keep=review)",
+          "dedupe: 1 duplicate identities on ['/sku'] (1 of them with different values in Selling price, /price; keep=review)"
+        ],
+        "rows_out": 12,
+        "warnings": [],
+        "rows_checked": 12
+      },
+      "clarifications": [
+        {
+          "why": "The target schema allows only one /price per SKU and the source gives no precedence rule. Choosing one of the two prices silently would fabricate a business decision.",
+          "kind": "number",
+          "action": "value_map",
+          "target": "/price",
+          "options": [
+            "152",
+            "9999"
+          ],
+          "question": "Material code 000004 appears twice in Prices with selling prices 9999 and 152 THB (9999 is a strong outlier). Which price should be delivered for this SKU?",
+          "source_value": "000004"
+        }
+      ],
+      "confidence_basis": {
+        "capped": [
+          "/sku"
+        ],
+        "raised": [
+          "/price"
+        ],
+        "mapping_capped": false
+      },
+      "review_decisions": [],
+      "target_schema_hash": "1336e2efaba28b2a",
+      "confirmed_decisions": []
+    },
+    "open_questions": [
+      "No SKU-like header found in root table; using 'Selling price' as identity — confirm",
+      "Material code 000004 appears twice in Prices with selling prices 9999 and 152 THB (9999 is a strong outlier). Which price should be delivered for this SKU?"
+    ],
+    "validation": {
+      "ok": true,
+      "issues": []
+    },
+    "parent_id": null,
+    "approved_by": null,
+    "approved_at": null,
+    "comment": null,
+    "created_at": "2026-11-04T08:25:53.524909+00:00",
+    "agent_log": [
+      {
+        "agent": "operator_requirements",
+        "sha256": "626bdcb9d0d5e1a1c6c33597d2c369969fc41935b8d2b740d14a2f0b6b27ed9d",
+        "characters": 310,
+        "changed_since_approved": false
+      },
+      {
+        "agent": "heuristic",
+        "unmatched": {
+          "products": [
+            "Material code"
+          ]
+        },
+        "confidence": 0.723,
+        "table_roles": {
+          "0": "other",
+          "1": "products"
+        }
+      },
+      {
+        "data": {
+          "notes": [
+            "Table 0 is the product population (identity + name); table 1 supplies price and currency keyed by the same material codes, so delivery records must be joined on material code rather than emitted per sheet.",
+            "Material code is reported by the profiler as int with values like '000001'; the source stores/display these zero-padded, so the mapping must emit sku as text to satisfy the contract's leading-zero requirement.",
+            "Table 1 has 13 rows but only 12 distinct material codes: code '000004' occurs twice. Prices for '000004' conflict and the operator states no precedence rule exists, so this needs a business decision rather than a silent pick.",
+            "Selling price '9999' is a strong outlier against a 113–256 range; it may be a placeholder/sentinel price but the source gives no flag column to verify this, so it has not been treated as null.",
+            "Both sheets have zero formulas, zero error cells and no hidden rows/columns, so all values are directly readable."
+          ],
+          "tables": [
+            {
+              "role": "products",
+              "reason": "Sheet 'Material' is a two-column master list: one unique identity code per row (12 distinct in 12 rows) and one human-readable product description (12 distinct). No price, quantity or status attributes, so it is the product master, not pricing or inventory.",
+              "columns": [
+                {
+                  "name": "Material code",
+                  "reason": "Unique per row (unique_ratio 1.0) with sku_like hint; displayed values such as '000001' are zero-padded, so it must be read as text and not cast to int, per the contract's 'preserve leading zeros'.",
+                  "semantic": "sku",
+                  "confidence": 0.95,
+                  "target_pointer": "/sku"
+                },
+                {
+                  "name": "Description",
+                  "reason": "Free-text label describing each material ('Coffee variant 01', 'Soap variant 11'); matches the contract's 'Product name from the master list'.",
+                  "semantic": "product_name",
+                  "confidence": 0.92,
+                  "target_pointer": "/product_name"
+                }
+              ],
+              "confidence": 0.95,
+              "key_column": "Material code",
+              "table_index": 0
+            },
+            {
+              "role": "pricing",
+              "reason": "Sheet 'Prices' pairs a material reference code with a single numeric amount column and a currency column constant at THB — a per-material price list. It links to the products table by material code rather than defining products itself.",
+              "columns": [
+                {
+                  "name": "Material code",
+                  "reason": "Values 1–12 overlap the Material master's codes (zero-padded text such as '000001'); acts as a foreign key to the product population and the natural join key for the price.",
+                  "semantic": "sku",
+                  "confidence": 0.9,
+                  "target_pointer": "/sku"
+                },
+                {
+                  "name": "Selling price",
+                  "reason": "Only monetary-looking numeric column, never null, range 113–256 with one outlier at 9999; matches the contract's 'requested selling price'. Confidence reduced because material code 000004 appears on two rows with different amounts and no source precedence rule exists.",
+                  "semantic": "price.amount",
+                  "confidence": 0.8,
+                  "target_pointer": "/price"
+                },
+                {
+                  "name": "Currency",
+                  "reason": "Constant single value 'THB' across all 13 rows — an explicit ISO 4217 code stated by the source, not inferred from locale.",
+                  "semantic": "currency",
+                  "confidence": 0.97,
+                  "target_pointer": "/currency"
+                }
+              ],
+              "confidence": 0.9,
+              "key_column": "Material code",
+              "table_index": 1
+            }
+          ]
+        },
+        "agent": "schema",
+        "notes": [],
+        "usage": {
+          "calls": 1,
+          "model": "deepseek-flash",
+          "cost_usd": 0.008025,
+          "latency_ms": 6776.8,
+          "input_tokens": 4261,
+          "output_tokens": 941
+        },
+        "attempts": 1
+      },
+      {
+        "data": {
+          "confidence": 0.72,
+          "self_check": {
+            "errors": 1,
+            "history": [
+              {
+                "turn": "ground",
+                "columns": 3
+              },
+              {
+                "turn": "inspect",
+                "requests": 2
+              },
+              {
+                "turn": "mapping",
+                "complete": true,
+                "coverage": {
+                  "fields": {
+                    "/sku": {
+                      "risk": "medium",
+                      "records": 12,
+                      "records_filled": 12
+                    },
+                    "/price": {
+                      "risk": "critical",
+                      "records": 12,
+                      "records_filled": 12
+                    },
+                    "/currency": {
+                      "risk": "critical",
+                      "records": 12,
+                      "records_filled": 12
+                    },
+                    "/product_name": {
+                      "risk": "medium",
+                      "records": 12,
+                      "records_filled": 12
+                    }
+                  },
+                  "sources": {
+                    "prices": 13,
+                    "products": 12
+                  },
+                  "collections": {},
+                  "invalid_records": 0
+                },
+                "problems": [
+                  "dedupe: 1 duplicate identities on ['/sku'] (1 of them with different values in Selling price, /price; keep=review)"
+                ],
+                "rows_out": 12
+              },
+              {
+                "turn": "mapping",
+                "complete": true,
+                "coverage": {
+                  "fields": {
+                    "/sku": {
+                      "risk": "medium",
+                      "records": 12,
+                      "records_filled": 12
+                    },
+                    "/price": {
+                      "risk": "critical",
+                      "records": 12,
+                      "records_filled": 12
+                    },
+                    "/currency": {
+                      "risk": "critical",
+                      "records": 12,
+                      "records_filled": 12
+                    },
+                    "/product_name": {
+                      "risk": "medium",
+                      "records": 12,
+                      "records_filled": 12
+                    }
+                  },
+                  "sources": {
+                    "prices": 13,
+                    "products": 12
+                  },
+                  "collections": {},
+                  "invalid_records": 0
+                },
+                "problems": [
+                  "dedupe: 1 duplicate identities on ['/sku'] (1 of them with different values in Selling price, /price; keep=review)"
+                ],
+                "rows_out": 12
+              },
+              {
+                "turn": "mapping",
+                "complete": true,
+                "coverage": {
+                  "fields": {
+                    "/sku": {
+                      "risk": "medium",
+                      "records": 12,
+                      "records_filled": 12
+                    },
+                    "/price": {
+                      "risk": "critical",
+                      "records": 12,
+                      "records_filled": 12
+                    },
+                    "/currency": {
+                      "risk": "critical",
+                      "records": 12,
+                      "records_filled": 12
+                    },
+                    "/product_name": {
+                      "risk": "medium",
+                      "records": 12,
+                      "records_filled": 12
+                    }
+                  },
+                  "sources": {
+                    "prices": 13,
+                    "products": 12
+                  },
+                  "collections": {},
+                  "invalid_records": 0
+                },
+                "problems": [
+                  "dedupe: 1 duplicate identities on ['/sku'] (1 of them with different values in Selling price, /price; keep=last)"
+                ],
+                "rows_out": 12
+              }
+            ],
+            "complete": true,
+            "coverage": {
+              "fields": {
+                "/sku": {
+                  "risk": "medium",
+                  "records": 12,
+                  "records_filled": 12
+                },
+                "/price": {
+                  "risk": "critical",
+                  "records": 12,
+                  "records_filled": 12
+                },
+                "/currency": {
+                  "risk": "critical",
+                  "records": 12,
+                  "records_filled": 12
+                },
+                "/product_name": {
+                  "risk": "medium",
+                  "records": 12,
+                  "records_filled": 12
+                }
+              },
+              "sources": {
+                "prices": 13,
+                "products": 12
+              },
+              "collections": {},
+              "invalid_records": 0
+            },
+            "grounded": 3,
+            "rows_out": 12,
+            "fix_rounds": 2,
+            "inspections": 1,
+            "python_turns": 0,
+            "rows_checked": 12,
+            "problems_left": [
+              "dedupe: 1 duplicate identities on ['/sku'] (1 of them with different values in Selling price, /price; keep=review)"
+            ]
+          },
+          "clarifications": [
+            {
+              "why": "The target schema allows only one /price per SKU and the source gives no precedence rule. Choosing one of the two prices silently would fabricate a business decision.",
+              "kind": "number",
+              "action": "value_map",
+              "target": "/price",
+              "options": [
+                "152",
+                "9999"
+              ],
+              "question": "Material code 000004 appears twice in Prices with selling prices 9999 and 152 THB (9999 is a strong outlier). Which price should be delivered for this SKU?",
+              "source_value": "000004"
+            }
+          ],
+          "changes_from_draft": [
+            "Reclassified the sources: 'products' now reads sheet Material (the product master) and 'prices' reads sheet Prices (the price list); the draft had used Prices as the product source.",
+            "Replaced the bogus /sku mapping from 'Selling price' with 'Material code' from the Material master, preserving zero-padded identifiers as text.",
+            "Added a left join from Material to Prices on Material code, normalising keys with trim and strip_leading_zeros.",
+            "Mapped /product_name from Material.Description.",
+            "Mapped /price from Prices.'Selling price' using parse_number_th.",
+            "Mapped /currency from Prices.Currency with trim/upper; the source explicitly states THB on every row.",
+            "Set record dedupe to /sku with keep='review' so the conflicting 000004 price rows are surfaced rather than silently choosing first/last.",
+            "Set attributes_passthrough=false because the target schema has additionalProperties=false and all needed root fields are mapped.",
+            "Added a clarification for the conflicting 000004 price.",
+            "The 9999 value is treated as a source value under review, not as null or a placeholder without evidence."
+          ]
+        },
+        "agent": "mapping",
+        "notes": [
+          "self_check_unresolved: 1 problem(s) left"
+        ],
+        "usage": {
+          "calls": 8,
+          "model": "deepseek-flash",
+          "cost_usd": 0.2332,
+          "latency_ms": 195526.4,
+          "input_tokens": 101572,
+          "output_tokens": 32907
+        },
+        "attempts": 8
+      },
+      {
+        "ops": 2,
+        "agent": "agreement",
+        "agree": 2,
+        "record": 3,
+        "dropped": 0,
+        "disagree": 1,
+        "model_only": 1
+      }
+    ],
+    "sample": [
+      {
+        "sku": "000001",
+        "price": 113.0,
+        "currency": "THB",
+        "source_meta": {
+          "file": "delivery.xlsx",
+          "lineage": {
+            "joined": {
+              "prices": 4
+            },
+            "source": "products",
+            "root_row": 0
+          }
+        },
+        "product_name": "Coffee variant 01"
+      },
+      {
+        "sku": "000011",
+        "price": 243.0,
+        "currency": "THB",
+        "source_meta": {
+          "file": "delivery.xlsx",
+          "lineage": {
+            "joined": {
+              "prices": 3
+            },
+            "source": "products",
+            "root_row": 1
+          }
+        },
+        "product_name": "Soap variant 11"
+      },
+      {
+        "sku": "000002",
+        "price": 126.0,
+        "currency": "THB",
+        "source_meta": {
+          "file": "delivery.xlsx",
+          "lineage": {
+            "joined": {
+              "prices": 6
+            },
+            "source": "products",
+            "root_row": 2
+          }
+        },
+        "product_name": "Shampoo variant 02"
+      },
+      {
+        "sku": "000012",
+        "price": 256.0,
+        "currency": "THB",
+        "source_meta": {
+          "file": "delivery.xlsx",
+          "lineage": {
+            "joined": {
+              "prices": 9
+            },
+            "source": "products",
+            "root_row": 3
+          }
+        },
+        "product_name": "Tea variant 12"
+      },
+      {
+        "sku": "000009",
+        "price": 217.0,
+        "currency": "THB",
+        "source_meta": {
+          "file": "delivery.xlsx",
+          "lineage": {
+            "joined": {
+              "prices": 5
+            },
+            "source": "products",
+            "root_row": 4
+          }
+        },
+        "product_name": "Coffee variant 09"
+      }
+    ],
+    "document": {
+      "meta": {
+        "model": "deepseek-flash",
+        "notes": "Root population is the Material master joined to Prices by Material code. The duplicate price for 000004 is preserved for review rather than silently resolved.",
+        "version": 1,
+        "evidence": [
+          "Sheet 'Material' is the product master: unique Material code plus Description for 12 products.",
+          "Sheet 'Prices' is the price list keyed by Material code, with Selling price and Currency.",
+          "Material code values are displayed zero-padded in the source and must remain text in /sku.",
+          "Currency is explicitly THB on every price row, not inferred.",
+          "Material code 000004 occurs twice in Prices with conflicting prices 9999 and 152; no precedence rule exists."
+        ],
+        "confidence": 0.72,
+        "created_by": "ai",
+        "customer_id": "cus_01M6JTDXH281XPECNE63AV3Z1T",
+        "fingerprints": {
+          "prices": "37a86ed9e7ac715e",
+          "products": "37a86ed9e7ac715e"
+        },
+        "target_schema": "eval_rel-20261104-fixed1_t10@1"
+      },
+      "joins": [
+        {
+          "on": [
+            {
+              "left": "Material code",
+              "right": "Material code"
+            }
+          ],
+          "how": "left",
+          "left": "products",
+          "right": "prices",
+          "cardinality": "1:N",
+          "on_unmatched": "keep",
+          "normalize_keys": [
+            "trim",
+            "strip_leading_zeros"
+          ]
+        }
+      ],
+      "fields": [
+        {
+          "expr": {
+            "op": "trim",
+            "args": [
+              {
+                "op": "col",
+                "name": "Material code",
+                "source": "products"
+              }
+            ],
+            "params": {}
+          },
+          "note": "Do not cast to numeric; source identifiers are zero-padded.",
+          "target": "/sku",
+          "evidence": [
+            "Header 'Material code' is the unique identity column in the Material master.",
+            "Raw cells display values such as '000001'; the mapping keeps them as text and does not cast to int, preserving leading zeros.",
+            "FORMA's matcher read Prices.Selling price instead: confidence 0.95 → 0.70"
+          ],
+          "confidence": 0.7
+        },
+        {
+          "expr": {
+            "op": "trim",
+            "args": [
+              {
+                "op": "col",
+                "name": "Description",
+                "source": "products"
+              }
+            ],
+            "params": {}
+          },
+          "target": "/product_name",
+          "evidence": [
+            "Header 'Description' holds the human-readable product label in the Material master.",
+            "Samples: 'Coffee variant 01', 'Soap variant 11', 'Shampoo variant 02'."
+          ],
+          "confidence": 0.92
+        },
+        {
+          "expr": {
+            "op": "parse_number_th",
+            "args": [
+              {
+                "op": "col",
+                "name": "Selling price",
+                "source": "prices"
+              }
+            ],
+            "params": {}
+          },
+          "note": "Provisional: record 000004 has conflicting prices; dedupe is set to review so the conflict is not silently hidden.",
+          "target": "/price",
+          "evidence": [
+            "Header 'Selling price' is the only monetary column and matches the requested selling price.",
+            "Values range from 113 to 256 except for one 9999 outlier.",
+            "Material code 000004 appears twice with prices 9999 and 152, so this field needs operator clarification.",
+            "FORMA's matcher reads this field the same way: confidence 0.55 → 0.90"
+          ],
+          "confidence": 0.9
+        },
+        {
+          "expr": {
+            "op": "upper",
+            "args": [
+              {
+                "op": "trim",
+                "args": [
+                  {
+                    "op": "col",
+                    "name": "Currency",
+                    "source": "prices"
+                  }
+                ],
+                "params": {}
+              }
+            ],
+            "params": {}
+          },
+          "target": "/currency",
+          "evidence": [
+            "Header 'Currency' contains the explicit ISO code THB on every price row.",
+            "Normalised with trim/upper without inferring currency from locale."
+          ],
+          "confidence": 0.97
+        }
+      ],
+      "record": {
+        "dedupe": {
+          "keep": "review",
+          "keys": [
+            "/sku"
+          ]
+        },
+        "filters": [],
+        "root_source": "products"
+      },
+      "quality": [
+        {
+          "rule": "not_null",
+          "params": {},
+          "target": "/sku",
+          "severity": "error"
+        },
+        {
+          "rule": "unique",
+          "params": {},
+          "target": "/sku",
+          "severity": "warning"
+        },
+        {
+          "rule": "not_null",
+          "params": {},
+          "target": "/product_name",
+          "severity": "error"
+        },
+        {
+          "rule": "positive",
+          "params": {},
+          "target": "/price",
+          "severity": "warning"
+        },
+        {
+          "rule": "not_null",
+          "params": {},
+          "target": "/currency",
+          "severity": "error"
+        }
+      ],
+      "sources": [
+        {
+          "id": "products",
+          "csv": {
+            "encoding": "auto",
+            "delimiter": "auto",
+            "quote_char": "\""
+          },
+          "file": {
+            "name_pattern": "(?i)^delivery",
+            "sheet_names_any": [
+              "Material"
+            ]
+          },
+          "role": "products",
+          "sheet": {
+            "name": "Material"
+          },
+          "table": {
+            "fill_down": [],
+            "header_row": 0,
+            "header_rows": 1,
+            "last_column": 2,
+            "first_column": 0,
+            "drop_total_rows": true,
+            "drop_empty_columns": true,
+            "stop_at_blank_rows": 2,
+            "drop_repeated_headers": true
+          },
+          "rename": {},
+          "description": "Product master from sheet Material: Material code and Description."
+        },
+        {
+          "id": "prices",
+          "csv": {
+            "encoding": "auto",
+            "delimiter": "auto",
+            "quote_char": "\""
+          },
+          "file": {
+            "name_pattern": "(?i)^delivery",
+            "sheet_names_any": [
+              "Prices"
+            ]
+          },
+          "role": "pricing",
+          "sheet": {
+            "name": "Prices"
+          },
+          "table": {
+            "fill_down": [],
+            "header_row": 0,
+            "header_rows": 1,
+            "last_column": 3,
+            "first_column": 0,
+            "drop_total_rows": true,
+            "drop_empty_columns": true,
+            "stop_at_blank_rows": 2,
+            "drop_repeated_headers": true
+          },
+          "rename": {},
+          "description": "Retail price list from sheet Prices: Material code, Selling price, Currency."
+        }
+      ],
+      "provenance": true,
+      "collections": [],
+      "attributes_passthrough": false
+    }
+  },
+  "questions": {
+    "mapping_id": "map_01M6JTM93DMD5MXK2FBWE0WHCW",
+    "round_id": "rnd_01M6JTDY5FQXGZQ5FRPHD30XMS",
+    "status": "proposed",
+    "blocked": false,
+    "questions": [
+      {
+        "id": "/price:value:03cc69a0db45",
+        "field": {
+          "pointer": "/price",
+          "name": "price",
+          "json_type": [
+            "number"
+          ],
+          "semantic": "price.amount",
+          "risk": "critical",
+          "required": true,
+          "nullable": false,
+          "enum": null,
+          "format": null,
+          "synonyms_en": [],
+          "synonyms_th": [],
+          "description": "Requested selling price, not cost.",
+          "description_th": null,
+          "in_collection": null,
+          "is_collection": false,
+          "system": false,
+          "default": null,
+          "examples": []
+        },
+        "kind": "text",
+        "options": [
+          "152",
+          "9999"
+        ],
+        "question": "Material code 000004 appears twice in Prices with selling prices 9999 and 152 THB (9999 is a strong outlier). Which price should be delivered for this SKU?",
+        "current": {
+          "op": "parse_number_th",
+          "args": [
+            {
+              "op": "col",
+              "name": "Selling price",
+              "source": "prices"
+            }
+          ],
+          "params": {}
+        },
+        "evidence": [
+          "Header 'Selling price' is the only monetary column and matches the requested selling price.",
+          "Values range from 113 to 256 except for one 9999 outlier.",
+          "Material code 000004 appears twice with prices 9999 and 152, so this field needs operator clarification.",
+          "FORMA's matcher reads this field the same way: confidence 0.55 → 0.90"
+        ],
+        "note": "The target schema allows only one /price per SKU and the source gives no precedence rule. Choosing one of the two prices silently would fabricate a business decision.",
+        "contested": true,
+        "action": "value_map",
+        "scope": "source_value",
+        "allow_custom": true,
+        "source_value": "000004"
+      }
+    ],
+    "open_questions": [
+      "No SKU-like header found in root table; using 'Selling price' as identity — confirm",
+      "Material code 000004 appears twice in Prices with selling prices 9999 and 152 THB (9999 is a strong outlier). Which price should be delivered for this SKU?"
+    ],
+    "reasons": [
+      "mapping confidence 0.72 < 0.95",
+      "1 engine/validation errors",
+      "first time this customer/format is seen",
+      "2 questions still need operator confirmation",
+      "the model selects rows differently from FORMA's matcher (records: dedupe; records: joins; records: root)",
+      "verification: 1 duplicate identities on ['/sku'] (1 of them with different values in Selling price, /price; keep=review)",
+      "verification: dedupe: 1 duplicate identities on ['/sku'] (1 of them with different values in Selling price, /price; keep=review)"
+    ],
+    "sample": [
+      {
+        "sku": "000001",
+        "price": 113.0,
+        "currency": "THB",
+        "source_meta": {
+          "file": "delivery.xlsx",
+          "lineage": {
+            "joined": {
+              "prices": 4
+            },
+            "source": "products",
+            "root_row": 0
+          }
+        },
+        "product_name": "Coffee variant 01"
+      },
+      {
+        "sku": "000011",
+        "price": 243.0,
+        "currency": "THB",
+        "source_meta": {
+          "file": "delivery.xlsx",
+          "lineage": {
+            "joined": {
+              "prices": 3
+            },
+            "source": "products",
+            "root_row": 1
+          }
+        },
+        "product_name": "Soap variant 11"
+      },
+      {
+        "sku": "000002",
+        "price": 126.0,
+        "currency": "THB",
+        "source_meta": {
+          "file": "delivery.xlsx",
+          "lineage": {
+            "joined": {
+              "prices": 6
+            },
+            "source": "products",
+            "root_row": 2
+          }
+        },
+        "product_name": "Shampoo variant 02"
+      }
+    ],
+    "context": {
+      "customer": {
+        "code": "EVAL-rel-20261104-fixed1-T10",
+        "name": "EVAL-rel-20261104-fixed1-T10"
+      },
+      "round_label": "EVAL rel-20261104-fixed1 T10_r1",
+      "files": [
+        {
+          "id": "fil_01M6JTDY82WAJQ2984NPE7APDP",
+          "name": "delivery.xlsx"
+        }
+      ],
+      "mapping_version": 1
+    },
+    "changes": [],
+    "comparison_dataset_id": null,
+    "checks": {
+      "drift": null,
+      "errors": 1,
+      "rows_out": 12,
+      "warnings": 0,
+      "agreement": {
+        "ops": 2,
+        "agree": 2,
+        "record": 3,
+        "dropped": 0,
+        "disagree": 1,
+        "model_only": 1
+      },
+      "llm_fallback": false,
+      "reused_approved": false,
+      "full_verification": false,
+      "mapping_confidence": 0.72,
+      "data_checks_trusted": false,
+      "low_confidence_high": [],
+      "unresolved_questions": 2,
+      "plausibility_warnings": 0,
+      "low_confidence_critical": [],
+      "verification": {
+        "scope": "Execution and contract checks; business ambiguities require operator answers",
+        "passed": false,
+        "version": 1,
+        "complete": true,
+        "coverage": {
+          "fields": {
+            "/sku": {
+              "risk": "medium",
+              "records": 12,
+              "records_filled": 12
+            },
+            "/price": {
+              "risk": "critical",
+              "records": 12,
+              "records_filled": 12
+            },
+            "/currency": {
+              "risk": "critical",
+              "records": 12,
+              "records_filled": 12
+            },
+            "/product_name": {
+              "risk": "medium",
+              "records": 12,
+              "records_filled": 12
+            }
+          },
+          "sources": {
+            "prices": 13,
+            "products": 12
+          },
+          "collections": {},
+          "invalid_records": 0
+        },
+        "problems": [
+          "1 duplicate identities on ['/sku'] (1 of them with different values in Selling price, /price; keep=review)",
+          "dedupe: 1 duplicate identities on ['/sku'] (1 of them with different values in Selling price, /price; keep=review)"
+        ],
+        "rows_out": 12,
+        "warnings": [],
+        "rows_checked": 12
+      }
+    },
+    "impact": {},
+    "fields": [
+      {
+        "pointer": "/sku",
+        "name": "sku",
+        "json_type": [
+          "string"
+        ],
+        "semantic": "identity.sku",
+        "risk": "medium",
+        "required": true,
+        "nullable": false,
+        "enum": null,
+        "format": null,
+        "synonyms_en": [],
+        "synonyms_th": [],
+        "description": "Unique SKU identifier; preserve leading zeros.",
+        "description_th": null,
+        "in_collection": null,
+        "is_collection": false,
+        "system": false,
+        "default": null,
+        "examples": []
+      },
+      {
+        "pointer": "/price",
+        "name": "price",
+        "json_type": [
+          "number"
+        ],
+        "semantic": "price.amount",
+        "risk": "critical",
+        "required": true,
+        "nullable": false,
+        "enum": null,
+        "format": null,
+        "synonyms_en": [],
+        "synonyms_th": [],
+        "description": "Requested selling price, not cost.",
+        "description_th": null,
+        "in_collection": null,
+        "is_collection": false,
+        "system": false,
+        "default": null,
+        "examples": []
+      },
+      {
+        "pointer": "/currency",
+        "name": "currency",
+        "json_type": [
+          "string"
+        ],
+        "semantic": "currency",
+        "risk": "critical",
+        "required": true,
+        "nullable": false,
+        "enum": null,
+        "format": null,
+        "synonyms_en": [],
+        "synonyms_th": [],
+        "description": "ISO 4217 code supported by the source.",
+        "description_th": null,
+        "in_collection": null,
+        "is_collection": false,
+        "system": false,
+        "default": null,
+        "examples": []
+      },
+      {
+        "pointer": "/product_name",
+        "name": "product_name",
+        "json_type": [
+          "string"
+        ],
+        "semantic": "product.name",
+        "risk": "medium",
+        "required": true,
+        "nullable": false,
+        "enum": null,
+        "format": null,
+        "synonyms_en": [],
+        "synonyms_th": [],
+        "description": "Product name from the master list.",
+        "description_th": null,
+        "in_collection": null,
+        "is_collection": false,
+        "system": false,
+        "default": null,
+        "examples": []
+      }
+    ]
+  },
+  "preview": {
+    "ok": false,
+    "validation": {
+      "ok": true,
+      "issues": []
+    },
+    "records": [
+      {
+        "sku": "000001",
+        "product_name": "Coffee variant 01",
+        "price": 113.0,
+        "currency": "THB",
+        "source_meta": {
+          "file": "delivery.xlsx",
+          "lineage": {
+            "root_row": 0,
+            "source": "products",
+            "joined": {
+              "prices": 4
+            }
+          }
+        }
+      },
+      {
+        "sku": "000011",
+        "product_name": "Soap variant 11",
+        "price": 243.0,
+        "currency": "THB",
+        "source_meta": {
+          "file": "delivery.xlsx",
+          "lineage": {
+            "root_row": 1,
+            "source": "products",
+            "joined": {
+              "prices": 3
+            }
+          }
+        }
+      },
+      {
+        "sku": "000002",
+        "product_name": "Shampoo variant 02",
+        "price": 126.0,
+        "currency": "THB",
+        "source_meta": {
+          "file": "delivery.xlsx",
+          "lineage": {
+            "root_row": 2,
+            "source": "products",
+            "joined": {
+              "prices": 6
+            }
+          }
+        }
+      },
+      {
+        "sku": "000012",
+        "product_name": "Tea variant 12",
+        "price": 256.0,
+        "currency": "THB",
+        "source_meta": {
+          "file": "delivery.xlsx",
+          "lineage": {
+            "root_row": 3,
+            "source": "products",
+            "joined": {
+              "prices": 9
+            }
+          }
+        }
+      },
+      {
+        "sku": "000009",
+        "product_name": "Coffee variant 09",
+        "price": 217.0,
+        "currency": "THB",
+        "source_meta": {
+          "file": "delivery.xlsx",
+          "lineage": {
+            "root_row": 4,
+            "source": "products",
+            "joined": {
+              "prices": 5
+            }
+          }
+        }
+      },
+      {
+        "sku": "000008",
+        "product_name": "Tea variant 08",
+        "price": 204.0,
+        "currency": "THB",
+        "source_meta": {
+          "file": "delivery.xlsx",
+          "lineage": {
+            "root_row": 5,
+            "source": "products",
+            "joined": {
+              "prices": 10
+            }
+          }
+        }
+      },
+      {
+        "sku": "000007",
+        "product_name": "Soap variant 07",
+        "price": 191.0,
+        "currency": "THB",
+        "source_meta": {
+          "file": "delivery.xlsx",
+          "lineage": {
+            "root_row": 6,
+            "source": "products",
+            "joined": {
+              "prices": 2
+            }
+          }
+        }
+      },
+      {
+        "sku": "000003",
+        "product_name": "Soap variant 03",
+        "price": 139.0,
+        "currency": "THB",
+        "source_meta": {
+          "file": "delivery.xlsx",
+          "lineage": {
+            "root_row": 7,
+            "source": "products",
+            "joined": {
+              "prices": 0
+            }
+          }
+        }
+      },
+      {
+        "sku": "000004",
+        "product_name": "Tea variant 04",
+        "price": 9999.0,
+        "currency": "THB",
+        "source_meta": {
+          "file": "delivery.xlsx",
+          "lineage": {
+            "root_row": 8,
+            "source": "products",
+            "joined": {
+              "prices": 7
+            }
+          }
+        }
+      },
+      {
+        "sku": "000006",
+        "product_name": "Shampoo variant 06",
+        "price": 178.0,
+        "currency": "THB",
+        "source_meta": {
+          "file": "delivery.xlsx",
+          "lineage": {
+            "root_row": 9,
+            "source": "products",
+            "joined": {
+              "prices": 8
+            }
+          }
+        }
+      },
+      {
+        "sku": "000010",
+        "product_name": "Shampoo variant 10",
+        "price": 230.0,
+        "currency": "THB",
+        "source_meta": {
+          "file": "delivery.xlsx",
+          "lineage": {
+            "root_row": 10,
+            "source": "products",
+            "joined": {
+              "prices": 1
+            }
+          }
+        }
+      },
+      {
+        "sku": "000005",
+        "product_name": "Coffee variant 05",
+        "price": 165.0,
+        "currency": "THB",
+        "source_meta": {
+          "file": "delivery.xlsx",
+          "lineage": {
+            "root_row": 11,
+            "source": "products",
+            "joined": {
+              "prices": 12
+            }
+          }
+        }
+      }
+    ],
+    "findings": [
+      {
+        "kind": "dedupe",
+        "severity": "error",
+        "message": "1 duplicate identities on ['/sku'] (1 of them with different values in Selling price, /price; keep=review)",
+        "target": null,
+        "row": null,
+        "identity": null,
+        "details": {
+          "sample": [
+            "000004"
+          ],
+          "count": 1,
+          "conflicting": 1
+        }
+      }
+    ],
+    "stats": {
+      "rows_in": 12,
+      "rows_out": 12,
+      "sources": {
+        "products": 12,
+        "prices": 13
+      },
+      "collections": {},
+      "duration_ms": 172.5,
+      "identity_keys": [
+        "/sku"
+      ],
+      "invalid_records": 0
+    }
+  }
+}

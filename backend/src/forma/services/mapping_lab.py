@@ -48,6 +48,10 @@ def executor(ctx: Any, files: list[Any], schema: Any) -> Any:
         inputs.append(Input(path, len(data), lambda data=data: io.BytesIO(data)))
 
     def execute(code: str) -> dict[str, Any]:
+        from forma.ai.budget import progress, remaining
+
+        left = remaining()
+        progress("กำลังตรวจสูตรและความสัมพันธ์ของไฟล์ในพื้นที่ทดสอบ")
         if not isinstance(code, str) or not 0 < len(code) <= MAX_CODE_CHARS:
             return {"status": "rejected", "error": "Python code must contain 1–20000 characters"}
         if sum(x.size for x in inputs) > ctx.settings.code_sandbox_max_input_mb * 1024 * 1024:
@@ -56,7 +60,12 @@ def executor(ctx: Any, files: list[Any], schema: Any) -> Any:
                 "error": "Input size exceeds the sandbox budget; use inspection tools",
             }
         try:
-            result = runner.run(code, inputs, ctx.settings.code_sandbox_timeout_s)
+            timeout = (
+                min(ctx.settings.code_sandbox_timeout_s, left)
+                if left
+                else ctx.settings.code_sandbox_timeout_s
+            )
+            result = runner.run(code, inputs, timeout)
         except SandboxUnavailable:
             return {
                 "status": "unavailable",

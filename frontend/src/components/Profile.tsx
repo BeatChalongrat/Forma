@@ -1,17 +1,21 @@
 import { useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, Camera, Check, ChevronRight, Clock3, Image, Languages, LogOut, Monitor, Moon, Sun } from 'lucide-react'
+import { ArrowLeft, Camera, Check, ChevronDown, ChevronRight, Clock3, Image, Languages, LogOut, Monitor, Moon, Sun } from 'lucide-react'
 import { api, type Preferences } from '../lib/api'
 import { usePreferences } from '../lib/preferences'
 import { logout } from '../lib/auth'
 import { cn } from '../lib/utils'
 
-export function Profile() {
+export function Profile({ onOpenChange }: { onOpenChange?: (open: boolean) => void }) {
   const { prefs, t } = usePreferences()
   const { data: me } = useQuery({ queryKey: ['me'], queryFn: api.me })
   const qc = useQueryClient()
   const root = useRef<HTMLDivElement>(null), trigger = useRef<HTMLButtonElement>(null), panel = useRef<HTMLDivElement>(null), file = useRef<HTMLInputElement>(null)
   const [open, setOpen] = useState(false)
+  useEffect(() => { onOpenChange?.(open) }, [open, onOpenChange])
+  const name = prefs.display_name || me?.name || t('Your account', 'บัญชีของคุณ')
+  const roleNames: Record<string, string> = { admin: t('Administrator', 'ผู้ดูแลระบบ'), approver: t('Approver', 'ผู้อนุมัติ'), reviewer: t('Reviewer', 'ผู้ตรวจข้อมูล'), importer: t('File uploader', 'ผู้นำเข้าไฟล์'), viewer: t('Viewer', 'ผู้ดูข้อมูล') }
+  const role = me?.effective_roles.includes('admin') ? roleNames.admin : (me?.roles.map(r => roleNames[r] || r).join(' · ') || t('Account', 'ผู้ใช้งาน'))
   const [view, setView] = useState<'main' | 'profile' | 'regional'>('main')
   const [draft, setDraft] = useState(prefs)
   const [photoError, setPhotoError] = useState('')
@@ -41,10 +45,10 @@ export function Profile() {
     } catch { setPhotoError(t('Could not read this image.', 'อ่านรูปนี้ไม่ได้ ลองเลือกรูปอื่น')) } finally { setPhotoBusy(false) }
   }
   return <div ref={root} className="relative ml-2" onBlur={e => { if (e.relatedTarget && !e.currentTarget.contains(e.relatedTarget)) setOpen(false) }}>
-    <button ref={trigger} className="rounded-full hover:ring-2 ring-signal/40" aria-label={t('Open profile and preferences', 'เปิดโปรไฟล์และการตั้งค่า')} aria-haspopup="dialog" aria-expanded={open} aria-controls="profile-popover" onClick={() => { if (!open) navigate('main'); setOpen(!open) }}>{avatar(prefs.avatar, prefs.display_name)}</button>
+    <button ref={trigger} className="flex items-center gap-2 rounded-lg px-1.5 py-1 text-left hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-signal" aria-label={t('Open profile and preferences', 'เปิดโปรไฟล์และการตั้งค่า')} aria-haspopup="dialog" aria-expanded={open} aria-controls="profile-popover" onClick={() => { if (!open) navigate('main'); setOpen(!open) }}>{avatar(prefs.avatar, prefs.display_name)}<span className="min-w-0 max-w-24 sm:max-w-40"><span className="block truncate text-[13px] font-medium text-navy">{name}</span><span className="block truncate text-[11px] text-muted">{role}</span></span><ChevronDown size={14} className={cn('shrink-0 text-muted transition-transform', open && 'rotate-180')} aria-hidden="true" /></button>
     {open && <div ref={panel} id="profile-popover" role="dialog" aria-label={t('Profile menu', 'เมนูโปรไฟล์')} className="absolute right-0 top-[calc(100%+12px)] z-50 w-[300px] max-w-[calc(100vw-24px)] max-h-[calc(100dvh-90px)] overflow-y-auto rounded-2xl border border-line bg-popover shadow-xl p-2 text-sm">
       {view === 'main' ? <>
-        <div className="flex gap-3 items-center px-3 py-3">{avatar(prefs.avatar, prefs.display_name)}<div className="min-w-0"><div className="font-medium truncate">{prefs.display_name || me?.name}</div><div className="text-xs text-muted">{me?.effective_roles.includes('admin') ? t('Administrator', 'ผู้ดูแลระบบ') : me?.roles.join(', ')}</div></div></div>
+        <div className="flex gap-3 items-center px-3 py-3">{avatar(prefs.avatar, prefs.display_name)}<div className="min-w-0"><div className="font-medium truncate">{name}</div><div className="text-xs text-muted">{role}</div></div></div>
         <button className="profile-menu-row" onClick={() => navigate('profile')}><Image size={16} />{t('Photo & display name', 'รูปและชื่อโปรไฟล์')}<ChevronRight size={15} className="ml-auto" /></button>
         <div className="profile-menu-divider" /><div className="text-xs text-muted px-3 py-1 flex gap-2 items-center"><Languages size={14} />{t('Language', 'ภาษา')}</div>
         {(['th', 'en'] as const).map(language => <button key={language} className="profile-menu-row pl-10" aria-pressed={prefs.language === language} disabled={save.isPending} onClick={() => save.mutate({ ...prefs, language })}>{language === 'th' ? 'ไทย' : 'English'}{prefs.language === language && <Check size={15} className="ml-auto text-signal" />}</button>)}

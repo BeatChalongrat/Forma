@@ -1,0 +1,156 @@
+........................................................................ [  8%]
+..................................................................s....s [ 16%]
+........................F............................................... [ 24%]
+..................................F..........F.......................... [ 32%]
+....................................F................................... [ 40%]
+........................................................................ [ 48%]
+...................................................................s.... [ 56%]
+....................ss.................................................. [ 64%]
+........................................................................ [ 72%]
+........................................................................ [ 80%]
+........................................................................ [ 88%]
+........................................................................ [ 96%]
+...........................                                              [100%]
+================================== FAILURES ===================================
+________________ test_env_example_is_generated_and_up_to_date _________________
+
+tmp_path = WindowsPath('C:/Users/Beat Beat/AppData/Local/Temp/pytest-of-Beat Beat/pytest-1064/test_env_example_is_generated_0')
+
+    def test_env_example_is_generated_and_up_to_date(tmp_path: Path) -> None:
+        from forma.cli import app
+        from forma.core.config_example import render_env_example
+        from forma.core.settings import SECRET_FIELDS, Settings
+    
+        text = render_env_example()
+        for name in Settings.model_fields:
+            assert f"FORMA_{name.upper()}=" in text
+        for secret in SECRET_FIELDS:
+            assert f"FORMA_{secret.upper()}=\n" in text  # secrets are blank
+        assert "[SECRET]" in text and "# dev | prod" in text
+        committed = REPO / ".env.production.example"
+        assert committed.exists(), "run: forma config example --out ../.env.production.example"
+        res = runner.invoke(app, ["config", "example", "--check", str(committed)])
+>       assert res.exit_code == 0, res.output
+E       AssertionError: C:\Users\Beat Beat\Desktop\Forma\.env.production.example is out of date; regenerate with: forma config example --out C:\Users\Beat Beat\Desktop\Forma\.env.production.example
+E         
+E       assert 1 == 0
+E        +  where 1 = <Result SystemExit(1)>.exit_code
+
+tests\test_config_cli.py:46: AssertionError
+____________ test_profile_keeps_top_values_and_the_card_shows_them ____________
+
+tmp_path = WindowsPath('C:/Users/Beat Beat/AppData/Local/Temp/pytest-of-Beat Beat/pytest-1064/test_profile_keeps_top_values_0')
+
+    def test_profile_keeps_top_values_and_the_card_shows_them(tmp_path: Path) -> None:
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        assert ws is not None
+        ws.append(["code", "status", "price"])
+        for i in range(1, 13):
+            ws.append([f"A{i:03d}", "sell" if i % 4 else "stop", i * 10.5])
+        wb.save(tmp_path / "p.xlsx")
+        prof = profile_workbook(tmp_path / "p.xlsx")
+        status = next(c for c in prof.tables[0].columns if c.name == "status")
+        assert status.top_values == [["sell", 9], ["stop", 3]]  # by frequency, with counts
+        card = _column_card(status, rows=5, chars=200)
+>       assert (
+            card["top_values"] == [["sell", 9], ["stop", 3]] and card["distinct"] == 2 and "samples" not in card
+        )
+E       AssertionError: assert ([['sell', 9], ['stop', 3]] == [['sell', 9], ['stop', 3]]
+E         
+E         Use -v to get more diff and 2 == 2 and 'samples' not in {'name': 'status', 'type': 'string', 'null_ratio': 0.0, 'distinct': 2, ...})
+
+tests\test_evidence.py:55: AssertionError
+________ test_a_contested_field_is_asked_with_the_matcher_column_first ________
+
+client = <starlette.testclient.TestClient object at 0x0000027CF20F7D10>
+isolated_env = WindowsPath('C:/Users/Beat Beat/AppData/Local/Temp/pytest-of-Beat Beat/pytest-1064/test_a_contested_field_is_aske0')
+
+    def test_a_contested_field_is_asked_with_the_matcher_column_first(
+        client: TestClient, isolated_env: Path
+    ) -> None:
+        from forma.db.models import MappingVersion
+        from forma.db.session import session_scope
+    
+        c = client
+        cust = c.post("/api/customers", json={"code": "CT1", "name": "CT1"}).json()["id"]
+        r = c.post("/api/rounds", json={"customer_id": cust}).json()["id"]
+        _upload(c, r, make_workbook(isolated_env / "ct1.xlsx"))
+        mv = _run(c, r)["result"]["mapping_version_id"]
+        with session_scope() as s:
+            m = s.get(MappingVersion, mv)
+            assert m is not None
+            doc = copy.deepcopy(m.document)
+            for f in doc["fields"] + [f for coll in doc["collections"] for f in coll["fields"]]:
+                f["confidence"] = 0.97  # sure of everything ...
+            m.document = doc
+            m.policy = {  # ... but the matcher read /product_name from ������
+                **(m.policy or {}),
+                "checks": {},
+                "agreement": {"disagree": {"/product_name": {"matcher": ["�Թ���.������"], "model": ["�Թ���.�����Թ���"]}}},
+            }
+        qs = c.get(f"/api/mappings/{mv}/questions").json()["questions"]
+        q = next(x for x in qs if x["id"] == "/product_name")
+        assert q["kind"] == "choice" and q["contested"] is True and q["options"][:2] == ["�����Թ���", "������"]
+>       assert q["evidence"][-1] == "FORMA's matcher read ������ for this field" and qs[0]["id"] == "/product_name"
+E       assert ('\u0e15\u0e31\u0e27\u0e2d\u0e22\u0e48\u0e32\u0e07\u0e08\u0e32\u0e01\u0e04... 2 \xb7 \u0e2a\u0e34\u0e19\u0e04\u0e49\u0e32 3' == "FORMA's matc...or this field"
+E         
+E         - FORMA's matcher read ������ for this field
+E         + \u0e15\u0e31\u0e27\u0e2d\u0e22\u0e48\u0e32\u0e07\u0e08\u0e32\u0e01\u0e04\u0e2d\u0e25\u0e31\u0e21\u0e19\u0e4c \u0e0a\u0e37\u0e48\u0e2d\u0e2a\u0e34\u0e19\u0e04\u0e49\u0e32: \u0e2a\u0e34\u0e19\u0e04\u0e49\u0e32 1 \xb7 \u0e2a\u0e34\u0e19\u0e04\u0e49\u0e32 2 \xb7 \u0e2a\u0e34\u0e19\u0e04\u0e49\u0e32 3)
+
+tests\test_evidence.py:366: AssertionError
+---------------------------- Captured stderr setup ----------------------------
+INFO  [alembic.runtime.migration] Context impl SQLiteImpl.
+INFO  [alembic.runtime.migration] Will assume non-transactional DDL.
+INFO  [alembic.runtime.migration] Running stamp_revision  -> e1a5c6d7f8b9
+2026-11-04T10:36:16.812031Z [info     ] schema created (dev)           added_columns=[] legacy=False stamped=e1a5c6d7f8b9
+____________________ test_verification_report_fails_closed ____________________
+
+schema = TargetSchema(schema_id='product', version=1, document={'$schema': 'https://json-schema.org/draft/2020-12/schema', '$id... 'additionalProperties': True}}}}}, path=WindowsPath('C:/Users/Beat Beat/Desktop/Forma/target_schema/product.v1.json'))
+
+    def test_verification_report_fails_closed(schema: TargetSchema) -> None:
+        missing = verification(None, schema, complete=True)
+        assert missing["passed"] is False and missing["problems"] == ["No transformation result was verified"]
+    
+        def result(records: list[dict[str, Any]], findings: list[Any] | None = None) -> Any:
+            return SimpleNamespace(
+                errors=[f for f in findings or [] if f.severity == "error"],
+                findings=findings or [],
+                records=records,
+                stats={"rows_in": 10, "sources": {}},
+            )
+    
+        good = [{"sku": f"A{i}", "product_name": f"n{i}", "prices": [{"amount": 1.0}]} for i in range(10)]
+        ok = verification(result(good), schema, complete=True)
+        assert (
+            ok["passed"]
+            and ok["complete"]
+            and ok["rows_out"] == 10
+            and ok["coverage"]["fields"]["/sku"]["records_filled"] == 10
+        )
+        partial = verification(result(good), schema, complete=False)
+        assert not partial["passed"] and "Only a sample was checked" in partial["problems"]
+        empty = verification(result([]), schema, complete=True)
+        assert "No output records" in empty["problems"]
+        orphan = SimpleNamespace(severity="warning", message="/inventory: 6 items reference unknown root records")
+>       with_orphans = verification(result(good, [orphan]), schema, complete=True)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests\test_harness_edges.py:163: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+src\forma\ai\reconciliation.py:73: in verification
+    warnings.extend(f.message for f in result.findings if f.kind == "semantic")
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+.0 = <list_iterator object at 0x0000027CF032D270>
+
+>   warnings.extend(f.message for f in result.findings if f.kind == "semantic")
+                                                          ^^^^^^
+E   AttributeError: 'types.SimpleNamespace' object has no attribute 'kind'
+
+src\forma\ai\reconciliation.py:73: AttributeError
+=========================== short test summary info ===========================
+FAILED tests/test_config_cli.py::test_env_example_is_generated_and_up_to_date
+FAILED tests/test_evidence.py::test_profile_keeps_top_values_and_the_card_shows_them
+FAILED tests/test_evidence.py::test_a_contested_field_is_asked_with_the_matcher_column_first
+FAILED tests/test_harness_edges.py::test_verification_report_fails_closed - A...

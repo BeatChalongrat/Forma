@@ -1,0 +1,4456 @@
+{
+  "round": {
+    "id": "rnd_01M6K29DP5NYPNMMSTF8F31G4S",
+    "customer_id": "cus_01M6K29DBGGEHMQ8TNS6TRATC0",
+    "label": "EVAL wf-before T08_r1",
+    "status": "review",
+    "target_schema": "eval_wf-before_t08@1",
+    "notes": "Map the supplied ERP export(s) to the supplied JSON Schema. Preserve the master product population and identities. Do not invent business facts. Ask a specific question if required facts cannot be established.\nUse Export as the product list. Quantities must be supported by the workbook dependencies. If a referenced input is unavailable, do not infer its value.",
+    "summary": {
+      "drift": null,
+      "profile": [
+        {
+          "name": "delivery.xlsx",
+          "drift": null,
+          "tables": 3,
+          "file_id": "fil_01M6K29DQV8E1WA4888XSTJT0X",
+          "fingerprint": "ecf1de050b88661f"
+        }
+      ],
+      "verdict": {
+        "word": "sure",
+        "stage": "mapping",
+        "digest": "2b56c7b0d2710e3e68194763e0286395",
+        "outcome": "fix_mapping",
+        "subject": {
+          "id": "map_01M6K2EZ14R0DKGT7J58KJXGFT",
+          "kind": "mapping",
+          "round_id": "rnd_01M6K29DP5NYPNMMSTF8F31G4S"
+        },
+        "evidence": [
+          {
+            "id": 1,
+            "kind": "rows",
+            "link": "/rounds/rnd_01M6K29DP5NYPNMMSTF8F31G4S",
+            "text": {
+              "en": "12 records produced",
+              "th": "สร้างได้ 12 รายการ"
+            },
+            "numbers": {
+              "rows_out": 12
+            }
+          },
+          {
+            "id": 2,
+            "kind": "self_check",
+            "link": null,
+            "text": {
+              "en": "The AI ran its mapping on the first 12 rows (1 look(s) at the file, 2 fix round(s)): 1 problem(s) left",
+              "th": "AI ลองรัน mapping กับ 12 แถวแรก (ดูไฟล์ 1 ครั้ง แก้ 2 รอบ): เหลือปัญหา 1 ข้อ"
+            },
+            "numbers": {
+              "rows": 12,
+              "fix_rounds": 2,
+              "inspections": 1,
+              "problems_left": 1
+            }
+          },
+          {
+            "id": 3,
+            "kind": "questions",
+            "link": "/review?round=rnd_01M6K29DP5NYPNMMSTF8F31G4S",
+            "text": {
+              "en": "1 fields below the confidence bar",
+              "th": "1 ฟิลด์ยังไม่ถึงเกณฑ์ความมั่นใจ"
+            },
+            "numbers": {
+              "count": 1
+            }
+          }
+        ],
+        "narrative": null,
+        "conclusion": {
+          "en": "Source information is missing. Supply or repair the file and run mapping again.",
+          "th": "ข้อมูลต้นทางยังไม่ครบ เพิ่มหรือแก้ไฟล์ แล้วให้ระบบจับคู่ใหม่"
+        },
+        "confidence": 0.98,
+        "suppressed": {
+          "count": 0,
+          "groups": [
+            {
+              "text": {
+                "en": "1 notes from the mapper",
+                "th": "หมายเหตุจากตัวจับคู่ 1 ข้อ"
+              },
+              "reason": "open_questions",
+              "pointers": []
+            }
+          ]
+        },
+        "must_decide": [
+          {
+            "id": "/qty",
+            "why": {
+              "en": "The header 'Pieces per carton' exists but all values are blank — please supply the missing external workbook, or confirm the per-SKU pieces per carton (Pack factors!B2:B13). Export!C2:C13 are external formulas ='Counts'!B2*'[missing-pack.xlsx]Pack factors'!B2 …, but delivery.xlsx contains no values in Pack factors!B2:B13 and the referenced file '[missing-pack.xlsx]' was not delivered; Counts!Cartons is 3–14 per SKU. Without the factor, /qty (stock in individual pieces) cannot be computed and stays null.",
+              "th": "The header 'Pieces per carton' exists but all values are blank — please supply the missing external workbook, or confirm the per-SKU pieces per carton (Pack factors!B2:B13). Export!C2:C13 are external formulas ='Counts'!B2*'[missing-pack.xlsx]Pack factors'!B2 …, but delivery.xlsx contains no values in Pack factors!B2:B13 and the referenced file '[missing-pack.xlsx]' was not delivered; Counts!Cartons is 3–14 per SKU. Without the factor, /qty (stock in individual pieces) cannot be computed and stays null."
+            },
+            "kind": "confirm",
+            "scope": "source_file",
+            "default": null,
+            "options": [
+              "confirm"
+            ],
+            "question": {
+              "en": "The header 'Pieces per carton' exists but all values are blank — please supply the missing external workbook, or confirm the per-SKU pieces per carton (Pack factors!B2:B13).",
+              "th": "The header 'Pieces per carton' exists but all values are blank — please supply the missing external workbook, or confirm the per-SKU pieces per carton (Pack factors!B2:B13)."
+            },
+            "semantic": "stock.qty",
+            "allow_custom": false,
+            "evidence_ids": [
+              3
+            ],
+            "option_labels": null
+          }
+        ],
+        "rules_fired": [
+          "source_required"
+        ],
+        "round_status": "review",
+        "rules_version": "2026.11.04.1",
+        "mapping_status": "proposed",
+        "policy_decision": "review"
+      },
+      "decision": "review",
+      "simulation": {
+        "rows_in": 12,
+        "sources": {
+          "products_0": 12,
+          "products_1": 12,
+          "pack_factors_2": 12
+        },
+        "findings": {
+          "info": 0,
+          "error": 0,
+          "warning": 2
+        },
+        "rows_out": 12,
+        "collections": {},
+        "duration_ms": 13567.9,
+        "identity_keys": [
+          "/sku"
+        ],
+        "invalid_records": 0
+      },
+      "drift_report": null,
+      "format_memory": {
+        "status": "new",
+        "mapping_id": null,
+        "target_schema": "eval_wf-before_t08@1",
+        "mapping_version": null
+      },
+      "skipped_files": 0,
+      "profiled_files": 1,
+      "mapping_version_id": "map_01M6K2EZ14R0DKGT7J58KJXGFT",
+      "has_previous_approval": false,
+      "matches_other_customer": null
+    },
+    "created_at": "2026-11-04T10:39:46.373803+00:00",
+    "updated_at": "2026-11-04T10:42:48.006817+00:00",
+    "successor_id": null,
+    "predecessor_id": null,
+    "files": [
+      {
+        "id": "fil_01M6K29DQV8E1WA4888XSTJT0X",
+        "round_id": "rnd_01M6K29DP5NYPNMMSTF8F31G4S",
+        "name": "delivery.xlsx",
+        "size": 5134,
+        "kind": "excel",
+        "status": "profiled",
+        "sha256": "8aea9aee3923d5068ee713dfb0c4b1afe1d290168fc656ad806cf0d6542d52a4",
+        "duplicate_of": "fil_01M6JVGA43J76KE62T3KW4AQQT",
+        "error": null,
+        "created_at": "2026-11-04T10:39:46.427202+00:00",
+        "fingerprint": "ecf1de050b88661f",
+        "drift": null,
+        "tables": 3,
+        "sheets": [
+          "Export",
+          "Counts",
+          "Pack factors"
+        ]
+      }
+    ],
+    "customer": {
+      "id": "cus_01M6K29DBGGEHMQ8TNS6TRATC0",
+      "code": "EVAL-wf-before-T08",
+      "name": "EVAL-wf-before-T08"
+    },
+    "successor": null,
+    "predecessor": null,
+    "mappings": [
+      {
+        "id": "map_01M6K2EZ14R0DKGT7J58KJXGFT",
+        "customer_id": "cus_01M6K29DBGGEHMQ8TNS6TRATC0",
+        "round_id": "rnd_01M6K29DP5NYPNMMSTF8F31G4S",
+        "version": 1,
+        "status": "proposed",
+        "target_schema": "eval_wf-before_t08@1",
+        "confidence": 0.55,
+        "created_by": "ai",
+        "model": "deepseek-flash",
+        "policy": {
+          "checks": {
+            "drift": null,
+            "errors": 0,
+            "rows_out": 12,
+            "warnings": 3,
+            "agreement": {
+              "ops": 2,
+              "agree": 2,
+              "record": 2,
+              "dropped": 0,
+              "disagree": 0,
+              "model_only": 1
+            },
+            "llm_fallback": false,
+            "reused_approved": false,
+            "full_verification": false,
+            "mapping_confidence": 0.55,
+            "data_checks_trusted": false,
+            "low_confidence_high": [
+              "/qty (0.40)"
+            ],
+            "unresolved_questions": 1,
+            "plausibility_warnings": 1,
+            "source_review_required": true,
+            "low_confidence_critical": []
+          },
+          "impact": {},
+          "source": "ai",
+          "reasons": [
+            "products_0: formula values are saved Excel caches; FORMA does not recalculate or verify cache freshness",
+            "low confidence on high-risk fields: /qty (0.40)",
+            "mapping confidence 0.55 < 0.95",
+            "first time this customer/format is seen",
+            "1 questions still need operator confirmation",
+            "the model selects rows differently from FORMA's matcher (records: dedupe; records: joins)",
+            "verification: /qty: empty in 12 of 12 records"
+          ],
+          "sandbox": null,
+          "verdict": {
+            "word": "sure",
+            "stage": "mapping",
+            "digest": "2b56c7b0d2710e3e68194763e0286395",
+            "outcome": "fix_mapping",
+            "subject": {
+              "id": "map_01M6K2EZ14R0DKGT7J58KJXGFT",
+              "kind": "mapping",
+              "round_id": "rnd_01M6K29DP5NYPNMMSTF8F31G4S"
+            },
+            "evidence": [
+              {
+                "id": 1,
+                "kind": "rows",
+                "link": "/rounds/rnd_01M6K29DP5NYPNMMSTF8F31G4S",
+                "text": {
+                  "en": "12 records produced",
+                  "th": "สร้างได้ 12 รายการ"
+                },
+                "numbers": {
+                  "rows_out": 12
+                }
+              },
+              {
+                "id": 2,
+                "kind": "self_check",
+                "link": null,
+                "text": {
+                  "en": "The AI ran its mapping on the first 12 rows (1 look(s) at the file, 2 fix round(s)): 1 problem(s) left",
+                  "th": "AI ลองรัน mapping กับ 12 แถวแรก (ดูไฟล์ 1 ครั้ง แก้ 2 รอบ): เหลือปัญหา 1 ข้อ"
+                },
+                "numbers": {
+                  "rows": 12,
+                  "fix_rounds": 2,
+                  "inspections": 1,
+                  "problems_left": 1
+                }
+              },
+              {
+                "id": 3,
+                "kind": "questions",
+                "link": "/review?round=rnd_01M6K29DP5NYPNMMSTF8F31G4S",
+                "text": {
+                  "en": "1 fields below the confidence bar",
+                  "th": "1 ฟิลด์ยังไม่ถึงเกณฑ์ความมั่นใจ"
+                },
+                "numbers": {
+                  "count": 1
+                }
+              }
+            ],
+            "narrative": null,
+            "conclusion": {
+              "en": "Source information is missing. Supply or repair the file and run mapping again.",
+              "th": "ข้อมูลต้นทางยังไม่ครบ เพิ่มหรือแก้ไฟล์ แล้วให้ระบบจับคู่ใหม่"
+            },
+            "confidence": 0.98,
+            "suppressed": {
+              "count": 0,
+              "groups": [
+                {
+                  "text": {
+                    "en": "1 notes from the mapper",
+                    "th": "หมายเหตุจากตัวจับคู่ 1 ข้อ"
+                  },
+                  "reason": "open_questions",
+                  "pointers": []
+                }
+              ]
+            },
+            "must_decide": [
+              {
+                "id": "/qty",
+                "why": {
+                  "en": "The header 'Pieces per carton' exists but all values are blank — please supply the missing external workbook, or confirm the per-SKU pieces per carton (Pack factors!B2:B13). Export!C2:C13 are external formulas ='Counts'!B2*'[missing-pack.xlsx]Pack factors'!B2 …, but delivery.xlsx contains no values in Pack factors!B2:B13 and the referenced file '[missing-pack.xlsx]' was not delivered; Counts!Cartons is 3–14 per SKU. Without the factor, /qty (stock in individual pieces) cannot be computed and stays null.",
+                  "th": "The header 'Pieces per carton' exists but all values are blank — please supply the missing external workbook, or confirm the per-SKU pieces per carton (Pack factors!B2:B13). Export!C2:C13 are external formulas ='Counts'!B2*'[missing-pack.xlsx]Pack factors'!B2 …, but delivery.xlsx contains no values in Pack factors!B2:B13 and the referenced file '[missing-pack.xlsx]' was not delivered; Counts!Cartons is 3–14 per SKU. Without the factor, /qty (stock in individual pieces) cannot be computed and stays null."
+                },
+                "kind": "confirm",
+                "scope": "source_file",
+                "default": null,
+                "options": [
+                  "confirm"
+                ],
+                "question": {
+                  "en": "The header 'Pieces per carton' exists but all values are blank — please supply the missing external workbook, or confirm the per-SKU pieces per carton (Pack factors!B2:B13).",
+                  "th": "The header 'Pieces per carton' exists but all values are blank — please supply the missing external workbook, or confirm the per-SKU pieces per carton (Pack factors!B2:B13)."
+                },
+                "semantic": "stock.qty",
+                "allow_custom": false,
+                "evidence_ids": [
+                  3
+                ],
+                "option_labels": null
+              }
+            ],
+            "rules_fired": [
+              "source_required"
+            ],
+            "round_status": "review",
+            "rules_version": "2026.11.04.1",
+            "mapping_status": "proposed",
+            "policy_decision": "review"
+          },
+          "decision": "review",
+          "learning": null,
+          "priority": 50,
+          "workflow": null,
+          "agreement": {
+            "ops": [
+              "/product_name",
+              "/sku"
+            ],
+            "agree": [
+              "/product_name",
+              "/sku"
+            ],
+            "record": {
+              "joins": {
+                "model": [
+                  {
+                    "on": [
+                      {
+                        "left": "SKU",
+                        "right": "SKU"
+                      }
+                    ],
+                    "how": "left",
+                    "left": {
+                      "file": "fil_01M6K29DQV8E1WA4888XSTJT0X",
+                      "sheet": "export",
+                      "filter": null,
+                      "rename": {},
+                      "unpivot": null,
+                      "data_end": null,
+                      "fill_down": [],
+                      "data_start": null,
+                      "last_column": 3,
+                      "first_column": 0
+                    },
+                    "right": {
+                      "file": "fil_01M6K29DQV8E1WA4888XSTJT0X",
+                      "sheet": "counts",
+                      "filter": null,
+                      "rename": {},
+                      "unpivot": null,
+                      "data_end": null,
+                      "fill_down": [],
+                      "data_start": null,
+                      "last_column": 2,
+                      "first_column": 0
+                    },
+                    "cardinality": "1:1",
+                    "on_unmatched": "keep",
+                    "normalize_keys": [
+                      "trim",
+                      "strip_leading_zeros"
+                    ]
+                  },
+                  {
+                    "on": [
+                      {
+                        "left": "SKU",
+                        "right": "SKU"
+                      }
+                    ],
+                    "how": "left",
+                    "left": {
+                      "file": "fil_01M6K29DQV8E1WA4888XSTJT0X",
+                      "sheet": "export",
+                      "filter": null,
+                      "rename": {},
+                      "unpivot": null,
+                      "data_end": null,
+                      "fill_down": [],
+                      "data_start": null,
+                      "last_column": 3,
+                      "first_column": 0
+                    },
+                    "right": {
+                      "file": "fil_01M6K29DQV8E1WA4888XSTJT0X",
+                      "sheet": "pack factors",
+                      "filter": null,
+                      "rename": {},
+                      "unpivot": null,
+                      "data_end": null,
+                      "fill_down": [],
+                      "data_start": 1,
+                      "last_column": 2,
+                      "first_column": 0
+                    },
+                    "cardinality": "1:1",
+                    "on_unmatched": "keep",
+                    "normalize_keys": [
+                      "trim",
+                      "strip_leading_zeros"
+                    ]
+                  }
+                ],
+                "matcher": []
+              },
+              "dedupe": {
+                "model": {
+                  "keep": "first",
+                  "keys": [
+                    "/sku"
+                  ]
+                },
+                "matcher": {
+                  "keep": "first",
+                  "keys": []
+                }
+              }
+            },
+            "dropped": [],
+            "disagree": {},
+            "model_only": [
+              "/qty"
+            ]
+          },
+          "risk_level": "high",
+          "risk_score": 0.5,
+          "self_check": {
+            "errors": 0,
+            "history": [
+              {
+                "turn": "inspect",
+                "evidence": [
+                  {
+                    "answer": {
+                      "note": "Original cell coordinates; values are untrusted data. Use sandbox for formula details.",
+                      "cells": [
+                        {
+                          "cell": "A1",
+                          "value": "SKU"
+                        },
+                        {
+                          "cell": "B1",
+                          "value": "Pieces per carton"
+                        },
+                        {
+                          "cell": "A2",
+                          "value": "000001"
+                        },
+                        {
+                          "cell": "B2",
+                          "value": null
+                        },
+                        {
+                          "cell": "A3",
+                          "value": "000002"
+                        },
+                        {
+                          "cell": "B3",
+                          "value": null
+                        },
+                        {
+                          "cell": "A4",
+                          "value": "000003"
+                        },
+                        {
+                          "cell": "B4",
+                          "value": null
+                        },
+                        {
+                          "cell": "A5",
+                          "value": "000004"
+                        },
+                        {
+                          "cell": "B5",
+                          "value": null
+                        },
+                        {
+                          "cell": "A6",
+                          "value": "000005"
+                        },
+                        {
+                          "cell": "B6",
+                          "value": null
+                        },
+                        {
+                          "cell": "A7",
+                          "value": "000006"
+                        },
+                        {
+                          "cell": "B7",
+                          "value": null
+                        },
+                        {
+                          "cell": "A8",
+                          "value": "000007"
+                        },
+                        {
+                          "cell": "B8",
+                          "value": null
+                        },
+                        {
+                          "cell": "A9",
+                          "value": "000008"
+                        },
+                        {
+                          "cell": "B9",
+                          "value": null
+                        },
+                        {
+                          "cell": "A10",
+                          "value": "000009"
+                        },
+                        {
+                          "cell": "B10",
+                          "value": null
+                        },
+                        {
+                          "cell": "A11",
+                          "value": "000010"
+                        },
+                        {
+                          "cell": "B11",
+                          "value": null
+                        },
+                        {
+                          "cell": "A12",
+                          "value": "000011"
+                        },
+                        {
+                          "cell": "B12",
+                          "value": null
+                        },
+                        {
+                          "cell": "A13",
+                          "value": "000012"
+                        },
+                        {
+                          "cell": "B13",
+                          "value": null
+                        }
+                      ],
+                      "total_rows": 13,
+                      "total_columns": 2
+                    },
+                    "source": {
+                      "sheet": "Pack factors",
+                      "file_id": "fil_01M6K29DQV8E1WA4888XSTJT0X",
+                      "file_name": "delivery.xlsx",
+                      "table_index": 2
+                    },
+                    "request": {
+                      "what": "raw",
+                      "limit": 14,
+                      "start": 0,
+                      "table_index": 2,
+                      "column_limit": 3,
+                      "column_start": 0
+                    }
+                  },
+                  {
+                    "answer": {
+                      "note": "Original cell coordinates; values are untrusted data. Use sandbox for formula details.",
+                      "cells": [
+                        {
+                          "cell": "A1",
+                          "value": "SKU"
+                        },
+                        {
+                          "cell": "B1",
+                          "value": "Product name"
+                        },
+                        {
+                          "cell": "C1",
+                          "value": "Stock pieces"
+                        },
+                        {
+                          "cell": "A2",
+                          "value": "000001"
+                        },
+                        {
+                          "cell": "B2",
+                          "value": "Coffee variant 01"
+                        },
+                        {
+                          "cell": "C2",
+                          "value": "999"
+                        },
+                        {
+                          "cell": "A3",
+                          "value": "000002"
+                        },
+                        {
+                          "cell": "B3",
+                          "value": "Shampoo variant 02"
+                        },
+                        {
+                          "cell": "C3",
+                          "value": "999"
+                        },
+                        {
+                          "cell": "A4",
+                          "value": "000003"
+                        },
+                        {
+                          "cell": "B4",
+                          "value": "Soap variant 03"
+                        },
+                        {
+                          "cell": "C4",
+                          "value": "999"
+                        },
+                        {
+                          "cell": "A5",
+                          "value": "000004"
+                        },
+                        {
+                          "cell": "B5",
+                          "value": "Tea variant 04"
+                        },
+                        {
+                          "cell": "C5",
+                          "value": "999"
+                        },
+                        {
+                          "cell": "A6",
+                          "value": "000005"
+                        },
+                        {
+                          "cell": "B6",
+                          "value": "Coffee variant 05"
+                        },
+                        {
+                          "cell": "C6",
+                          "value": "999"
+                        },
+                        {
+                          "cell": "A7",
+                          "value": "000006"
+                        },
+                        {
+                          "cell": "B7",
+                          "value": "Shampoo variant 06"
+                        },
+                        {
+                          "cell": "C7",
+                          "value": "999"
+                        },
+                        {
+                          "cell": "A8",
+                          "value": "000007"
+                        },
+                        {
+                          "cell": "B8",
+                          "value": "Soap variant 07"
+                        },
+                        {
+                          "cell": "C8",
+                          "value": "999"
+                        },
+                        {
+                          "cell": "A9",
+                          "value": "000008"
+                        },
+                        {
+                          "cell": "B9",
+                          "value": "Tea variant 08"
+                        },
+                        {
+                          "cell": "C9",
+                          "value": "999"
+                        },
+                        {
+                          "cell": "A10",
+                          "value": "000009"
+                        },
+                        {
+                          "cell": "B10",
+                          "value": "Coffee variant 09"
+                        },
+                        {
+                          "cell": "C10",
+                          "value": "999"
+                        },
+                        {
+                          "cell": "A11",
+                          "value": "000010"
+                        },
+                        {
+                          "cell": "B11",
+                          "value": "Shampoo variant 10"
+                        },
+                        {
+                          "cell": "C11",
+                          "value": "999"
+                        },
+                        {
+                          "cell": "A12",
+                          "value": "000011"
+                        },
+                        {
+                          "cell": "B12",
+                          "value": "Soap variant 11"
+                        },
+                        {
+                          "cell": "C12",
+                          "value": "999"
+                        },
+                        {
+                          "cell": "A13",
+                          "value": "000012"
+                        },
+                        {
+                          "cell": "B13",
+                          "value": "Tea variant 12"
+                        },
+                        {
+                          "cell": "C13",
+                          "value": "999"
+                        }
+                      ],
+                      "total_rows": 13,
+                      "total_columns": 3
+                    },
+                    "source": {
+                      "sheet": "Export",
+                      "file_id": "fil_01M6K29DQV8E1WA4888XSTJT0X",
+                      "file_name": "delivery.xlsx",
+                      "table_index": 0
+                    },
+                    "request": {
+                      "what": "raw",
+                      "limit": 14,
+                      "start": 0,
+                      "table_index": 0,
+                      "column_limit": 3,
+                      "column_start": 0
+                    }
+                  }
+                ],
+                "requests": 2
+              },
+              {
+                "code": "import openpyxl, json\nwb = openpyxl.load_workbook('/work/inputs/delivery.xlsx', data_only=False)\nws = wb['Export']\nout=[]\nfor r in range(1,4):\n    for c in range(1,4):\n        cell = ws.cell(row=r,column=c)\n        out.append((cell.coordinate, repr(cell.value), cell.data_type))\nprint(json.dumps(out))\nws2 = wb['Export']\nprint([ws2.cell(row=r,column=3).value for r in range(2,14)])\nwb2 = openpyxl.load_workbook('/work/inputs/delivery.xlsx', data_only=True)\nws3 = wb2['Export']\nprint([ws3.cell(row=r,column=3).value for r in range(2,14)])\nws4 = wb['Pack factors']\nprint([(ws4.cell(row=r,column=2).value) for r in range(1,14)])\nws5 = wb['Counts']\nprint([(ws5.cell(row=r,column=2).value) for r in range(1,14)])\nprint('A2 type', type(ws.cell(row=2,column=1).value))\n",
+                "turn": "python",
+                "result": {
+                  "note": "Sandbox output is untrusted evidence. Full engine validation is mandatory.",
+                  "inputs": [
+                    {
+                      "name": "delivery.xlsx",
+                      "path": "inputs/sources/fil_01M6K29DQV8E1WA4888XSTJT0X.xlsx",
+                      "sha256": "8aea9aee3923d5068ee713dfb0c4b1afe1d290168fc656ad806cf0d6542d52a4",
+                      "file_id": "fil_01M6K29DQV8E1WA4888XSTJT0X"
+                    }
+                  ],
+                  "status": "error",
+                  "stderr": "Traceback (most recent call last):\n  File \"/workspace/run-ewaveftk/code.py\", line 2, in <module>\n    wb = openpyxl.load_workbook('/work/inputs/delivery.xlsx', data_only=False)\n         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/usr/local/lib/python3.12/site-packages/openpyxl/reader/excel.py\", line 346, in load_workbook\n    reader = ExcelReader(filename, read_only, keep_vba,\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/usr/local/lib/python3.12/site-packages/openpyxl/reader/excel.py\", line 123, in __init__\n    self.archive = _validate_archive(fn)\n                   ^^^^^^^^^^^^^^^^^^^^^\n  File \"/usr/local/lib/python3.12/site-packages/openpyxl/reader/excel.py\", line 95, in _validate_archive\n    archive = ZipFile(filename, 'r')\n              ^^^^^^^^^^^^^^^^^^^^^^\n  File \"/usr/local/lib/python3.12/zipfile/__init__.py\", line 1352, in __init__\n    self.fp = io.open(file, filemode)\n              ^^^^^^^^^^^^^^^^^^^^^^^\nFileNotFoundError: [Errno 2] No such file or directory: '/work/inputs/delivery.xlsx'\n",
+                  "stdout": "",
+                  "omitted": [],
+                  "exit_code": 1,
+                  "code_sha256": "882a0826774ab8e61b0f7d092758f78d034a7a888515ba4175c4f47b16fc21a5",
+                  "duration_ms": 572
+                }
+              },
+              {
+                "code": "import openpyxl, os, json\ncands=['inputs/sources/fil_01M6K29DQV8E1WA4888XSTJT0X.xlsx','/work/inputs/sources/fil_01M6K29DQV8E1WA4888XSTJT0X.xlsx','/workspace/inputs/sources/fil_01M6K29DQV8E1WA4888XSTJT0X.xlsx']\np=next((c for c in cands if os.path.exists(c)), None)\nprint('path', p)\nwb=openpyxl.load_workbook(p, data_only=False)\nws=wb['Export']\nprint('Export C2:C4 formulas', [(ws.cell(row=r,column=3).value, ws.cell(row=r,column=3).data_type) for r in (2,3,4)])\nprint('Export C5:C13', [ws.cell(row=r,column=3).value for r in range(5,14)])\nprint('Export A2 type', repr(ws.cell(row=2,column=1).value), ws.cell(row=2,column=1).data_type)\nwsp=wb['Pack factors']\nprint('Pack hdr', [wsp.cell(row=1,column=c).value for c in (1,2)])\nprint('Pack B rows', [(wsp.cell(row=r,column=2).value, wsp.cell(row=r,column=2).data_type) for r in range(1,14)])\nwsc=wb['Counts']\nprint('Counts hdr', [wsc.cell(row=1,column=c).value for c in (1,2)])\nprint('Counts B', [wsc.cell(row=r,column=2).value for r in range(1,14)])\nwb2=openpyxl.load_workbook(p, data_only=True)\nw2=wb2['Export']\nprint('cached Export C', [w2.cell(row=r,column=3).value for r in range(2,14)])\n",
+                "turn": "python",
+                "result": {
+                  "note": "Sandbox output is untrusted evidence. Full engine validation is mandatory.",
+                  "inputs": [
+                    {
+                      "name": "delivery.xlsx",
+                      "path": "inputs/sources/fil_01M6K29DQV8E1WA4888XSTJT0X.xlsx",
+                      "sha256": "8aea9aee3923d5068ee713dfb0c4b1afe1d290168fc656ad806cf0d6542d52a4",
+                      "file_id": "fil_01M6K29DQV8E1WA4888XSTJT0X"
+                    }
+                  ],
+                  "status": "ok",
+                  "stderr": "",
+                  "stdout": "path inputs/sources/fil_01M6K29DQV8E1WA4888XSTJT0X.xlsx\nExport C2:C4 formulas [(\"='Counts'!B2*'[missing-pack.xlsx]Pack factors'!B2\", 'f'), (\"='Counts'!B3*'[missing-pack.xlsx]Pack factors'!B3\", 'f'), (\"='Counts'!B4*'[missing-pack.xlsx]Pack factors'!B4\", 'f')]\nExport C5:C13 [\"='Counts'!B5*'[missing-pack.xlsx]Pack factors'!B5\", \"='Counts'!B6*'[missing-pack.xlsx]Pack factors'!B6\", \"='Counts'!B7*'[missing-pack.xlsx]Pack factors'!B7\", \"='Counts'!B8*'[missing-pack.xlsx]Pack factors'!B8\", \"='Counts'!B9*'[missing-pack.xlsx]Pack factors'!B9\", \"='Counts'!B10*'[missing-pack.xlsx]Pack factors'!B10\", \"='Counts'!B11*'[missing-pack.xlsx]Pack factors'!B11\", \"='Counts'!B12*'[missing-pack.xlsx]Pack factors'!B12\", \"='Counts'!B13*'[missing-pack.xlsx]Pack factors'!B13\"]\nExport A2 type '000001' s\nPack hdr ['SKU', 'Pieces per carton']\nPack B rows [('Pieces per carton', 's'), (None, 'n'), (None, 'n'), (None, 'n'), (None, 'n'), (None, 'n'), (None, 'n'), (None, 'n'), (None, 'n'), (None, 'n'), (None, 'n'), (None, 'n'), (None, 'n')]\nCounts hdr ['SKU', 'Cartons']\nCounts B ['Cartons', 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]\ncached Export C [999, 999, 999, 999, 999, 999, 999, 999, 999, 999, 999, 999]\n",
+                  "omitted": [],
+                  "exit_code": 0,
+                  "code_sha256": "34aef1cfae93ea8a15cdc3b2cb9878d35740282076513d9a4508e8d49e1e8ff7",
+                  "duration_ms": 518
+                }
+              },
+              {
+                "turn": "mapping",
+                "complete": true,
+                "coverage": {
+                  "fields": {
+                    "/qty": {
+                      "risk": "high",
+                      "records": 12,
+                      "records_filled": 0
+                    },
+                    "/sku": {
+                      "risk": "medium",
+                      "records": 12,
+                      "records_filled": 12
+                    },
+                    "/product_name": {
+                      "risk": "medium",
+                      "records": 12,
+                      "records_filled": 12
+                    }
+                  },
+                  "sources": {
+                    "products_0": 12,
+                    "products_1": 12,
+                    "pack_factors_2": 12
+                  },
+                  "collections": {},
+                  "invalid_records": 0
+                },
+                "problems": [
+                  "/qty: empty in 12 of 12 records"
+                ],
+                "rows_out": 12
+              },
+              {
+                "turn": "mapping",
+                "complete": true,
+                "coverage": {
+                  "fields": {
+                    "/qty": {
+                      "risk": "high",
+                      "records": 12,
+                      "records_filled": 0
+                    },
+                    "/sku": {
+                      "risk": "medium",
+                      "records": 12,
+                      "records_filled": 12
+                    },
+                    "/product_name": {
+                      "risk": "medium",
+                      "records": 12,
+                      "records_filled": 12
+                    }
+                  },
+                  "sources": {
+                    "products_0": 12,
+                    "products_1": 12,
+                    "pack_factors_2": 12
+                  },
+                  "collections": {},
+                  "invalid_records": 0
+                },
+                "problems": [
+                  "/qty: empty in 12 of 12 records"
+                ],
+                "rows_out": 12
+              },
+              {
+                "turn": "mapping",
+                "complete": true,
+                "coverage": {
+                  "fields": {
+                    "/qty": {
+                      "risk": "high",
+                      "records": 12,
+                      "records_filled": 0
+                    },
+                    "/sku": {
+                      "risk": "medium",
+                      "records": 12,
+                      "records_filled": 12
+                    },
+                    "/product_name": {
+                      "risk": "medium",
+                      "records": 12,
+                      "records_filled": 12
+                    }
+                  },
+                  "sources": {
+                    "products_0": 12,
+                    "products_1": 12,
+                    "pack_factors_2": 12
+                  },
+                  "collections": {},
+                  "invalid_records": 0
+                },
+                "problems": [
+                  "/qty: empty in 12 of 12 records"
+                ],
+                "rows_out": 12
+              }
+            ],
+            "complete": true,
+            "coverage": {
+              "fields": {
+                "/qty": {
+                  "risk": "high",
+                  "records": 12,
+                  "records_filled": 0
+                },
+                "/sku": {
+                  "risk": "medium",
+                  "records": 12,
+                  "records_filled": 12
+                },
+                "/product_name": {
+                  "risk": "medium",
+                  "records": 12,
+                  "records_filled": 12
+                }
+              },
+              "sources": {
+                "products_0": 12,
+                "products_1": 12,
+                "pack_factors_2": 12
+              },
+              "collections": {},
+              "invalid_records": 0
+            },
+            "grounded": 0,
+            "rows_out": 12,
+            "fix_rounds": 2,
+            "inspections": 1,
+            "python_turns": 2,
+            "rows_checked": 12,
+            "problems_left": [
+              "/qty: empty in 12 of 12 records"
+            ],
+            "candidate_turns": 0
+          },
+          "simulation": {
+            "fill": {
+              "/qty": 0.0,
+              "/sku": 1.0,
+              "/product_name": 1.0
+            },
+            "rows_in": 12,
+            "sources": {
+              "products_0": 12,
+              "products_1": 12,
+              "pack_factors_2": 12
+            },
+            "complete": true,
+            "findings": {
+              "info": 0,
+              "error": 0,
+              "warning": 2
+            },
+            "rows_out": 12,
+            "collections": {},
+            "duration_ms": 13567.9,
+            "identity_keys": [
+              "/sku"
+            ],
+            "invalid_records": 0
+          },
+          "reused_from": null,
+          "field_review": null,
+          "risk_factors": [],
+          "verification": {
+            "scope": "Execution and contract checks; business ambiguities require operator answers",
+            "passed": false,
+            "version": 1,
+            "complete": true,
+            "coverage": {
+              "fields": {
+                "/qty": {
+                  "risk": "high",
+                  "records": 12,
+                  "records_filled": 0
+                },
+                "/sku": {
+                  "risk": "medium",
+                  "records": 12,
+                  "records_filled": 12
+                },
+                "/product_name": {
+                  "risk": "medium",
+                  "records": 12,
+                  "records_filled": 12
+                }
+              },
+              "sources": {
+                "products_0": 12,
+                "products_1": 12,
+                "pack_factors_2": 12
+              },
+              "collections": {},
+              "invalid_records": 0
+            },
+            "problems": [
+              "/qty: empty in 12 of 12 records"
+            ],
+            "rows_out": 12,
+            "warnings": [
+              "/qty: empty in 12 of 12 records"
+            ],
+            "rows_checked": 12,
+            "semantic_checks": {
+              "limitation": "Passing these checks does not prove column meaning. Missing business intent still requires an operator decision.",
+              "contract_rules": [],
+              "source_identity_warnings": []
+            }
+          },
+          "clarifications": [
+            {
+              "why": "The header 'Pieces per carton' exists but all values are blank — please supply the missing external workbook, or confirm the per-SKU pieces per carton (Pack factors!B2:B13). Export!C2:C13 are external formulas ='Counts'!B2*'[missing-pack.xlsx]Pack factors'!B2 …, but delivery.xlsx contains no values in Pack factors!B2:B13 and the referenced file '[missing-pack.xlsx]' was not delivered; Counts!Cartons is 3–14 per SKU. Without the factor, /qty (stock in individual pieces) cannot be computed and stays null.",
+              "kind": "confirm",
+              "action": "request_source",
+              "target": "/qty",
+              "question": "The header 'Pieces per carton' exists but all values are blank — please supply the missing external workbook, or confirm the per-SKU pieces per carton (Pack factors!B2:B13)."
+            }
+          ],
+          "confidence_basis": {
+            "capped": [],
+            "raised": [],
+            "mapping_capped": false
+          },
+          "review_decisions": [],
+          "target_schema_hash": "4d39ca4a890f57cc",
+          "confirmed_decisions": []
+        },
+        "open_questions": [
+          "The header 'Pieces per carton' exists but all values are blank — please supply the missing external workbook, or confirm the per-SKU pieces per carton (Pack factors!B2:B13)."
+        ],
+        "validation": {
+          "ok": true,
+          "issues": []
+        },
+        "parent_id": null,
+        "approved_by": null,
+        "approved_at": null,
+        "comment": null,
+        "created_at": "2026-11-04T10:42:47.982987+00:00",
+        "agent_log": [
+          {
+            "agent": "operator_requirements",
+            "sha256": "035610bb352a9af304d1018d577ee9b1b9febc17380fcc47f5beaea2545ec734",
+            "characters": 362,
+            "changed_since_approved": false
+          },
+          {
+            "agent": "heuristic",
+            "unmatched": {
+              "products_0": [
+                "Stock pieces"
+              ],
+              "products_1": [
+                "SKU",
+                "Cartons"
+              ]
+            },
+            "confidence": 1.0,
+            "table_roles": {
+              "0": "products",
+              "1": "products",
+              "2": "other"
+            }
+          },
+          {
+            "data": {
+              "notes": [
+                "Export is the authoritative product population (SKU + Product name); Counts and Pack factors are per-SKU supplements that join 1:1 on SKU (12/12 codes in the 000001–000012 range on all three sheets).",
+                "Export!C (\"Stock pieces\") is NOT usable stock evidence: all 12 cells are external formulas (12 external_formula_cells) and every row reads the identical placeholder 999. The referenced external workbook is missing from the export, so no per-SKU quantity can be read from it.",
+                "/qty ('Stock in individual pieces') therefore has to be derived as Counts!Cartons × the pieces-per-carton factor from 'Pack factors'!B, or supplied from the missing external inventory workbook — the pack-factor column B is headerless in the detected layout and must be confirmed before the multiplication is trusted.",
+                "SKU must be preserved as text with leading zeros (000001…); do not cast to integer."
+              ],
+              "tables": [
+                {
+                  "role": "products",
+                  "reason": "Sheet 'Export' is the master product list required by the operator ('Use Export as the product list'): one row per SKU (12 distinct SKUs, unique_ratio 1.0, leading-zero text codes 000001–000012) with a human-readable product name (12 distinct, mixed Coffee/Shampoo/Soap/Tea). The third column is a stock-quantity column whose 12 cells are all external formulas.",
+                  "columns": [
+                    {
+                      "name": "SKU",
+                      "reason": "Header 'SKU'; 12 distinct values, unique ratio 1.0, samples '000001'…'000012' with leading zeros — must be cast to string preserving zeros, not numeric.",
+                      "semantic": "identity.sku",
+                      "confidence": 0.97,
+                      "target_pointer": "/sku"
+                    },
+                    {
+                      "name": "Product name",
+                      "reason": "Header 'Product name'; 12 distinct non-numeric values ('Coffee variant 01', 'Shampoo variant 02', 'Soap variant 03'…) aligned one-to-one with SKU.",
+                      "semantic": "product.name",
+                      "confidence": 0.95,
+                      "target_pointer": "/product_name"
+                    },
+                    {
+                      "name": "Stock pieces",
+                      "reason": "Header implies pieces (pieces = individual units, matching the /qty description) but every one of the 12 cells is an external formula (external_formula_cells=12) and the observed value is the constant 999 in all 12 rows — a placeholder, not a real per-SKU quantity. The referenced external workbook/sheet is not supplied, so this column cannot be trusted as stock evidence.",
+                      "semantic": "stock.qty (external-workbook formula — value unavailable)",
+                      "confidence": 0.15,
+                      "target_pointer": "/qty"
+                    }
+                  ],
+                  "confidence": 0.93,
+                  "key_column": "SKU",
+                  "table_index": 0
+                },
+                {
+                  "role": "inventory",
+                  "reason": "Sheet 'Counts' holds one row per SKU (12 distinct SKUs matching Export) with a 'Cartons' count column (integers 3–14, all distinct). Row grain is SKU × carton quantity, i.e. an inventory/count table rather than product master or prices; it becomes the stock source only when combined with a pack-size factor to convert cartons to pieces.",
+                  "columns": [
+                    {
+                      "name": "SKU",
+                      "reason": "Header 'SKU', 12 distinct leading-zero codes in the same 000001–000012 range as Export; joins 1:1 to the product list.",
+                      "semantic": "identity.sku (foreign key to Export)",
+                      "confidence": 0.93,
+                      "target_pointer": "/sku"
+                    },
+                    {
+                      "name": "Cartons",
+                      "reason": "Header 'Cartons'; integer counts 3–14, unique per SKU, no nulls. Cartons are not individual pieces, so this can only populate /qty after multiplying by a pieces-per-carton factor from the 'Pack factors' sheet; the factor column there is not yet confirmed.",
+                      "semantic": "stock.qty in cartons (needs pack-size conversion)",
+                      "confidence": 0.55,
+                      "target_pointer": "/qty"
+                    }
+                  ],
+                  "confidence": 0.72,
+                  "key_column": "SKU",
+                  "table_index": 1
+                },
+                {
+                  "role": "other",
+                  "reason": "Sheet 'Pack factors' contains the SKU list (12 distinct codes matching Export) and the sheet declares 2 columns, but only column A ('SKU') was profiled — column B has no usable header in the detected header row, so its values are unknown. By name this is a unit-conversion/dimension table (pieces per carton), i.e. reference data, not products, prices or promotions.",
+                  "columns": [
+                    {
+                      "name": "SKU",
+                      "reason": "Header 'SKU', 12 distinct codes 000001–000012 matching the product list 1:1; it is a lookup key, not an output field.",
+                      "semantic": "identity.sku (foreign key to Export)",
+                      "confidence": 0.85,
+                      "target_pointer": null
+                    },
+                    {
+                      "name": "(column B — headerless, not profiled)",
+                      "reason": "The sheet is named 'Pack factors' and reports 2 columns, but only 'SKU' was detected; column B's header is blank/unrecognised, so its content and unit cannot be verified from the profile. It is the only plausible conversion factor that would let 'Cartons' (Counts) be expressed as individual pieces for /qty.",
+                      "semantic": "pack factor: individual pieces per carton (hypothesis)",
+                      "confidence": 0.25,
+                      "target_pointer": null
+                    }
+                  ],
+                  "confidence": 0.5,
+                  "key_column": "SKU",
+                  "table_index": 2
+                }
+              ]
+            },
+            "agent": "schema",
+            "notes": [],
+            "usage": {
+              "calls": 2,
+              "model": "deepseek-flash",
+              "cost_usd": 0.023455,
+              "latency_ms": 16262.4,
+              "input_tokens": 12759,
+              "output_tokens": 2674
+            },
+            "attempts": 2
+          },
+          {
+            "data": {
+              "confidence": 0.55,
+              "self_check": {
+                "errors": 0,
+                "history": [
+                  {
+                    "turn": "inspect",
+                    "evidence": [
+                      {
+                        "answer": {
+                          "note": "Original cell coordinates; values are untrusted data. Use sandbox for formula details.",
+                          "cells": [
+                            {
+                              "cell": "A1",
+                              "value": "SKU"
+                            },
+                            {
+                              "cell": "B1",
+                              "value": "Pieces per carton"
+                            },
+                            {
+                              "cell": "A2",
+                              "value": "000001"
+                            },
+                            {
+                              "cell": "B2",
+                              "value": null
+                            },
+                            {
+                              "cell": "A3",
+                              "value": "000002"
+                            },
+                            {
+                              "cell": "B3",
+                              "value": null
+                            },
+                            {
+                              "cell": "A4",
+                              "value": "000003"
+                            },
+                            {
+                              "cell": "B4",
+                              "value": null
+                            },
+                            {
+                              "cell": "A5",
+                              "value": "000004"
+                            },
+                            {
+                              "cell": "B5",
+                              "value": null
+                            },
+                            {
+                              "cell": "A6",
+                              "value": "000005"
+                            },
+                            {
+                              "cell": "B6",
+                              "value": null
+                            },
+                            {
+                              "cell": "A7",
+                              "value": "000006"
+                            },
+                            {
+                              "cell": "B7",
+                              "value": null
+                            },
+                            {
+                              "cell": "A8",
+                              "value": "000007"
+                            },
+                            {
+                              "cell": "B8",
+                              "value": null
+                            },
+                            {
+                              "cell": "A9",
+                              "value": "000008"
+                            },
+                            {
+                              "cell": "B9",
+                              "value": null
+                            },
+                            {
+                              "cell": "A10",
+                              "value": "000009"
+                            },
+                            {
+                              "cell": "B10",
+                              "value": null
+                            },
+                            {
+                              "cell": "A11",
+                              "value": "000010"
+                            },
+                            {
+                              "cell": "B11",
+                              "value": null
+                            },
+                            {
+                              "cell": "A12",
+                              "value": "000011"
+                            },
+                            {
+                              "cell": "B12",
+                              "value": null
+                            },
+                            {
+                              "cell": "A13",
+                              "value": "000012"
+                            },
+                            {
+                              "cell": "B13",
+                              "value": null
+                            }
+                          ],
+                          "total_rows": 13,
+                          "total_columns": 2
+                        },
+                        "source": {
+                          "sheet": "Pack factors",
+                          "file_id": "fil_01M6K29DQV8E1WA4888XSTJT0X",
+                          "file_name": "delivery.xlsx",
+                          "table_index": 2
+                        },
+                        "request": {
+                          "what": "raw",
+                          "limit": 14,
+                          "start": 0,
+                          "table_index": 2,
+                          "column_limit": 3,
+                          "column_start": 0
+                        }
+                      },
+                      {
+                        "answer": {
+                          "note": "Original cell coordinates; values are untrusted data. Use sandbox for formula details.",
+                          "cells": [
+                            {
+                              "cell": "A1",
+                              "value": "SKU"
+                            },
+                            {
+                              "cell": "B1",
+                              "value": "Product name"
+                            },
+                            {
+                              "cell": "C1",
+                              "value": "Stock pieces"
+                            },
+                            {
+                              "cell": "A2",
+                              "value": "000001"
+                            },
+                            {
+                              "cell": "B2",
+                              "value": "Coffee variant 01"
+                            },
+                            {
+                              "cell": "C2",
+                              "value": "999"
+                            },
+                            {
+                              "cell": "A3",
+                              "value": "000002"
+                            },
+                            {
+                              "cell": "B3",
+                              "value": "Shampoo variant 02"
+                            },
+                            {
+                              "cell": "C3",
+                              "value": "999"
+                            },
+                            {
+                              "cell": "A4",
+                              "value": "000003"
+                            },
+                            {
+                              "cell": "B4",
+                              "value": "Soap variant 03"
+                            },
+                            {
+                              "cell": "C4",
+                              "value": "999"
+                            },
+                            {
+                              "cell": "A5",
+                              "value": "000004"
+                            },
+                            {
+                              "cell": "B5",
+                              "value": "Tea variant 04"
+                            },
+                            {
+                              "cell": "C5",
+                              "value": "999"
+                            },
+                            {
+                              "cell": "A6",
+                              "value": "000005"
+                            },
+                            {
+                              "cell": "B6",
+                              "value": "Coffee variant 05"
+                            },
+                            {
+                              "cell": "C6",
+                              "value": "999"
+                            },
+                            {
+                              "cell": "A7",
+                              "value": "000006"
+                            },
+                            {
+                              "cell": "B7",
+                              "value": "Shampoo variant 06"
+                            },
+                            {
+                              "cell": "C7",
+                              "value": "999"
+                            },
+                            {
+                              "cell": "A8",
+                              "value": "000007"
+                            },
+                            {
+                              "cell": "B8",
+                              "value": "Soap variant 07"
+                            },
+                            {
+                              "cell": "C8",
+                              "value": "999"
+                            },
+                            {
+                              "cell": "A9",
+                              "value": "000008"
+                            },
+                            {
+                              "cell": "B9",
+                              "value": "Tea variant 08"
+                            },
+                            {
+                              "cell": "C9",
+                              "value": "999"
+                            },
+                            {
+                              "cell": "A10",
+                              "value": "000009"
+                            },
+                            {
+                              "cell": "B10",
+                              "value": "Coffee variant 09"
+                            },
+                            {
+                              "cell": "C10",
+                              "value": "999"
+                            },
+                            {
+                              "cell": "A11",
+                              "value": "000010"
+                            },
+                            {
+                              "cell": "B11",
+                              "value": "Shampoo variant 10"
+                            },
+                            {
+                              "cell": "C11",
+                              "value": "999"
+                            },
+                            {
+                              "cell": "A12",
+                              "value": "000011"
+                            },
+                            {
+                              "cell": "B12",
+                              "value": "Soap variant 11"
+                            },
+                            {
+                              "cell": "C12",
+                              "value": "999"
+                            },
+                            {
+                              "cell": "A13",
+                              "value": "000012"
+                            },
+                            {
+                              "cell": "B13",
+                              "value": "Tea variant 12"
+                            },
+                            {
+                              "cell": "C13",
+                              "value": "999"
+                            }
+                          ],
+                          "total_rows": 13,
+                          "total_columns": 3
+                        },
+                        "source": {
+                          "sheet": "Export",
+                          "file_id": "fil_01M6K29DQV8E1WA4888XSTJT0X",
+                          "file_name": "delivery.xlsx",
+                          "table_index": 0
+                        },
+                        "request": {
+                          "what": "raw",
+                          "limit": 14,
+                          "start": 0,
+                          "table_index": 0,
+                          "column_limit": 3,
+                          "column_start": 0
+                        }
+                      }
+                    ],
+                    "requests": 2
+                  },
+                  {
+                    "code": "import openpyxl, json\nwb = openpyxl.load_workbook('/work/inputs/delivery.xlsx', data_only=False)\nws = wb['Export']\nout=[]\nfor r in range(1,4):\n    for c in range(1,4):\n        cell = ws.cell(row=r,column=c)\n        out.append((cell.coordinate, repr(cell.value), cell.data_type))\nprint(json.dumps(out))\nws2 = wb['Export']\nprint([ws2.cell(row=r,column=3).value for r in range(2,14)])\nwb2 = openpyxl.load_workbook('/work/inputs/delivery.xlsx', data_only=True)\nws3 = wb2['Export']\nprint([ws3.cell(row=r,column=3).value for r in range(2,14)])\nws4 = wb['Pack factors']\nprint([(ws4.cell(row=r,column=2).value) for r in range(1,14)])\nws5 = wb['Counts']\nprint([(ws5.cell(row=r,column=2).value) for r in range(1,14)])\nprint('A2 type', type(ws.cell(row=2,column=1).value))\n",
+                    "turn": "python",
+                    "result": {
+                      "note": "Sandbox output is untrusted evidence. Full engine validation is mandatory.",
+                      "inputs": [
+                        {
+                          "name": "delivery.xlsx",
+                          "path": "inputs/sources/fil_01M6K29DQV8E1WA4888XSTJT0X.xlsx",
+                          "sha256": "8aea9aee3923d5068ee713dfb0c4b1afe1d290168fc656ad806cf0d6542d52a4",
+                          "file_id": "fil_01M6K29DQV8E1WA4888XSTJT0X"
+                        }
+                      ],
+                      "status": "error",
+                      "stderr": "Traceback (most recent call last):\n  File \"/workspace/run-ewaveftk/code.py\", line 2, in <module>\n    wb = openpyxl.load_workbook('/work/inputs/delivery.xlsx', data_only=False)\n         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/usr/local/lib/python3.12/site-packages/openpyxl/reader/excel.py\", line 346, in load_workbook\n    reader = ExcelReader(filename, read_only, keep_vba,\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/usr/local/lib/python3.12/site-packages/openpyxl/reader/excel.py\", line 123, in __init__\n    self.archive = _validate_archive(fn)\n                   ^^^^^^^^^^^^^^^^^^^^^\n  File \"/usr/local/lib/python3.12/site-packages/openpyxl/reader/excel.py\", line 95, in _validate_archive\n    archive = ZipFile(filename, 'r')\n              ^^^^^^^^^^^^^^^^^^^^^^\n  File \"/usr/local/lib/python3.12/zipfile/__init__.py\", line 1352, in __init__\n    self.fp = io.open(file, filemode)\n              ^^^^^^^^^^^^^^^^^^^^^^^\nFileNotFoundError: [Errno 2] No such file or directory: '/work/inputs/delivery.xlsx'\n",
+                      "stdout": "",
+                      "omitted": [],
+                      "exit_code": 1,
+                      "code_sha256": "882a0826774ab8e61b0f7d092758f78d034a7a888515ba4175c4f47b16fc21a5",
+                      "duration_ms": 572
+                    }
+                  },
+                  {
+                    "code": "import openpyxl, os, json\ncands=['inputs/sources/fil_01M6K29DQV8E1WA4888XSTJT0X.xlsx','/work/inputs/sources/fil_01M6K29DQV8E1WA4888XSTJT0X.xlsx','/workspace/inputs/sources/fil_01M6K29DQV8E1WA4888XSTJT0X.xlsx']\np=next((c for c in cands if os.path.exists(c)), None)\nprint('path', p)\nwb=openpyxl.load_workbook(p, data_only=False)\nws=wb['Export']\nprint('Export C2:C4 formulas', [(ws.cell(row=r,column=3).value, ws.cell(row=r,column=3).data_type) for r in (2,3,4)])\nprint('Export C5:C13', [ws.cell(row=r,column=3).value for r in range(5,14)])\nprint('Export A2 type', repr(ws.cell(row=2,column=1).value), ws.cell(row=2,column=1).data_type)\nwsp=wb['Pack factors']\nprint('Pack hdr', [wsp.cell(row=1,column=c).value for c in (1,2)])\nprint('Pack B rows', [(wsp.cell(row=r,column=2).value, wsp.cell(row=r,column=2).data_type) for r in range(1,14)])\nwsc=wb['Counts']\nprint('Counts hdr', [wsc.cell(row=1,column=c).value for c in (1,2)])\nprint('Counts B', [wsc.cell(row=r,column=2).value for r in range(1,14)])\nwb2=openpyxl.load_workbook(p, data_only=True)\nw2=wb2['Export']\nprint('cached Export C', [w2.cell(row=r,column=3).value for r in range(2,14)])\n",
+                    "turn": "python",
+                    "result": {
+                      "note": "Sandbox output is untrusted evidence. Full engine validation is mandatory.",
+                      "inputs": [
+                        {
+                          "name": "delivery.xlsx",
+                          "path": "inputs/sources/fil_01M6K29DQV8E1WA4888XSTJT0X.xlsx",
+                          "sha256": "8aea9aee3923d5068ee713dfb0c4b1afe1d290168fc656ad806cf0d6542d52a4",
+                          "file_id": "fil_01M6K29DQV8E1WA4888XSTJT0X"
+                        }
+                      ],
+                      "status": "ok",
+                      "stderr": "",
+                      "stdout": "path inputs/sources/fil_01M6K29DQV8E1WA4888XSTJT0X.xlsx\nExport C2:C4 formulas [(\"='Counts'!B2*'[missing-pack.xlsx]Pack factors'!B2\", 'f'), (\"='Counts'!B3*'[missing-pack.xlsx]Pack factors'!B3\", 'f'), (\"='Counts'!B4*'[missing-pack.xlsx]Pack factors'!B4\", 'f')]\nExport C5:C13 [\"='Counts'!B5*'[missing-pack.xlsx]Pack factors'!B5\", \"='Counts'!B6*'[missing-pack.xlsx]Pack factors'!B6\", \"='Counts'!B7*'[missing-pack.xlsx]Pack factors'!B7\", \"='Counts'!B8*'[missing-pack.xlsx]Pack factors'!B8\", \"='Counts'!B9*'[missing-pack.xlsx]Pack factors'!B9\", \"='Counts'!B10*'[missing-pack.xlsx]Pack factors'!B10\", \"='Counts'!B11*'[missing-pack.xlsx]Pack factors'!B11\", \"='Counts'!B12*'[missing-pack.xlsx]Pack factors'!B12\", \"='Counts'!B13*'[missing-pack.xlsx]Pack factors'!B13\"]\nExport A2 type '000001' s\nPack hdr ['SKU', 'Pieces per carton']\nPack B rows [('Pieces per carton', 's'), (None, 'n'), (None, 'n'), (None, 'n'), (None, 'n'), (None, 'n'), (None, 'n'), (None, 'n'), (None, 'n'), (None, 'n'), (None, 'n'), (None, 'n'), (None, 'n')]\nCounts hdr ['SKU', 'Cartons']\nCounts B ['Cartons', 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]\ncached Export C [999, 999, 999, 999, 999, 999, 999, 999, 999, 999, 999, 999]\n",
+                      "omitted": [],
+                      "exit_code": 0,
+                      "code_sha256": "34aef1cfae93ea8a15cdc3b2cb9878d35740282076513d9a4508e8d49e1e8ff7",
+                      "duration_ms": 518
+                    }
+                  },
+                  {
+                    "turn": "mapping",
+                    "complete": true,
+                    "coverage": {
+                      "fields": {
+                        "/qty": {
+                          "risk": "high",
+                          "records": 12,
+                          "records_filled": 0
+                        },
+                        "/sku": {
+                          "risk": "medium",
+                          "records": 12,
+                          "records_filled": 12
+                        },
+                        "/product_name": {
+                          "risk": "medium",
+                          "records": 12,
+                          "records_filled": 12
+                        }
+                      },
+                      "sources": {
+                        "products_0": 12,
+                        "products_1": 12,
+                        "pack_factors_2": 12
+                      },
+                      "collections": {},
+                      "invalid_records": 0
+                    },
+                    "problems": [
+                      "/qty: empty in 12 of 12 records"
+                    ],
+                    "rows_out": 12
+                  },
+                  {
+                    "turn": "mapping",
+                    "complete": true,
+                    "coverage": {
+                      "fields": {
+                        "/qty": {
+                          "risk": "high",
+                          "records": 12,
+                          "records_filled": 0
+                        },
+                        "/sku": {
+                          "risk": "medium",
+                          "records": 12,
+                          "records_filled": 12
+                        },
+                        "/product_name": {
+                          "risk": "medium",
+                          "records": 12,
+                          "records_filled": 12
+                        }
+                      },
+                      "sources": {
+                        "products_0": 12,
+                        "products_1": 12,
+                        "pack_factors_2": 12
+                      },
+                      "collections": {},
+                      "invalid_records": 0
+                    },
+                    "problems": [
+                      "/qty: empty in 12 of 12 records"
+                    ],
+                    "rows_out": 12
+                  },
+                  {
+                    "turn": "mapping",
+                    "complete": true,
+                    "coverage": {
+                      "fields": {
+                        "/qty": {
+                          "risk": "high",
+                          "records": 12,
+                          "records_filled": 0
+                        },
+                        "/sku": {
+                          "risk": "medium",
+                          "records": 12,
+                          "records_filled": 12
+                        },
+                        "/product_name": {
+                          "risk": "medium",
+                          "records": 12,
+                          "records_filled": 12
+                        }
+                      },
+                      "sources": {
+                        "products_0": 12,
+                        "products_1": 12,
+                        "pack_factors_2": 12
+                      },
+                      "collections": {},
+                      "invalid_records": 0
+                    },
+                    "problems": [
+                      "/qty: empty in 12 of 12 records"
+                    ],
+                    "rows_out": 12
+                  }
+                ],
+                "complete": true,
+                "coverage": {
+                  "fields": {
+                    "/qty": {
+                      "risk": "high",
+                      "records": 12,
+                      "records_filled": 0
+                    },
+                    "/sku": {
+                      "risk": "medium",
+                      "records": 12,
+                      "records_filled": 12
+                    },
+                    "/product_name": {
+                      "risk": "medium",
+                      "records": 12,
+                      "records_filled": 12
+                    }
+                  },
+                  "sources": {
+                    "products_0": 12,
+                    "products_1": 12,
+                    "pack_factors_2": 12
+                  },
+                  "collections": {},
+                  "invalid_records": 0
+                },
+                "grounded": 0,
+                "rows_out": 12,
+                "fix_rounds": 2,
+                "inspections": 1,
+                "python_turns": 2,
+                "rows_checked": 12,
+                "problems_left": [
+                  "/qty: empty in 12 of 12 records"
+                ],
+                "candidate_turns": 0
+              },
+              "clarifications": [
+                {
+                  "why": "The header 'Pieces per carton' exists but all values are blank — please supply the missing external workbook, or confirm the per-SKU pieces per carton (Pack factors!B2:B13). Export!C2:C13 are external formulas ='Counts'!B2*'[missing-pack.xlsx]Pack factors'!B2 …, but delivery.xlsx contains no values in Pack factors!B2:B13 and the referenced file '[missing-pack.xlsx]' was not delivered; Counts!Cartons is 3–14 per SKU. Without the factor, /qty (stock in individual pieces) cannot be computed and stays null.",
+                  "kind": "confirm",
+                  "action": "request_source",
+                  "target": "/qty",
+                  "question": "The header 'Pieces per carton' exists but all values are blank — please supply the missing external workbook, or confirm the per-SKU pieces per carton (Pack factors!B2:B13)."
+                }
+              ],
+              "changes_from_draft": [
+                "Added 1:1 left joins from the Export product list to 'Counts' (Cartons) and 'Pack factors' (Pieces per carton) on SKU, key-normalised with trim + strip_leading_zeros; unmatched rows kept.",
+                "Added /qty = Counts!Cartons × Pack factors!Pieces per carton, reproducing the Export!C formula ='Counts'!B*'[missing-pack.xlsx]Pack factors'!B; /sku and /product_name unchanged from the draft.",
+                "'Pack factors' source extracted with drop_empty_columns=false, otherwise column B ('Pieces per carton') would be dropped because it is entirely blank.",
+                "Export!C 'Stock pieces' is not used: all 12 cells are external formulas whose cached value is the constant 999 — a placeholder, not per-SKU stock. attributes_passthrough set to false so this unused broken column is not exported.",
+                "Role of the 'Counts' source changed from products to inventory; record dedupe key set to /sku (the identity key of the target schema).",
+                "/qty currently evaluates to null (honest missing evidence) instead of 999; a warning-level quality rule flags it until the pack factors arrive.",
+                "meta.created_by set to ai; confidence reflects the fact that the populate rule is proven by the source formula but one operand is missing from the delivery."
+              ]
+            },
+            "agent": "mapping",
+            "notes": [
+              "self_check_unresolved: 1 problem(s) left"
+            ],
+            "usage": {
+              "calls": 6,
+              "model": "deepseek-flash",
+              "cost_usd": 0.168785,
+              "latency_ms": 72259.6,
+              "input_tokens": 115209,
+              "output_tokens": 13394
+            },
+            "attempts": 6
+          },
+          {
+            "ops": 2,
+            "agent": "agreement",
+            "agree": 2,
+            "record": 2,
+            "dropped": 0,
+            "disagree": 0,
+            "model_only": 1
+          }
+        ],
+        "sample": [
+          {
+            "qty": null,
+            "sku": "000001",
+            "source_meta": {
+              "file": "delivery.xlsx",
+              "lineage": {
+                "joined": {
+                  "products_1": 0,
+                  "pack_factors_2": 0
+                },
+                "source": "products_0",
+                "root_row": 0
+              }
+            },
+            "product_name": "Coffee variant 01"
+          },
+          {
+            "qty": null,
+            "sku": "000002",
+            "source_meta": {
+              "file": "delivery.xlsx",
+              "lineage": {
+                "joined": {
+                  "products_1": 1,
+                  "pack_factors_2": 1
+                },
+                "source": "products_0",
+                "root_row": 1
+              }
+            },
+            "product_name": "Shampoo variant 02"
+          },
+          {
+            "qty": null,
+            "sku": "000003",
+            "source_meta": {
+              "file": "delivery.xlsx",
+              "lineage": {
+                "joined": {
+                  "products_1": 2,
+                  "pack_factors_2": 2
+                },
+                "source": "products_0",
+                "root_row": 2
+              }
+            },
+            "product_name": "Soap variant 03"
+          },
+          {
+            "qty": null,
+            "sku": "000004",
+            "source_meta": {
+              "file": "delivery.xlsx",
+              "lineage": {
+                "joined": {
+                  "products_1": 3,
+                  "pack_factors_2": 3
+                },
+                "source": "products_0",
+                "root_row": 3
+              }
+            },
+            "product_name": "Tea variant 04"
+          },
+          {
+            "qty": null,
+            "sku": "000005",
+            "source_meta": {
+              "file": "delivery.xlsx",
+              "lineage": {
+                "joined": {
+                  "products_1": 4,
+                  "pack_factors_2": 4
+                },
+                "source": "products_0",
+                "root_row": 4
+              }
+            },
+            "product_name": "Coffee variant 05"
+          }
+        ]
+      }
+    ],
+    "datasets": [],
+    "review_tasks": [
+      {
+        "id": "rev_01M6K2EZ238RCSDVAPHXBWEJYJ",
+        "round_id": "rnd_01M6K29DP5NYPNMMSTF8F31G4S",
+        "customer_id": "cus_01M6K29DBGGEHMQ8TNS6TRATC0",
+        "mapping_version_id": "map_01M6K2EZ14R0DKGT7J58KJXGFT",
+        "dataset_version_id": null,
+        "kind": "mapping",
+        "priority": 50,
+        "status": "open",
+        "reasons": [
+          "products_0: formula values are saved Excel caches; FORMA does not recalculate or verify cache freshness",
+          "low confidence on high-risk fields: /qty (0.40)",
+          "mapping confidence 0.55 < 0.95",
+          "first time this customer/format is seen",
+          "1 questions still need operator confirmation",
+          "the model selects rows differently from FORMA's matcher (records: dedupe; records: joins)",
+          "verification: /qty: empty in 12 of 12 records"
+        ],
+        "details": {
+          "impact": {},
+          "verdict": {
+            "word": "sure",
+            "stage": "mapping",
+            "digest": "2b56c7b0d2710e3e68194763e0286395",
+            "outcome": "fix_mapping",
+            "conclusion": {
+              "en": "Source information is missing. Supply or repair the file and run mapping again.",
+              "th": "ข้อมูลต้นทางยังไม่ครบ เพิ่มหรือแก้ไฟล์ แล้วให้ระบบจับคู่ใหม่"
+            },
+            "confidence": 0.98,
+            "rules_fired": [
+              "source_required"
+            ]
+          },
+          "decision": "review",
+          "findings": [
+            {
+              "row": null,
+              "kind": "source_review",
+              "target": null,
+              "details": {},
+              "message": "products_0: formula values are saved Excel caches; FORMA does not recalculate or verify cache freshness",
+              "identity": null,
+              "severity": "warning"
+            },
+            {
+              "row": null,
+              "kind": "quality",
+              "target": "/qty",
+              "details": {
+                "rule": "not_null",
+                "count": 12,
+                "sample": [
+                  {
+                    "row": 0,
+                    "value": null,
+                    "identity": "000001"
+                  },
+                  {
+                    "row": 1,
+                    "value": null,
+                    "identity": "000002"
+                  },
+                  {
+                    "row": 2,
+                    "value": null,
+                    "identity": "000003"
+                  },
+                  {
+                    "row": 3,
+                    "value": null,
+                    "identity": "000004"
+                  },
+                  {
+                    "row": 4,
+                    "value": null,
+                    "identity": "000005"
+                  },
+                  {
+                    "row": 5,
+                    "value": null,
+                    "identity": "000006"
+                  },
+                  {
+                    "row": 6,
+                    "value": null,
+                    "identity": "000007"
+                  },
+                  {
+                    "row": 7,
+                    "value": null,
+                    "identity": "000008"
+                  },
+                  {
+                    "row": 8,
+                    "value": null,
+                    "identity": "000009"
+                  },
+                  {
+                    "row": 9,
+                    "value": null,
+                    "identity": "000010"
+                  }
+                ]
+              },
+              "message": "qty depends on 'Prefixes per carton' from the missing '[missing-pack.xlsx]' / blank 'Pack factors'!B2:B13",
+              "identity": null,
+              "severity": "warning"
+            },
+            {
+              "kind": "plausibility",
+              "message": "/qty: empty in 12 of 12 records",
+              "severity": "warning"
+            }
+          ],
+          "risk_level": "high",
+          "risk_factors": [],
+          "open_questions": [
+            "The header 'Pieces per carton' exists but all values are blank — please supply the missing external workbook, or confirm the per-SKU pieces per carton (Pack factors!B2:B13)."
+          ]
+        },
+        "resolver": null,
+        "comment": null,
+        "created_at": "2026-11-04T10:42:48.003148+00:00",
+        "resolved_at": null,
+        "age_days": 0,
+        "waiting_until": null,
+        "waiting_note": null
+      }
+    ],
+    "jobs": [
+      {
+        "id": "job_01M6K29GS197TFG88TN0E7DZ87",
+        "kind": "propose_mapping",
+        "status": "done",
+        "progress": 100,
+        "message": null,
+        "error": null
+      },
+      {
+        "id": "job_01M6K29DS0DA712EHNK80722ER",
+        "kind": "profile_round",
+        "status": "done",
+        "progress": 100,
+        "message": null,
+        "error": null
+      }
+    ]
+  },
+  "mapping": {
+    "id": "map_01M6K2EZ14R0DKGT7J58KJXGFT",
+    "customer_id": "cus_01M6K29DBGGEHMQ8TNS6TRATC0",
+    "round_id": "rnd_01M6K29DP5NYPNMMSTF8F31G4S",
+    "version": 1,
+    "status": "proposed",
+    "target_schema": "eval_wf-before_t08@1",
+    "confidence": 0.55,
+    "created_by": "ai",
+    "model": "deepseek-flash",
+    "policy": {
+      "checks": {
+        "drift": null,
+        "errors": 0,
+        "rows_out": 12,
+        "warnings": 3,
+        "agreement": {
+          "ops": 2,
+          "agree": 2,
+          "record": 2,
+          "dropped": 0,
+          "disagree": 0,
+          "model_only": 1
+        },
+        "llm_fallback": false,
+        "reused_approved": false,
+        "full_verification": false,
+        "mapping_confidence": 0.55,
+        "data_checks_trusted": false,
+        "low_confidence_high": [
+          "/qty (0.40)"
+        ],
+        "unresolved_questions": 1,
+        "plausibility_warnings": 1,
+        "source_review_required": true,
+        "low_confidence_critical": []
+      },
+      "impact": {},
+      "source": "ai",
+      "reasons": [
+        "products_0: formula values are saved Excel caches; FORMA does not recalculate or verify cache freshness",
+        "low confidence on high-risk fields: /qty (0.40)",
+        "mapping confidence 0.55 < 0.95",
+        "first time this customer/format is seen",
+        "1 questions still need operator confirmation",
+        "the model selects rows differently from FORMA's matcher (records: dedupe; records: joins)",
+        "verification: /qty: empty in 12 of 12 records"
+      ],
+      "sandbox": null,
+      "verdict": {
+        "word": "sure",
+        "stage": "mapping",
+        "digest": "2b56c7b0d2710e3e68194763e0286395",
+        "outcome": "fix_mapping",
+        "subject": {
+          "id": "map_01M6K2EZ14R0DKGT7J58KJXGFT",
+          "kind": "mapping",
+          "round_id": "rnd_01M6K29DP5NYPNMMSTF8F31G4S"
+        },
+        "evidence": [
+          {
+            "id": 1,
+            "kind": "rows",
+            "link": "/rounds/rnd_01M6K29DP5NYPNMMSTF8F31G4S",
+            "text": {
+              "en": "12 records produced",
+              "th": "สร้างได้ 12 รายการ"
+            },
+            "numbers": {
+              "rows_out": 12
+            }
+          },
+          {
+            "id": 2,
+            "kind": "self_check",
+            "link": null,
+            "text": {
+              "en": "The AI ran its mapping on the first 12 rows (1 look(s) at the file, 2 fix round(s)): 1 problem(s) left",
+              "th": "AI ลองรัน mapping กับ 12 แถวแรก (ดูไฟล์ 1 ครั้ง แก้ 2 รอบ): เหลือปัญหา 1 ข้อ"
+            },
+            "numbers": {
+              "rows": 12,
+              "fix_rounds": 2,
+              "inspections": 1,
+              "problems_left": 1
+            }
+          },
+          {
+            "id": 3,
+            "kind": "questions",
+            "link": "/review?round=rnd_01M6K29DP5NYPNMMSTF8F31G4S",
+            "text": {
+              "en": "1 fields below the confidence bar",
+              "th": "1 ฟิลด์ยังไม่ถึงเกณฑ์ความมั่นใจ"
+            },
+            "numbers": {
+              "count": 1
+            }
+          }
+        ],
+        "narrative": null,
+        "conclusion": {
+          "en": "Source information is missing. Supply or repair the file and run mapping again.",
+          "th": "ข้อมูลต้นทางยังไม่ครบ เพิ่มหรือแก้ไฟล์ แล้วให้ระบบจับคู่ใหม่"
+        },
+        "confidence": 0.98,
+        "suppressed": {
+          "count": 0,
+          "groups": [
+            {
+              "text": {
+                "en": "1 notes from the mapper",
+                "th": "หมายเหตุจากตัวจับคู่ 1 ข้อ"
+              },
+              "reason": "open_questions",
+              "pointers": []
+            }
+          ]
+        },
+        "must_decide": [
+          {
+            "id": "/qty",
+            "why": {
+              "en": "The header 'Pieces per carton' exists but all values are blank — please supply the missing external workbook, or confirm the per-SKU pieces per carton (Pack factors!B2:B13). Export!C2:C13 are external formulas ='Counts'!B2*'[missing-pack.xlsx]Pack factors'!B2 …, but delivery.xlsx contains no values in Pack factors!B2:B13 and the referenced file '[missing-pack.xlsx]' was not delivered; Counts!Cartons is 3–14 per SKU. Without the factor, /qty (stock in individual pieces) cannot be computed and stays null.",
+              "th": "The header 'Pieces per carton' exists but all values are blank — please supply the missing external workbook, or confirm the per-SKU pieces per carton (Pack factors!B2:B13). Export!C2:C13 are external formulas ='Counts'!B2*'[missing-pack.xlsx]Pack factors'!B2 …, but delivery.xlsx contains no values in Pack factors!B2:B13 and the referenced file '[missing-pack.xlsx]' was not delivered; Counts!Cartons is 3–14 per SKU. Without the factor, /qty (stock in individual pieces) cannot be computed and stays null."
+            },
+            "kind": "confirm",
+            "scope": "source_file",
+            "default": null,
+            "options": [
+              "confirm"
+            ],
+            "question": {
+              "en": "The header 'Pieces per carton' exists but all values are blank — please supply the missing external workbook, or confirm the per-SKU pieces per carton (Pack factors!B2:B13).",
+              "th": "The header 'Pieces per carton' exists but all values are blank — please supply the missing external workbook, or confirm the per-SKU pieces per carton (Pack factors!B2:B13)."
+            },
+            "semantic": "stock.qty",
+            "allow_custom": false,
+            "evidence_ids": [
+              3
+            ],
+            "option_labels": null
+          }
+        ],
+        "rules_fired": [
+          "source_required"
+        ],
+        "round_status": "review",
+        "rules_version": "2026.11.04.1",
+        "mapping_status": "proposed",
+        "policy_decision": "review"
+      },
+      "decision": "review",
+      "learning": null,
+      "priority": 50,
+      "workflow": null,
+      "agreement": {
+        "ops": [
+          "/product_name",
+          "/sku"
+        ],
+        "agree": [
+          "/product_name",
+          "/sku"
+        ],
+        "record": {
+          "joins": {
+            "model": [
+              {
+                "on": [
+                  {
+                    "left": "SKU",
+                    "right": "SKU"
+                  }
+                ],
+                "how": "left",
+                "left": {
+                  "file": "fil_01M6K29DQV8E1WA4888XSTJT0X",
+                  "sheet": "export",
+                  "filter": null,
+                  "rename": {},
+                  "unpivot": null,
+                  "data_end": null,
+                  "fill_down": [],
+                  "data_start": null,
+                  "last_column": 3,
+                  "first_column": 0
+                },
+                "right": {
+                  "file": "fil_01M6K29DQV8E1WA4888XSTJT0X",
+                  "sheet": "counts",
+                  "filter": null,
+                  "rename": {},
+                  "unpivot": null,
+                  "data_end": null,
+                  "fill_down": [],
+                  "data_start": null,
+                  "last_column": 2,
+                  "first_column": 0
+                },
+                "cardinality": "1:1",
+                "on_unmatched": "keep",
+                "normalize_keys": [
+                  "trim",
+                  "strip_leading_zeros"
+                ]
+              },
+              {
+                "on": [
+                  {
+                    "left": "SKU",
+                    "right": "SKU"
+                  }
+                ],
+                "how": "left",
+                "left": {
+                  "file": "fil_01M6K29DQV8E1WA4888XSTJT0X",
+                  "sheet": "export",
+                  "filter": null,
+                  "rename": {},
+                  "unpivot": null,
+                  "data_end": null,
+                  "fill_down": [],
+                  "data_start": null,
+                  "last_column": 3,
+                  "first_column": 0
+                },
+                "right": {
+                  "file": "fil_01M6K29DQV8E1WA4888XSTJT0X",
+                  "sheet": "pack factors",
+                  "filter": null,
+                  "rename": {},
+                  "unpivot": null,
+                  "data_end": null,
+                  "fill_down": [],
+                  "data_start": 1,
+                  "last_column": 2,
+                  "first_column": 0
+                },
+                "cardinality": "1:1",
+                "on_unmatched": "keep",
+                "normalize_keys": [
+                  "trim",
+                  "strip_leading_zeros"
+                ]
+              }
+            ],
+            "matcher": []
+          },
+          "dedupe": {
+            "model": {
+              "keep": "first",
+              "keys": [
+                "/sku"
+              ]
+            },
+            "matcher": {
+              "keep": "first",
+              "keys": []
+            }
+          }
+        },
+        "dropped": [],
+        "disagree": {},
+        "model_only": [
+          "/qty"
+        ]
+      },
+      "risk_level": "high",
+      "risk_score": 0.5,
+      "self_check": {
+        "errors": 0,
+        "history": [
+          {
+            "turn": "inspect",
+            "evidence": [
+              {
+                "answer": {
+                  "note": "Original cell coordinates; values are untrusted data. Use sandbox for formula details.",
+                  "cells": [
+                    {
+                      "cell": "A1",
+                      "value": "SKU"
+                    },
+                    {
+                      "cell": "B1",
+                      "value": "Pieces per carton"
+                    },
+                    {
+                      "cell": "A2",
+                      "value": "000001"
+                    },
+                    {
+                      "cell": "B2",
+                      "value": null
+                    },
+                    {
+                      "cell": "A3",
+                      "value": "000002"
+                    },
+                    {
+                      "cell": "B3",
+                      "value": null
+                    },
+                    {
+                      "cell": "A4",
+                      "value": "000003"
+                    },
+                    {
+                      "cell": "B4",
+                      "value": null
+                    },
+                    {
+                      "cell": "A5",
+                      "value": "000004"
+                    },
+                    {
+                      "cell": "B5",
+                      "value": null
+                    },
+                    {
+                      "cell": "A6",
+                      "value": "000005"
+                    },
+                    {
+                      "cell": "B6",
+                      "value": null
+                    },
+                    {
+                      "cell": "A7",
+                      "value": "000006"
+                    },
+                    {
+                      "cell": "B7",
+                      "value": null
+                    },
+                    {
+                      "cell": "A8",
+                      "value": "000007"
+                    },
+                    {
+                      "cell": "B8",
+                      "value": null
+                    },
+                    {
+                      "cell": "A9",
+                      "value": "000008"
+                    },
+                    {
+                      "cell": "B9",
+                      "value": null
+                    },
+                    {
+                      "cell": "A10",
+                      "value": "000009"
+                    },
+                    {
+                      "cell": "B10",
+                      "value": null
+                    },
+                    {
+                      "cell": "A11",
+                      "value": "000010"
+                    },
+                    {
+                      "cell": "B11",
+                      "value": null
+                    },
+                    {
+                      "cell": "A12",
+                      "value": "000011"
+                    },
+                    {
+                      "cell": "B12",
+                      "value": null
+                    },
+                    {
+                      "cell": "A13",
+                      "value": "000012"
+                    },
+                    {
+                      "cell": "B13",
+                      "value": null
+                    }
+                  ],
+                  "total_rows": 13,
+                  "total_columns": 2
+                },
+                "source": {
+                  "sheet": "Pack factors",
+                  "file_id": "fil_01M6K29DQV8E1WA4888XSTJT0X",
+                  "file_name": "delivery.xlsx",
+                  "table_index": 2
+                },
+                "request": {
+                  "what": "raw",
+                  "limit": 14,
+                  "start": 0,
+                  "table_index": 2,
+                  "column_limit": 3,
+                  "column_start": 0
+                }
+              },
+              {
+                "answer": {
+                  "note": "Original cell coordinates; values are untrusted data. Use sandbox for formula details.",
+                  "cells": [
+                    {
+                      "cell": "A1",
+                      "value": "SKU"
+                    },
+                    {
+                      "cell": "B1",
+                      "value": "Product name"
+                    },
+                    {
+                      "cell": "C1",
+                      "value": "Stock pieces"
+                    },
+                    {
+                      "cell": "A2",
+                      "value": "000001"
+                    },
+                    {
+                      "cell": "B2",
+                      "value": "Coffee variant 01"
+                    },
+                    {
+                      "cell": "C2",
+                      "value": "999"
+                    },
+                    {
+                      "cell": "A3",
+                      "value": "000002"
+                    },
+                    {
+                      "cell": "B3",
+                      "value": "Shampoo variant 02"
+                    },
+                    {
+                      "cell": "C3",
+                      "value": "999"
+                    },
+                    {
+                      "cell": "A4",
+                      "value": "000003"
+                    },
+                    {
+                      "cell": "B4",
+                      "value": "Soap variant 03"
+                    },
+                    {
+                      "cell": "C4",
+                      "value": "999"
+                    },
+                    {
+                      "cell": "A5",
+                      "value": "000004"
+                    },
+                    {
+                      "cell": "B5",
+                      "value": "Tea variant 04"
+                    },
+                    {
+                      "cell": "C5",
+                      "value": "999"
+                    },
+                    {
+                      "cell": "A6",
+                      "value": "000005"
+                    },
+                    {
+                      "cell": "B6",
+                      "value": "Coffee variant 05"
+                    },
+                    {
+                      "cell": "C6",
+                      "value": "999"
+                    },
+                    {
+                      "cell": "A7",
+                      "value": "000006"
+                    },
+                    {
+                      "cell": "B7",
+                      "value": "Shampoo variant 06"
+                    },
+                    {
+                      "cell": "C7",
+                      "value": "999"
+                    },
+                    {
+                      "cell": "A8",
+                      "value": "000007"
+                    },
+                    {
+                      "cell": "B8",
+                      "value": "Soap variant 07"
+                    },
+                    {
+                      "cell": "C8",
+                      "value": "999"
+                    },
+                    {
+                      "cell": "A9",
+                      "value": "000008"
+                    },
+                    {
+                      "cell": "B9",
+                      "value": "Tea variant 08"
+                    },
+                    {
+                      "cell": "C9",
+                      "value": "999"
+                    },
+                    {
+                      "cell": "A10",
+                      "value": "000009"
+                    },
+                    {
+                      "cell": "B10",
+                      "value": "Coffee variant 09"
+                    },
+                    {
+                      "cell": "C10",
+                      "value": "999"
+                    },
+                    {
+                      "cell": "A11",
+                      "value": "000010"
+                    },
+                    {
+                      "cell": "B11",
+                      "value": "Shampoo variant 10"
+                    },
+                    {
+                      "cell": "C11",
+                      "value": "999"
+                    },
+                    {
+                      "cell": "A12",
+                      "value": "000011"
+                    },
+                    {
+                      "cell": "B12",
+                      "value": "Soap variant 11"
+                    },
+                    {
+                      "cell": "C12",
+                      "value": "999"
+                    },
+                    {
+                      "cell": "A13",
+                      "value": "000012"
+                    },
+                    {
+                      "cell": "B13",
+                      "value": "Tea variant 12"
+                    },
+                    {
+                      "cell": "C13",
+                      "value": "999"
+                    }
+                  ],
+                  "total_rows": 13,
+                  "total_columns": 3
+                },
+                "source": {
+                  "sheet": "Export",
+                  "file_id": "fil_01M6K29DQV8E1WA4888XSTJT0X",
+                  "file_name": "delivery.xlsx",
+                  "table_index": 0
+                },
+                "request": {
+                  "what": "raw",
+                  "limit": 14,
+                  "start": 0,
+                  "table_index": 0,
+                  "column_limit": 3,
+                  "column_start": 0
+                }
+              }
+            ],
+            "requests": 2
+          },
+          {
+            "code": "import openpyxl, json\nwb = openpyxl.load_workbook('/work/inputs/delivery.xlsx', data_only=False)\nws = wb['Export']\nout=[]\nfor r in range(1,4):\n    for c in range(1,4):\n        cell = ws.cell(row=r,column=c)\n        out.append((cell.coordinate, repr(cell.value), cell.data_type))\nprint(json.dumps(out))\nws2 = wb['Export']\nprint([ws2.cell(row=r,column=3).value for r in range(2,14)])\nwb2 = openpyxl.load_workbook('/work/inputs/delivery.xlsx', data_only=True)\nws3 = wb2['Export']\nprint([ws3.cell(row=r,column=3).value for r in range(2,14)])\nws4 = wb['Pack factors']\nprint([(ws4.cell(row=r,column=2).value) for r in range(1,14)])\nws5 = wb['Counts']\nprint([(ws5.cell(row=r,column=2).value) for r in range(1,14)])\nprint('A2 type', type(ws.cell(row=2,column=1).value))\n",
+            "turn": "python",
+            "result": {
+              "note": "Sandbox output is untrusted evidence. Full engine validation is mandatory.",
+              "inputs": [
+                {
+                  "name": "delivery.xlsx",
+                  "path": "inputs/sources/fil_01M6K29DQV8E1WA4888XSTJT0X.xlsx",
+                  "sha256": "8aea9aee3923d5068ee713dfb0c4b1afe1d290168fc656ad806cf0d6542d52a4",
+                  "file_id": "fil_01M6K29DQV8E1WA4888XSTJT0X"
+                }
+              ],
+              "status": "error",
+              "stderr": "Traceback (most recent call last):\n  File \"/workspace/run-ewaveftk/code.py\", line 2, in <module>\n    wb = openpyxl.load_workbook('/work/inputs/delivery.xlsx', data_only=False)\n         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/usr/local/lib/python3.12/site-packages/openpyxl/reader/excel.py\", line 346, in load_workbook\n    reader = ExcelReader(filename, read_only, keep_vba,\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/usr/local/lib/python3.12/site-packages/openpyxl/reader/excel.py\", line 123, in __init__\n    self.archive = _validate_archive(fn)\n                   ^^^^^^^^^^^^^^^^^^^^^\n  File \"/usr/local/lib/python3.12/site-packages/openpyxl/reader/excel.py\", line 95, in _validate_archive\n    archive = ZipFile(filename, 'r')\n              ^^^^^^^^^^^^^^^^^^^^^^\n  File \"/usr/local/lib/python3.12/zipfile/__init__.py\", line 1352, in __init__\n    self.fp = io.open(file, filemode)\n              ^^^^^^^^^^^^^^^^^^^^^^^\nFileNotFoundError: [Errno 2] No such file or directory: '/work/inputs/delivery.xlsx'\n",
+              "stdout": "",
+              "omitted": [],
+              "exit_code": 1,
+              "code_sha256": "882a0826774ab8e61b0f7d092758f78d034a7a888515ba4175c4f47b16fc21a5",
+              "duration_ms": 572
+            }
+          },
+          {
+            "code": "import openpyxl, os, json\ncands=['inputs/sources/fil_01M6K29DQV8E1WA4888XSTJT0X.xlsx','/work/inputs/sources/fil_01M6K29DQV8E1WA4888XSTJT0X.xlsx','/workspace/inputs/sources/fil_01M6K29DQV8E1WA4888XSTJT0X.xlsx']\np=next((c for c in cands if os.path.exists(c)), None)\nprint('path', p)\nwb=openpyxl.load_workbook(p, data_only=False)\nws=wb['Export']\nprint('Export C2:C4 formulas', [(ws.cell(row=r,column=3).value, ws.cell(row=r,column=3).data_type) for r in (2,3,4)])\nprint('Export C5:C13', [ws.cell(row=r,column=3).value for r in range(5,14)])\nprint('Export A2 type', repr(ws.cell(row=2,column=1).value), ws.cell(row=2,column=1).data_type)\nwsp=wb['Pack factors']\nprint('Pack hdr', [wsp.cell(row=1,column=c).value for c in (1,2)])\nprint('Pack B rows', [(wsp.cell(row=r,column=2).value, wsp.cell(row=r,column=2).data_type) for r in range(1,14)])\nwsc=wb['Counts']\nprint('Counts hdr', [wsc.cell(row=1,column=c).value for c in (1,2)])\nprint('Counts B', [wsc.cell(row=r,column=2).value for r in range(1,14)])\nwb2=openpyxl.load_workbook(p, data_only=True)\nw2=wb2['Export']\nprint('cached Export C', [w2.cell(row=r,column=3).value for r in range(2,14)])\n",
+            "turn": "python",
+            "result": {
+              "note": "Sandbox output is untrusted evidence. Full engine validation is mandatory.",
+              "inputs": [
+                {
+                  "name": "delivery.xlsx",
+                  "path": "inputs/sources/fil_01M6K29DQV8E1WA4888XSTJT0X.xlsx",
+                  "sha256": "8aea9aee3923d5068ee713dfb0c4b1afe1d290168fc656ad806cf0d6542d52a4",
+                  "file_id": "fil_01M6K29DQV8E1WA4888XSTJT0X"
+                }
+              ],
+              "status": "ok",
+              "stderr": "",
+              "stdout": "path inputs/sources/fil_01M6K29DQV8E1WA4888XSTJT0X.xlsx\nExport C2:C4 formulas [(\"='Counts'!B2*'[missing-pack.xlsx]Pack factors'!B2\", 'f'), (\"='Counts'!B3*'[missing-pack.xlsx]Pack factors'!B3\", 'f'), (\"='Counts'!B4*'[missing-pack.xlsx]Pack factors'!B4\", 'f')]\nExport C5:C13 [\"='Counts'!B5*'[missing-pack.xlsx]Pack factors'!B5\", \"='Counts'!B6*'[missing-pack.xlsx]Pack factors'!B6\", \"='Counts'!B7*'[missing-pack.xlsx]Pack factors'!B7\", \"='Counts'!B8*'[missing-pack.xlsx]Pack factors'!B8\", \"='Counts'!B9*'[missing-pack.xlsx]Pack factors'!B9\", \"='Counts'!B10*'[missing-pack.xlsx]Pack factors'!B10\", \"='Counts'!B11*'[missing-pack.xlsx]Pack factors'!B11\", \"='Counts'!B12*'[missing-pack.xlsx]Pack factors'!B12\", \"='Counts'!B13*'[missing-pack.xlsx]Pack factors'!B13\"]\nExport A2 type '000001' s\nPack hdr ['SKU', 'Pieces per carton']\nPack B rows [('Pieces per carton', 's'), (None, 'n'), (None, 'n'), (None, 'n'), (None, 'n'), (None, 'n'), (None, 'n'), (None, 'n'), (None, 'n'), (None, 'n'), (None, 'n'), (None, 'n'), (None, 'n')]\nCounts hdr ['SKU', 'Cartons']\nCounts B ['Cartons', 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]\ncached Export C [999, 999, 999, 999, 999, 999, 999, 999, 999, 999, 999, 999]\n",
+              "omitted": [],
+              "exit_code": 0,
+              "code_sha256": "34aef1cfae93ea8a15cdc3b2cb9878d35740282076513d9a4508e8d49e1e8ff7",
+              "duration_ms": 518
+            }
+          },
+          {
+            "turn": "mapping",
+            "complete": true,
+            "coverage": {
+              "fields": {
+                "/qty": {
+                  "risk": "high",
+                  "records": 12,
+                  "records_filled": 0
+                },
+                "/sku": {
+                  "risk": "medium",
+                  "records": 12,
+                  "records_filled": 12
+                },
+                "/product_name": {
+                  "risk": "medium",
+                  "records": 12,
+                  "records_filled": 12
+                }
+              },
+              "sources": {
+                "products_0": 12,
+                "products_1": 12,
+                "pack_factors_2": 12
+              },
+              "collections": {},
+              "invalid_records": 0
+            },
+            "problems": [
+              "/qty: empty in 12 of 12 records"
+            ],
+            "rows_out": 12
+          },
+          {
+            "turn": "mapping",
+            "complete": true,
+            "coverage": {
+              "fields": {
+                "/qty": {
+                  "risk": "high",
+                  "records": 12,
+                  "records_filled": 0
+                },
+                "/sku": {
+                  "risk": "medium",
+                  "records": 12,
+                  "records_filled": 12
+                },
+                "/product_name": {
+                  "risk": "medium",
+                  "records": 12,
+                  "records_filled": 12
+                }
+              },
+              "sources": {
+                "products_0": 12,
+                "products_1": 12,
+                "pack_factors_2": 12
+              },
+              "collections": {},
+              "invalid_records": 0
+            },
+            "problems": [
+              "/qty: empty in 12 of 12 records"
+            ],
+            "rows_out": 12
+          },
+          {
+            "turn": "mapping",
+            "complete": true,
+            "coverage": {
+              "fields": {
+                "/qty": {
+                  "risk": "high",
+                  "records": 12,
+                  "records_filled": 0
+                },
+                "/sku": {
+                  "risk": "medium",
+                  "records": 12,
+                  "records_filled": 12
+                },
+                "/product_name": {
+                  "risk": "medium",
+                  "records": 12,
+                  "records_filled": 12
+                }
+              },
+              "sources": {
+                "products_0": 12,
+                "products_1": 12,
+                "pack_factors_2": 12
+              },
+              "collections": {},
+              "invalid_records": 0
+            },
+            "problems": [
+              "/qty: empty in 12 of 12 records"
+            ],
+            "rows_out": 12
+          }
+        ],
+        "complete": true,
+        "coverage": {
+          "fields": {
+            "/qty": {
+              "risk": "high",
+              "records": 12,
+              "records_filled": 0
+            },
+            "/sku": {
+              "risk": "medium",
+              "records": 12,
+              "records_filled": 12
+            },
+            "/product_name": {
+              "risk": "medium",
+              "records": 12,
+              "records_filled": 12
+            }
+          },
+          "sources": {
+            "products_0": 12,
+            "products_1": 12,
+            "pack_factors_2": 12
+          },
+          "collections": {},
+          "invalid_records": 0
+        },
+        "grounded": 0,
+        "rows_out": 12,
+        "fix_rounds": 2,
+        "inspections": 1,
+        "python_turns": 2,
+        "rows_checked": 12,
+        "problems_left": [
+          "/qty: empty in 12 of 12 records"
+        ],
+        "candidate_turns": 0
+      },
+      "simulation": {
+        "fill": {
+          "/qty": 0.0,
+          "/sku": 1.0,
+          "/product_name": 1.0
+        },
+        "rows_in": 12,
+        "sources": {
+          "products_0": 12,
+          "products_1": 12,
+          "pack_factors_2": 12
+        },
+        "complete": true,
+        "findings": {
+          "info": 0,
+          "error": 0,
+          "warning": 2
+        },
+        "rows_out": 12,
+        "collections": {},
+        "duration_ms": 13567.9,
+        "identity_keys": [
+          "/sku"
+        ],
+        "invalid_records": 0
+      },
+      "reused_from": null,
+      "field_review": null,
+      "risk_factors": [],
+      "verification": {
+        "scope": "Execution and contract checks; business ambiguities require operator answers",
+        "passed": false,
+        "version": 1,
+        "complete": true,
+        "coverage": {
+          "fields": {
+            "/qty": {
+              "risk": "high",
+              "records": 12,
+              "records_filled": 0
+            },
+            "/sku": {
+              "risk": "medium",
+              "records": 12,
+              "records_filled": 12
+            },
+            "/product_name": {
+              "risk": "medium",
+              "records": 12,
+              "records_filled": 12
+            }
+          },
+          "sources": {
+            "products_0": 12,
+            "products_1": 12,
+            "pack_factors_2": 12
+          },
+          "collections": {},
+          "invalid_records": 0
+        },
+        "problems": [
+          "/qty: empty in 12 of 12 records"
+        ],
+        "rows_out": 12,
+        "warnings": [
+          "/qty: empty in 12 of 12 records"
+        ],
+        "rows_checked": 12,
+        "semantic_checks": {
+          "limitation": "Passing these checks does not prove column meaning. Missing business intent still requires an operator decision.",
+          "contract_rules": [],
+          "source_identity_warnings": []
+        }
+      },
+      "clarifications": [
+        {
+          "why": "The header 'Pieces per carton' exists but all values are blank — please supply the missing external workbook, or confirm the per-SKU pieces per carton (Pack factors!B2:B13). Export!C2:C13 are external formulas ='Counts'!B2*'[missing-pack.xlsx]Pack factors'!B2 …, but delivery.xlsx contains no values in Pack factors!B2:B13 and the referenced file '[missing-pack.xlsx]' was not delivered; Counts!Cartons is 3–14 per SKU. Without the factor, /qty (stock in individual pieces) cannot be computed and stays null.",
+          "kind": "confirm",
+          "action": "request_source",
+          "target": "/qty",
+          "question": "The header 'Pieces per carton' exists but all values are blank — please supply the missing external workbook, or confirm the per-SKU pieces per carton (Pack factors!B2:B13)."
+        }
+      ],
+      "confidence_basis": {
+        "capped": [],
+        "raised": [],
+        "mapping_capped": false
+      },
+      "review_decisions": [],
+      "target_schema_hash": "4d39ca4a890f57cc",
+      "confirmed_decisions": []
+    },
+    "open_questions": [
+      "The header 'Pieces per carton' exists but all values are blank — please supply the missing external workbook, or confirm the per-SKU pieces per carton (Pack factors!B2:B13)."
+    ],
+    "validation": {
+      "ok": true,
+      "issues": []
+    },
+    "parent_id": null,
+    "approved_by": null,
+    "approved_at": null,
+    "comment": null,
+    "created_at": "2026-11-04T10:42:47.982987+00:00",
+    "agent_log": [
+      {
+        "agent": "operator_requirements",
+        "sha256": "035610bb352a9af304d1018d577ee9b1b9febc17380fcc47f5beaea2545ec734",
+        "characters": 362,
+        "changed_since_approved": false
+      },
+      {
+        "agent": "heuristic",
+        "unmatched": {
+          "products_0": [
+            "Stock pieces"
+          ],
+          "products_1": [
+            "SKU",
+            "Cartons"
+          ]
+        },
+        "confidence": 1.0,
+        "table_roles": {
+          "0": "products",
+          "1": "products",
+          "2": "other"
+        }
+      },
+      {
+        "data": {
+          "notes": [
+            "Export is the authoritative product population (SKU + Product name); Counts and Pack factors are per-SKU supplements that join 1:1 on SKU (12/12 codes in the 000001–000012 range on all three sheets).",
+            "Export!C (\"Stock pieces\") is NOT usable stock evidence: all 12 cells are external formulas (12 external_formula_cells) and every row reads the identical placeholder 999. The referenced external workbook is missing from the export, so no per-SKU quantity can be read from it.",
+            "/qty ('Stock in individual pieces') therefore has to be derived as Counts!Cartons × the pieces-per-carton factor from 'Pack factors'!B, or supplied from the missing external inventory workbook — the pack-factor column B is headerless in the detected layout and must be confirmed before the multiplication is trusted.",
+            "SKU must be preserved as text with leading zeros (000001…); do not cast to integer."
+          ],
+          "tables": [
+            {
+              "role": "products",
+              "reason": "Sheet 'Export' is the master product list required by the operator ('Use Export as the product list'): one row per SKU (12 distinct SKUs, unique_ratio 1.0, leading-zero text codes 000001–000012) with a human-readable product name (12 distinct, mixed Coffee/Shampoo/Soap/Tea). The third column is a stock-quantity column whose 12 cells are all external formulas.",
+              "columns": [
+                {
+                  "name": "SKU",
+                  "reason": "Header 'SKU'; 12 distinct values, unique ratio 1.0, samples '000001'…'000012' with leading zeros — must be cast to string preserving zeros, not numeric.",
+                  "semantic": "identity.sku",
+                  "confidence": 0.97,
+                  "target_pointer": "/sku"
+                },
+                {
+                  "name": "Product name",
+                  "reason": "Header 'Product name'; 12 distinct non-numeric values ('Coffee variant 01', 'Shampoo variant 02', 'Soap variant 03'…) aligned one-to-one with SKU.",
+                  "semantic": "product.name",
+                  "confidence": 0.95,
+                  "target_pointer": "/product_name"
+                },
+                {
+                  "name": "Stock pieces",
+                  "reason": "Header implies pieces (pieces = individual units, matching the /qty description) but every one of the 12 cells is an external formula (external_formula_cells=12) and the observed value is the constant 999 in all 12 rows — a placeholder, not a real per-SKU quantity. The referenced external workbook/sheet is not supplied, so this column cannot be trusted as stock evidence.",
+                  "semantic": "stock.qty (external-workbook formula — value unavailable)",
+                  "confidence": 0.15,
+                  "target_pointer": "/qty"
+                }
+              ],
+              "confidence": 0.93,
+              "key_column": "SKU",
+              "table_index": 0
+            },
+            {
+              "role": "inventory",
+              "reason": "Sheet 'Counts' holds one row per SKU (12 distinct SKUs matching Export) with a 'Cartons' count column (integers 3–14, all distinct). Row grain is SKU × carton quantity, i.e. an inventory/count table rather than product master or prices; it becomes the stock source only when combined with a pack-size factor to convert cartons to pieces.",
+              "columns": [
+                {
+                  "name": "SKU",
+                  "reason": "Header 'SKU', 12 distinct leading-zero codes in the same 000001–000012 range as Export; joins 1:1 to the product list.",
+                  "semantic": "identity.sku (foreign key to Export)",
+                  "confidence": 0.93,
+                  "target_pointer": "/sku"
+                },
+                {
+                  "name": "Cartons",
+                  "reason": "Header 'Cartons'; integer counts 3–14, unique per SKU, no nulls. Cartons are not individual pieces, so this can only populate /qty after multiplying by a pieces-per-carton factor from the 'Pack factors' sheet; the factor column there is not yet confirmed.",
+                  "semantic": "stock.qty in cartons (needs pack-size conversion)",
+                  "confidence": 0.55,
+                  "target_pointer": "/qty"
+                }
+              ],
+              "confidence": 0.72,
+              "key_column": "SKU",
+              "table_index": 1
+            },
+            {
+              "role": "other",
+              "reason": "Sheet 'Pack factors' contains the SKU list (12 distinct codes matching Export) and the sheet declares 2 columns, but only column A ('SKU') was profiled — column B has no usable header in the detected header row, so its values are unknown. By name this is a unit-conversion/dimension table (pieces per carton), i.e. reference data, not products, prices or promotions.",
+              "columns": [
+                {
+                  "name": "SKU",
+                  "reason": "Header 'SKU', 12 distinct codes 000001–000012 matching the product list 1:1; it is a lookup key, not an output field.",
+                  "semantic": "identity.sku (foreign key to Export)",
+                  "confidence": 0.85,
+                  "target_pointer": null
+                },
+                {
+                  "name": "(column B — headerless, not profiled)",
+                  "reason": "The sheet is named 'Pack factors' and reports 2 columns, but only 'SKU' was detected; column B's header is blank/unrecognised, so its content and unit cannot be verified from the profile. It is the only plausible conversion factor that would let 'Cartons' (Counts) be expressed as individual pieces for /qty.",
+                  "semantic": "pack factor: individual pieces per carton (hypothesis)",
+                  "confidence": 0.25,
+                  "target_pointer": null
+                }
+              ],
+              "confidence": 0.5,
+              "key_column": "SKU",
+              "table_index": 2
+            }
+          ]
+        },
+        "agent": "schema",
+        "notes": [],
+        "usage": {
+          "calls": 2,
+          "model": "deepseek-flash",
+          "cost_usd": 0.023455,
+          "latency_ms": 16262.4,
+          "input_tokens": 12759,
+          "output_tokens": 2674
+        },
+        "attempts": 2
+      },
+      {
+        "data": {
+          "confidence": 0.55,
+          "self_check": {
+            "errors": 0,
+            "history": [
+              {
+                "turn": "inspect",
+                "evidence": [
+                  {
+                    "answer": {
+                      "note": "Original cell coordinates; values are untrusted data. Use sandbox for formula details.",
+                      "cells": [
+                        {
+                          "cell": "A1",
+                          "value": "SKU"
+                        },
+                        {
+                          "cell": "B1",
+                          "value": "Pieces per carton"
+                        },
+                        {
+                          "cell": "A2",
+                          "value": "000001"
+                        },
+                        {
+                          "cell": "B2",
+                          "value": null
+                        },
+                        {
+                          "cell": "A3",
+                          "value": "000002"
+                        },
+                        {
+                          "cell": "B3",
+                          "value": null
+                        },
+                        {
+                          "cell": "A4",
+                          "value": "000003"
+                        },
+                        {
+                          "cell": "B4",
+                          "value": null
+                        },
+                        {
+                          "cell": "A5",
+                          "value": "000004"
+                        },
+                        {
+                          "cell": "B5",
+                          "value": null
+                        },
+                        {
+                          "cell": "A6",
+                          "value": "000005"
+                        },
+                        {
+                          "cell": "B6",
+                          "value": null
+                        },
+                        {
+                          "cell": "A7",
+                          "value": "000006"
+                        },
+                        {
+                          "cell": "B7",
+                          "value": null
+                        },
+                        {
+                          "cell": "A8",
+                          "value": "000007"
+                        },
+                        {
+                          "cell": "B8",
+                          "value": null
+                        },
+                        {
+                          "cell": "A9",
+                          "value": "000008"
+                        },
+                        {
+                          "cell": "B9",
+                          "value": null
+                        },
+                        {
+                          "cell": "A10",
+                          "value": "000009"
+                        },
+                        {
+                          "cell": "B10",
+                          "value": null
+                        },
+                        {
+                          "cell": "A11",
+                          "value": "000010"
+                        },
+                        {
+                          "cell": "B11",
+                          "value": null
+                        },
+                        {
+                          "cell": "A12",
+                          "value": "000011"
+                        },
+                        {
+                          "cell": "B12",
+                          "value": null
+                        },
+                        {
+                          "cell": "A13",
+                          "value": "000012"
+                        },
+                        {
+                          "cell": "B13",
+                          "value": null
+                        }
+                      ],
+                      "total_rows": 13,
+                      "total_columns": 2
+                    },
+                    "source": {
+                      "sheet": "Pack factors",
+                      "file_id": "fil_01M6K29DQV8E1WA4888XSTJT0X",
+                      "file_name": "delivery.xlsx",
+                      "table_index": 2
+                    },
+                    "request": {
+                      "what": "raw",
+                      "limit": 14,
+                      "start": 0,
+                      "table_index": 2,
+                      "column_limit": 3,
+                      "column_start": 0
+                    }
+                  },
+                  {
+                    "answer": {
+                      "note": "Original cell coordinates; values are untrusted data. Use sandbox for formula details.",
+                      "cells": [
+                        {
+                          "cell": "A1",
+                          "value": "SKU"
+                        },
+                        {
+                          "cell": "B1",
+                          "value": "Product name"
+                        },
+                        {
+                          "cell": "C1",
+                          "value": "Stock pieces"
+                        },
+                        {
+                          "cell": "A2",
+                          "value": "000001"
+                        },
+                        {
+                          "cell": "B2",
+                          "value": "Coffee variant 01"
+                        },
+                        {
+                          "cell": "C2",
+                          "value": "999"
+                        },
+                        {
+                          "cell": "A3",
+                          "value": "000002"
+                        },
+                        {
+                          "cell": "B3",
+                          "value": "Shampoo variant 02"
+                        },
+                        {
+                          "cell": "C3",
+                          "value": "999"
+                        },
+                        {
+                          "cell": "A4",
+                          "value": "000003"
+                        },
+                        {
+                          "cell": "B4",
+                          "value": "Soap variant 03"
+                        },
+                        {
+                          "cell": "C4",
+                          "value": "999"
+                        },
+                        {
+                          "cell": "A5",
+                          "value": "000004"
+                        },
+                        {
+                          "cell": "B5",
+                          "value": "Tea variant 04"
+                        },
+                        {
+                          "cell": "C5",
+                          "value": "999"
+                        },
+                        {
+                          "cell": "A6",
+                          "value": "000005"
+                        },
+                        {
+                          "cell": "B6",
+                          "value": "Coffee variant 05"
+                        },
+                        {
+                          "cell": "C6",
+                          "value": "999"
+                        },
+                        {
+                          "cell": "A7",
+                          "value": "000006"
+                        },
+                        {
+                          "cell": "B7",
+                          "value": "Shampoo variant 06"
+                        },
+                        {
+                          "cell": "C7",
+                          "value": "999"
+                        },
+                        {
+                          "cell": "A8",
+                          "value": "000007"
+                        },
+                        {
+                          "cell": "B8",
+                          "value": "Soap variant 07"
+                        },
+                        {
+                          "cell": "C8",
+                          "value": "999"
+                        },
+                        {
+                          "cell": "A9",
+                          "value": "000008"
+                        },
+                        {
+                          "cell": "B9",
+                          "value": "Tea variant 08"
+                        },
+                        {
+                          "cell": "C9",
+                          "value": "999"
+                        },
+                        {
+                          "cell": "A10",
+                          "value": "000009"
+                        },
+                        {
+                          "cell": "B10",
+                          "value": "Coffee variant 09"
+                        },
+                        {
+                          "cell": "C10",
+                          "value": "999"
+                        },
+                        {
+                          "cell": "A11",
+                          "value": "000010"
+                        },
+                        {
+                          "cell": "B11",
+                          "value": "Shampoo variant 10"
+                        },
+                        {
+                          "cell": "C11",
+                          "value": "999"
+                        },
+                        {
+                          "cell": "A12",
+                          "value": "000011"
+                        },
+                        {
+                          "cell": "B12",
+                          "value": "Soap variant 11"
+                        },
+                        {
+                          "cell": "C12",
+                          "value": "999"
+                        },
+                        {
+                          "cell": "A13",
+                          "value": "000012"
+                        },
+                        {
+                          "cell": "B13",
+                          "value": "Tea variant 12"
+                        },
+                        {
+                          "cell": "C13",
+                          "value": "999"
+                        }
+                      ],
+                      "total_rows": 13,
+                      "total_columns": 3
+                    },
+                    "source": {
+                      "sheet": "Export",
+                      "file_id": "fil_01M6K29DQV8E1WA4888XSTJT0X",
+                      "file_name": "delivery.xlsx",
+                      "table_index": 0
+                    },
+                    "request": {
+                      "what": "raw",
+                      "limit": 14,
+                      "start": 0,
+                      "table_index": 0,
+                      "column_limit": 3,
+                      "column_start": 0
+                    }
+                  }
+                ],
+                "requests": 2
+              },
+              {
+                "code": "import openpyxl, json\nwb = openpyxl.load_workbook('/work/inputs/delivery.xlsx', data_only=False)\nws = wb['Export']\nout=[]\nfor r in range(1,4):\n    for c in range(1,4):\n        cell = ws.cell(row=r,column=c)\n        out.append((cell.coordinate, repr(cell.value), cell.data_type))\nprint(json.dumps(out))\nws2 = wb['Export']\nprint([ws2.cell(row=r,column=3).value for r in range(2,14)])\nwb2 = openpyxl.load_workbook('/work/inputs/delivery.xlsx', data_only=True)\nws3 = wb2['Export']\nprint([ws3.cell(row=r,column=3).value for r in range(2,14)])\nws4 = wb['Pack factors']\nprint([(ws4.cell(row=r,column=2).value) for r in range(1,14)])\nws5 = wb['Counts']\nprint([(ws5.cell(row=r,column=2).value) for r in range(1,14)])\nprint('A2 type', type(ws.cell(row=2,column=1).value))\n",
+                "turn": "python",
+                "result": {
+                  "note": "Sandbox output is untrusted evidence. Full engine validation is mandatory.",
+                  "inputs": [
+                    {
+                      "name": "delivery.xlsx",
+                      "path": "inputs/sources/fil_01M6K29DQV8E1WA4888XSTJT0X.xlsx",
+                      "sha256": "8aea9aee3923d5068ee713dfb0c4b1afe1d290168fc656ad806cf0d6542d52a4",
+                      "file_id": "fil_01M6K29DQV8E1WA4888XSTJT0X"
+                    }
+                  ],
+                  "status": "error",
+                  "stderr": "Traceback (most recent call last):\n  File \"/workspace/run-ewaveftk/code.py\", line 2, in <module>\n    wb = openpyxl.load_workbook('/work/inputs/delivery.xlsx', data_only=False)\n         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/usr/local/lib/python3.12/site-packages/openpyxl/reader/excel.py\", line 346, in load_workbook\n    reader = ExcelReader(filename, read_only, keep_vba,\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/usr/local/lib/python3.12/site-packages/openpyxl/reader/excel.py\", line 123, in __init__\n    self.archive = _validate_archive(fn)\n                   ^^^^^^^^^^^^^^^^^^^^^\n  File \"/usr/local/lib/python3.12/site-packages/openpyxl/reader/excel.py\", line 95, in _validate_archive\n    archive = ZipFile(filename, 'r')\n              ^^^^^^^^^^^^^^^^^^^^^^\n  File \"/usr/local/lib/python3.12/zipfile/__init__.py\", line 1352, in __init__\n    self.fp = io.open(file, filemode)\n              ^^^^^^^^^^^^^^^^^^^^^^^\nFileNotFoundError: [Errno 2] No such file or directory: '/work/inputs/delivery.xlsx'\n",
+                  "stdout": "",
+                  "omitted": [],
+                  "exit_code": 1,
+                  "code_sha256": "882a0826774ab8e61b0f7d092758f78d034a7a888515ba4175c4f47b16fc21a5",
+                  "duration_ms": 572
+                }
+              },
+              {
+                "code": "import openpyxl, os, json\ncands=['inputs/sources/fil_01M6K29DQV8E1WA4888XSTJT0X.xlsx','/work/inputs/sources/fil_01M6K29DQV8E1WA4888XSTJT0X.xlsx','/workspace/inputs/sources/fil_01M6K29DQV8E1WA4888XSTJT0X.xlsx']\np=next((c for c in cands if os.path.exists(c)), None)\nprint('path', p)\nwb=openpyxl.load_workbook(p, data_only=False)\nws=wb['Export']\nprint('Export C2:C4 formulas', [(ws.cell(row=r,column=3).value, ws.cell(row=r,column=3).data_type) for r in (2,3,4)])\nprint('Export C5:C13', [ws.cell(row=r,column=3).value for r in range(5,14)])\nprint('Export A2 type', repr(ws.cell(row=2,column=1).value), ws.cell(row=2,column=1).data_type)\nwsp=wb['Pack factors']\nprint('Pack hdr', [wsp.cell(row=1,column=c).value for c in (1,2)])\nprint('Pack B rows', [(wsp.cell(row=r,column=2).value, wsp.cell(row=r,column=2).data_type) for r in range(1,14)])\nwsc=wb['Counts']\nprint('Counts hdr', [wsc.cell(row=1,column=c).value for c in (1,2)])\nprint('Counts B', [wsc.cell(row=r,column=2).value for r in range(1,14)])\nwb2=openpyxl.load_workbook(p, data_only=True)\nw2=wb2['Export']\nprint('cached Export C', [w2.cell(row=r,column=3).value for r in range(2,14)])\n",
+                "turn": "python",
+                "result": {
+                  "note": "Sandbox output is untrusted evidence. Full engine validation is mandatory.",
+                  "inputs": [
+                    {
+                      "name": "delivery.xlsx",
+                      "path": "inputs/sources/fil_01M6K29DQV8E1WA4888XSTJT0X.xlsx",
+                      "sha256": "8aea9aee3923d5068ee713dfb0c4b1afe1d290168fc656ad806cf0d6542d52a4",
+                      "file_id": "fil_01M6K29DQV8E1WA4888XSTJT0X"
+                    }
+                  ],
+                  "status": "ok",
+                  "stderr": "",
+                  "stdout": "path inputs/sources/fil_01M6K29DQV8E1WA4888XSTJT0X.xlsx\nExport C2:C4 formulas [(\"='Counts'!B2*'[missing-pack.xlsx]Pack factors'!B2\", 'f'), (\"='Counts'!B3*'[missing-pack.xlsx]Pack factors'!B3\", 'f'), (\"='Counts'!B4*'[missing-pack.xlsx]Pack factors'!B4\", 'f')]\nExport C5:C13 [\"='Counts'!B5*'[missing-pack.xlsx]Pack factors'!B5\", \"='Counts'!B6*'[missing-pack.xlsx]Pack factors'!B6\", \"='Counts'!B7*'[missing-pack.xlsx]Pack factors'!B7\", \"='Counts'!B8*'[missing-pack.xlsx]Pack factors'!B8\", \"='Counts'!B9*'[missing-pack.xlsx]Pack factors'!B9\", \"='Counts'!B10*'[missing-pack.xlsx]Pack factors'!B10\", \"='Counts'!B11*'[missing-pack.xlsx]Pack factors'!B11\", \"='Counts'!B12*'[missing-pack.xlsx]Pack factors'!B12\", \"='Counts'!B13*'[missing-pack.xlsx]Pack factors'!B13\"]\nExport A2 type '000001' s\nPack hdr ['SKU', 'Pieces per carton']\nPack B rows [('Pieces per carton', 's'), (None, 'n'), (None, 'n'), (None, 'n'), (None, 'n'), (None, 'n'), (None, 'n'), (None, 'n'), (None, 'n'), (None, 'n'), (None, 'n'), (None, 'n'), (None, 'n')]\nCounts hdr ['SKU', 'Cartons']\nCounts B ['Cartons', 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]\ncached Export C [999, 999, 999, 999, 999, 999, 999, 999, 999, 999, 999, 999]\n",
+                  "omitted": [],
+                  "exit_code": 0,
+                  "code_sha256": "34aef1cfae93ea8a15cdc3b2cb9878d35740282076513d9a4508e8d49e1e8ff7",
+                  "duration_ms": 518
+                }
+              },
+              {
+                "turn": "mapping",
+                "complete": true,
+                "coverage": {
+                  "fields": {
+                    "/qty": {
+                      "risk": "high",
+                      "records": 12,
+                      "records_filled": 0
+                    },
+                    "/sku": {
+                      "risk": "medium",
+                      "records": 12,
+                      "records_filled": 12
+                    },
+                    "/product_name": {
+                      "risk": "medium",
+                      "records": 12,
+                      "records_filled": 12
+                    }
+                  },
+                  "sources": {
+                    "products_0": 12,
+                    "products_1": 12,
+                    "pack_factors_2": 12
+                  },
+                  "collections": {},
+                  "invalid_records": 0
+                },
+                "problems": [
+                  "/qty: empty in 12 of 12 records"
+                ],
+                "rows_out": 12
+              },
+              {
+                "turn": "mapping",
+                "complete": true,
+                "coverage": {
+                  "fields": {
+                    "/qty": {
+                      "risk": "high",
+                      "records": 12,
+                      "records_filled": 0
+                    },
+                    "/sku": {
+                      "risk": "medium",
+                      "records": 12,
+                      "records_filled": 12
+                    },
+                    "/product_name": {
+                      "risk": "medium",
+                      "records": 12,
+                      "records_filled": 12
+                    }
+                  },
+                  "sources": {
+                    "products_0": 12,
+                    "products_1": 12,
+                    "pack_factors_2": 12
+                  },
+                  "collections": {},
+                  "invalid_records": 0
+                },
+                "problems": [
+                  "/qty: empty in 12 of 12 records"
+                ],
+                "rows_out": 12
+              },
+              {
+                "turn": "mapping",
+                "complete": true,
+                "coverage": {
+                  "fields": {
+                    "/qty": {
+                      "risk": "high",
+                      "records": 12,
+                      "records_filled": 0
+                    },
+                    "/sku": {
+                      "risk": "medium",
+                      "records": 12,
+                      "records_filled": 12
+                    },
+                    "/product_name": {
+                      "risk": "medium",
+                      "records": 12,
+                      "records_filled": 12
+                    }
+                  },
+                  "sources": {
+                    "products_0": 12,
+                    "products_1": 12,
+                    "pack_factors_2": 12
+                  },
+                  "collections": {},
+                  "invalid_records": 0
+                },
+                "problems": [
+                  "/qty: empty in 12 of 12 records"
+                ],
+                "rows_out": 12
+              }
+            ],
+            "complete": true,
+            "coverage": {
+              "fields": {
+                "/qty": {
+                  "risk": "high",
+                  "records": 12,
+                  "records_filled": 0
+                },
+                "/sku": {
+                  "risk": "medium",
+                  "records": 12,
+                  "records_filled": 12
+                },
+                "/product_name": {
+                  "risk": "medium",
+                  "records": 12,
+                  "records_filled": 12
+                }
+              },
+              "sources": {
+                "products_0": 12,
+                "products_1": 12,
+                "pack_factors_2": 12
+              },
+              "collections": {},
+              "invalid_records": 0
+            },
+            "grounded": 0,
+            "rows_out": 12,
+            "fix_rounds": 2,
+            "inspections": 1,
+            "python_turns": 2,
+            "rows_checked": 12,
+            "problems_left": [
+              "/qty: empty in 12 of 12 records"
+            ],
+            "candidate_turns": 0
+          },
+          "clarifications": [
+            {
+              "why": "The header 'Pieces per carton' exists but all values are blank — please supply the missing external workbook, or confirm the per-SKU pieces per carton (Pack factors!B2:B13). Export!C2:C13 are external formulas ='Counts'!B2*'[missing-pack.xlsx]Pack factors'!B2 …, but delivery.xlsx contains no values in Pack factors!B2:B13 and the referenced file '[missing-pack.xlsx]' was not delivered; Counts!Cartons is 3–14 per SKU. Without the factor, /qty (stock in individual pieces) cannot be computed and stays null.",
+              "kind": "confirm",
+              "action": "request_source",
+              "target": "/qty",
+              "question": "The header 'Pieces per carton' exists but all values are blank — please supply the missing external workbook, or confirm the per-SKU pieces per carton (Pack factors!B2:B13)."
+            }
+          ],
+          "changes_from_draft": [
+            "Added 1:1 left joins from the Export product list to 'Counts' (Cartons) and 'Pack factors' (Pieces per carton) on SKU, key-normalised with trim + strip_leading_zeros; unmatched rows kept.",
+            "Added /qty = Counts!Cartons × Pack factors!Pieces per carton, reproducing the Export!C formula ='Counts'!B*'[missing-pack.xlsx]Pack factors'!B; /sku and /product_name unchanged from the draft.",
+            "'Pack factors' source extracted with drop_empty_columns=false, otherwise column B ('Pieces per carton') would be dropped because it is entirely blank.",
+            "Export!C 'Stock pieces' is not used: all 12 cells are external formulas whose cached value is the constant 999 — a placeholder, not per-SKU stock. attributes_passthrough set to false so this unused broken column is not exported.",
+            "Role of the 'Counts' source changed from products to inventory; record dedupe key set to /sku (the identity key of the target schema).",
+            "/qty currently evaluates to null (honest missing evidence) instead of 999; a warning-level quality rule flags it until the pack factors arrive.",
+            "meta.created_by set to ai; confidence reflects the fact that the populate rule is proven by the source formula but one operand is missing from the delivery."
+          ]
+        },
+        "agent": "mapping",
+        "notes": [
+          "self_check_unresolved: 1 problem(s) left"
+        ],
+        "usage": {
+          "calls": 6,
+          "model": "deepseek-flash",
+          "cost_usd": 0.168785,
+          "latency_ms": 72259.6,
+          "input_tokens": 115209,
+          "output_tokens": 13394
+        },
+        "attempts": 6
+      },
+      {
+        "ops": 2,
+        "agent": "agreement",
+        "agree": 2,
+        "record": 2,
+        "dropped": 0,
+        "disagree": 0,
+        "model_only": 1
+      }
+    ],
+    "sample": [
+      {
+        "qty": null,
+        "sku": "000001",
+        "source_meta": {
+          "file": "delivery.xlsx",
+          "lineage": {
+            "joined": {
+              "products_1": 0,
+              "pack_factors_2": 0
+            },
+            "source": "products_0",
+            "root_row": 0
+          }
+        },
+        "product_name": "Coffee variant 01"
+      },
+      {
+        "qty": null,
+        "sku": "000002",
+        "source_meta": {
+          "file": "delivery.xlsx",
+          "lineage": {
+            "joined": {
+              "products_1": 1,
+              "pack_factors_2": 1
+            },
+            "source": "products_0",
+            "root_row": 1
+          }
+        },
+        "product_name": "Shampoo variant 02"
+      },
+      {
+        "qty": null,
+        "sku": "000003",
+        "source_meta": {
+          "file": "delivery.xlsx",
+          "lineage": {
+            "joined": {
+              "products_1": 2,
+              "pack_factors_2": 2
+            },
+            "source": "products_0",
+            "root_row": 2
+          }
+        },
+        "product_name": "Soap variant 03"
+      },
+      {
+        "qty": null,
+        "sku": "000004",
+        "source_meta": {
+          "file": "delivery.xlsx",
+          "lineage": {
+            "joined": {
+              "products_1": 3,
+              "pack_factors_2": 3
+            },
+            "source": "products_0",
+            "root_row": 3
+          }
+        },
+        "product_name": "Tea variant 04"
+      },
+      {
+        "qty": null,
+        "sku": "000005",
+        "source_meta": {
+          "file": "delivery.xlsx",
+          "lineage": {
+            "joined": {
+              "products_1": 4,
+              "pack_factors_2": 4
+            },
+            "source": "products_0",
+            "root_row": 4
+          }
+        },
+        "product_name": "Coffee variant 05"
+      }
+    ],
+    "document": {
+      "meta": {
+        "model": "deepseek-flash",
+        "notes": "qty = 'Counts'!Cartons * 'Pack factors'!Pieces per carton; the second operand is blank locally and referenced from external '[missing-pack.xlsx]'.",
+        "version": 1,
+        "evidence": [
+          "Root: sheet 'Export' = authoritative product list (12 rows, SKU unique, leading-zero text codes 000001-000012).",
+          "Export!C ('Stock pieces') cells C2:C13 are external formulas ='Counts'!B2*'[missing-pack.xlsx]Pack factors'!B2 etc.; their cached value is the constant 999 in all 12 rows (placeholder from a failed external link).",
+          "'Counts'!B ('Cartons') holds integer counts 3-14, one row per SKU; 'Pack factors'!B header is 'Pieces per carton' but B2:B13 are blank in this workbook, so the pack factor only exists in the missing external workbook.",
+          "/qty is therefore reproduced as Cartons x Pieces-per-carton (exactly the Export!C formula) and resolves to null until the pack factors are supplied."
+        ],
+        "confidence": 0.55,
+        "created_by": "ai",
+        "customer_id": "cus_01M6K29DBGGEHMQ8TNS6TRATC0",
+        "fingerprints": {
+          "products_0": "ecf1de050b88661f",
+          "products_1": "ecf1de050b88661f",
+          "pack_factors_2": "ecf1de050b88661f"
+        },
+        "target_schema": "eval_wf-before_t08@1"
+      },
+      "joins": [
+        {
+          "on": [
+            {
+              "left": "SKU",
+              "right": "SKU"
+            }
+          ],
+          "how": "left",
+          "left": "products_0",
+          "right": "products_1",
+          "cardinality": "1:1",
+          "on_unmatched": "keep",
+          "normalize_keys": [
+            "trim",
+            "strip_leading_zeros"
+          ]
+        },
+        {
+          "on": [
+            {
+              "left": "SKU",
+              "right": "SKU"
+            }
+          ],
+          "how": "left",
+          "left": "products_0",
+          "right": "pack_factors_2",
+          "cardinality": "1:1",
+          "on_unmatched": "keep",
+          "normalize_keys": [
+            "trim",
+            "strip_leading_zeros"
+          ]
+        }
+      ],
+      "fields": [
+        {
+          "expr": {
+            "op": "cast",
+            "args": [
+              {
+                "op": "col",
+                "name": "SKU",
+                "source": "products_0"
+              }
+            ],
+            "params": {
+              "to": "string"
+            }
+          },
+          "note": "Cast to string keeps the original text; do not cast to int.",
+          "target": "/sku",
+          "evidence": [
+            "Header 'SKU', 12 distinct values, unique ratio 1.0; raw cells stored as text with leading zeros ('000001')."
+          ],
+          "confidence": 0.95
+        },
+        {
+          "expr": {
+            "op": "normalize_whitespace",
+            "args": [
+              {
+                "op": "col",
+                "name": "Product name",
+                "source": "products_0"
+              }
+            ],
+            "params": {}
+          },
+          "target": "/product_name",
+          "evidence": [
+            "Header 'Product name'; 12 distinct non-numeric values aligned 1:1 with SKU ('Coffee variant 01', 'Shampoo variant 02', ...)."
+          ],
+          "confidence": 0.95
+        },
+        {
+          "expr": {
+            "op": "multiply",
+            "args": [
+              {
+                "op": "parse_number_th",
+                "args": [
+                  {
+                    "op": "col",
+                    "name": "Cartons",
+                    "source": "products_1"
+                  }
+                ],
+                "params": {}
+              },
+              {
+                "op": "parse_number_th",
+                "args": [
+                  {
+                    "op": "col",
+                    "name": "Pieces per carton",
+                    "source": "pack_factors_2"
+                  }
+                ],
+                "params": {}
+              }
+            ],
+            "params": {}
+          },
+          "note": "Resolves to null until the external pack factors are supplied/filled.",
+          "target": "/qty",
+          "evidence": [
+            "Export!C2 formula is exactly ='Counts'!B2*'[missing-pack.xlsx]Pack factors'!B2, i.e. cartons x pieces-per-carton, so the operands are Counts!Cartons and Pack factors!Pieces per carton.",
+            "Cached Export!C values are the constant 999 for all 12 SKUs - a placeholder, not stock.",
+            "'Pack factors'!B2:B13 are blank in this workbook; the factor lives in the missing external '[missing-pack.xlsx]', so this expression currently evaluates to null rather than a fabricated quantity."
+          ],
+          "confidence": 0.4
+        }
+      ],
+      "record": {
+        "dedupe": {
+          "keep": "first",
+          "keys": [
+            "/sku"
+          ]
+        },
+        "filters": [],
+        "root_source": "products_0"
+      },
+      "quality": [
+        {
+          "rule": "unique",
+          "params": {},
+          "target": "/sku",
+          "severity": "warning"
+        },
+        {
+          "rule": "not_null",
+          "params": {},
+          "target": "/qty",
+          "message": "qty depends on 'Prefixes per carton' from the missing '[missing-pack.xlsx]' / blank 'Pack factors'!B2:B13",
+          "severity": "warning"
+        }
+      ],
+      "sources": [
+        {
+          "id": "products_0",
+          "csv": {
+            "encoding": "auto",
+            "delimiter": "auto",
+            "quote_char": "\""
+          },
+          "file": {
+            "name_pattern": "(?i)^delivery",
+            "sheet_names_any": [
+              "Export"
+            ]
+          },
+          "role": "products",
+          "sheet": {
+            "name": "Export"
+          },
+          "table": {
+            "fill_down": [],
+            "header_row": 0,
+            "header_rows": 1,
+            "last_column": 3,
+            "first_column": 0,
+            "drop_total_rows": true,
+            "drop_empty_columns": true,
+            "stop_at_blank_rows": 2,
+            "drop_repeated_headers": true
+          },
+          "rename": {},
+          "description": "Product master: SKU, Product name, Stock pieces (broken external formula)."
+        },
+        {
+          "id": "products_1",
+          "csv": {
+            "encoding": "auto",
+            "delimiter": "auto",
+            "quote_char": "\""
+          },
+          "file": {
+            "name_pattern": "(?i)^delivery",
+            "sheet_names_any": [
+              "Counts"
+            ]
+          },
+          "role": "inventory",
+          "sheet": {
+            "name": "Counts"
+          },
+          "table": {
+            "fill_down": [],
+            "header_row": 0,
+            "header_rows": 1,
+            "last_column": 2,
+            "first_column": 0,
+            "drop_total_rows": true,
+            "drop_empty_columns": true,
+            "stop_at_blank_rows": 2,
+            "drop_repeated_headers": true
+          },
+          "rename": {},
+          "description": "Per-SKU carton counts (integer 3-14)."
+        },
+        {
+          "id": "pack_factors_2",
+          "csv": {
+            "encoding": "auto",
+            "delimiter": "auto",
+            "quote_char": "\""
+          },
+          "file": {
+            "name_pattern": "(?i)^delivery",
+            "sheet_names_any": [
+              "Pack factors"
+            ]
+          },
+          "role": "other",
+          "sheet": {
+            "name": "Pack factors"
+          },
+          "table": {
+            "fill_down": [],
+            "data_start": 1,
+            "header_row": 0,
+            "header_rows": 1,
+            "last_column": 2,
+            "first_column": 0,
+            "drop_total_rows": false,
+            "drop_empty_columns": false,
+            "stop_at_blank_rows": 2,
+            "drop_repeated_headers": true
+          },
+          "rename": {},
+          "description": "Per-SKU pack factor, header 'Pieces per carton'; all values blank in this workbook (referenced from external '[missing-pack.xlsx]')."
+        }
+      ],
+      "provenance": true,
+      "collections": [],
+      "attributes_passthrough": false
+    }
+  },
+  "questions": {
+    "mapping_id": "map_01M6K2EZ14R0DKGT7J58KJXGFT",
+    "round_id": "rnd_01M6K29DP5NYPNMMSTF8F31G4S",
+    "status": "proposed",
+    "blocked": false,
+    "questions": [
+      {
+        "id": "/qty",
+        "field": {
+          "pointer": "/qty",
+          "name": "qty",
+          "json_type": [
+            "number",
+            "null"
+          ],
+          "semantic": "stock.qty",
+          "risk": "high",
+          "required": true,
+          "nullable": true,
+          "enum": null,
+          "format": null,
+          "synonyms_en": [],
+          "synonyms_th": [],
+          "description": "Stock in individual pieces. Missing evidence is null, never zero.",
+          "description_th": null,
+          "in_collection": null,
+          "is_collection": false,
+          "system": false,
+          "default": null,
+          "examples": []
+        },
+        "kind": "confirm",
+        "options": [],
+        "question": "The header 'Pieces per carton' exists but all values are blank — please supply the missing external workbook, or confirm the per-SKU pieces per carton (Pack factors!B2:B13).",
+        "current": {
+          "op": "multiply",
+          "args": [
+            {
+              "op": "parse_number_th",
+              "args": [
+                {
+                  "op": "col",
+                  "name": "Cartons",
+                  "source": "products_1"
+                }
+              ],
+              "params": {}
+            },
+            {
+              "op": "parse_number_th",
+              "args": [
+                {
+                  "op": "col",
+                  "name": "Pieces per carton",
+                  "source": "pack_factors_2"
+                }
+              ],
+              "params": {}
+            }
+          ],
+          "params": {}
+        },
+        "evidence": [
+          "Export!C2 formula is exactly ='Counts'!B2*'[missing-pack.xlsx]Pack factors'!B2, i.e. cartons x pieces-per-carton, so the operands are Counts!Cartons and Pack factors!Pieces per carton.",
+          "Cached Export!C values are the constant 999 for all 12 SKUs - a placeholder, not stock.",
+          "'Pack factors'!B2:B13 are blank in this workbook; the factor lives in the missing external '[missing-pack.xlsx]', so this expression currently evaluates to null rather than a fabricated quantity.",
+          "ตัวอย่างจากคอลัมน์ Cartons: 3 · 4 · 5"
+        ],
+        "note": "The header 'Pieces per carton' exists but all values are blank — please supply the missing external workbook, or confirm the per-SKU pieces per carton (Pack factors!B2:B13). Export!C2:C13 are external formulas ='Counts'!B2*'[missing-pack.xlsx]Pack factors'!B2 …, but delivery.xlsx contains no values in Pack factors!B2:B13 and the referenced file '[missing-pack.xlsx]' was not delivered; Counts!Cartons is 3–14 per SKU. Without the factor, /qty (stock in individual pieces) cannot be computed and stays null.",
+        "contested": true,
+        "action": "request_source",
+        "scope": "source_file",
+        "allow_custom": false,
+        "source_examples": [
+          {
+            "source": "products_1",
+            "column": "Cartons",
+            "values": [
+              "3",
+              "4",
+              "5"
+            ],
+            "scope": "profile samples; not all rows"
+          }
+        ]
+      }
+    ],
+    "open_questions": [
+      "The header 'Pieces per carton' exists but all values are blank — please supply the missing external workbook, or confirm the per-SKU pieces per carton (Pack factors!B2:B13)."
+    ],
+    "reasons": [
+      "products_0: formula values are saved Excel caches; FORMA does not recalculate or verify cache freshness",
+      "low confidence on high-risk fields: /qty (0.40)",
+      "mapping confidence 0.55 < 0.95",
+      "first time this customer/format is seen",
+      "1 questions still need operator confirmation",
+      "the model selects rows differently from FORMA's matcher (records: dedupe; records: joins)",
+      "verification: /qty: empty in 12 of 12 records"
+    ],
+    "sample": [
+      {
+        "qty": null,
+        "sku": "000001",
+        "source_meta": {
+          "file": "delivery.xlsx",
+          "lineage": {
+            "joined": {
+              "products_1": 0,
+              "pack_factors_2": 0
+            },
+            "source": "products_0",
+            "root_row": 0
+          }
+        },
+        "product_name": "Coffee variant 01"
+      },
+      {
+        "qty": null,
+        "sku": "000002",
+        "source_meta": {
+          "file": "delivery.xlsx",
+          "lineage": {
+            "joined": {
+              "products_1": 1,
+              "pack_factors_2": 1
+            },
+            "source": "products_0",
+            "root_row": 1
+          }
+        },
+        "product_name": "Shampoo variant 02"
+      },
+      {
+        "qty": null,
+        "sku": "000003",
+        "source_meta": {
+          "file": "delivery.xlsx",
+          "lineage": {
+            "joined": {
+              "products_1": 2,
+              "pack_factors_2": 2
+            },
+            "source": "products_0",
+            "root_row": 2
+          }
+        },
+        "product_name": "Soap variant 03"
+      }
+    ],
+    "context": {
+      "customer": {
+        "code": "EVAL-wf-before-T08",
+        "name": "EVAL-wf-before-T08"
+      },
+      "round_label": "EVAL wf-before T08_r1",
+      "files": [
+        {
+          "id": "fil_01M6K29DQV8E1WA4888XSTJT0X",
+          "name": "delivery.xlsx"
+        }
+      ],
+      "mapping_version": 1
+    },
+    "changes": [],
+    "comparison_dataset_id": null,
+    "checks": {
+      "drift": null,
+      "errors": 0,
+      "rows_out": 12,
+      "warnings": 3,
+      "agreement": {
+        "ops": 2,
+        "agree": 2,
+        "record": 2,
+        "dropped": 0,
+        "disagree": 0,
+        "model_only": 1
+      },
+      "llm_fallback": false,
+      "reused_approved": false,
+      "full_verification": false,
+      "mapping_confidence": 0.55,
+      "data_checks_trusted": false,
+      "low_confidence_high": [
+        "/qty (0.40)"
+      ],
+      "unresolved_questions": 1,
+      "plausibility_warnings": 1,
+      "source_review_required": true,
+      "low_confidence_critical": [],
+      "verification": {
+        "scope": "Execution and contract checks; business ambiguities require operator answers",
+        "passed": false,
+        "version": 1,
+        "complete": true,
+        "coverage": {
+          "fields": {
+            "/qty": {
+              "risk": "high",
+              "records": 12,
+              "records_filled": 0
+            },
+            "/sku": {
+              "risk": "medium",
+              "records": 12,
+              "records_filled": 12
+            },
+            "/product_name": {
+              "risk": "medium",
+              "records": 12,
+              "records_filled": 12
+            }
+          },
+          "sources": {
+            "products_0": 12,
+            "products_1": 12,
+            "pack_factors_2": 12
+          },
+          "collections": {},
+          "invalid_records": 0
+        },
+        "problems": [
+          "/qty: empty in 12 of 12 records"
+        ],
+        "rows_out": 12,
+        "warnings": [
+          "/qty: empty in 12 of 12 records"
+        ],
+        "rows_checked": 12,
+        "semantic_checks": {
+          "limitation": "Passing these checks does not prove column meaning. Missing business intent still requires an operator decision.",
+          "contract_rules": [],
+          "source_identity_warnings": []
+        }
+      }
+    },
+    "impact": {},
+    "fields": [
+      {
+        "pointer": "/qty",
+        "name": "qty",
+        "json_type": [
+          "number",
+          "null"
+        ],
+        "semantic": "stock.qty",
+        "risk": "high",
+        "required": true,
+        "nullable": true,
+        "enum": null,
+        "format": null,
+        "synonyms_en": [],
+        "synonyms_th": [],
+        "description": "Stock in individual pieces. Missing evidence is null, never zero.",
+        "description_th": null,
+        "in_collection": null,
+        "is_collection": false,
+        "system": false,
+        "default": null,
+        "examples": []
+      },
+      {
+        "pointer": "/sku",
+        "name": "sku",
+        "json_type": [
+          "string"
+        ],
+        "semantic": "identity.sku",
+        "risk": "medium",
+        "required": true,
+        "nullable": false,
+        "enum": null,
+        "format": null,
+        "synonyms_en": [],
+        "synonyms_th": [],
+        "description": "Unique SKU identifier; preserve leading zeros.",
+        "description_th": null,
+        "in_collection": null,
+        "is_collection": false,
+        "system": false,
+        "default": null,
+        "examples": []
+      },
+      {
+        "pointer": "/product_name",
+        "name": "product_name",
+        "json_type": [
+          "string"
+        ],
+        "semantic": "product.name",
+        "risk": "medium",
+        "required": true,
+        "nullable": false,
+        "enum": null,
+        "format": null,
+        "synonyms_en": [],
+        "synonyms_th": [],
+        "description": "Product name from the master list.",
+        "description_th": null,
+        "in_collection": null,
+        "is_collection": false,
+        "system": false,
+        "default": null,
+        "examples": []
+      }
+    ]
+  },
+  "preview": {
+    "ok": true,
+    "validation": {
+      "ok": true,
+      "issues": []
+    },
+    "records": [
+      {
+        "sku": "000001",
+        "product_name": "Coffee variant 01",
+        "qty": null,
+        "source_meta": {
+          "file": "delivery.xlsx",
+          "lineage": {
+            "root_row": 0,
+            "source": "products_0",
+            "joined": {
+              "products_1": 0,
+              "pack_factors_2": 0
+            }
+          }
+        }
+      },
+      {
+        "sku": "000002",
+        "product_name": "Shampoo variant 02",
+        "qty": null,
+        "source_meta": {
+          "file": "delivery.xlsx",
+          "lineage": {
+            "root_row": 1,
+            "source": "products_0",
+            "joined": {
+              "products_1": 1,
+              "pack_factors_2": 1
+            }
+          }
+        }
+      },
+      {
+        "sku": "000003",
+        "product_name": "Soap variant 03",
+        "qty": null,
+        "source_meta": {
+          "file": "delivery.xlsx",
+          "lineage": {
+            "root_row": 2,
+            "source": "products_0",
+            "joined": {
+              "products_1": 2,
+              "pack_factors_2": 2
+            }
+          }
+        }
+      },
+      {
+        "sku": "000004",
+        "product_name": "Tea variant 04",
+        "qty": null,
+        "source_meta": {
+          "file": "delivery.xlsx",
+          "lineage": {
+            "root_row": 3,
+            "source": "products_0",
+            "joined": {
+              "products_1": 3,
+              "pack_factors_2": 3
+            }
+          }
+        }
+      },
+      {
+        "sku": "000005",
+        "product_name": "Coffee variant 05",
+        "qty": null,
+        "source_meta": {
+          "file": "delivery.xlsx",
+          "lineage": {
+            "root_row": 4,
+            "source": "products_0",
+            "joined": {
+              "products_1": 4,
+              "pack_factors_2": 4
+            }
+          }
+        }
+      },
+      {
+        "sku": "000006",
+        "product_name": "Shampoo variant 06",
+        "qty": null,
+        "source_meta": {
+          "file": "delivery.xlsx",
+          "lineage": {
+            "root_row": 5,
+            "source": "products_0",
+            "joined": {
+              "products_1": 5,
+              "pack_factors_2": 5
+            }
+          }
+        }
+      },
+      {
+        "sku": "000007",
+        "product_name": "Soap variant 07",
+        "qty": null,
+        "source_meta": {
+          "file": "delivery.xlsx",
+          "lineage": {
+            "root_row": 6,
+            "source": "products_0",
+            "joined": {
+              "products_1": 6,
+              "pack_factors_2": 6
+            }
+          }
+        }
+      },
+      {
+        "sku": "000008",
+        "product_name": "Tea variant 08",
+        "qty": null,
+        "source_meta": {
+          "file": "delivery.xlsx",
+          "lineage": {
+            "root_row": 7,
+            "source": "products_0",
+            "joined": {
+              "products_1": 7,
+              "pack_factors_2": 7
+            }
+          }
+        }
+      },
+      {
+        "sku": "000009",
+        "product_name": "Coffee variant 09",
+        "qty": null,
+        "source_meta": {
+          "file": "delivery.xlsx",
+          "lineage": {
+            "root_row": 8,
+            "source": "products_0",
+            "joined": {
+              "products_1": 8,
+              "pack_factors_2": 8
+            }
+          }
+        }
+      },
+      {
+        "sku": "000010",
+        "product_name": "Shampoo variant 10",
+        "qty": null,
+        "source_meta": {
+          "file": "delivery.xlsx",
+          "lineage": {
+            "root_row": 9,
+            "source": "products_0",
+            "joined": {
+              "products_1": 9,
+              "pack_factors_2": 9
+            }
+          }
+        }
+      },
+      {
+        "sku": "000011",
+        "product_name": "Soap variant 11",
+        "qty": null,
+        "source_meta": {
+          "file": "delivery.xlsx",
+          "lineage": {
+            "root_row": 10,
+            "source": "products_0",
+            "joined": {
+              "products_1": 10,
+              "pack_factors_2": 10
+            }
+          }
+        }
+      },
+      {
+        "sku": "000012",
+        "product_name": "Tea variant 12",
+        "qty": null,
+        "source_meta": {
+          "file": "delivery.xlsx",
+          "lineage": {
+            "root_row": 11,
+            "source": "products_0",
+            "joined": {
+              "products_1": 11,
+              "pack_factors_2": 11
+            }
+          }
+        }
+      }
+    ],
+    "findings": [
+      {
+        "kind": "source_review",
+        "severity": "warning",
+        "message": "products_0: formula values are saved Excel caches; FORMA does not recalculate or verify cache freshness",
+        "target": null,
+        "row": null,
+        "identity": null,
+        "details": {}
+      },
+      {
+        "kind": "quality",
+        "severity": "warning",
+        "message": "qty depends on 'Prefixes per carton' from the missing '[missing-pack.xlsx]' / blank 'Pack factors'!B2:B13",
+        "target": "/qty",
+        "row": null,
+        "identity": null,
+        "details": {
+          "count": 12,
+          "rule": "not_null",
+          "sample": [
+            {
+              "row": 0,
+              "identity": "000001",
+              "value": null
+            },
+            {
+              "row": 1,
+              "identity": "000002",
+              "value": null
+            },
+            {
+              "row": 2,
+              "identity": "000003",
+              "value": null
+            },
+            {
+              "row": 3,
+              "identity": "000004",
+              "value": null
+            },
+            {
+              "row": 4,
+              "identity": "000005",
+              "value": null
+            },
+            {
+              "row": 5,
+              "identity": "000006",
+              "value": null
+            },
+            {
+              "row": 6,
+              "identity": "000007",
+              "value": null
+            },
+            {
+              "row": 7,
+              "identity": "000008",
+              "value": null
+            },
+            {
+              "row": 8,
+              "identity": "000009",
+              "value": null
+            },
+            {
+              "row": 9,
+              "identity": "000010",
+              "value": null
+            }
+          ]
+        }
+      }
+    ],
+    "stats": {
+      "rows_in": 12,
+      "rows_out": 12,
+      "sources": {
+        "products_0": 12,
+        "products_1": 12,
+        "pack_factors_2": 12
+      },
+      "collections": {},
+      "duration_ms": 9752.0,
+      "identity_keys": [
+        "/sku"
+      ],
+      "invalid_records": 0
+    }
+  }
+}

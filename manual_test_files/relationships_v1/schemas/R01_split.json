@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "title": "Three files, shuffled joins",
+  "required": [
+    "sku",
+    "product_name",
+    "price",
+    "currency",
+    "inventory"
+  ],
+  "properties": {
+    "sku": {
+      "type": "string",
+      "description": "Unique SKU identifier; preserve leading zeros.",
+      "x-forma": {
+        "semantic": "identity.sku"
+      }
+    },
+    "product_name": {
+      "type": "string",
+      "description": "Product name from the master list.",
+      "x-forma": {
+        "semantic": "product.name"
+      }
+    },
+    "price": {
+      "type": "number",
+      "description": "Requested selling price, not cost.",
+      "x-forma": {
+        "semantic": "price.amount"
+      }
+    },
+    "currency": {
+      "type": "string",
+      "description": "ISO 4217 code supported by the source.",
+      "x-forma": {
+        "semantic": "currency"
+      }
+    },
+    "inventory": {
+      "type": "array",
+      "description": "One entry per warehouse. Aggregate lots within each warehouse; never sum warehouses together.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "warehouse_code",
+          "qty"
+        ],
+        "properties": {
+          "warehouse_code": {
+            "type": "string",
+            "description": "Warehouse identifier.",
+            "x-forma": {
+              "semantic": "stock.warehouse"
+            }
+          },
+          "qty": {
+            "type": "number",
+            "description": "Stock in individual pieces, summed across lots in this warehouse.",
+            "x-forma": {
+              "semantic": "stock.qty"
+            }
+          }
+        }
+      }
+    }
+  },
+  "x-forma": {
+    "identity_keys": [
+      "/sku"
+    ],
+    "collections": {
+      "/inventory": {
+        "key_fields": [
+          "/warehouse_code"
+        ]
+      }
+    }
+  }
+}
