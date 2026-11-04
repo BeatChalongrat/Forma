@@ -3,12 +3,37 @@ from __future__ import annotations
 from collections.abc import Iterator
 from contextlib import contextmanager
 from functools import lru_cache
+from typing import Any
 
 from fastapi import Request
 from sqlalchemy import Engine, create_engine, event
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.orm import ORMExecuteState, Session, SessionTransaction, sessionmaker
 
 from forma.core.settings import get_settings
+
+
+@event.listens_for(Session, "before_flush")
+def _remember_job_writes(session: Session, flush_context: Any, instances: Any) -> None:
+    session.info["job_writes"] = True
+
+
+@event.listens_for(Session, "do_orm_execute")
+def _remember_job_dml(state: ORMExecuteState) -> None:
+    if state.is_insert or state.is_update or state.is_delete:
+        state.session.info["job_writes"] = True
+
+
+@event.listens_for(Session, "after_transaction_end")
+def _clear_job_writes(session: Session, transaction: SessionTransaction) -> None:
+    if transaction.parent is None:
+        session.info.pop("job_writes", None)
+
+
+@event.listens_for(Session, "before_commit")
+def _fence_job_commit(session: Session) -> None:
+    from forma.jobs.execution import guard_commit
+
+    guard_commit(session)
 
 
 @lru_cache
@@ -54,7 +79,7 @@ def session_scope() -> Iterator[Session]:
     try:
         yield s
         s.commit()
-    except Exception:
+    except BaseException:
         s.rollback()
         raise
     finally:

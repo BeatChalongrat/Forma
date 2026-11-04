@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from forma.mapping_dsl.models import MappingDocument
+from forma.mapping_dsl.models import CallExpr, Expr, MappingDocument
 from forma.schema_registry import TargetSchema
 
 QUESTION_SCHEMA = {
@@ -18,7 +18,10 @@ QUESTION_SCHEMA = {
             "question": {"type": "string", "maxLength": 500},
             "why": {"type": "string", "maxLength": 1000},
             "kind": {"type": "string", "enum": ["boolean", "number", "text", "enum", "confirm"]},
-            "action": {"type": "string", "enum": ["constant", "date_format", "value_map", "confirm"]},
+            "action": {
+                "type": "string",
+                "enum": ["constant", "date_format", "value_map", "confirm", "request_source"],
+            },
             "source_value": {"type": "string", "maxLength": 500},
             "options": {"type": "array", "items": {"type": "string"}, "maxItems": 12},
         },
@@ -59,4 +62,24 @@ def validate(questions: Any, doc: MappingDocument, schema: TargetSchema) -> list
             errors.append(f"Clarification {target} is not a date field")
         if q.get("action") == "value_map" and not q.get("source_value"):
             errors.append(f"Clarification {target} needs the ambiguous source value")
+        if q.get("action", "constant") == "constant":
+            fm = next(
+                f
+                for f in [*doc.fields, *(f for c in doc.collections for f in c.fields)]
+                if f.target == target
+            )
+            if derived_value(fm.expr):
+                errors.append(
+                    f"Clarification {target}: a constant would replace the entire calculation, "
+                    "not its missing operand. Use action=request_source and kind=confirm to request "
+                    "source repair, or model an explicit scoped decision."
+                )
     return errors
+
+
+def derived_value(expr: Expr) -> bool:
+    """A generic constant answer cannot safely stand for an operand of a calculated field."""
+    return isinstance(expr, CallExpr) and (
+        expr.op in {"add", "subtract", "multiply", "divide", "vat_adjust"}
+        or any(derived_value(arg) for arg in expr.args)
+    )

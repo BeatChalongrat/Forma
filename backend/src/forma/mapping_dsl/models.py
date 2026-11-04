@@ -354,6 +354,17 @@ class FieldMapping(Strict):
     note: str | None = None
 
 
+class CollectionAggregate(Strict):
+    """Sum additive rows after field expressions and unit conversion, never before."""
+
+    group_by: list[str] = Field(
+        default_factory=list, description="Relative item pointers to retain, e.g. /warehouse_code"
+    )
+    sum: list[str] = Field(
+        min_length=1, description="Relative numeric item pointers to sum; null inputs remain null"
+    )
+
+
 class CollectionMapping(Strict):
     """Builds a nested array (``/prices``, ``/promotions``, ``/inventory``) from a source frame."""
 
@@ -369,6 +380,13 @@ class CollectionMapping(Strict):
         default_factory=list, description="Target item pointers (relative, e.g. /price_list)"
     )
     normalize_keys: list[NormalizeKeyOp] = Field(default_factory=_default_normalize_keys)
+    aggregate: CollectionAggregate | None = Field(
+        default=None,
+        description=(
+            "Explicit aggregation of additive rows per parent plus group_by. "
+            "Every mapped field must be grouped or summed. Never use for competing prices."
+        ),
+    )
 
 
 class DedupeSpec(Strict):

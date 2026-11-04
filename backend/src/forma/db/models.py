@@ -315,6 +315,10 @@ class Job(Base):
     created_at: Mapped[dt.datetime] = mapped_column(UTCDateTime, default=utcnow)
     started_at: Mapped[dt.datetime | None] = mapped_column(UTCDateTime)
     finished_at: Mapped[dt.datetime | None] = mapped_column(UTCDateTime)
+    lease_token: Mapped[str | None] = mapped_column(String(40))
+    heartbeat_at: Mapped[dt.datetime | None] = mapped_column(UTCDateTime)
+    lease_expires_at: Mapped[dt.datetime | None] = mapped_column(UTCDateTime)
+    dispatched_at: Mapped[dt.datetime | None] = mapped_column(UTCDateTime)
 
 
 Index("ix_jobs_status_created", Job.status, Job.created_at)

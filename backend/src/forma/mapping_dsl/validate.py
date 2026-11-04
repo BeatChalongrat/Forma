@@ -209,3 +209,18 @@ def _check_collection(
     for ptr in item_required:
         if ptr not in seen:
             rep.error("missing_required", f"required collection field {ptr} is not mapped", path)
+    if c.aggregate:
+        groups, sums = c.aggregate.group_by, c.aggregate.sum
+        mapped = {f.target[len(c.target) + 2 :] for f in c.fields}
+        if set(groups) & set(sums) or len(set(groups + sums)) != len(groups + sums):
+            rep.error("aggregate_overlap", "Each aggregation field must occur exactly once", path)
+        if set(groups + sums) != mapped:
+            rep.error("aggregate_fields", "Every mapped item field must be grouped or summed", path)
+        if not set(schema.collection_identity_keys(c.target)) <= set(groups):
+            rep.error("aggregate_identity", "Collection identity fields must be in group_by", path)
+        for pointer in sums:
+            full = c.target + "/*" + pointer
+            if full in schema_pointers and not {"integer", "number"} & set(schema.field(full).json_type):
+                rep.error("aggregate_type", f"Cannot sum non-numeric field {pointer}", path)
+    if c.filter is not None:
+        _check_expr(c.filter, path + "/filter", rep, source_ids)

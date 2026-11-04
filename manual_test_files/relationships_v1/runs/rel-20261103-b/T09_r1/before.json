@@ -1,0 +1,2452 @@
+{
+  "round": {
+    "id": "rnd_01M6G9ZR8YQ647S6515DBZ75JW",
+    "customer_id": "cus_01M6G9ZQQZA3Z6Z6YQ7J3Q9YQ3",
+    "label": "EVAL rel-20261103-b T09_r1",
+    "status": "review",
+    "target_schema": "eval_rel-20261103-b_t09@1",
+    "notes": "Map the supplied ERP export(s) to the supplied JSON Schema. Preserve the master product population and identities. Do not invent business facts. Ask a specific question if required facts cannot be established.\nReturn full selling-unit names, not unexplained abbreviations. The meaning of BT has not been specified.",
+    "summary": {
+      "drift": null,
+      "profile": [
+        {
+          "name": "delivery.xlsx",
+          "drift": null,
+          "tables": 2,
+          "file_id": "fil_01M6G9ZRB90MG1P3KX9G6ZMQNX",
+          "fingerprint": "b2d76da4b3273cec"
+        }
+      ],
+      "verdict": {
+        "word": "likely",
+        "stage": "mapping",
+        "digest": "49385a56d341dc46483da154b2811646",
+        "outcome": "answer",
+        "subject": {
+          "id": "map_01M6GB2MAHKJQ24BRRDXS2639X",
+          "kind": "mapping",
+          "round_id": "rnd_01M6G9ZR8YQ647S6515DBZ75JW"
+        },
+        "evidence": [
+          {
+            "id": 1,
+            "kind": "rows",
+            "link": "/rounds/rnd_01M6G9ZR8YQ647S6515DBZ75JW",
+            "text": {
+              "en": "12 records produced",
+              "th": "สร้างได้ 12 รายการ"
+            },
+            "numbers": {
+              "rows_out": 12
+            }
+          },
+          {
+            "id": 2,
+            "kind": "self_check",
+            "link": null,
+            "text": {
+              "en": "The AI ran its mapping on the first 12 rows (1 look(s) at the file, 1 fix round(s)): 0 problem(s) left",
+              "th": "AI ลองรัน mapping กับ 12 แถวแรก (ดูไฟล์ 1 ครั้ง แก้ 1 รอบ): เหลือปัญหา 0 ข้อ"
+            },
+            "numbers": {
+              "rows": 12,
+              "fix_rounds": 1,
+              "inspections": 1,
+              "problems_left": 0
+            }
+          },
+          {
+            "id": 3,
+            "kind": "questions",
+            "link": "/review?round=rnd_01M6G9ZR8YQ647S6515DBZ75JW",
+            "text": {
+              "en": "1 fields below the confidence bar",
+              "th": "1 ฟิลด์ยังไม่ถึงเกณฑ์ความมั่นใจ"
+            },
+            "numbers": {
+              "count": 1
+            }
+          }
+        ],
+        "narrative": null,
+        "conclusion": {
+          "en": "First file from EVAL-rel-20261103-b-T09; 1 fields need a confirmation",
+          "th": "ไฟล์แรกของ EVAL-rel-20261103-b-T09 มี 1 ฟิลด์ที่ต้องยืนยัน"
+        },
+        "confidence": 0.8,
+        "suppressed": {
+          "count": 0,
+          "groups": [
+            {
+              "text": {
+                "en": "2 notes from the mapper",
+                "th": "หมายเหตุจากตัวจับคู่ 2 ข้อ"
+              },
+              "reason": "open_questions",
+              "pointers": []
+            }
+          ]
+        },
+        "must_decide": [
+          {
+            "id": "/sell_unit:value:9ed0965ce03b",
+            "why": {
+              "en": "The contract requires a full selling-unit name and states codes need source evidence or human confirmation. The export contains no legend or lookup defining 'BT', and the built-in unit table does not know this code, so any expansion would be invented.",
+              "th": "The contract requires a full selling-unit name and states codes need source evidence or human confirmation. The export contains no legend or lookup defining 'BT', and the built-in unit table does not know this code, so any expansion would be invented."
+            },
+            "kind": "text",
+            "scope": "source_value",
+            "default": null,
+            "options": [
+              "Bottle",
+              "Bag",
+              "Box",
+              "Bottle (BT)",
+              "Carton"
+            ],
+            "question": {
+              "en": "The workbook's unit code is 'BT' for all 12 materials. What full selling-unit name should 'BT' map to in the output?",
+              "th": "The workbook's unit code is 'BT' for all 12 materials. What full selling-unit name should 'BT' map to in the output?"
+            },
+            "semantic": "unit.sell",
+            "allow_custom": true,
+            "evidence_ids": [
+              3
+            ],
+            "option_labels": null
+          }
+        ],
+        "rules_fired": [
+          "first_time"
+        ],
+        "round_status": "review",
+        "rules_version": "2026.10.4",
+        "mapping_status": "proposed",
+        "policy_decision": "review"
+      },
+      "decision": "review",
+      "simulation": {
+        "rows_in": 12,
+        "sources": {
+          "units": 12,
+          "products": 12
+        },
+        "findings": {
+          "info": 0,
+          "error": 0,
+          "warning": 0
+        },
+        "rows_out": 12,
+        "collections": {},
+        "duration_ms": 64.0,
+        "identity_keys": [
+          "/sku"
+        ],
+        "invalid_records": 0
+      },
+      "drift_report": null,
+      "format_memory": {
+        "status": "new",
+        "mapping_id": null,
+        "target_schema": "eval_rel-20261103-b_t09@1",
+        "mapping_version": null
+      },
+      "skipped_files": 0,
+      "profiled_files": 1,
+      "mapping_version_id": "map_01M6GB2MAHKJQ24BRRDXS2639X",
+      "has_previous_approval": false,
+      "matches_other_customer": null
+    },
+    "created_at": "2026-11-03T08:56:34.846969+00:00",
+    "updated_at": "2026-11-03T09:15:37.699958+00:00",
+    "successor_id": null,
+    "predecessor_id": null,
+    "files": [
+      {
+        "id": "fil_01M6G9ZRB90MG1P3KX9G6ZMQNX",
+        "round_id": "rnd_01M6G9ZR8YQ647S6515DBZ75JW",
+        "name": "delivery.xlsx",
+        "size": 4433,
+        "kind": "excel",
+        "status": "profiled",
+        "sha256": "1120a30a06cc9b4118939dee15ce24d99441118270e2573edd426d537b25cfe0",
+        "duplicate_of": null,
+        "error": null,
+        "created_at": "2026-11-03T08:56:34.921642+00:00",
+        "fingerprint": "b2d76da4b3273cec",
+        "drift": null,
+        "tables": 2,
+        "sheets": [
+          "Material",
+          "Sales units"
+        ]
+      }
+    ],
+    "customer": {
+      "id": "cus_01M6G9ZQQZA3Z6Z6YQ7J3Q9YQ3",
+      "code": "EVAL-rel-20261103-b-T09",
+      "name": "EVAL-rel-20261103-b-T09"
+    },
+    "successor": null,
+    "predecessor": null,
+    "mappings": [
+      {
+        "id": "map_01M6GB2MAHKJQ24BRRDXS2639X",
+        "customer_id": "cus_01M6G9ZQQZA3Z6Z6YQ7J3Q9YQ3",
+        "round_id": "rnd_01M6G9ZR8YQ647S6515DBZ75JW",
+        "version": 1,
+        "status": "proposed",
+        "target_schema": "eval_rel-20261103-b_t09@1",
+        "confidence": 0.72,
+        "created_by": "ai",
+        "model": "deepseek-flash",
+        "policy": {
+          "checks": {
+            "drift": null,
+            "errors": 0,
+            "rows_out": 12,
+            "warnings": 0,
+            "agreement": {
+              "ops": 1,
+              "agree": 1,
+              "record": 2,
+              "dropped": 0,
+              "disagree": 0,
+              "model_only": 2
+            },
+            "llm_fallback": false,
+            "reused_approved": false,
+            "full_verification": true,
+            "mapping_confidence": 0.72,
+            "data_checks_trusted": false,
+            "low_confidence_high": [
+              "/sell_unit (0.45)"
+            ],
+            "unresolved_questions": 2,
+            "plausibility_warnings": 0,
+            "low_confidence_critical": []
+          },
+          "impact": {},
+          "source": "ai",
+          "reasons": [
+            "low confidence on high-risk fields: /sell_unit (0.45)",
+            "mapping confidence 0.72 < 0.95",
+            "first time this customer/format is seen",
+            "2 questions still need operator confirmation",
+            "the model selects rows differently from FORMA's matcher (records: dedupe; records: joins)"
+          ],
+          "sandbox": null,
+          "verdict": {
+            "word": "likely",
+            "stage": "mapping",
+            "digest": "49385a56d341dc46483da154b2811646",
+            "outcome": "answer",
+            "subject": {
+              "id": "map_01M6GB2MAHKJQ24BRRDXS2639X",
+              "kind": "mapping",
+              "round_id": "rnd_01M6G9ZR8YQ647S6515DBZ75JW"
+            },
+            "evidence": [
+              {
+                "id": 1,
+                "kind": "rows",
+                "link": "/rounds/rnd_01M6G9ZR8YQ647S6515DBZ75JW",
+                "text": {
+                  "en": "12 records produced",
+                  "th": "สร้างได้ 12 รายการ"
+                },
+                "numbers": {
+                  "rows_out": 12
+                }
+              },
+              {
+                "id": 2,
+                "kind": "self_check",
+                "link": null,
+                "text": {
+                  "en": "The AI ran its mapping on the first 12 rows (1 look(s) at the file, 1 fix round(s)): 0 problem(s) left",
+                  "th": "AI ลองรัน mapping กับ 12 แถวแรก (ดูไฟล์ 1 ครั้ง แก้ 1 รอบ): เหลือปัญหา 0 ข้อ"
+                },
+                "numbers": {
+                  "rows": 12,
+                  "fix_rounds": 1,
+                  "inspections": 1,
+                  "problems_left": 0
+                }
+              },
+              {
+                "id": 3,
+                "kind": "questions",
+                "link": "/review?round=rnd_01M6G9ZR8YQ647S6515DBZ75JW",
+                "text": {
+                  "en": "1 fields below the confidence bar",
+                  "th": "1 ฟิลด์ยังไม่ถึงเกณฑ์ความมั่นใจ"
+                },
+                "numbers": {
+                  "count": 1
+                }
+              }
+            ],
+            "narrative": null,
+            "conclusion": {
+              "en": "First file from EVAL-rel-20261103-b-T09; 1 fields need a confirmation",
+              "th": "ไฟล์แรกของ EVAL-rel-20261103-b-T09 มี 1 ฟิลด์ที่ต้องยืนยัน"
+            },
+            "confidence": 0.8,
+            "suppressed": {
+              "count": 0,
+              "groups": [
+                {
+                  "text": {
+                    "en": "2 notes from the mapper",
+                    "th": "หมายเหตุจากตัวจับคู่ 2 ข้อ"
+                  },
+                  "reason": "open_questions",
+                  "pointers": []
+                }
+              ]
+            },
+            "must_decide": [
+              {
+                "id": "/sell_unit:value:9ed0965ce03b",
+                "why": {
+                  "en": "The contract requires a full selling-unit name and states codes need source evidence or human confirmation. The export contains no legend or lookup defining 'BT', and the built-in unit table does not know this code, so any expansion would be invented.",
+                  "th": "The contract requires a full selling-unit name and states codes need source evidence or human confirmation. The export contains no legend or lookup defining 'BT', and the built-in unit table does not know this code, so any expansion would be invented."
+                },
+                "kind": "text",
+                "scope": "source_value",
+                "default": null,
+                "options": [
+                  "Bottle",
+                  "Bag",
+                  "Box",
+                  "Bottle (BT)",
+                  "Carton"
+                ],
+                "question": {
+                  "en": "The workbook's unit code is 'BT' for all 12 materials. What full selling-unit name should 'BT' map to in the output?",
+                  "th": "The workbook's unit code is 'BT' for all 12 materials. What full selling-unit name should 'BT' map to in the output?"
+                },
+                "semantic": "unit.sell",
+                "allow_custom": true,
+                "evidence_ids": [
+                  3
+                ],
+                "option_labels": null
+              }
+            ],
+            "rules_fired": [
+              "first_time"
+            ],
+            "round_status": "review",
+            "rules_version": "2026.10.4",
+            "mapping_status": "proposed",
+            "policy_decision": "review"
+          },
+          "decision": "review",
+          "learning": null,
+          "priority": 50,
+          "agreement": {
+            "ops": [
+              "/sku"
+            ],
+            "agree": [
+              "/sku"
+            ],
+            "record": {
+              "joins": {
+                "model": [
+                  {
+                    "on": [
+                      {
+                        "left": "Material code",
+                        "right": "Material code"
+                      }
+                    ],
+                    "how": "left",
+                    "left": {
+                      "file": "fil_01M6G9ZRB90MG1P3KX9G6ZMQNX",
+                      "sheet": "material",
+                      "filter": null,
+                      "rename": {},
+                      "unpivot": null,
+                      "data_end": null,
+                      "fill_down": [],
+                      "data_start": null
+                    },
+                    "right": {
+                      "file": "fil_01M6G9ZRB90MG1P3KX9G6ZMQNX",
+                      "sheet": "sales units",
+                      "filter": null,
+                      "rename": {},
+                      "unpivot": null,
+                      "data_end": null,
+                      "fill_down": [],
+                      "data_start": null
+                    },
+                    "cardinality": "1:1",
+                    "on_unmatched": "keep",
+                    "normalize_keys": [
+                      "trim",
+                      "upper",
+                      "strip_leading_zeros"
+                    ]
+                  }
+                ],
+                "matcher": []
+              },
+              "dedupe": {
+                "model": {
+                  "keep": "first",
+                  "keys": [
+                    "/sku"
+                  ]
+                },
+                "matcher": {
+                  "keep": "first",
+                  "keys": []
+                }
+              }
+            },
+            "dropped": [],
+            "disagree": {},
+            "model_only": [
+              "/product_name",
+              "/sell_unit"
+            ]
+          },
+          "risk_level": "medium",
+          "risk_score": 0.473,
+          "self_check": {
+            "errors": 0,
+            "history": [
+              {
+                "turn": "ground",
+                "columns": 2
+              },
+              {
+                "turn": "inspect",
+                "requests": 2
+              },
+              {
+                "turn": "mapping",
+                "complete": true,
+                "coverage": {
+                  "fields": {
+                    "/sku": {
+                      "risk": "medium",
+                      "records": 12,
+                      "records_filled": 12
+                    },
+                    "/sell_unit": {
+                      "risk": "high",
+                      "records": 12,
+                      "records_filled": 0
+                    },
+                    "/product_name": {
+                      "risk": "medium",
+                      "records": 12,
+                      "records_filled": 12
+                    }
+                  },
+                  "sources": {
+                    "units": 12,
+                    "products": 12
+                  },
+                  "collections": {},
+                  "invalid_records": 12
+                },
+                "problems": [
+                  "compile: source column 'products.Unit code' not found; values will be null",
+                  "validation: data.sell_unit must be string",
+                  "/sell_unit: empty in 12 of 12 records"
+                ],
+                "rows_out": 12
+              },
+              {
+                "turn": "mapping",
+                "complete": true,
+                "coverage": {
+                  "fields": {
+                    "/sku": {
+                      "risk": "medium",
+                      "records": 12,
+                      "records_filled": 12
+                    },
+                    "/sell_unit": {
+                      "risk": "high",
+                      "records": 12,
+                      "records_filled": 12
+                    },
+                    "/product_name": {
+                      "risk": "medium",
+                      "records": 12,
+                      "records_filled": 12
+                    }
+                  },
+                  "sources": {
+                    "units": 12,
+                    "products": 12
+                  },
+                  "collections": {},
+                  "invalid_records": 0
+                },
+                "problems": [],
+                "rows_out": 12
+              }
+            ],
+            "complete": true,
+            "coverage": {
+              "fields": {
+                "/sku": {
+                  "risk": "medium",
+                  "records": 12,
+                  "records_filled": 12
+                },
+                "/sell_unit": {
+                  "risk": "high",
+                  "records": 12,
+                  "records_filled": 12
+                },
+                "/product_name": {
+                  "risk": "medium",
+                  "records": 12,
+                  "records_filled": 12
+                }
+              },
+              "sources": {
+                "units": 12,
+                "products": 12
+              },
+              "collections": {},
+              "invalid_records": 0
+            },
+            "grounded": 2,
+            "rows_out": 12,
+            "fix_rounds": 1,
+            "inspections": 1,
+            "python_turns": 0,
+            "rows_checked": 12,
+            "problems_left": []
+          },
+          "simulation": {
+            "fill": {
+              "/sku": 1.0,
+              "/sell_unit": 1.0,
+              "/product_name": 1.0
+            },
+            "rows_in": 12,
+            "sources": {
+              "units": 12,
+              "products": 12
+            },
+            "complete": true,
+            "findings": {
+              "info": 0,
+              "error": 0,
+              "warning": 0
+            },
+            "rows_out": 12,
+            "collections": {},
+            "duration_ms": 64.0,
+            "identity_keys": [
+              "/sku"
+            ],
+            "invalid_records": 0
+          },
+          "reused_from": null,
+          "field_review": null,
+          "risk_factors": [],
+          "verification": {
+            "scope": "Execution and contract checks; business ambiguities require operator answers",
+            "passed": true,
+            "version": 1,
+            "complete": true,
+            "coverage": {
+              "fields": {
+                "/sku": {
+                  "risk": "medium",
+                  "records": 12,
+                  "records_filled": 12
+                },
+                "/sell_unit": {
+                  "risk": "high",
+                  "records": 12,
+                  "records_filled": 12
+                },
+                "/product_name": {
+                  "risk": "medium",
+                  "records": 12,
+                  "records_filled": 12
+                }
+              },
+              "sources": {
+                "units": 12,
+                "products": 12
+              },
+              "collections": {},
+              "invalid_records": 0
+            },
+            "problems": [],
+            "rows_out": 12,
+            "warnings": [],
+            "rows_checked": 12
+          },
+          "clarifications": [
+            {
+              "why": "The contract requires a full selling-unit name and states codes need source evidence or human confirmation. The export contains no legend or lookup defining 'BT', and the built-in unit table does not know this code, so any expansion would be invented.",
+              "kind": "text",
+              "action": "value_map",
+              "target": "/sell_unit",
+              "options": [
+                "Bottle",
+                "Bag",
+                "Box",
+                "Bottle (BT)",
+                "Carton"
+              ],
+              "question": "The workbook's unit code is 'BT' for all 12 materials. What full selling-unit name should 'BT' map to in the output?",
+              "source_value": "BT"
+            }
+          ],
+          "confidence_basis": {
+            "capped": [],
+            "raised": [],
+            "mapping_capped": false
+          },
+          "review_decisions": [],
+          "target_schema_hash": "1a99bd3e7d310172",
+          "confirmed_decisions": []
+        },
+        "open_questions": [
+          "No SKU-like header found in root table; using 'Material code' as identity — confirm",
+          "The workbook's unit code is 'BT' for all 12 materials. What full selling-unit name should 'BT' map to in the output?"
+        ],
+        "validation": {
+          "ok": true,
+          "issues": []
+        },
+        "parent_id": null,
+        "approved_by": null,
+        "approved_at": null,
+        "comment": null,
+        "created_at": "2026-11-03T09:15:37.687436+00:00",
+        "agent_log": [
+          {
+            "agent": "operator_requirements",
+            "sha256": "29cf9fbac47c8f73ccfe026fc521e30e44b98b719ef9576bbd9b27e78f6f23fc",
+            "characters": 314,
+            "changed_since_approved": false
+          },
+          {
+            "agent": "heuristic",
+            "unmatched": {
+              "products": [
+                "Description"
+              ]
+            },
+            "confidence": 0.35000000000000003,
+            "table_roles": {
+              "0": "products",
+              "1": "other"
+            }
+          },
+          {
+            "data": {
+              "notes": [
+                "The two sheets are complementary: Material supplies /sku and /product_name, while Sales units supplies /sell_unit keyed by Material code.",
+                "Unit code is uniformly 'BT' across all 12 materials. The source contains no definition of BT, so the required full selling-unit name must be confirmed by the operator rather than inferred.",
+                "Material codes are identifiers and their leading zeros should be preserved as text."
+              ],
+              "tables": [
+                {
+                  "role": "products",
+                  "reason": "Material master table listing one unique material code per row with a descriptive product name; directly supplies the product identity and name fields.",
+                  "columns": [
+                    {
+                      "name": "Material code",
+                      "reason": "Unique material identifier, 12 distinct values for 12 rows; SKU-like code that must preserve leading zeros.",
+                      "semantic": "identity.sku",
+                      "confidence": 0.97,
+                      "target_pointer": "/sku"
+                    },
+                    {
+                      "name": "Description",
+                      "reason": "Human-readable product descriptions such as Coffee variant 01 and Soap variant 11; product-name source.",
+                      "semantic": "product.name",
+                      "confidence": 0.95,
+                      "target_pointer": "/product_name"
+                    }
+                  ],
+                  "confidence": 0.97,
+                  "key_column": "Material code",
+                  "table_index": 0
+                },
+                {
+                  "role": "other",
+                  "reason": "Supplemental sales-unit assignment table keyed by material code; it is not a standalone product catalogue, pricing, inventory, promotion or category table.",
+                  "columns": [
+                    {
+                      "name": "Material code",
+                      "reason": "Material identifier matching the product master key; used to join the selling unit to each product.",
+                      "semantic": "identity.sku",
+                      "confidence": 0.95,
+                      "target_pointer": "/sku"
+                    },
+                    {
+                      "name": "Unit code",
+                      "reason": "Column explicitly holds a sales unit code, but the only value is the abbreviation BT and the workbook does not define its full selling-unit name.",
+                      "semantic": "unit.sell",
+                      "confidence": 0.7,
+                      "target_pointer": "/sell_unit"
+                    }
+                  ],
+                  "confidence": 0.8,
+                  "key_column": "Material code",
+                  "table_index": 1
+                }
+              ]
+            },
+            "agent": "schema",
+            "notes": [],
+            "usage": {
+              "calls": 1,
+              "model": "deepseek-flash",
+              "cost_usd": 0.010254,
+              "latency_ms": 35348.4,
+              "input_tokens": 3874,
+              "output_tokens": 1595
+            },
+            "attempts": 1
+          },
+          {
+            "data": {
+              "confidence": 0.72,
+              "self_check": {
+                "errors": 0,
+                "history": [
+                  {
+                    "turn": "ground",
+                    "columns": 2
+                  },
+                  {
+                    "turn": "inspect",
+                    "requests": 2
+                  },
+                  {
+                    "turn": "mapping",
+                    "complete": true,
+                    "coverage": {
+                      "fields": {
+                        "/sku": {
+                          "risk": "medium",
+                          "records": 12,
+                          "records_filled": 12
+                        },
+                        "/sell_unit": {
+                          "risk": "high",
+                          "records": 12,
+                          "records_filled": 0
+                        },
+                        "/product_name": {
+                          "risk": "medium",
+                          "records": 12,
+                          "records_filled": 12
+                        }
+                      },
+                      "sources": {
+                        "units": 12,
+                        "products": 12
+                      },
+                      "collections": {},
+                      "invalid_records": 12
+                    },
+                    "problems": [
+                      "compile: source column 'products.Unit code' not found; values will be null",
+                      "validation: data.sell_unit must be string",
+                      "/sell_unit: empty in 12 of 12 records"
+                    ],
+                    "rows_out": 12
+                  },
+                  {
+                    "turn": "mapping",
+                    "complete": true,
+                    "coverage": {
+                      "fields": {
+                        "/sku": {
+                          "risk": "medium",
+                          "records": 12,
+                          "records_filled": 12
+                        },
+                        "/sell_unit": {
+                          "risk": "high",
+                          "records": 12,
+                          "records_filled": 12
+                        },
+                        "/product_name": {
+                          "risk": "medium",
+                          "records": 12,
+                          "records_filled": 12
+                        }
+                      },
+                      "sources": {
+                        "units": 12,
+                        "products": 12
+                      },
+                      "collections": {},
+                      "invalid_records": 0
+                    },
+                    "problems": [],
+                    "rows_out": 12
+                  }
+                ],
+                "complete": true,
+                "coverage": {
+                  "fields": {
+                    "/sku": {
+                      "risk": "medium",
+                      "records": 12,
+                      "records_filled": 12
+                    },
+                    "/sell_unit": {
+                      "risk": "high",
+                      "records": 12,
+                      "records_filled": 12
+                    },
+                    "/product_name": {
+                      "risk": "medium",
+                      "records": 12,
+                      "records_filled": 12
+                    }
+                  },
+                  "sources": {
+                    "units": 12,
+                    "products": 12
+                  },
+                  "collections": {},
+                  "invalid_records": 0
+                },
+                "grounded": 2,
+                "rows_out": 12,
+                "fix_rounds": 1,
+                "inspections": 1,
+                "python_turns": 0,
+                "rows_checked": 12,
+                "problems_left": []
+              },
+              "clarifications": [
+                {
+                  "why": "The contract requires a full selling-unit name and states codes need source evidence or human confirmation. The export contains no legend or lookup defining 'BT', and the built-in unit table does not know this code, so any expansion would be invented.",
+                  "kind": "text",
+                  "action": "value_map",
+                  "target": "/sell_unit",
+                  "options": [
+                    "Bottle",
+                    "Bag",
+                    "Box",
+                    "Bottle (BT)",
+                    "Carton"
+                  ],
+                  "question": "The workbook's unit code is 'BT' for all 12 materials. What full selling-unit name should 'BT' map to in the output?",
+                  "source_value": "BT"
+                }
+              ],
+              "open_questions": [],
+              "changes_from_draft": [
+                "Kept both sources and the 1:1 left join on 'Material code' (both sheets cover the same 12 codes, leading zeros normalised only for the join key).",
+                "Fixed the /sell_unit failure: the column is read with source='units' instead of unqualified (the compiler had resolved it against the root 'products' frame, giving column 'products.Unit code' not found).",
+                "Kept /sku as a string cast of the text codes so '000001' stays '000001' — no padding or rounding introduced.",
+                "Mapped /product_name from 'Description' — 12 distinct names, one per material; the draft had left it unmapped.",
+                "No VAT, price, currency or unit-conversion fields exist in this contract, so none were applied; 'BT' is passed through as evidence rather than guessed.",
+                "Removed the draft open question about the SKU key: the raw cells show A2:A13 are already '000001'-style text codes, so 'Material code' is a confirmed identity source; the only genuinely missing business fact is the meaning of 'BT'."
+              ]
+            },
+            "agent": "mapping",
+            "notes": [],
+            "usage": {
+              "calls": 6,
+              "model": "deepseek-flash",
+              "cost_usd": 0.101831,
+              "latency_ms": 1098920.5,
+              "input_tokens": 60755,
+              "output_tokens": 10269
+            },
+            "attempts": 6
+          },
+          {
+            "ops": 1,
+            "agent": "agreement",
+            "agree": 1,
+            "record": 2,
+            "dropped": 0,
+            "disagree": 0,
+            "model_only": 2
+          }
+        ],
+        "sample": [
+          {
+            "sku": "000001",
+            "sell_unit": "BT",
+            "source_meta": {
+              "file": "delivery.xlsx",
+              "lineage": {
+                "joined": {
+                  "units": 0
+                },
+                "source": "products",
+                "root_row": 0
+              }
+            },
+            "product_name": "Coffee variant 01"
+          },
+          {
+            "sku": "000011",
+            "sell_unit": "BT",
+            "source_meta": {
+              "file": "delivery.xlsx",
+              "lineage": {
+                "joined": {
+                  "units": 6
+                },
+                "source": "products",
+                "root_row": 1
+              }
+            },
+            "product_name": "Soap variant 11"
+          },
+          {
+            "sku": "000002",
+            "sell_unit": "BT",
+            "source_meta": {
+              "file": "delivery.xlsx",
+              "lineage": {
+                "joined": {
+                  "units": 10
+                },
+                "source": "products",
+                "root_row": 2
+              }
+            },
+            "product_name": "Shampoo variant 02"
+          },
+          {
+            "sku": "000012",
+            "sell_unit": "BT",
+            "source_meta": {
+              "file": "delivery.xlsx",
+              "lineage": {
+                "joined": {
+                  "units": 7
+                },
+                "source": "products",
+                "root_row": 3
+              }
+            },
+            "product_name": "Tea variant 12"
+          },
+          {
+            "sku": "000009",
+            "sell_unit": "BT",
+            "source_meta": {
+              "file": "delivery.xlsx",
+              "lineage": {
+                "joined": {
+                  "units": 9
+                },
+                "source": "products",
+                "root_row": 4
+              }
+            },
+            "product_name": "Coffee variant 09"
+          }
+        ]
+      }
+    ],
+    "datasets": [],
+    "review_tasks": [
+      {
+        "id": "rev_01M6GB2MB2HGSNC7AP9E0DY9QV",
+        "round_id": "rnd_01M6G9ZR8YQ647S6515DBZ75JW",
+        "customer_id": "cus_01M6G9ZQQZA3Z6Z6YQ7J3Q9YQ3",
+        "mapping_version_id": "map_01M6GB2MAHKJQ24BRRDXS2639X",
+        "dataset_version_id": null,
+        "kind": "mapping",
+        "priority": 50,
+        "status": "open",
+        "reasons": [
+          "low confidence on high-risk fields: /sell_unit (0.45)",
+          "mapping confidence 0.72 < 0.95",
+          "first time this customer/format is seen",
+          "2 questions still need operator confirmation",
+          "the model selects rows differently from FORMA's matcher (records: dedupe; records: joins)"
+        ],
+        "details": {
+          "impact": {},
+          "verdict": {
+            "word": "likely",
+            "stage": "mapping",
+            "digest": "49385a56d341dc46483da154b2811646",
+            "outcome": "answer",
+            "conclusion": {
+              "en": "First file from EVAL-rel-20261103-b-T09; 1 fields need a confirmation",
+              "th": "ไฟล์แรกของ EVAL-rel-20261103-b-T09 มี 1 ฟิลด์ที่ต้องยืนยัน"
+            },
+            "confidence": 0.8,
+            "rules_fired": [
+              "first_time"
+            ]
+          },
+          "decision": "review",
+          "findings": [],
+          "risk_level": "medium",
+          "risk_factors": [],
+          "open_questions": [
+            "No SKU-like header found in root table; using 'Material code' as identity — confirm",
+            "The workbook's unit code is 'BT' for all 12 materials. What full selling-unit name should 'BT' map to in the output?"
+          ]
+        },
+        "resolver": null,
+        "comment": null,
+        "created_at": "2026-11-03T09:15:37.698382+00:00",
+        "resolved_at": null,
+        "age_days": 0,
+        "waiting_until": null,
+        "waiting_note": null
+      }
+    ],
+    "jobs": [
+      {
+        "id": "job_01M6G9ZVCFXNVTY0HE5WN49530",
+        "kind": "propose_mapping",
+        "status": "done",
+        "progress": 100,
+        "message": null,
+        "error": null
+      },
+      {
+        "id": "job_01M6G9ZRCDR06TJKDZQAK9ZRAJ",
+        "kind": "profile_round",
+        "status": "done",
+        "progress": 100,
+        "message": null,
+        "error": null
+      }
+    ]
+  },
+  "mapping": {
+    "id": "map_01M6GB2MAHKJQ24BRRDXS2639X",
+    "customer_id": "cus_01M6G9ZQQZA3Z6Z6YQ7J3Q9YQ3",
+    "round_id": "rnd_01M6G9ZR8YQ647S6515DBZ75JW",
+    "version": 1,
+    "status": "proposed",
+    "target_schema": "eval_rel-20261103-b_t09@1",
+    "confidence": 0.72,
+    "created_by": "ai",
+    "model": "deepseek-flash",
+    "policy": {
+      "checks": {
+        "drift": null,
+        "errors": 0,
+        "rows_out": 12,
+        "warnings": 0,
+        "agreement": {
+          "ops": 1,
+          "agree": 1,
+          "record": 2,
+          "dropped": 0,
+          "disagree": 0,
+          "model_only": 2
+        },
+        "llm_fallback": false,
+        "reused_approved": false,
+        "full_verification": true,
+        "mapping_confidence": 0.72,
+        "data_checks_trusted": false,
+        "low_confidence_high": [
+          "/sell_unit (0.45)"
+        ],
+        "unresolved_questions": 2,
+        "plausibility_warnings": 0,
+        "low_confidence_critical": []
+      },
+      "impact": {},
+      "source": "ai",
+      "reasons": [
+        "low confidence on high-risk fields: /sell_unit (0.45)",
+        "mapping confidence 0.72 < 0.95",
+        "first time this customer/format is seen",
+        "2 questions still need operator confirmation",
+        "the model selects rows differently from FORMA's matcher (records: dedupe; records: joins)"
+      ],
+      "sandbox": null,
+      "verdict": {
+        "word": "likely",
+        "stage": "mapping",
+        "digest": "49385a56d341dc46483da154b2811646",
+        "outcome": "answer",
+        "subject": {
+          "id": "map_01M6GB2MAHKJQ24BRRDXS2639X",
+          "kind": "mapping",
+          "round_id": "rnd_01M6G9ZR8YQ647S6515DBZ75JW"
+        },
+        "evidence": [
+          {
+            "id": 1,
+            "kind": "rows",
+            "link": "/rounds/rnd_01M6G9ZR8YQ647S6515DBZ75JW",
+            "text": {
+              "en": "12 records produced",
+              "th": "สร้างได้ 12 รายการ"
+            },
+            "numbers": {
+              "rows_out": 12
+            }
+          },
+          {
+            "id": 2,
+            "kind": "self_check",
+            "link": null,
+            "text": {
+              "en": "The AI ran its mapping on the first 12 rows (1 look(s) at the file, 1 fix round(s)): 0 problem(s) left",
+              "th": "AI ลองรัน mapping กับ 12 แถวแรก (ดูไฟล์ 1 ครั้ง แก้ 1 รอบ): เหลือปัญหา 0 ข้อ"
+            },
+            "numbers": {
+              "rows": 12,
+              "fix_rounds": 1,
+              "inspections": 1,
+              "problems_left": 0
+            }
+          },
+          {
+            "id": 3,
+            "kind": "questions",
+            "link": "/review?round=rnd_01M6G9ZR8YQ647S6515DBZ75JW",
+            "text": {
+              "en": "1 fields below the confidence bar",
+              "th": "1 ฟิลด์ยังไม่ถึงเกณฑ์ความมั่นใจ"
+            },
+            "numbers": {
+              "count": 1
+            }
+          }
+        ],
+        "narrative": null,
+        "conclusion": {
+          "en": "First file from EVAL-rel-20261103-b-T09; 1 fields need a confirmation",
+          "th": "ไฟล์แรกของ EVAL-rel-20261103-b-T09 มี 1 ฟิลด์ที่ต้องยืนยัน"
+        },
+        "confidence": 0.8,
+        "suppressed": {
+          "count": 0,
+          "groups": [
+            {
+              "text": {
+                "en": "2 notes from the mapper",
+                "th": "หมายเหตุจากตัวจับคู่ 2 ข้อ"
+              },
+              "reason": "open_questions",
+              "pointers": []
+            }
+          ]
+        },
+        "must_decide": [
+          {
+            "id": "/sell_unit:value:9ed0965ce03b",
+            "why": {
+              "en": "The contract requires a full selling-unit name and states codes need source evidence or human confirmation. The export contains no legend or lookup defining 'BT', and the built-in unit table does not know this code, so any expansion would be invented.",
+              "th": "The contract requires a full selling-unit name and states codes need source evidence or human confirmation. The export contains no legend or lookup defining 'BT', and the built-in unit table does not know this code, so any expansion would be invented."
+            },
+            "kind": "text",
+            "scope": "source_value",
+            "default": null,
+            "options": [
+              "Bottle",
+              "Bag",
+              "Box",
+              "Bottle (BT)",
+              "Carton"
+            ],
+            "question": {
+              "en": "The workbook's unit code is 'BT' for all 12 materials. What full selling-unit name should 'BT' map to in the output?",
+              "th": "The workbook's unit code is 'BT' for all 12 materials. What full selling-unit name should 'BT' map to in the output?"
+            },
+            "semantic": "unit.sell",
+            "allow_custom": true,
+            "evidence_ids": [
+              3
+            ],
+            "option_labels": null
+          }
+        ],
+        "rules_fired": [
+          "first_time"
+        ],
+        "round_status": "review",
+        "rules_version": "2026.10.4",
+        "mapping_status": "proposed",
+        "policy_decision": "review"
+      },
+      "decision": "review",
+      "learning": null,
+      "priority": 50,
+      "agreement": {
+        "ops": [
+          "/sku"
+        ],
+        "agree": [
+          "/sku"
+        ],
+        "record": {
+          "joins": {
+            "model": [
+              {
+                "on": [
+                  {
+                    "left": "Material code",
+                    "right": "Material code"
+                  }
+                ],
+                "how": "left",
+                "left": {
+                  "file": "fil_01M6G9ZRB90MG1P3KX9G6ZMQNX",
+                  "sheet": "material",
+                  "filter": null,
+                  "rename": {},
+                  "unpivot": null,
+                  "data_end": null,
+                  "fill_down": [],
+                  "data_start": null
+                },
+                "right": {
+                  "file": "fil_01M6G9ZRB90MG1P3KX9G6ZMQNX",
+                  "sheet": "sales units",
+                  "filter": null,
+                  "rename": {},
+                  "unpivot": null,
+                  "data_end": null,
+                  "fill_down": [],
+                  "data_start": null
+                },
+                "cardinality": "1:1",
+                "on_unmatched": "keep",
+                "normalize_keys": [
+                  "trim",
+                  "upper",
+                  "strip_leading_zeros"
+                ]
+              }
+            ],
+            "matcher": []
+          },
+          "dedupe": {
+            "model": {
+              "keep": "first",
+              "keys": [
+                "/sku"
+              ]
+            },
+            "matcher": {
+              "keep": "first",
+              "keys": []
+            }
+          }
+        },
+        "dropped": [],
+        "disagree": {},
+        "model_only": [
+          "/product_name",
+          "/sell_unit"
+        ]
+      },
+      "risk_level": "medium",
+      "risk_score": 0.473,
+      "self_check": {
+        "errors": 0,
+        "history": [
+          {
+            "turn": "ground",
+            "columns": 2
+          },
+          {
+            "turn": "inspect",
+            "requests": 2
+          },
+          {
+            "turn": "mapping",
+            "complete": true,
+            "coverage": {
+              "fields": {
+                "/sku": {
+                  "risk": "medium",
+                  "records": 12,
+                  "records_filled": 12
+                },
+                "/sell_unit": {
+                  "risk": "high",
+                  "records": 12,
+                  "records_filled": 0
+                },
+                "/product_name": {
+                  "risk": "medium",
+                  "records": 12,
+                  "records_filled": 12
+                }
+              },
+              "sources": {
+                "units": 12,
+                "products": 12
+              },
+              "collections": {},
+              "invalid_records": 12
+            },
+            "problems": [
+              "compile: source column 'products.Unit code' not found; values will be null",
+              "validation: data.sell_unit must be string",
+              "/sell_unit: empty in 12 of 12 records"
+            ],
+            "rows_out": 12
+          },
+          {
+            "turn": "mapping",
+            "complete": true,
+            "coverage": {
+              "fields": {
+                "/sku": {
+                  "risk": "medium",
+                  "records": 12,
+                  "records_filled": 12
+                },
+                "/sell_unit": {
+                  "risk": "high",
+                  "records": 12,
+                  "records_filled": 12
+                },
+                "/product_name": {
+                  "risk": "medium",
+                  "records": 12,
+                  "records_filled": 12
+                }
+              },
+              "sources": {
+                "units": 12,
+                "products": 12
+              },
+              "collections": {},
+              "invalid_records": 0
+            },
+            "problems": [],
+            "rows_out": 12
+          }
+        ],
+        "complete": true,
+        "coverage": {
+          "fields": {
+            "/sku": {
+              "risk": "medium",
+              "records": 12,
+              "records_filled": 12
+            },
+            "/sell_unit": {
+              "risk": "high",
+              "records": 12,
+              "records_filled": 12
+            },
+            "/product_name": {
+              "risk": "medium",
+              "records": 12,
+              "records_filled": 12
+            }
+          },
+          "sources": {
+            "units": 12,
+            "products": 12
+          },
+          "collections": {},
+          "invalid_records": 0
+        },
+        "grounded": 2,
+        "rows_out": 12,
+        "fix_rounds": 1,
+        "inspections": 1,
+        "python_turns": 0,
+        "rows_checked": 12,
+        "problems_left": []
+      },
+      "simulation": {
+        "fill": {
+          "/sku": 1.0,
+          "/sell_unit": 1.0,
+          "/product_name": 1.0
+        },
+        "rows_in": 12,
+        "sources": {
+          "units": 12,
+          "products": 12
+        },
+        "complete": true,
+        "findings": {
+          "info": 0,
+          "error": 0,
+          "warning": 0
+        },
+        "rows_out": 12,
+        "collections": {},
+        "duration_ms": 64.0,
+        "identity_keys": [
+          "/sku"
+        ],
+        "invalid_records": 0
+      },
+      "reused_from": null,
+      "field_review": null,
+      "risk_factors": [],
+      "verification": {
+        "scope": "Execution and contract checks; business ambiguities require operator answers",
+        "passed": true,
+        "version": 1,
+        "complete": true,
+        "coverage": {
+          "fields": {
+            "/sku": {
+              "risk": "medium",
+              "records": 12,
+              "records_filled": 12
+            },
+            "/sell_unit": {
+              "risk": "high",
+              "records": 12,
+              "records_filled": 12
+            },
+            "/product_name": {
+              "risk": "medium",
+              "records": 12,
+              "records_filled": 12
+            }
+          },
+          "sources": {
+            "units": 12,
+            "products": 12
+          },
+          "collections": {},
+          "invalid_records": 0
+        },
+        "problems": [],
+        "rows_out": 12,
+        "warnings": [],
+        "rows_checked": 12
+      },
+      "clarifications": [
+        {
+          "why": "The contract requires a full selling-unit name and states codes need source evidence or human confirmation. The export contains no legend or lookup defining 'BT', and the built-in unit table does not know this code, so any expansion would be invented.",
+          "kind": "text",
+          "action": "value_map",
+          "target": "/sell_unit",
+          "options": [
+            "Bottle",
+            "Bag",
+            "Box",
+            "Bottle (BT)",
+            "Carton"
+          ],
+          "question": "The workbook's unit code is 'BT' for all 12 materials. What full selling-unit name should 'BT' map to in the output?",
+          "source_value": "BT"
+        }
+      ],
+      "confidence_basis": {
+        "capped": [],
+        "raised": [],
+        "mapping_capped": false
+      },
+      "review_decisions": [],
+      "target_schema_hash": "1a99bd3e7d310172",
+      "confirmed_decisions": []
+    },
+    "open_questions": [
+      "No SKU-like header found in root table; using 'Material code' as identity — confirm",
+      "The workbook's unit code is 'BT' for all 12 materials. What full selling-unit name should 'BT' map to in the output?"
+    ],
+    "validation": {
+      "ok": true,
+      "issues": []
+    },
+    "parent_id": null,
+    "approved_by": null,
+    "approved_at": null,
+    "comment": null,
+    "created_at": "2026-11-03T09:15:37.687436+00:00",
+    "agent_log": [
+      {
+        "agent": "operator_requirements",
+        "sha256": "29cf9fbac47c8f73ccfe026fc521e30e44b98b719ef9576bbd9b27e78f6f23fc",
+        "characters": 314,
+        "changed_since_approved": false
+      },
+      {
+        "agent": "heuristic",
+        "unmatched": {
+          "products": [
+            "Description"
+          ]
+        },
+        "confidence": 0.35000000000000003,
+        "table_roles": {
+          "0": "products",
+          "1": "other"
+        }
+      },
+      {
+        "data": {
+          "notes": [
+            "The two sheets are complementary: Material supplies /sku and /product_name, while Sales units supplies /sell_unit keyed by Material code.",
+            "Unit code is uniformly 'BT' across all 12 materials. The source contains no definition of BT, so the required full selling-unit name must be confirmed by the operator rather than inferred.",
+            "Material codes are identifiers and their leading zeros should be preserved as text."
+          ],
+          "tables": [
+            {
+              "role": "products",
+              "reason": "Material master table listing one unique material code per row with a descriptive product name; directly supplies the product identity and name fields.",
+              "columns": [
+                {
+                  "name": "Material code",
+                  "reason": "Unique material identifier, 12 distinct values for 12 rows; SKU-like code that must preserve leading zeros.",
+                  "semantic": "identity.sku",
+                  "confidence": 0.97,
+                  "target_pointer": "/sku"
+                },
+                {
+                  "name": "Description",
+                  "reason": "Human-readable product descriptions such as Coffee variant 01 and Soap variant 11; product-name source.",
+                  "semantic": "product.name",
+                  "confidence": 0.95,
+                  "target_pointer": "/product_name"
+                }
+              ],
+              "confidence": 0.97,
+              "key_column": "Material code",
+              "table_index": 0
+            },
+            {
+              "role": "other",
+              "reason": "Supplemental sales-unit assignment table keyed by material code; it is not a standalone product catalogue, pricing, inventory, promotion or category table.",
+              "columns": [
+                {
+                  "name": "Material code",
+                  "reason": "Material identifier matching the product master key; used to join the selling unit to each product.",
+                  "semantic": "identity.sku",
+                  "confidence": 0.95,
+                  "target_pointer": "/sku"
+                },
+                {
+                  "name": "Unit code",
+                  "reason": "Column explicitly holds a sales unit code, but the only value is the abbreviation BT and the workbook does not define its full selling-unit name.",
+                  "semantic": "unit.sell",
+                  "confidence": 0.7,
+                  "target_pointer": "/sell_unit"
+                }
+              ],
+              "confidence": 0.8,
+              "key_column": "Material code",
+              "table_index": 1
+            }
+          ]
+        },
+        "agent": "schema",
+        "notes": [],
+        "usage": {
+          "calls": 1,
+          "model": "deepseek-flash",
+          "cost_usd": 0.010254,
+          "latency_ms": 35348.4,
+          "input_tokens": 3874,
+          "output_tokens": 1595
+        },
+        "attempts": 1
+      },
+      {
+        "data": {
+          "confidence": 0.72,
+          "self_check": {
+            "errors": 0,
+            "history": [
+              {
+                "turn": "ground",
+                "columns": 2
+              },
+              {
+                "turn": "inspect",
+                "requests": 2
+              },
+              {
+                "turn": "mapping",
+                "complete": true,
+                "coverage": {
+                  "fields": {
+                    "/sku": {
+                      "risk": "medium",
+                      "records": 12,
+                      "records_filled": 12
+                    },
+                    "/sell_unit": {
+                      "risk": "high",
+                      "records": 12,
+                      "records_filled": 0
+                    },
+                    "/product_name": {
+                      "risk": "medium",
+                      "records": 12,
+                      "records_filled": 12
+                    }
+                  },
+                  "sources": {
+                    "units": 12,
+                    "products": 12
+                  },
+                  "collections": {},
+                  "invalid_records": 12
+                },
+                "problems": [
+                  "compile: source column 'products.Unit code' not found; values will be null",
+                  "validation: data.sell_unit must be string",
+                  "/sell_unit: empty in 12 of 12 records"
+                ],
+                "rows_out": 12
+              },
+              {
+                "turn": "mapping",
+                "complete": true,
+                "coverage": {
+                  "fields": {
+                    "/sku": {
+                      "risk": "medium",
+                      "records": 12,
+                      "records_filled": 12
+                    },
+                    "/sell_unit": {
+                      "risk": "high",
+                      "records": 12,
+                      "records_filled": 12
+                    },
+                    "/product_name": {
+                      "risk": "medium",
+                      "records": 12,
+                      "records_filled": 12
+                    }
+                  },
+                  "sources": {
+                    "units": 12,
+                    "products": 12
+                  },
+                  "collections": {},
+                  "invalid_records": 0
+                },
+                "problems": [],
+                "rows_out": 12
+              }
+            ],
+            "complete": true,
+            "coverage": {
+              "fields": {
+                "/sku": {
+                  "risk": "medium",
+                  "records": 12,
+                  "records_filled": 12
+                },
+                "/sell_unit": {
+                  "risk": "high",
+                  "records": 12,
+                  "records_filled": 12
+                },
+                "/product_name": {
+                  "risk": "medium",
+                  "records": 12,
+                  "records_filled": 12
+                }
+              },
+              "sources": {
+                "units": 12,
+                "products": 12
+              },
+              "collections": {},
+              "invalid_records": 0
+            },
+            "grounded": 2,
+            "rows_out": 12,
+            "fix_rounds": 1,
+            "inspections": 1,
+            "python_turns": 0,
+            "rows_checked": 12,
+            "problems_left": []
+          },
+          "clarifications": [
+            {
+              "why": "The contract requires a full selling-unit name and states codes need source evidence or human confirmation. The export contains no legend or lookup defining 'BT', and the built-in unit table does not know this code, so any expansion would be invented.",
+              "kind": "text",
+              "action": "value_map",
+              "target": "/sell_unit",
+              "options": [
+                "Bottle",
+                "Bag",
+                "Box",
+                "Bottle (BT)",
+                "Carton"
+              ],
+              "question": "The workbook's unit code is 'BT' for all 12 materials. What full selling-unit name should 'BT' map to in the output?",
+              "source_value": "BT"
+            }
+          ],
+          "open_questions": [],
+          "changes_from_draft": [
+            "Kept both sources and the 1:1 left join on 'Material code' (both sheets cover the same 12 codes, leading zeros normalised only for the join key).",
+            "Fixed the /sell_unit failure: the column is read with source='units' instead of unqualified (the compiler had resolved it against the root 'products' frame, giving column 'products.Unit code' not found).",
+            "Kept /sku as a string cast of the text codes so '000001' stays '000001' — no padding or rounding introduced.",
+            "Mapped /product_name from 'Description' — 12 distinct names, one per material; the draft had left it unmapped.",
+            "No VAT, price, currency or unit-conversion fields exist in this contract, so none were applied; 'BT' is passed through as evidence rather than guessed.",
+            "Removed the draft open question about the SKU key: the raw cells show A2:A13 are already '000001'-style text codes, so 'Material code' is a confirmed identity source; the only genuinely missing business fact is the meaning of 'BT'."
+          ]
+        },
+        "agent": "mapping",
+        "notes": [],
+        "usage": {
+          "calls": 6,
+          "model": "deepseek-flash",
+          "cost_usd": 0.101831,
+          "latency_ms": 1098920.5,
+          "input_tokens": 60755,
+          "output_tokens": 10269
+        },
+        "attempts": 6
+      },
+      {
+        "ops": 1,
+        "agent": "agreement",
+        "agree": 1,
+        "record": 2,
+        "dropped": 0,
+        "disagree": 0,
+        "model_only": 2
+      }
+    ],
+    "sample": [
+      {
+        "sku": "000001",
+        "sell_unit": "BT",
+        "source_meta": {
+          "file": "delivery.xlsx",
+          "lineage": {
+            "joined": {
+              "units": 0
+            },
+            "source": "products",
+            "root_row": 0
+          }
+        },
+        "product_name": "Coffee variant 01"
+      },
+      {
+        "sku": "000011",
+        "sell_unit": "BT",
+        "source_meta": {
+          "file": "delivery.xlsx",
+          "lineage": {
+            "joined": {
+              "units": 6
+            },
+            "source": "products",
+            "root_row": 1
+          }
+        },
+        "product_name": "Soap variant 11"
+      },
+      {
+        "sku": "000002",
+        "sell_unit": "BT",
+        "source_meta": {
+          "file": "delivery.xlsx",
+          "lineage": {
+            "joined": {
+              "units": 10
+            },
+            "source": "products",
+            "root_row": 2
+          }
+        },
+        "product_name": "Shampoo variant 02"
+      },
+      {
+        "sku": "000012",
+        "sell_unit": "BT",
+        "source_meta": {
+          "file": "delivery.xlsx",
+          "lineage": {
+            "joined": {
+              "units": 7
+            },
+            "source": "products",
+            "root_row": 3
+          }
+        },
+        "product_name": "Tea variant 12"
+      },
+      {
+        "sku": "000009",
+        "sell_unit": "BT",
+        "source_meta": {
+          "file": "delivery.xlsx",
+          "lineage": {
+            "joined": {
+              "units": 9
+            },
+            "source": "products",
+            "root_row": 4
+          }
+        },
+        "product_name": "Coffee variant 09"
+      }
+    ],
+    "document": {
+      "meta": {
+        "model": "deepseek-flash",
+        "notes": "Two-sheet ERP export: 'Material' supplies /sku and /product_name; 'Sales units' supplies /sell_unit, joined 1:1 on Material code.",
+        "version": 1,
+        "evidence": [
+          "Sheet 'Material' is the product master: 'Material code' (A2:A13 = text '000001'…'000012', 12 distinct, no blanks) plus 'Description' (Coffee variant 01, Soap variant 11 … one name per material).",
+          "Sheet 'Sales units' is a unit-assignment table keyed by the same 'Material code' values (12 rows, same code set) and holds 'Unit code' = 'BT' on 12/12 rows.",
+          "Codes must stay text; casting the code column to string preserves the leading zeros already present in the cells (no padding, no truncation).",
+          "'BT' has no definition anywhere in the workbook (both sheets have only two columns and no lookup/legend sheet), so its full selling-unit name is not inferable from the file."
+        ],
+        "confidence": 0.72,
+        "created_by": "ai",
+        "customer_id": "cus_01M6G9ZQQZA3Z6Z6YQ7J3Q9YQ3",
+        "fingerprints": {
+          "units": "b2d76da4b3273cec",
+          "products": "b2d76da4b3273cec"
+        },
+        "target_schema": "eval_rel-20261103-b_t09@1"
+      },
+      "joins": [
+        {
+          "on": [
+            {
+              "left": "Material code",
+              "right": "Material code"
+            }
+          ],
+          "how": "left",
+          "left": "products",
+          "right": "units",
+          "cardinality": "1:1",
+          "on_unmatched": "keep",
+          "normalize_keys": [
+            "trim",
+            "upper",
+            "strip_leading_zeros"
+          ]
+        }
+      ],
+      "fields": [
+        {
+          "expr": {
+            "op": "cast",
+            "args": [
+              {
+                "op": "normalize_whitespace",
+                "args": [
+                  {
+                    "op": "col",
+                    "name": "Material code"
+                  }
+                ],
+                "params": {}
+              }
+            ],
+            "params": {
+              "to": "string"
+            }
+          },
+          "target": "/sku",
+          "evidence": [
+            "Header 'Material code'; raw cells A2:A13 are text values '000001' … '000012', 12 distinct with 0% empty.",
+            "Cast to string only fixes the type; existing leading zeros are kept as-is (no zero-padding, no truncation)."
+          ],
+          "confidence": 0.95
+        },
+        {
+          "expr": {
+            "op": "normalize_whitespace",
+            "args": [
+              {
+                "op": "col",
+                "name": "Description"
+              }
+            ],
+            "params": {}
+          },
+          "target": "/product_name",
+          "evidence": [
+            "Header 'Description' in the material master; values 'Coffee variant 01', 'Soap variant 11', 'Shampoo variant 02' … name the product.",
+            "12 distinct non-null descriptions for 12 materials → one name per material."
+          ],
+          "confidence": 0.93
+        },
+        {
+          "expr": {
+            "op": "normalize_whitespace",
+            "args": [
+              {
+                "op": "col",
+                "name": "Unit code",
+                "source": "units"
+              }
+            ],
+            "params": {}
+          },
+          "note": "Full selling-unit name for 'BT' pending operator confirmation (see clarifications); once known, a value_map on 'BT' should replace the raw abbreviation.",
+          "target": "/sell_unit",
+          "evidence": [
+            "Column 'Unit code' lives in the 'units' source (sheet 'Sales units'), not in the root 'products' frame; the previous draft read it unqualified from the root frame, which produced nulls for all 12 records.",
+            "Every row (12/12) holds 'BT'; the value is passed through unchanged because the workbook defines no full selling-unit name and unit_normalize's built-in table has no entry for 'BT'."
+          ],
+          "confidence": 0.45
+        }
+      ],
+      "record": {
+        "dedupe": {
+          "keep": "first",
+          "keys": [
+            "/sku"
+          ]
+        },
+        "filters": [],
+        "root_source": "products"
+      },
+      "quality": [
+        {
+          "rule": "not_null",
+          "params": {},
+          "target": "/sku",
+          "severity": "error"
+        },
+        {
+          "rule": "unique",
+          "params": {},
+          "target": "/sku",
+          "severity": "error"
+        },
+        {
+          "rule": "not_null",
+          "params": {},
+          "target": "/product_name",
+          "severity": "error"
+        },
+        {
+          "rule": "not_null",
+          "params": {},
+          "target": "/sell_unit",
+          "severity": "warning"
+        }
+      ],
+      "sources": [
+        {
+          "id": "products",
+          "csv": {
+            "encoding": "auto",
+            "delimiter": "auto",
+            "quote_char": "\""
+          },
+          "file": {
+            "name_pattern": "(?i)^delivery",
+            "sheet_names_any": [
+              "Material"
+            ]
+          },
+          "role": "products",
+          "sheet": {
+            "name": "Material"
+          },
+          "table": {
+            "fill_down": [],
+            "header_row": 0,
+            "header_rows": 1,
+            "last_column": 2,
+            "first_column": 0,
+            "drop_total_rows": true,
+            "drop_empty_columns": true,
+            "stop_at_blank_rows": 2,
+            "drop_repeated_headers": true
+          },
+          "rename": {},
+          "description": "Material master: material code + description (12 rows, one per material)."
+        },
+        {
+          "id": "units",
+          "csv": {
+            "encoding": "auto",
+            "delimiter": "auto",
+            "quote_char": "\""
+          },
+          "file": {
+            "name_pattern": "(?i)^delivery",
+            "sheet_names_any": [
+              "Sales units"
+            ]
+          },
+          "role": "other",
+          "sheet": {
+            "name": "Sales units"
+          },
+          "table": {
+            "fill_down": [],
+            "header_row": 0,
+            "header_rows": 1,
+            "last_column": 2,
+            "first_column": 0,
+            "drop_total_rows": true,
+            "drop_empty_columns": true,
+            "stop_at_blank_rows": 2,
+            "drop_repeated_headers": true
+          },
+          "rename": {},
+          "description": "Sales-unit assignment per material code; 'Unit code' column holds the abbreviation 'BT' for every material."
+        }
+      ],
+      "provenance": true,
+      "collections": [],
+      "attributes_passthrough": true
+    }
+  },
+  "questions": {
+    "mapping_id": "map_01M6GB2MAHKJQ24BRRDXS2639X",
+    "round_id": "rnd_01M6G9ZR8YQ647S6515DBZ75JW",
+    "status": "proposed",
+    "blocked": false,
+    "questions": [
+      {
+        "id": "/sell_unit:value:9ed0965ce03b",
+        "field": {
+          "pointer": "/sell_unit",
+          "name": "sell_unit",
+          "json_type": [
+            "string"
+          ],
+          "semantic": "unit.sell",
+          "risk": "high",
+          "required": true,
+          "nullable": false,
+          "enum": null,
+          "format": null,
+          "synonyms_en": [],
+          "synonyms_th": [],
+          "description": "Full selling unit name. Codes require source evidence or human confirmation.",
+          "description_th": null,
+          "in_collection": null,
+          "is_collection": false,
+          "system": false,
+          "default": null,
+          "examples": []
+        },
+        "kind": "text",
+        "options": [
+          "Bottle",
+          "Bag",
+          "Box",
+          "Bottle (BT)",
+          "Carton"
+        ],
+        "question": "The workbook's unit code is 'BT' for all 12 materials. What full selling-unit name should 'BT' map to in the output?",
+        "current": {
+          "op": "normalize_whitespace",
+          "args": [
+            {
+              "op": "col",
+              "name": "Unit code",
+              "source": "units"
+            }
+          ],
+          "params": {}
+        },
+        "evidence": [
+          "Column 'Unit code' lives in the 'units' source (sheet 'Sales units'), not in the root 'products' frame; the previous draft read it unqualified from the root frame, which produced nulls for all 12 records.",
+          "Every row (12/12) holds 'BT'; the value is passed through unchanged because the workbook defines no full selling-unit name and unit_normalize's built-in table has no entry for 'BT'."
+        ],
+        "note": "The contract requires a full selling-unit name and states codes need source evidence or human confirmation. The export contains no legend or lookup defining 'BT', and the built-in unit table does not know this code, so any expansion would be invented.",
+        "contested": true,
+        "action": "value_map",
+        "scope": "source_value",
+        "allow_custom": true,
+        "source_value": "BT"
+      }
+    ],
+    "open_questions": [
+      "No SKU-like header found in root table; using 'Material code' as identity — confirm",
+      "The workbook's unit code is 'BT' for all 12 materials. What full selling-unit name should 'BT' map to in the output?"
+    ],
+    "reasons": [
+      "low confidence on high-risk fields: /sell_unit (0.45)",
+      "mapping confidence 0.72 < 0.95",
+      "first time this customer/format is seen",
+      "2 questions still need operator confirmation",
+      "the model selects rows differently from FORMA's matcher (records: dedupe; records: joins)"
+    ],
+    "sample": [
+      {
+        "sku": "000001",
+        "sell_unit": "BT",
+        "source_meta": {
+          "file": "delivery.xlsx",
+          "lineage": {
+            "joined": {
+              "units": 0
+            },
+            "source": "products",
+            "root_row": 0
+          }
+        },
+        "product_name": "Coffee variant 01"
+      },
+      {
+        "sku": "000011",
+        "sell_unit": "BT",
+        "source_meta": {
+          "file": "delivery.xlsx",
+          "lineage": {
+            "joined": {
+              "units": 6
+            },
+            "source": "products",
+            "root_row": 1
+          }
+        },
+        "product_name": "Soap variant 11"
+      },
+      {
+        "sku": "000002",
+        "sell_unit": "BT",
+        "source_meta": {
+          "file": "delivery.xlsx",
+          "lineage": {
+            "joined": {
+              "units": 10
+            },
+            "source": "products",
+            "root_row": 2
+          }
+        },
+        "product_name": "Shampoo variant 02"
+      }
+    ],
+    "context": {
+      "customer": {
+        "code": "EVAL-rel-20261103-b-T09",
+        "name": "EVAL-rel-20261103-b-T09"
+      },
+      "round_label": "EVAL rel-20261103-b T09_r1",
+      "files": [
+        {
+          "id": "fil_01M6G9ZRB90MG1P3KX9G6ZMQNX",
+          "name": "delivery.xlsx"
+        }
+      ],
+      "mapping_version": 1
+    },
+    "changes": [],
+    "comparison_dataset_id": null,
+    "checks": {
+      "drift": null,
+      "errors": 0,
+      "rows_out": 12,
+      "warnings": 0,
+      "agreement": {
+        "ops": 1,
+        "agree": 1,
+        "record": 2,
+        "dropped": 0,
+        "disagree": 0,
+        "model_only": 2
+      },
+      "llm_fallback": false,
+      "reused_approved": false,
+      "full_verification": true,
+      "mapping_confidence": 0.72,
+      "data_checks_trusted": false,
+      "low_confidence_high": [
+        "/sell_unit (0.45)"
+      ],
+      "unresolved_questions": 2,
+      "plausibility_warnings": 0,
+      "low_confidence_critical": []
+    },
+    "impact": {},
+    "fields": [
+      {
+        "pointer": "/sku",
+        "name": "sku",
+        "json_type": [
+          "string"
+        ],
+        "semantic": "identity.sku",
+        "risk": "medium",
+        "required": true,
+        "nullable": false,
+        "enum": null,
+        "format": null,
+        "synonyms_en": [],
+        "synonyms_th": [],
+        "description": "Unique SKU identifier; preserve leading zeros.",
+        "description_th": null,
+        "in_collection": null,
+        "is_collection": false,
+        "system": false,
+        "default": null,
+        "examples": []
+      },
+      {
+        "pointer": "/sell_unit",
+        "name": "sell_unit",
+        "json_type": [
+          "string"
+        ],
+        "semantic": "unit.sell",
+        "risk": "high",
+        "required": true,
+        "nullable": false,
+        "enum": null,
+        "format": null,
+        "synonyms_en": [],
+        "synonyms_th": [],
+        "description": "Full selling unit name. Codes require source evidence or human confirmation.",
+        "description_th": null,
+        "in_collection": null,
+        "is_collection": false,
+        "system": false,
+        "default": null,
+        "examples": []
+      },
+      {
+        "pointer": "/product_name",
+        "name": "product_name",
+        "json_type": [
+          "string"
+        ],
+        "semantic": "product.name",
+        "risk": "medium",
+        "required": true,
+        "nullable": false,
+        "enum": null,
+        "format": null,
+        "synonyms_en": [],
+        "synonyms_th": [],
+        "description": "Product name from the master list.",
+        "description_th": null,
+        "in_collection": null,
+        "is_collection": false,
+        "system": false,
+        "default": null,
+        "examples": []
+      }
+    ]
+  },
+  "preview": {
+    "ok": true,
+    "validation": {
+      "ok": true,
+      "issues": []
+    },
+    "records": [
+      {
+        "sku": "000001",
+        "product_name": "Coffee variant 01",
+        "sell_unit": "BT",
+        "source_meta": {
+          "file": "delivery.xlsx",
+          "lineage": {
+            "root_row": 0,
+            "source": "products",
+            "joined": {
+              "units": 0
+            }
+          }
+        }
+      },
+      {
+        "sku": "000011",
+        "product_name": "Soap variant 11",
+        "sell_unit": "BT",
+        "source_meta": {
+          "file": "delivery.xlsx",
+          "lineage": {
+            "root_row": 1,
+            "source": "products",
+            "joined": {
+              "units": 6
+            }
+          }
+        }
+      },
+      {
+        "sku": "000002",
+        "product_name": "Shampoo variant 02",
+        "sell_unit": "BT",
+        "source_meta": {
+          "file": "delivery.xlsx",
+          "lineage": {
+            "root_row": 2,
+            "source": "products",
+            "joined": {
+              "units": 10
+            }
+          }
+        }
+      },
+      {
+        "sku": "000012",
+        "product_name": "Tea variant 12",
+        "sell_unit": "BT",
+        "source_meta": {
+          "file": "delivery.xlsx",
+          "lineage": {
+            "root_row": 3,
+            "source": "products",
+            "joined": {
+              "units": 7
+            }
+          }
+        }
+      },
+      {
+        "sku": "000009",
+        "product_name": "Coffee variant 09",
+        "sell_unit": "BT",
+        "source_meta": {
+          "file": "delivery.xlsx",
+          "lineage": {
+            "root_row": 4,
+            "source": "products",
+            "joined": {
+              "units": 9
+            }
+          }
+        }
+      },
+      {
+        "sku": "000008",
+        "product_name": "Tea variant 08",
+        "sell_unit": "BT",
+        "source_meta": {
+          "file": "delivery.xlsx",
+          "lineage": {
+            "root_row": 5,
+            "source": "products",
+            "joined": {
+              "units": 8
+            }
+          }
+        }
+      },
+      {
+        "sku": "000007",
+        "product_name": "Soap variant 07",
+        "sell_unit": "BT",
+        "source_meta": {
+          "file": "delivery.xlsx",
+          "lineage": {
+            "root_row": 6,
+            "source": "products",
+            "joined": {
+              "units": 2
+            }
+          }
+        }
+      },
+      {
+        "sku": "000003",
+        "product_name": "Soap variant 03",
+        "sell_unit": "BT",
+        "source_meta": {
+          "file": "delivery.xlsx",
+          "lineage": {
+            "root_row": 7,
+            "source": "products",
+            "joined": {
+              "units": 3
+            }
+          }
+        }
+      },
+      {
+        "sku": "000004",
+        "product_name": "Tea variant 04",
+        "sell_unit": "BT",
+        "source_meta": {
+          "file": "delivery.xlsx",
+          "lineage": {
+            "root_row": 8,
+            "source": "products",
+            "joined": {
+              "units": 5
+            }
+          }
+        }
+      },
+      {
+        "sku": "000006",
+        "product_name": "Shampoo variant 06",
+        "sell_unit": "BT",
+        "source_meta": {
+          "file": "delivery.xlsx",
+          "lineage": {
+            "root_row": 9,
+            "source": "products",
+            "joined": {
+              "units": 11
+            }
+          }
+        }
+      },
+      {
+        "sku": "000010",
+        "product_name": "Shampoo variant 10",
+        "sell_unit": "BT",
+        "source_meta": {
+          "file": "delivery.xlsx",
+          "lineage": {
+            "root_row": 10,
+            "source": "products",
+            "joined": {
+              "units": 1
+            }
+          }
+        }
+      },
+      {
+        "sku": "000005",
+        "product_name": "Coffee variant 05",
+        "sell_unit": "BT",
+        "source_meta": {
+          "file": "delivery.xlsx",
+          "lineage": {
+            "root_row": 11,
+            "source": "products",
+            "joined": {
+              "units": 4
+            }
+          }
+        }
+      }
+    ],
+    "findings": [],
+    "stats": {
+      "rows_in": 12,
+      "rows_out": 12,
+      "sources": {
+        "products": 12,
+        "units": 12
+      },
+      "collections": {},
+      "duration_ms": 103.2,
+      "identity_keys": [
+        "/sku"
+      ],
+      "invalid_records": 0
+    }
+  }
+}

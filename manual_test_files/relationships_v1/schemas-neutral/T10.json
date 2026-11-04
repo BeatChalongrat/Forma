@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "title": "Product delivery",
+  "required": [
+    "sku",
+    "product_name",
+    "price",
+    "currency"
+  ],
+  "properties": {
+    "sku": {
+      "type": "string",
+      "description": "Unique SKU identifier; preserve leading zeros.",
+      "x-forma": {
+        "semantic": "identity.sku"
+      }
+    },
+    "product_name": {
+      "type": "string",
+      "description": "Product name from the master list.",
+      "x-forma": {
+        "semantic": "product.name"
+      }
+    },
+    "price": {
+      "type": "number",
+      "description": "Requested selling price, not cost.",
+      "x-forma": {
+        "semantic": "price.amount"
+      }
+    },
+    "currency": {
+      "type": "string",
+      "description": "ISO 4217 code supported by the source.",
+      "x-forma": {
+        "semantic": "currency"
+      }
+    }
+  },
+  "x-forma": {
+    "identity_keys": [
+      "/sku"
+    ]
+  }
+}

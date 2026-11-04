@@ -1,0 +1,71 @@
+name: forma-stability
+x-env: &env
+  PYTHONPATH: /app/backend/src
+  FORMA_ENV: prod
+  FORMA_AUTH: dev
+  FORMA_AUTH_ALLOW_DEV_IN_PROD: 'true'
+  FORMA_DATABASE_URL: postgresql+psycopg://test:test@postgres:5432/test
+  FORMA_REDIS_URL: redis://redis:6379/0
+  FORMA_JOB_BACKEND: arq
+  FORMA_STORAGE: local
+  FORMA_DATA_DIR: /data
+  FORMA_LLM_PROVIDER: openai_compatible
+  FORMA_LLM_API_KEY: fake-local-only
+  FORMA_LLM_BASE_URL: http://fake:8001/v1
+  FORMA_LLM_MODEL: fake-stability
+  FORMA_MAPPING_WORKFLOW: graph
+  FORMA_WORKERS: '2'
+  FORMA_FILE_WORKERS: '1'
+  FORMA_JOB_LEASE_S: '9'
+  FORMA_JOB_RECOVERY_INTERVAL_S: '2'
+  FORMA_JOB_DISPATCH_RETRY_S: '8'
+  FORMA_JOB_TIMEOUT_S: '120'
+  FORMA_LLM_TIMEOUT_S: '4'
+  FORMA_LLM_BACKOFF_S: '0.1'
+  FORMA_LLM_TASK_BUDGET_S: '90'
+  FORMA_LLM_SHARED_CONCURRENCY: '2'
+  FORMA_LLM_SHARED_RPM: '6000'
+  FORMA_LLM_RATE_LIMIT_PER_MIN: '10000'
+  FORMA_LLM_BREAKER_FAILURES: '100'
+  FORMA_RETENTION_INTERVAL_H: '0'
+  FORMA_LOG_FORMAT: json
+x-app: &app
+  image: forma-stability-code
+  build: {context: ../.., dockerfile: backend/Dockerfile}
+  environment: *env
+  volumes:
+    - .:/test:ro
+    - testdata:/data
+  healthcheck: {disable: true}
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment: {POSTGRES_USER: test, POSTGRES_PASSWORD: test, POSTGRES_DB: test}
+    volumes: [testpg:/var/lib/postgresql/data]
+    healthcheck: {test: [CMD-SHELL, 'pg_isready -U test -d test'], interval: 2s, timeout: 2s, retries: 20}
+  redis:
+    image: redis:7-alpine
+    command: [redis-server, --appendonly, 'yes']
+    volumes: [testredis:/data]
+  fake:
+    <<: *app
+    command: [python, /test/fake_provider.py]
+    ports: ['127.0.0.1:18081:8001']
+  migrate:
+    <<: *app
+    command: [forma, db, upgrade]
+    depends_on: {postgres: {condition: service_healthy}}
+  api:
+    <<: *app
+    command: [forma, serve, --host, 0.0.0.0, --port, '8000']
+    ports: ['127.0.0.1:18080:8000']
+    depends_on: {migrate: {condition: service_completed_successfully}}
+  worker:
+    <<: *app
+    restart: unless-stopped
+    command: [forma, worker]
+    depends_on: {migrate: {condition: service_completed_successfully}}
+volumes:
+  testdata: {}
+  testpg: {}
+  testredis: {}

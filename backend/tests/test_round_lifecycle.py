@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import io
+import json
 import zipfile
 from collections.abc import Iterator
 from pathlib import Path
@@ -87,7 +88,10 @@ def test_move_gives_the_same_file_to_the_right_customer(client: TestClient, isol
     assert c.post(f"/api/rounds/{rid}/reopen").status_code == 409
 
 
-def test_replace_takes_the_old_rounds_place_in_the_zip(client: TestClient, isolated_env: Path) -> None:
+@pytest.mark.parametrize("one_file", [False, True])
+def test_replace_takes_the_old_rounds_place_in_the_zip(
+    client: TestClient, isolated_env: Path, one_file: bool
+) -> None:
     c = client
     _known_customer(c, isolated_env, "K9")
     same = make_workbook(isolated_env / "same.xlsx").read_bytes()
@@ -97,11 +101,15 @@ def test_replace_takes_the_old_rounds_place_in_the_zip(client: TestClient, isola
     fixed = make_workbook(isolated_env / "fixed.xlsx", n_products=14).read_bytes()
 
     assert c.post(f"/api/rounds/{first['round_id']}/replace", data={"reason": "x"}).status_code == 422
+    url = f"/api/rounds/{first['round_id']}/replace"
+    if one_file:
+        fid = c.get(f"/api/rounds/{first['round_id']}").json()["files"][0]["id"]
+        url = f"/api/rounds/{first['round_id']}/files/{fid}/replace"
     new = c.post(
-        f"/api/rounds/{first['round_id']}/replace",
+        url,
         params={"sync": "true"},
         data={"reason": "two prices corrected"},
-        files=[("files", ("K9 oct fixed.xlsx", fixed, "application/octet-stream"))],
+        files=[("file" if one_file else "files", ("K9 oct fixed.xlsx", fixed, "application/octet-stream"))],
     ).json()
     assert new["predecessor_id"] == first["round_id"] and new["label"].endswith("K9 oct.xlsx")
     old = c.get(f"/api/rounds/{first['round_id']}").json()
@@ -111,8 +119,12 @@ def test_replace_takes_the_old_rounds_place_in_the_zip(client: TestClient, isola
     assert item["round_id"] == new["id"]  # the work round's row follows the file
     z = c.get(f"/api/batches/{view['id']}/download")
     with zipfile.ZipFile(io.BytesIO(z.content)) as zf:
-        assert zf.namelist() == ["K9 oct.json"]
+        assert zf.namelist() == ["K9 oct.json", "_forma/manifest.json"]
         assert len(zf.read("K9 oct.json")) > 0
+        manifest = json.loads(zf.read("_forma/manifest.json"))
+        assert manifest["complete"] and manifest["exported_files"] == 1
+        assert manifest["files"][0]["round_id"] == new["id"]
+        assert manifest["files"][0]["sources"][0]["name"] == "K9 oct fixed.xlsx"
     summary = c.get(f"/api/batches/{view['id']}/summary").json()
     assert summary["counts"] == {"ready": 1} and summary["total"] == 1
     assert c.get(f"/api/batches/{view['id']}").json()["items"][0]["round_status"] != "superseded"

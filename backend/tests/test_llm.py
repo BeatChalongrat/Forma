@@ -154,13 +154,13 @@ def test_http_providers_with_mocked_transport(monkeypatch: pytest.MonkeyPatch) -
         return httpx.Response(500, text="boom")
 
     handlers = {"openai": openai_handler}
-    real_client = httpx.Client
+    real_client = httpx.AsyncClient
 
-    def fake_client(*args: Any, **kwargs: Any) -> httpx.Client:
+    def fake_client(*args: Any, **kwargs: Any) -> httpx.AsyncClient:
         kwargs["transport"] = httpx.MockTransport(handlers["current"])
         return real_client(*args, **kwargs)
 
-    monkeypatch.setattr(httpx, "Client", fake_client)
+    monkeypatch.setattr(httpx, "AsyncClient", fake_client)
 
     handlers["current"] = openai_handler
     text, usage = OpenAICompatibleProvider("key").complete_json(

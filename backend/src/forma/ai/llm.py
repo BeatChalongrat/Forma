@@ -10,15 +10,18 @@ A client has a primary route and optional backup routes (ADR-025): when a provid
 
 from __future__ import annotations
 
+import asyncio
 import json
 import time
 from base64 import b64encode
 from collections.abc import Callable, Sequence
+from contextvars import ContextVar
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
 import httpx
 
+from forma.ai.budget import bounded_task
 from forma.core.settings import Settings, get_settings
 
 # USD per 1M tokens (input, output) — indicative; override via policies if needed.
@@ -86,6 +89,55 @@ class StructuredResult:
 
 class LLMError(RuntimeError):
     pass
+
+
+def _post_json(url: str, headers: dict[str, str], body: dict[str, Any], timeout: float) -> dict[str, Any]:
+    from forma.ai.limiter import provider_slot
+
+    with provider_slot(url, headers, timeout):
+        return _post_json_admitted(url, headers, body, timeout)
+
+
+def _post_json_admitted(url: str, headers: dict[str, str], body: dict[str, Any], timeout: float) -> dict[str, Any]:
+    """Cancel the network request on wall-clock expiry, including keepalive/whitespace bodies."""
+    from forma.ai.budget import progress, remaining
+
+    left = remaining()
+    timeout = min(timeout, left) if left is not None else timeout
+    progress(f"กำลังรอ AI · {_agent_name()} · จำกัดครั้งนี้ {timeout:.0f} วินาที")
+
+    async def request() -> dict[str, Any]:
+        try:
+            async with asyncio.timeout(timeout):
+                async with httpx.AsyncClient(timeout=timeout) as client:
+                    response = await client.post(url, headers=headers, json=body)
+                if response.status_code >= 400:
+                    if response.status_code == 429:
+                        from forma.ai.limiter import cooldown
+
+                        cooldown(url, headers, response.headers.get("Retry-After"))
+                    raise LLMError(f"AI HTTP {response.status_code}: {response.text[:500]}")
+                try:
+                    data = response.json()
+                except ValueError as exc:
+                    raise LLMError("AI returned invalid JSON instead of a provider response") from exc
+                if not isinstance(data, dict):
+                    raise LLMError("AI returned an empty or malformed provider response")
+                return data
+        except TimeoutError as exc:
+            raise httpx.ReadTimeout(f"AI request wall-clock deadline exceeded ({timeout:.0f}s)") from exc
+
+    # The public client is synchronous. Worker and FastAPI sync handlers already run in threads.
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return asyncio.run(request())
+    from concurrent.futures import ThreadPoolExecutor
+    from contextvars import copy_context
+
+    context = copy_context()
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        return pool.submit(context.run, lambda: asyncio.run(request())).result()
 
 
 @dataclass(frozen=True)
@@ -164,6 +216,7 @@ class OpenAICompatibleProvider:
             headers["Authorization"] = f"Bearer {self.api_key}"
         body = {
             "model": model,
+            "max_tokens": get_settings().llm_max_output_tokens,
             "temperature": temperature,
             "response_format": {"type": "json_object"},
             "messages": [
@@ -172,16 +225,23 @@ class OpenAICompatibleProvider:
             ],
         }
         t0 = time.perf_counter()
-        with httpx.Client(timeout=self.timeout) as client:
-            r = client.post(f"{self.base_url}/chat/completions", headers=headers, json=body)
-        if r.status_code >= 400:
-            raise LLMError(f"{self.name} HTTP {r.status_code}: {r.text[:500]}")
-        data = r.json()
-        text = data["choices"][0]["message"]["content"] or ""
-        u = data.get("usage", {})
+        data = _post_json(f"{self.base_url}/chat/completions", headers, body, self.timeout)
+        choices = data.get("choices")
+        if not isinstance(choices, list) or not choices or not isinstance(choices[0], dict):
+            raise LLMError("AI response has no completion choices; retry the import")
+        choice = choices[0]
+        if choice.get("finish_reason") == "length":
+            raise LLMError("AI reply was cut off at max_tokens; no partial mapping was accepted")
+        message = choice.get("message")
+        text = message.get("content") if isinstance(message, dict) else None
+        if not isinstance(text, str) or not text.strip():
+            raise LLMError("AI response has no answer content; no partial mapping was accepted")
+        u = data.get("usage") or {}
+        if not isinstance(u, dict):
+            raise LLMError("AI response contains malformed usage metadata")
         usage = Usage(
-            int(u.get("prompt_tokens", 0)),
-            int(u.get("completion_tokens", 0)),
+            _tokens(u, "prompt_tokens"),
+            _tokens(u, "completion_tokens"),
             1,
             (time.perf_counter() - t0) * 1000,
             model,
@@ -217,27 +277,33 @@ class AnthropicProvider:
         # prompt and the reply is parsed as JSON, with LLMClient.structured retrying on invalid output.
         body = {
             "model": model,
-            "max_tokens": 16000,
+            "max_tokens": get_settings().llm_max_output_tokens,
             "system": system + _json_instruction(schema),
             "messages": [{"role": "user", "content": _anthropic_content(user, images)}],
         }
         t0 = time.perf_counter()
-        with httpx.Client(timeout=self.timeout) as client:
-            r = client.post(f"{self.base_url}/v1/messages", headers=headers, json=body)
-        if r.status_code >= 400:
-            raise LLMError(f"{self.name} HTTP {r.status_code}: {r.text[:500]}")
-        data = r.json()
+        data = _post_json(f"{self.base_url}/v1/messages", headers, body, self.timeout)
         stop = data.get("stop_reason")
         if stop == "refusal":
             category = (data.get("stop_details") or {}).get("category")
             raise LLMError(f"{self.name} declined the request (refusal: {category or 'unspecified'})")
         if stop == "max_tokens":
             raise LLMError(f"{self.name} reply was cut off at max_tokens")
-        text = "".join(b.get("text", "") for b in data.get("content", []) if b.get("type") == "text")
-        u = data.get("usage", {})
+        blocks = data.get("content")
+        if not isinstance(blocks, list) or any(not isinstance(b, dict) for b in blocks):
+            raise LLMError("AI response contains malformed content blocks")
+        parts = [b.get("text") for b in blocks if b.get("type") == "text"]
+        if not parts or any(not isinstance(p, str) for p in parts):
+            raise LLMError("AI response has no answer content")
+        text = "".join(parts)
+        if not text.strip():
+            raise LLMError("AI response has empty answer content")
+        u = data.get("usage") or {}
+        if not isinstance(u, dict):
+            raise LLMError("AI response contains malformed usage metadata")
         usage = Usage(
-            int(u.get("input_tokens", 0)),
-            int(u.get("output_tokens", 0)),
+            _tokens(u, "input_tokens"),
+            _tokens(u, "output_tokens"),
             1,
             (time.perf_counter() - t0) * 1000,
             model,
@@ -356,6 +422,9 @@ class LLMClient:
         for route in routes:
 
             def call(r: Route = route) -> tuple[str, Usage]:
+                from forma.ai.budget import remaining
+
+                remaining()
                 return r.provider.complete_json(
                     system=system,
                     user=user,
@@ -371,6 +440,7 @@ class LLMClient:
                     attempts=s.llm_transport_retries,
                     base_s=s.llm_backoff_s,
                     breaker=get_breaker(route.name),
+                    sleep=_provider_sleep,
                 )
             except CircuitOpen as e:
                 failures.append(f"{route.name}: {e}")
@@ -387,6 +457,7 @@ class LLMClient:
             raise LLMError(failures[0].split(": ", 1)[1][:500])
         raise LLMError("every AI route failed — " + " | ".join(failures)[:1000])
 
+    @bounded_task
     def structured(
         self,
         *,
@@ -457,16 +528,32 @@ class LLMClient:
         raise LLMError("structured output failed validation: " + "; ".join(errors[:5]))
 
 
-_AGENT: list[str] = ["unknown"]
+_AGENT: ContextVar[str] = ContextVar("llm_agent", default="unknown")
+
+
+def _provider_sleep(seconds: float) -> None:
+    from forma.ai.budget import remaining
+    from forma.jobs.execution import interruptible_sleep
+
+    left = remaining()
+    interruptible_sleep(min(seconds, left) if left is not None else seconds)
+    remaining()
 
 
 def set_agent(name: str) -> None:
     """Name the agent for the next structured() call's span/metrics (agents set it before calling)."""
-    _AGENT[0] = name
+    _AGENT.set(name)
 
 
 def _agent_name() -> str:
-    return _AGENT[0]
+    return _AGENT.get()
+
+
+def _tokens(usage: dict[str, Any], key: str) -> int:
+    value = usage.get(key, 0)
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        raise LLMError(f"AI response contains malformed usage metadata: {key}")
+    return value
 
 
 def _parse_json(text: str) -> dict[str, Any]:

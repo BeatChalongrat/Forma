@@ -83,7 +83,11 @@ def validate_answer_effects(
             if spec.pointer in targets:
                 continue
             allowed = any(
-                spec.pointer.startswith(q["collection"] + "/")
+                (
+                    spec.pointer.startswith(q["collection"] + "/")
+                    if q.get("collection")
+                    else spec.pointer in q.get("affected_fields", [q.get("target")])
+                )
                 and all(_get_pointer(rec, p) == v for p, v in q["identity"].items())
                 for q in row_choices
             )
@@ -130,7 +134,7 @@ def overview(ctx: ServiceContext, session: Session, m: MappingVersion) -> dict[s
         },
         "changes": changes,
         "comparison_dataset_id": review.get("compared_with"),
-        "checks": policy.get("checks") or {},
+        "checks": {**(policy.get("checks") or {}), "verification": policy.get("verification")},
         "impact": policy.get("impact"),
         "fields": [f.to_dict() for f in schema.leaf_fields()],
     }
@@ -195,7 +199,12 @@ def evidence(ctx: ServiceContext, session: Session, m: MappingVersion, pointer: 
         lin = (rec.get(PROVENANCE_KEY) or {}).get("lineage") or {}
         joined = lin.get("joined") or {}
         locations = (
-            list(enumerate((lin.get("items") or {}).get(collection, [])))
+            list(
+                enumerate(
+                    (lin.get("item_groups") or {}).get(collection)
+                    or (lin.get("items") or {}).get(collection, [])
+                )
+            )
             if collection
             else [(None, lin.get("root_row"))]
         )
@@ -204,28 +213,31 @@ def evidence(ctx: ServiceContext, session: Session, m: MappingVersion, pointer: 
             actual = pointer.replace("/*/", f"/{index}/", 1) if index is not None else pointer
             cells = []
             for sid, name in cols:
-                source_row = rows.get(sid)
+                source_rows = rows.get(sid)
                 frame = frames.get(sid)
-                if frame is None or source_row is None:
+                if frame is None or source_rows is None:
                     continue
-                extracted = frame.filter(frame[ROW_COL] == source_row)
-                loc = sources.get(sid)
-                if loc is None or extracted.height != 1:
-                    continue
-                col = sources._column(loc, name)
-                cell = sources.cell(sid, source_row, name)
-                if cell is None or col not in extracted.columns or cell["raw"] != extracted[col][0]:
-                    continue
-                if cell.get("verified") is False:
-                    continue
-                cells.append(cell)
+                for source_row in source_rows if isinstance(source_rows, list) else [source_rows]:
+                    extracted = frame.filter(frame[ROW_COL] == source_row)
+                    loc = sources.get(sid)
+                    if loc is None or extracted.height != 1:
+                        continue
+                    col = sources._column(loc, name)
+                    cell = sources.cell(sid, source_row, name)
+                    if cell is None or col not in extracted.columns or cell["raw"] != extracted[col][0]:
+                        continue
+                    if cell.get("verified") is False:
+                        continue
+                    cells.append(cell)
             result["examples"].append(
                 {
                     "identity": sandbox._identity(rec, schema),
                     "item": index,
                     "value": _get_pointer(rec, actual),
                     "cells": cells,
-                    "source_complete": len(cells) == len(cols) and bool(cols),
+                    "source_complete": len(cells)
+                    == sum(len(rows[sid]) if isinstance(rows.get(sid), list) else 1 for sid, _ in cols)
+                    and bool(cols),
                 }
             )
             if len(result["examples"]) >= 5:

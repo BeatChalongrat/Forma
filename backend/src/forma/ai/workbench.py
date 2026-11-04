@@ -21,7 +21,19 @@ from forma.mapping_dsl.models import MappingDocument
 from forma.profiling.profile import WorkbookProfile
 from forma.schema_registry import TargetSchema
 
-INSPECT_KINDS = ("columns", "distinct", "rows", "find", "raw", "sample", "structure", "trial_table")
+INSPECT_KINDS = (
+    "columns",
+    "distinct",
+    "rows",
+    "find",
+    "raw",
+    "sample",
+    "structure",
+    "trial_table",
+    "column_profile",
+    "relationships",
+    "join",
+)
 MAX_INSPECT_REQUESTS = 8
 MAX_DISTINCT = 40
 MAX_ROWS = 20
@@ -101,10 +113,29 @@ def inspect_problems(requests: Any, n_tables: int) -> list[str]:
         ti = r.get("table_index")
         if not isinstance(ti, int) or isinstance(ti, bool) or not 0 <= ti < n_tables:
             out.append(f"inspect/{i}: table_index must be an integer from 0 to {n_tables - 1}")
-        if what == "distinct" and not isinstance(r.get("column"), str):
-            out.append(f"inspect/{i}: distinct needs a column name")
+        if what in ("distinct", "column_profile") and not isinstance(r.get("column"), str):
+            out.append(f"inspect/{i}: {what} needs a column name")
+        if what == "join":
+            other = r.get("other_table_index")
+            if type(other) is not int or not 0 <= other < n_tables:
+                out.append(f"inspect/{i}: other_table_index must identify a profiled table")
+            left, right = r.get("left_keys"), r.get("right_keys")
+            if (
+                not isinstance(left, list)
+                or not isinstance(right, list)
+                or not 1 <= len(left) <= 3
+                or len(left) != len(right)
+                or any(not isinstance(k, str) or not k for k in [*left, *right])
+            ):
+                out.append(f"inspect/{i}: join needs 1–3 left_keys and equally many right_keys")
         if what == "find" and not isinstance(r.get("pattern"), str):
             out.append(f"inspect/{i}: find needs literal text in pattern")
+        if "columns" in r and (
+            not isinstance(r["columns"], list)
+            or not 1 <= len(r["columns"]) <= 12
+            or any(not isinstance(c, str) or not c for c in r["columns"])
+        ):
+            out.append(f"inspect/{i}: columns must contain 1–12 names")
         for key in ("start", "limit", "column_start", "column_limit"):
             if key in r and (type(r[key]) is not int or r[key] < 0):
                 out.append(f"inspect/{i}: {key} must be a non-negative integer")
@@ -207,6 +238,34 @@ class FileWorkbench:
         if what in ("raw", "structure", "trial_table"):
             return self._raw(r)
         frame = self._frame(ti)
+        if what == "column_profile":
+            from forma.profiling.profile import profile_column
+
+            column = str(r.get("column"))
+            if column not in frame.columns:
+                raise ValueError(f"no column {column!r}")
+            return _clip(profile_column(frame[column], frame.columns.index(column)).to_dict(), self.max_chars)
+        if what == "relationships":
+            from forma.profiling.value_evidence import table_observations
+
+            return table_observations(frame, r.get("columns"))
+        if what == "join":
+            from forma.profiling.value_evidence import join_observations
+
+            other = int(r["other_table_index"])
+            target = self.profile.tables[other]
+            return _clip(
+                {
+                    **join_observations(frame, self._frame(other), r["left_keys"], r["right_keys"]),
+                    "right_source": {
+                        "table_index": other,
+                        "file_id": target.file_id,
+                        "file_name": target.file_name,
+                        "sheet": target.sheet,
+                    },
+                },
+                self.max_chars,
+            )
         if what == "columns":
             return [
                 {
@@ -406,6 +465,9 @@ class FileWorkbench:
     # ---- run ----------------------------------------------------------------------------------------
     def run(self, doc: MappingDocument, *, full: bool = False) -> RunReport:
         from forma.ai import plausibility
+        from forma.ai.budget import progress
+
+        progress("กำลังตรวจผลแปลงข้อมูลทั้งหมด" if full else "กำลังลองแปลงตัวอย่างและตรวจข้อผิดพลาด")
 
         bindings, problems = self.bind(doc)
         if problems:
@@ -416,7 +478,11 @@ class FileWorkbench:
             return RunReport(0, 0, [f"engine: {str(e)[:300]}"], errors=1, complete=full)
         out: list[str] = []
         for f in res.findings:
-            if f.severity == "error" or (f.kind == "compile" and "not found" in f.message):
+            if (
+                f.severity == "error"
+                or f.kind == "semantic"
+                or (f.kind == "compile" and "not found" in f.message)
+            ):
                 line = f"{f.kind}: {f.message}"
                 if line not in out:
                     out.append(line)

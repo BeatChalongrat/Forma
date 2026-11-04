@@ -11,6 +11,7 @@ import { useToast } from '../lib/toast'
 import { dateInZone, usePreferences } from '../lib/preferences'
 import { Workflow } from '../components/Workflow'
 import { WorkRounds } from '../components/WorkRounds'
+import { FileMenu } from '../components/FileMenu'
 import { CLOSED_STATUSES } from '../components/RoundMenu'
 import { refusedNames, splitReadable, UPLOAD_ACCEPT, UPLOAD_TYPES } from '../lib/uploads'
 
@@ -58,7 +59,7 @@ export function Imports() {
       {query.error && <p role="alert" className="p-4 text-bad">{t('Could not load history.', 'โหลดประวัติไม่ได้')} <button className="btn btn-sm" onClick={() => void query.refetch()}>{t('Try again', 'ลองใหม่')}</button></p>}
       {!invalid && <table className="table"><thead><tr><th>{t('Customer / file', 'ลูกค้า / ไฟล์')}</th><th>{t('Next step', 'ขั้นตอนถัดไป')}</th><th>{t('Uploaded', 'วันที่อัปโหลด')}</th></tr></thead><tbody>
         {query.isPending && <tr><td colSpan={3} className="p-8 text-center text-muted">{t('Loading files…', 'กำลังโหลดไฟล์…')}</td></tr>}
-        {query.data?.items.map(r => <tr key={r.id}><td className="max-w-[480px]"><Link to={`/rounds/${r.id}`} className="font-medium text-navy hover:underline break-words">{r.customer?.code} · {r.label || r.customer?.name}</Link><div className="text-xs text-muted mt-1 break-words">{r.files?.map(f => f.name).join(', ')}{CLOSED_STATUSES.includes(r.status) && r.closed?.reason && <> · “{r.closed.reason}”</>}</div></td><td><NextStepCell r={r} />{r.successor_id && <Link className="block text-xs underline mt-1" to={`/rounds/${r.successor_id}`}>{t('Open the current round', 'เปิดรอบที่ใช้อยู่')}</Link>}</td><td className="whitespace-nowrap text-muted">{date(r.uploaded_at)}</td></tr>)}
+        {query.data?.items.map(r => <tr key={r.id}><td className="max-w-[480px]"><Link to={`/rounds/${r.id}`} className="font-medium text-navy hover:underline break-words">{r.customer?.code} · {r.label || r.customer?.name}</Link><div className="text-xs text-muted mt-1 space-y-1">{r.files?.map(f => <div className="flex items-center gap-2" key={f.id}><span className="flex-1 min-w-0 break-words">{f.name}</span><FileMenu roundId={r.id} customerId={r.customer_id} status={r.status} file={f} fileCount={r.files?.length} /></div>)}{CLOSED_STATUSES.includes(r.status) && r.closed?.reason && <p>“{r.closed.reason}”</p>}</div></td><td><NextStepCell r={r} />{r.successor_id && <Link className="block text-xs underline mt-1" to={`/rounds/${r.successor_id}`}>{t('Open the current round', 'เปิดรอบที่ใช้อยู่')}</Link>}</td><td className="whitespace-nowrap text-muted">{date(r.uploaded_at)}</td></tr>)}
         {query.data?.total === 0 && <tr><td colSpan={3} className="text-center p-8 text-muted">{t('No files match these filters.', 'ไม่พบไฟล์ที่ตรงกับตัวกรองนี้')}</td></tr>}
       </tbody></table>}
       <div className="p-4 flex items-center justify-between gap-3 border-t border-line"><button className="btn btn-sm" disabled={offset === 0} onClick={() => change({ offset: String(Math.max(0, offset - 50)) })}>{t('Previous', 'ก่อนหน้า')}</button><span className="text-sm text-muted">{t('Page', 'หน้า')} {Math.floor(offset / 50) + 1}</span><button className="btn btn-sm" disabled={!query.data || offset + 50 >= query.data.total} onClick={() => change({ offset: String(offset + 50) })}>{t('Next', 'ถัดไป')}</button></div>

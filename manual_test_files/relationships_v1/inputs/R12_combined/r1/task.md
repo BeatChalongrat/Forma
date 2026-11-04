@@ -1,0 +1,2 @@
+Map the supplied ERP export(s) to the supplied JSON Schema. Preserve the master product population and identities. Do not invent business facts. Ask a specific question if required facts cannot be established.
+Return RETAIL THB price valid on 2026-11-03. Inventory is in individual pieces, one entry per warehouse, summed across lots. CASE conversion differs by product in Pack sizes; PCS already means individual pieces. Do not multiply PCS balances.

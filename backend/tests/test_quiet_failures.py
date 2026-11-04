@@ -65,7 +65,9 @@ def client(isolated_env: Path) -> Iterator[TestClient]:
         yield c
 
 
-def _published_rows(c: TestClient, path: Path, code: str) -> list[dict[str, Any]]:
+def _published_rows(
+    c: TestClient, path: Path, code: str, *, expect_blocked: bool = False
+) -> list[dict[str, Any]]:
     customer = c.post("/api/customers", json={"code": code, "name": code}).json()["id"]
     rid = c.post("/api/rounds", json={"customer_id": customer}).json()["id"]
     up = c.post(
@@ -76,6 +78,14 @@ def _published_rows(c: TestClient, path: Path, code: str) -> list[dict[str, Any]
     _run(c, rid)
     r = c.get(f"/api/rounds/{rid}").json()
     assert r["status"] == "review", r["summary"]
+    if expect_blocked:
+        mid = r["mappings"][0]["id"]
+        assert c.post(f"/api/mappings/{mid}/approve", json={}).status_code == 422
+        mapping = c.get(f"/api/mappings/{mid}").json()
+        preview = c.post(f"/api/rounds/{rid}/mapping-preview", json={"document": mapping["document"]}).json()
+        assert preview["ok"] is False
+        assert not c.get(f"/api/rounds/{rid}").json()["datasets"]
+        return preview["records"]  # type: ignore[no-any-return]
     assert c.post(f"/api/mappings/{r['mappings'][0]['id']}/approve", json={}).status_code == 200
     c.post(f"/api/rounds/{rid}/transform", params={"sync": True})
     dataset = c.get(f"/api/rounds/{rid}").json()["datasets"][-1]["id"]
@@ -172,7 +182,9 @@ def test_an_unknown_currency_stays_as_written_and_breaks_the_contract(
     client: TestClient, isolated_env: Path
 ) -> None:
     rows = [[*HEADER, "สกุลเงิน"], *[[*r, "ไม่ทราบ"] for r in ROWS]]
-    records = _published_rows(client, _book(isolated_env / "c.xlsx", {"สินค้า": rows}), "CUNK")
+    records = _published_rows(
+        client, _book(isolated_env / "c.xlsx", {"สินค้า": rows}), "CUNK", expect_blocked=True
+    )
     assert {r["currency"] for r in records} == {"ไม่ทราบ"}
 
 

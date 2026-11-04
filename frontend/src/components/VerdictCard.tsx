@@ -52,7 +52,7 @@ export function VerdictCard({ v, editable, busy, onAccept, onOpenDecision, onMov
   const lang = prefs.language
   const [decisions, setDecisions] = useState<Record<string, boolean | number | string | null>>({})
   const o = OUTCOME[v.outcome]
-  const oneClick = ['accept', 'answer', 'check_data'].includes(v.outcome)
+  const oneClick = ['accept', 'answer', 'check_data'].includes(v.outcome) && !v.must_decide.some(d => d.scope === 'source_file')
   const needed = v.must_decide.filter((d) => d.kind !== 'confirm' || v.outcome === 'answer')
   const answered = needed.filter((d) => decisions[d.id] !== undefined && decisions[d.id] !== null)
   const canAct = editable && !busy && oneClick && (v.outcome === 'accept' ? v.must_decide.length === 0 : answered.length === needed.length && needed.length > 0)
@@ -113,14 +113,14 @@ function Decision({ n, d, value, editable, onChange, onOpen }: { n: number; d: V
         <div className="min-w-0"><p className="font-medium"><span className="text-muted mr-1">{n}.</span>{d.question[lang]}</p><p className="text-xs text-muted mt-0.5">{d.why[lang]}{d.default !== null && d.default !== undefined && d.default_reason ? ` · ${t('Default', 'ค่าตั้งต้น')}: ${String(d.default === true ? yes : d.default === false ? no : d.default)} (${d.default_reason[lang]})` : ''}</p></div>
         {onOpen && <button className="btn btn-ghost btn-sm" onClick={() => onOpen(d.id)}>{t('Look at the evidence', 'ดูหลักฐาน')}<ArrowRight size={13} /></button>}
       </div>
-      <fieldset disabled={!editable} className="mt-2 flex flex-wrap gap-2">
+      {d.scope === 'source_file' ? <p className="mt-2 text-sm text-ink-2">{t('Provide or repair the source file, then run mapping again. This cannot be resolved by confirming a value.', 'เพิ่มหรือแก้ไฟล์ต้นทางแล้วให้ระบบจับคู่ใหม่ ข้อนี้แก้ด้วยการกดยืนยันค่าไม่ได้')}</p> : <fieldset disabled={!editable} className="mt-2 flex flex-wrap gap-2">
         {d.kind === 'boolean' && [true, false].map((opt) => <button key={String(opt)} className={cn('btn btn-sm', value === opt && 'btn-primary')} aria-pressed={value === opt} onClick={() => onChange(opt)}>{opt ? yes : no}</button>)}
         {(d.kind === 'choice' || d.kind === 'enum') && d.options.map((opt) => <button key={String(opt)} className={cn('btn btn-sm', value === opt && 'btn-primary')} aria-pressed={value === opt} onClick={() => onChange(String(opt))}>{d.option_labels?.[String(opt)] || String(opt)}</button>)}
-        {(d.kind === 'text' || d.allow_custom) && <input className="input" maxLength={5000} aria-label={d.question[lang]} value={value === undefined || value === null ? '' : String(value)} onChange={e => onChange(e.target.value || null)} />}
+        {(d.kind === 'text' || (d.allow_custom && d.kind === 'enum')) && <input className="input" maxLength={5000} aria-label={d.question[lang]} value={value === undefined || value === null ? '' : String(value)} onChange={e => onChange(e.target.value || null)} />}
         {d.kind === 'number' && <input className="input max-w-40" type="number" aria-label={d.question[lang]} value={value === undefined || value === null ? '' : String(value)} onChange={(e) => onChange(e.target.value === '' ? null : Number(e.target.value))} />}
         {d.kind === 'confirm' && <button className={cn('btn btn-sm', value === 'confirm' && 'btn-primary')} aria-pressed={value === 'confirm'} onClick={() => onChange('confirm')}><Check size={14} />{t('Correct as read', 'อ่านถูกต้องแล้ว')}</button>}
         <button className={cn('btn btn-ghost btn-sm', value === 'unknown' && 'bg-surface-2')} aria-pressed={value === 'unknown'} onClick={() => onChange('unknown')}>{t('Not sure', 'ยังไม่ทราบ')}</button>
-      </fieldset>
+      </fieldset>}
       {d.scope === 'constant_for_this_file' && <p className="text-xs text-muted mt-2">{t('Applies to every record in this file. Use the field editor if values differ by row.', 'ใช้กับทุกรายการในไฟล์นี้ ถ้าค่าต่างกันแต่ละแถว ให้แก้การจับคู่คอลัมน์')}</p>}
     </div>
   )

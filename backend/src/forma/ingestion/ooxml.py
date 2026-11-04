@@ -40,6 +40,7 @@ class SheetInspection:
     percentage_cells: int = 0
     display_format_warnings: list[str] = field(default_factory=list)
     replacements: list[tuple[int, int, str]] = field(default_factory=list)
+    invalid_columns: dict[int, list[str]] = field(default_factory=dict)
 
 
 def inspect_workbook(path: Path) -> tuple[SheetInspection, ...]:
@@ -93,16 +94,20 @@ def _scan_sheet(z: ZipFile, member: str, info: SheetInspection, formats: list[st
                 value = node.find(f"{{{NS}}}v")
                 raw = value.text if value is not None else None
                 formula = node.find(f"{{{NS}}}f")
+                faults = []
                 if formula is not None:
                     info.formula_cells += 1
                     if "[" in (formula.text or ""):
                         info.external_formula_cells += 1
+                        faults.append("external workbook reference")
                     # An explicit empty string result is a valid cache; an empty numeric <v/> is not.
                     if value is None or (not raw and node.get("t") != "str"):
                         info.formula_without_cache += 1
+                        faults.append("formula without cached result")
                         if len(info.formula_locations) < 10:
                             info.formula_locations.append(ref)
                 if node.get("t") == "e":
+                    faults.append(f"Excel error {raw}")
                     info.error_cells += 1
                     if len(info.error_locations) < 10:
                         info.error_locations.append(f"{ref}: {raw}")
@@ -124,6 +129,14 @@ def _scan_sheet(z: ZipFile, member: str, info: SheetInspection, formats: list[st
                             col = col * 26 + ord(char) - ord("A") + 1
                         info.replacements.append((int(coord[2]) - 1, col - 1, converted[0]))
                         setattr(info, converted[1], getattr(info, converted[1]) + 1)
+                coord = CELL.fullmatch(ref)
+                if faults and coord:
+                    col = 0
+                    for char in coord[1]:
+                        col = col * 26 + ord(char) - ord("A") + 1
+                    examples = info.invalid_columns.setdefault(col - 1, [])
+                    if len(examples) < 10:
+                        examples.append(f"{ref}: {', '.join(faults)}")
                 node.clear()
             elif tag == "row":
                 info.hidden_rows += node.get("hidden") in ("1", "true")
@@ -172,7 +185,16 @@ def _inspect(path: str, size: int, mtime_ns: int) -> tuple[SheetInspection, ...]
         raise UnsupportedFile("Workbook structure is damaged or unsupported; save a new .xlsx copy") from e
 
 
-def require_cached_values(info: SheetInspection) -> None:
+def require_cached_values(info: SheetInspection, *, columns: set[int] | None = None) -> None:
+    if columns is not None:
+        affected = [v for c, values in info.invalid_columns.items() if c in columns for v in values]
+        if affected:
+            raise UnsupportedFile(
+                f"Sheet '{info.name}' uses unavailable cells ({'; '.join(affected[:10])}); "
+                "provide the referenced workbook, recalculate and save in Excel, or map verified input columns",
+                details={"sheet": info.name, "cells": affected[:10], "action": "repair_source"},
+            )
+        return
     details = {
         "sheet": info.name,
         "formula_cells": info.formula_locations,
@@ -187,5 +209,10 @@ def require_cached_values(info: SheetInspection) -> None:
     if info.error_cells:
         raise UnsupportedFile(
             f"Sheet '{info.name}' has {info.error_cells} Excel error cells; fix the source and upload again",
+            details=details,
+        )
+    if info.external_formula_cells:
+        raise UnsupportedFile(
+            f"Sheet '{info.name}' references an external workbook; provide the input workbook or map verified inputs",
             details=details,
         )

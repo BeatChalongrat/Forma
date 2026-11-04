@@ -70,6 +70,7 @@ def verification(
     # values that pass the contract and still look wrong: a warning class of its own, so the policy can
     # treat a mapping a person already approved differently from a new one
     warnings = plausibility.check(result.records, schema)
+    warnings.extend(f.message for f in result.findings if f.kind == "semantic")
     problems.extend(f.message for f in result.findings if "unknown root records" in f.message)
     if not complete:
         problems.append("Only a sample was checked")
@@ -87,6 +88,14 @@ def verification(
         "rows_checked": result.stats.get("rows_in", 0),
         "rows_out": len(result.records),
         "coverage": evidence,
+        "semantic_checks": {
+            "contract_rules": [c.get("id") for c in schema.document.get("x-forma", {}).get("checks", [])],
+            "source_identity_warnings": [f.to_dict() for f in result.findings if f.kind == "semantic"],
+            "limitation": (
+                "Passing these checks does not prove column meaning. "
+                "Missing business intent still requires an operator decision."
+            ),
+        },
         "scope": "Execution and contract checks; business ambiguities require operator answers",
     }
 

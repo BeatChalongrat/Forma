@@ -1,0 +1,59 @@
+...F...F...................                                              [100%]
+================================== FAILURES ===================================
+________________ test_why_questions_are_answered_from_evidence ________________
+tests\test_assistant.py:130: in test_why_questions_are_answered_from_evidence
+    _, _, ds = _dataset(client, isolated_env, [["0A001", "BKK", 1], ["ZZ9", "BKK", 1]])
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests\test_assistant.py:109: in _dataset
+    assert c.post(f"/api/mappings/{mv}/approve", json={}).status_code == 200
+E   AssertionError: assert 422 == 200
+E    +  where 422 = <Response [422 Unprocessable Entity]>.status_code
+E    +    where <Response [422 Unprocessable Entity]> = post('/api/mappings/map_01M6JSWQNVV1XTHAP1Y0P5HYEJ/approve', json={})
+E    +      where post = <starlette.testclient.TestClient object at 0x000001C5FFE438F0>.post
+---------------------------- Captured stderr setup ----------------------------
+INFO  [alembic.runtime.migration] Context impl SQLiteImpl.
+INFO  [alembic.runtime.migration] Will assume non-transactional DDL.
+INFO  [alembic.runtime.migration] Running stamp_revision  -> e1a5c6d7f8b9
+2026-11-04T08:13:01.092910Z [info     ] schema created (dev)           added_columns=[] legacy=False stamped=e1a5c6d7f8b9
+____________ test_each_provider_gets_the_picture_in_its_own_format ____________
+src\forma\ai\llm.py:121: in _post_json
+    asyncio.get_running_loop()
+E   RuntimeError: no running event loop
+
+During handling of the above exception, another exception occurred:
+tests\test_chat_images.py:134: in test_each_provider_gets_the_picture_in_its_own_format
+    OpenAICompatibleProvider("k").complete_json(**args, images=[picture])
+src\forma\ai\llm.py:217: in complete_json
+    data = _post_json(f"{self.base_url}/chat/completions", headers, body, self.timeout)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src\forma\ai\llm.py:123: in _post_json
+    return asyncio.run(request())
+           ^^^^^^^^^^^^^^^^^^^^^^
+..\..\..\AppData\Roaming\uv\python\cpython-3.12-windows-x86_64-none\Lib\asyncio\runners.py:195: in run
+    return runner.run(main)
+           ^^^^^^^^^^^^^^^^
+..\..\..\AppData\Roaming\uv\python\cpython-3.12-windows-x86_64-none\Lib\asyncio\runners.py:118: in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\..\..\AppData\Roaming\uv\python\cpython-3.12-windows-x86_64-none\Lib\asyncio\base_events.py:691: in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+src\forma\ai\llm.py:108: in request
+    raise LLMError(f"AI HTTP {response.status_code}: {response.text[:500]}")
+E   forma.ai.llm.LLMError: AI HTTP 401: {
+E       "error": {
+E           "message": "Incorrect API key provided: k. You can find your API key at https://platform.openai.com/account/api-keys.",
+E           "type": "invalid_request_error",
+E           "param": null,
+E           "code": "invalid_api_key"
+E       }
+E   }
+============================== warnings summary ===============================
+.venv\Lib\site-packages\fastapi\testclient.py:1
+  C:\Users\Beat Beat\Desktop\Forma\backend\.venv\Lib\site-packages\fastapi\testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+FAILED tests/test_assistant.py::test_why_questions_are_answered_from_evidence
+FAILED tests/test_chat_images.py::test_each_provider_gets_the_picture_in_its_own_format

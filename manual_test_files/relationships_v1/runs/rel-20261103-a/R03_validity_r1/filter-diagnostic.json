@@ -1,0 +1,144 @@
+{
+  "rows_unfiltered": 48,
+  "columns": [
+    "__row__",
+    "Price material code",
+    "Price list",
+    "Currency",
+    "Valid from",
+    "Valid to",
+    "Selling price"
+  ],
+  "clauses": [
+    {
+      "index": 0,
+      "expression": {
+        "op": "eq",
+        "args": [
+          {
+            "op": "upper",
+            "args": [
+              {
+                "op": "trim",
+                "args": [
+                  {
+                    "op": "col",
+                    "name": "Price list",
+                    "source": null
+                  }
+                ],
+                "params": {}
+              }
+            ],
+            "params": {}
+          },
+          {
+            "op": "const",
+            "value": "RETAIL"
+          }
+        ],
+        "params": {}
+      },
+      "true": 36,
+      "null": 0
+    },
+    {
+      "index": 1,
+      "expression": {
+        "op": "eq",
+        "args": [
+          {
+            "op": "upper",
+            "args": [
+              {
+                "op": "trim",
+                "args": [
+                  {
+                    "op": "col",
+                    "name": "Currency",
+                    "source": null
+                  }
+                ],
+                "params": {}
+              }
+            ],
+            "params": {}
+          },
+          {
+            "op": "const",
+            "value": "THB"
+          }
+        ],
+        "params": {}
+      },
+      "true": 36,
+      "null": 0
+    },
+    {
+      "index": 2,
+      "expression": {
+        "op": "lte",
+        "args": [
+          {
+            "op": "parse_date_th",
+            "args": [
+              {
+                "op": "col",
+                "name": "Valid from",
+                "source": null
+              }
+            ],
+            "params": {}
+          },
+          {
+            "op": "parse_date_th",
+            "args": [
+              {
+                "op": "const",
+                "value": "2026-11-03"
+              }
+            ],
+            "params": {}
+          }
+        ],
+        "params": {}
+      },
+      "true": 0,
+      "null": 48
+    },
+    {
+      "index": 3,
+      "expression": {
+        "op": "gte",
+        "args": [
+          {
+            "op": "parse_date_th",
+            "args": [
+              {
+                "op": "col",
+                "name": "Valid to",
+                "source": null
+              }
+            ],
+            "params": {}
+          },
+          {
+            "op": "parse_date_th",
+            "args": [
+              {
+                "op": "const",
+                "value": "2026-11-03"
+              }
+            ],
+            "params": {}
+          }
+        ],
+        "params": {}
+      },
+      "true": 0,
+      "null": 48
+    }
+  ],
+  "missing_columns": [],
+  "diagnosis": "Date comparison uses numeric conversion in GTE/LTE; both date predicates are NULL for all 48 rows. No production change made."
+}

@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 
 from forma.ai import plausibility
 from forma.ai.agents import PROMPT_VERSION, AgentResult, adaptation_agent, mapping_agent, schema_agent
+from forma.ai.budget import bounded_task
 from forma.ai.heuristics import HeuristicProposal, propose_mapping
 from forma.ai.llm import LLMError
 from forma.ai.policy import PolicyDecision
@@ -264,6 +265,7 @@ def _verdict(ctx: ServiceContext, report: dict[str, Any] | None) -> None:
         report["verdict"] = "fail" if report["problems"] else "pass" if report.get("delta") else "n/a"
 
 
+@bounded_task
 def propose_for_round(
     ctx: ServiceContext,
     session: Session,
@@ -386,7 +388,36 @@ def propose_for_round(
                 history=(previous.policy or {}).get("simulation") if previous else None,
             )
             try:
-                if previous is not None and drift not in (None, "unrelated_file"):
+                if ctx.settings.mapping_workflow == "graph":
+                    from forma.ai.mapping_workflow import run_workflow
+
+                    doc, res = run_workflow(
+                        ctx.llm,
+                        profile,
+                        schema,
+                        draft,
+                        workbench,
+                        ctx.settings,
+                        snapshot={
+                            "round": r.id,
+                            "customer": r.customer_id,
+                            "version": next_version,
+                            "files": sorted((f.id, f.sha256, f.original_name) for f in r.files),
+                            "schema": schema.document,
+                            "instructions": r.notes or "",
+                            "learned": learned.for_prompt(),
+                            "model": ctx.llm.model,
+                            "provider": ctx.llm.provider.name,
+                            "endpoint": getattr(ctx.llm.provider, "base_url", None),
+                            "previous": previous.document if previous else None,
+                        },
+                        learned=None if learned.empty else learned.for_prompt(),
+                        instructions=r.notes,
+                        previous=previous.document if previous else None,
+                        examples=_examples(session, r.customer_id, profile),
+                    )
+                    source_kind = "ai_adaptation" if previous else "ai"
+                elif previous is not None and drift not in (None, "unrelated_file"):
                     prev_doc = MappingDocument.model_validate(previous.document)
                     drift_detail = next((f.drift for f in r.files if f.drift), {"classification": drift})
                     doc, res = adaptation_agent(
@@ -536,6 +567,16 @@ def propose_for_round(
         ]
         findings.extend({"kind": "plausibility", "severity": "warning", "message": p} for p in implausible)
     rows_out = sim.stats["rows_out"] if sim else 0
+    if sim and not sim.errors and not problems and source_kind in ("ai", "ai_adaptation"):
+        open_questions, retired = _retire_structural_questions(open_questions, doc, schema, sim.records)
+        if retired:
+            agent_log.append(
+                {
+                    "agent": "question_reconciliation",
+                    "retired": retired,
+                    "basis": "complete execution, populated source-backed fields and unique identities",
+                }
+            )
     self_check = next(
         (
             e["data"]["self_check"]
@@ -585,10 +626,11 @@ def propose_for_round(
     )
     if review is not None and previous is not None and source_kind != "memory":
         _inherit_confidence(doc, review, previous)  # a person approved these exact field mappings before
-    from forma.services.decision_actions import conflicting_items
+    from forma.services.decision_actions import conflicting_items, conflicting_records
     from forma.services.review_questions import _table_columns, unit_questions
 
     review_decisions = conflicting_items(doc, schema, sim.records if sim else [])
+    review_decisions.extend(conflicting_records(sim.findings if sim else []))
     review_decisions.extend(
         unit_questions(doc, schema, _table_columns(MappingVersion(round_id=r.id), doc, session))
     )
@@ -643,6 +685,9 @@ def propose_for_round(
             "field_review": review,
             "learning": learning_note,
             "self_check": self_check,
+            "workflow": next(
+                (e["data"]["workflow"] for e in agent_log if (e.get("data") or {}).get("workflow")), None
+            ),
             "agreement": agreement,
             "confidence_basis": confidence_basis,
             "verification": verified,
@@ -866,6 +911,56 @@ def _without_settled(questions: list[str], doc: MappingDocument, schema: TargetS
     return questions
 
 
+def _retire_structural_questions(
+    questions: list[str], doc: MappingDocument, schema: TargetSchema, records: list[dict[str, Any]]
+) -> tuple[list[str], list[str]]:
+    """Resolve narrowly recognized heuristic discovery failures, never business assumptions."""
+    from forma.ai.plausibility import values_at
+    from forma.engine.transform import _referenced_columns
+    from forma.services.healing import _source_sheet
+
+    fields = [(f, doc.record.root_source) for f in doc.fields]
+    fields.extend((f, c.source) for c in doc.collections for f in c.fields)
+    retired = []
+    for question in questions:
+        semantic = None
+        identity = re.fullmatch(
+            r"No SKU-like header found in root table; using '(.+)' as identity — confirm", question
+        )
+        inventory = re.fullmatch(r"Inventory table '(.+)' has no recognisable quantity column", question)
+        pricing = re.fullmatch(r"Pricing table '(.+)' has no recognisable amount column", question)
+        if identity:
+            semantic = "identity.sku"
+        elif inventory:
+            semantic = "stock.qty"
+        elif pricing:
+            semantic = "price.amount"
+        if semantic is None:
+            continue
+        candidates = [(f, source) for f, source in fields if schema.field(f.target).semantic == semantic]
+        for fm, source in candidates:
+            refs = _referenced_columns(fm.expr, source)
+            if not refs:
+                continue
+            if identity and any(ref.partition(".")[0] != doc.record.root_source for ref in refs):
+                continue
+            table_match = inventory or pricing
+            if table_match and not all(
+                _source_sheet(doc, ref.partition(".")[0]) == table_match.group(1) for ref in refs
+            ):
+                continue
+            values = [v for record in records for v in values_at(record, fm.target)]
+            if not values or any(v is None or v == "" for v in values):
+                continue
+            if semantic == "identity.sku" and (
+                len(values) != len(records) or len(set(map(str, values))) != len(values)
+            ):
+                continue
+            retired.append(question)
+            break
+    return [q for q in questions if q not in retired], retired
+
+
 def _inherit_confidence(doc: MappingDocument, review: dict[str, Any], previous: MappingVersion) -> None:
     """Field memory (ADR-006, ADR-037): a field mapped exactly as in the approved mapping — same expression,
     same table — carries the confidence a person already gave it, so it is not asked about again."""
@@ -965,6 +1060,12 @@ def approve_mapping(
         raise Conflict(f"mapping is {m.status}; cannot approve")
     if m.status == "approved":
         return m  # An idempotent approval must not teach the same answer twice.
+    verified = (m.policy or {}).get("verification")
+    if verified is not None and not (verified.get("complete") and verified.get("passed")):
+        raise ValidationFailed(
+            "Fix the transformation errors and verify all records before approving; confirming a field cannot override execution errors",
+            details={"problems": verified.get("problems", [])},
+        )
     unresolved = [
         q for q in (m.policy or {}).get("clarifications", []) if q.get("question") in (m.open_questions or [])
     ]
@@ -1082,10 +1183,15 @@ def save_mapping_edit(
     # Saving a production candidate always verifies the entire input. Preview endpoints may sample.
     sim, problems = simulate(ctx, doc, schema, r.files if r else [], limit=None) if r else (None, [])
     remaining_questions = parent.open_questions if remaining_questions is None else remaining_questions
-    from forma.services.decision_actions import conflicting_items
+    from forma.services.decision_actions import conflicting_items, conflicting_records
     from forma.services.review_questions import _table_columns, unit_questions
 
     review_decisions = conflicting_items(doc, schema, sim.records if sim else [])
+    review_decisions.extend(conflicting_records(sim.findings if sim else []))
+    if sim and not sim.errors and not problems:
+        remaining_questions, _ = _retire_structural_questions(
+            remaining_questions or [], doc, schema, sim.records
+        )
     review_decisions.extend(unit_questions(doc, schema, _table_columns(parent, doc, session)))
     remaining_questions = list(
         dict.fromkeys([*(remaining_questions or []), *(q["question"] for q in review_decisions)])
@@ -1277,7 +1383,7 @@ def preview_mapping(
     if sim is None:
         return {"ok": False, "validation": rep.to_dict(), "errors": problems, "records": [], "findings": []}
     return {
-        "ok": True,
+        "ok": not sim.errors and bool(sim.records),
         "validation": rep.to_dict(),
         "records": sim.records[:limit],
         "findings": [f.to_dict() for f in sim.findings],

@@ -7,9 +7,11 @@ error at validation time, long before data is touched.
 from __future__ import annotations
 
 import datetime as dt
+import operator
 import re
+from collections.abc import Sequence
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, cast
 
 import polars as pl
 
@@ -80,6 +82,29 @@ def _as_str(x: pl.Expr) -> pl.Expr:
 def _as_num(x: pl.Expr) -> pl.Expr:
     """Numeric view of any expression (strings go through the Thai-aware number parser)."""
     return pl.when(_as_str(x).is_null()).then(None).otherwise(_parse_number(x)).cast(pl.Float64, strict=False)
+
+
+def _ordered_compare(left: pl.Expr, right: pl.Expr, op: Op) -> pl.Expr:
+    """Preserve explicitly parsed dates; never send them through the number-text parser."""
+    compare = {Op.GT: operator.gt, Op.GTE: operator.ge, Op.LT: operator.lt, Op.LTE: operator.le}[op]
+
+    def run(columns: Sequence[pl.Series]) -> pl.Series:
+        a, b = columns
+
+        def temporal(s: pl.Series) -> bool:
+            return s.dtype == pl.Date or isinstance(s.dtype, pl.Datetime)
+
+        if temporal(a) or temporal(b):
+            if not all(temporal(s) or s.dtype == pl.Null for s in (a, b)):
+                raise CompileError("Date comparisons require two parsed dates/datetimes, not text or numbers")
+            return cast(pl.Series, compare(a, b))
+        # Parse separately: a literal is a length-one series and must broadcast at comparison,
+        # not when constructing a frame alongside a whole column.
+        av = a.cast(pl.Float64) if a.dtype.is_numeric() else pl.select(_as_num(pl.lit(a))).to_series()
+        bv = b.cast(pl.Float64) if b.dtype.is_numeric() else pl.select(_as_num(pl.lit(b))).to_series()
+        return cast(pl.Series, compare(av, bv))
+
+    return pl.map_batches([left, right], run, return_dtype=pl.Boolean, is_elementwise=True)
 
 
 def number_text_expr(x: pl.Expr) -> pl.Expr:
@@ -262,13 +287,13 @@ def _compile_call(e: CallExpr, ctx: CompileContext) -> pl.Expr:
         case Op.NEQ:
             return _cmp(a[0], a[1], "neq")
         case Op.GT:
-            return _as_num(a[0]) > _as_num(a[1])
+            return _ordered_compare(a[0], a[1], op)
         case Op.GTE:
-            return _as_num(a[0]) >= _as_num(a[1])
+            return _ordered_compare(a[0], a[1], op)
         case Op.LT:
-            return _as_num(a[0]) < _as_num(a[1])
+            return _ordered_compare(a[0], a[1], op)
         case Op.LTE:
-            return _as_num(a[0]) <= _as_num(a[1])
+            return _ordered_compare(a[0], a[1], op)
         case Op.IS_NULL:
             return a[0].is_null()
         case Op.NOT_NULL:

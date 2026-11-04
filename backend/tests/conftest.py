@@ -22,6 +22,8 @@ _SESSION_TMP = Path(tempfile.mkdtemp(prefix="forma-tests-"))
 os.environ.setdefault("FORMA_DATABASE_URL", f"sqlite:///{_SESSION_TMP}/session.db")
 os.environ.setdefault("FORMA_DATA_DIR", str(_SESSION_TMP / "data"))
 os.environ.setdefault("FORMA_LLM_PROVIDER", "mock")
+# Existing fixtures model the legacy schema+mapper protocol. Graph-specific tests opt in explicitly.
+os.environ.setdefault("FORMA_MAPPING_WORKFLOW", "legacy")
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCHEMA_DIR = REPO_ROOT / "target_schema"

@@ -262,9 +262,31 @@ class _Tracer:
             out.append(self._entry(fm, fm.target, root, rows, rec))
         for cm in self.doc.collections:
             for k, row in enumerate((lin.get("items") or {}).get(cm.target, [])[:MAX_ITEMS]):
+                groups = (lin.get("item_groups") or {}).get(cm.target)
+                contributing = groups[k] if groups and k < len(groups) else [row]
                 for fm in cm.fields:
                     pointer = fm.target.replace("/*/", f"/{k}/", 1)
-                    out.append(self._entry(fm, pointer, cm.source, {cm.source: row}, rec, item=k))
+                    parts = [
+                        self._entry(fm, pointer, cm.source, {cm.source: r}, rec, item=k) for r in contributing
+                    ]
+                    if not parts:
+                        continue
+                    entry = parts[0]
+                    if cm.aggregate:
+                        values = [part["mapped"] for part in parts]
+                        summed = fm.target[len(cm.target) + 2 :] in cm.aggregate.sum
+                        entry = {
+                            **entry,
+                            "cells": [cell for part in parts for cell in part["cells"]],
+                            "mapped": (
+                                sum(values) if all(isinstance(v, (int, float)) for v in values) else None
+                            )
+                            if summed
+                            else values[0],
+                            "aggregation": "sum" if summed else "group_by",
+                            "contributing_rows": contributing,
+                        }
+                    out.append(entry)
         return out
 
     def _entry(

@@ -1,0 +1,59 @@
+................F
+================================== FAILURES ===================================
+_________________________ test_ai_endpoints_with_llm __________________________
+tests\test_api.py:637: in test_ai_endpoints_with_llm
+    assert job["status"] == "done", job["error"]
+E   AssertionError: (sqlite3.OperationalError) database is locked
+E     [SQL: UPDATE jobs SET progress=?, message=? WHERE jobs.id = ?]
+E     [parameters: (15, '���ѧ��Ǩ���ŧ�����ŷ�����', 'job_01M6JSHNAFFVETA58YENVB4DST')]
+E     (Background on this error at: https://sqlalche.me/e/21/e3q8)
+E     ts(
+E       File "C:\Users\Beat Beat\Desktop\Forma\backend\.venv\Lib\site-packages\sqlalchemy\orm\persistence.py", line 916, in _emit_update_statements
+E         c = connection.execute(
+E             ^^^^^^^^^^^^^^^^^^^
+E       File "C:\Users\Beat Beat\Desktop\Forma\backend\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1463, in execute
+E         return meth(
+E                ^^^^^
+E       File "C:\Users\Beat Beat\Desktop\Forma\backend\.venv\Lib\site-packages\sqlalchemy\sql\elements.py", line 533, in _execute_on_connection
+E         return connection._execute_clauseelement(
+E                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       File "C:\Users\Beat Beat\Desktop\Forma\backend\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1683, in _execute_clauseelement
+E         ret = self._execute_context(
+E               ^^^^^^^^^^^^^^^^^^^^^^
+E       File "C:\Users\Beat Beat\Desktop\Forma\backend\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1837, in _execute_context
+E         return self._exec_single_context(
+E                ^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       File "C:\Users\Beat Beat\Desktop\Forma\backend\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1977, in _exec_single_context
+E         self._handle_dbapi_exception(
+E       File "C:\Users\Beat Beat\Desktop\Forma\backend\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 2347, in _handle_dbapi_exception
+E         raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+E       File "C:\Users\Beat Beat\Desktop\Forma\backend\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1958, in _exec_single_context
+E         self.dialect.do_execute(
+E       File "C:\Users\Beat Beat\Desktop\Forma\backend\.venv\Lib\site-packages\sqlalchemy\engine\default.py", line 1192, in do_execute
+E         cursor.execute(statement, parameters)
+E     sqlalchemy.exc.OperationalError: (sqlite3.OperationalError) database is locked
+E     [SQL: UPDATE jobs SET progress=?, message=? WHERE jobs.id = ?]
+E     [parameters: (15, '���ѧ��Ǩ���ŧ�����ŷ�����', 'job_01M6JSHNAFFVETA58YENVB4DST')]
+E     (Background on this error at: https://sqlalche.me/e/21/e3q8)
+E     
+E   assert 'failed' == 'done'
+E     
+E     - done
+E     + failed
+---------------------------- Captured stderr setup ----------------------------
+INFO  [alembic.runtime.migration] Context impl SQLiteImpl.
+INFO  [alembic.runtime.migration] Will assume non-transactional DDL.
+INFO  [alembic.runtime.migration] Running stamp_revision  -> e1a5c6d7f8b9
+2026-11-04T08:06:57.782855Z [info     ] schema created (dev)           added_columns=[] legacy=False stamped=e1a5c6d7f8b9
+---------------------------- Captured stderr call -----------------------------
+2026-11-04T08:07:31.942253Z [error    ] job failed                     error="(sqlite3.OperationalError) database is locked\n[SQL: UPDATE jobs SET progress=?, message=? WHERE jobs.id = ?]\n[parameters: (15, '���ѧ��Ǩ���ŧ�����ŷ�����', 'job_01M6JSHNAFFVETA58YENVB4DST')]\n(Background on this error at: https://sqlalche.me/e/21/e3q8)" job=job_01M6JSHNAFFVETA58YENVB4DST job_id=job_01M6JSHNAFFVETA58YENVB4DST job_kind=propose_mapping kind=propose_mapping path=/api/rounds/rnd_01M6JSHN575PGRWZ76QWZX1YFC/propose request_id=req_01M6JSHNABPHMXXJ5BTQS0CC5S
+============================== warnings summary ===============================
+.venv\Lib\site-packages\fastapi\testclient.py:1
+  C:\Users\Beat Beat\Desktop\Forma\backend\.venv\Lib\site-packages\fastapi\testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+FAILED tests/test_api.py::test_ai_endpoints_with_llm - AssertionError: (sqlit...
+!!!!!!!!!!!!!!!!!!!!!!!!!! stopping after 1 failures !!!!!!!!!!!!!!!!!!!!!!!!!!
+1 failed, 16 passed, 1 warning in 51.59s

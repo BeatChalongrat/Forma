@@ -15,7 +15,7 @@ from typing import Any
 from forma.core.hashing import stable_hash
 from forma.schema_registry import TargetSchema
 
-RULES_VERSION = "2026.10.4"
+RULES_VERSION = "2026.11.04.1"
 OUTCOMES = (
     "accept",
     "assign_customer",
@@ -393,12 +393,32 @@ def for_mapping(
         )
         outcome = "assign_customer" if other_code else "reject_file"
         confidence = 0.8 + (0.1 if other_code else 0.0)
+    elif any(q.get("scope") == "source_file" for q in questions):
+        rules.append("source_required")
+        conclusion = _text(
+            "Source information is missing. Supply or repair the file and run mapping again.",
+            "ข้อมูลต้นทางยังไม่ครบ เพิ่มหรือแก้ไฟล์ แล้วให้ระบบจับคู่ใหม่",
+        )
+        outcome = "fix_mapping"
+        confidence = 1.0
     elif decision == "block":
         rules.append("blocked")
         top = str((policy.get("reasons") or ["blocked by policy"])[0])
         conclusion = _text(f"The policy blocks this mapping: {top}", f"กฎระงับการจับคู่นี้: {top}")
         outcome = "fix_mapping"
         confidence = 0.85
+    elif (
+        policy.get("verification") is not None
+        and not (policy["verification"].get("complete") and policy["verification"].get("passed"))
+        and not questions
+    ):
+        rules.append("verification_failed")
+        conclusion = _text(
+            "Full-file verification has not passed. Repair the source or mapping and verify again.",
+            "การตรวจไฟล์ทั้งหมดยังไม่ผ่าน ต้องแก้ต้นทางหรือกฎจับคู่แล้วตรวจใหม่",
+        )
+        outcome = "fix_mapping"
+        confidence = 1.0
     elif errors and decision != "auto_approve":
         rules.append("engine_errors")
         conclusion = _text(

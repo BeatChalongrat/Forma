@@ -1,0 +1,3678 @@
+{
+  "round": {
+    "id": "rnd_01M6G8QXRQ6MQJ99DBNKE3CK48",
+    "customer_id": "cus_01M6G8QXE7DYG03DQ2E05JB0VN",
+    "label": "EVAL rel-20261103-a R01_split_r1",
+    "status": "review",
+    "target_schema": "eval_rel-20261103-a_r01_split@1",
+    "notes": "Map the supplied ERP export(s) to the supplied JSON Schema. Preserve the master product population and identities. Do not invent business facts. Ask a specific question if required facts cannot be established.\nAll three files belong to this delivery. Use the selling price as supplied and preserve both warehouses.",
+    "summary": {
+      "drift": null,
+      "profile": [
+        {
+          "name": "materials.xlsx",
+          "drift": null,
+          "tables": 1,
+          "file_id": "fil_01M6G8QXWXQMT5TCYKVRHWSBBB",
+          "fingerprint": "820912e8c46d6019"
+        },
+        {
+          "name": "balances.xlsx",
+          "drift": null,
+          "tables": 1,
+          "file_id": "fil_01M6G8QXYVY5MC7C0TKK66T82Y",
+          "fingerprint": "506c072c3a2c0c2d"
+        },
+        {
+          "name": "selling_prices.xlsx",
+          "drift": null,
+          "tables": 1,
+          "file_id": "fil_01M6G8QY09FF40461YKED03HRA",
+          "fingerprint": "07c63df410bea4d4"
+        }
+      ],
+      "verdict": {
+        "word": "likely",
+        "stage": "mapping",
+        "digest": "1944baea2dba4e3683c8161eb84ca1f0",
+        "outcome": "answer",
+        "subject": {
+          "id": "map_01M6G8SAWGJD5YPHMT0573Z8SP",
+          "kind": "mapping",
+          "round_id": "rnd_01M6G8QXRQ6MQJ99DBNKE3CK48"
+        },
+        "evidence": [
+          {
+            "id": 1,
+            "kind": "rows",
+            "link": "/rounds/rnd_01M6G8QXRQ6MQJ99DBNKE3CK48",
+            "text": {
+              "en": "12 records produced",
+              "th": "สร้างได้ 12 รายการ"
+            },
+            "numbers": {
+              "rows_out": 12
+            }
+          },
+          {
+            "id": 2,
+            "kind": "self_check",
+            "link": null,
+            "text": {
+              "en": "The AI ran its mapping on the first 12 rows (0 look(s) at the file, 1 fix round(s)): 0 problem(s) left",
+              "th": "AI ลองรัน mapping กับ 12 แถวแรก (ดูไฟล์ 0 ครั้ง แก้ 1 รอบ): เหลือปัญหา 0 ข้อ"
+            },
+            "numbers": {
+              "rows": 12,
+              "fix_rounds": 1,
+              "inspections": 0,
+              "problems_left": 0
+            }
+          },
+          {
+            "id": 3,
+            "kind": "questions",
+            "link": "/review?round=rnd_01M6G8QXRQ6MQJ99DBNKE3CK48",
+            "text": {
+              "en": "2 fields below the confidence bar",
+              "th": "2 ฟิลด์ยังไม่ถึงเกณฑ์ความมั่นใจ"
+            },
+            "numbers": {
+              "count": 2
+            }
+          }
+        ],
+        "narrative": null,
+        "conclusion": {
+          "en": "First file from EVAL-rel-20261103-a-R01_split; 2 fields need a confirmation",
+          "th": "ไฟล์แรกของ EVAL-rel-20261103-a-R01_split มี 2 ฟิลด์ที่ต้องยืนยัน"
+        },
+        "confidence": 0.8,
+        "suppressed": {
+          "count": 0,
+          "groups": [
+            {
+              "text": {
+                "en": "2 notes from the mapper",
+                "th": "หมายเหตุจากตัวจับคู่ 2 ข้อ"
+              },
+              "reason": "open_questions",
+              "pointers": []
+            }
+          ]
+        },
+        "must_decide": [
+          {
+            "id": "/price",
+            "why": {
+              "en": "Below the confidence bar for its risk",
+              "th": "ความมั่นใจต่ำกว่าเกณฑ์ของระดับความเสี่ยงนี้"
+            },
+            "kind": "choice",
+            "scope": null,
+            "default": null,
+            "options": [
+              "selling_price",
+              "Material code"
+            ],
+            "question": {
+              "en": "Which column holds Requested selling price, not cost.?",
+              "th": "คอลัมน์ไหนคือราคาขาย?"
+            },
+            "semantic": "price.amount",
+            "allow_custom": false,
+            "evidence_ids": [
+              3
+            ],
+            "option_labels": null
+          },
+          {
+            "id": "/currency",
+            "why": {
+              "en": "Below the confidence bar for its risk",
+              "th": "ความมั่นใจต่ำกว่าเกณฑ์ของระดับความเสี่ยงนี้"
+            },
+            "kind": "choice",
+            "scope": null,
+            "default": null,
+            "options": [
+              "currency",
+              "Description"
+            ],
+            "question": {
+              "en": "Which column holds ISO 4217 code supported by the source.?",
+              "th": "คอลัมน์ไหนคือสกุลเงิน?"
+            },
+            "semantic": "currency",
+            "allow_custom": false,
+            "evidence_ids": [
+              3
+            ],
+            "option_labels": null
+          }
+        ],
+        "rules_fired": [
+          "first_time"
+        ],
+        "round_status": "review",
+        "rules_version": "2026.10.4",
+        "mapping_status": "proposed",
+        "policy_decision": "review"
+      },
+      "decision": "review",
+      "simulation": {
+        "rows_in": 12,
+        "sources": {
+          "pricing": 12,
+          "products": 12,
+          "inventory": 24
+        },
+        "findings": {
+          "info": 0,
+          "error": 0,
+          "warning": 0
+        },
+        "rows_out": 12,
+        "collections": {
+          "/inventory": 24
+        },
+        "duration_ms": 174.9,
+        "identity_keys": [
+          "/sku"
+        ],
+        "invalid_records": 0
+      },
+      "drift_report": null,
+      "format_memory": {
+        "status": "new",
+        "mapping_id": null,
+        "target_schema": "eval_rel-20261103-a_r01_split@1",
+        "mapping_version": null
+      },
+      "skipped_files": 0,
+      "profiled_files": 3,
+      "mapping_version_id": "map_01M6G8SAWGJD5YPHMT0573Z8SP",
+      "has_previous_approval": false,
+      "matches_other_customer": null
+    },
+    "created_at": "2026-11-03T08:34:49.752005+00:00",
+    "updated_at": "2026-11-03T08:35:36.040297+00:00",
+    "successor_id": null,
+    "predecessor_id": null,
+    "files": [
+      {
+        "id": "fil_01M6G8QXWXQMT5TCYKVRHWSBBB",
+        "round_id": "rnd_01M6G8QXRQ6MQJ99DBNKE3CK48",
+        "name": "materials.xlsx",
+        "size": 3785,
+        "kind": "excel",
+        "status": "profiled",
+        "sha256": "3c382c035dd238c20d5a423d4140c4523d38a4dea2cb750cad8b4363f7d407ef",
+        "duplicate_of": null,
+        "error": null,
+        "created_at": "2026-11-03T08:34:49.885898+00:00",
+        "fingerprint": "820912e8c46d6019",
+        "drift": null,
+        "tables": 1,
+        "sheets": [
+          "Material"
+        ]
+      },
+      {
+        "id": "fil_01M6G8QXYVY5MC7C0TKK66T82Y",
+        "round_id": "rnd_01M6G8QXRQ6MQJ99DBNKE3CK48",
+        "name": "balances.xlsx",
+        "size": 4030,
+        "kind": "excel",
+        "status": "profiled",
+        "sha256": "d5bc5f15904cee6758ced5a8ab400ee4ec4dcaf87039b3bab824bce570c4c38b",
+        "duplicate_of": null,
+        "error": null,
+        "created_at": "2026-11-03T08:34:49.947468+00:00",
+        "fingerprint": "506c072c3a2c0c2d",
+        "drift": null,
+        "tables": 1,
+        "sheets": [
+          "Stock"
+        ]
+      },
+      {
+        "id": "fil_01M6G8QY09FF40461YKED03HRA",
+        "round_id": "rnd_01M6G8QXRQ6MQJ99DBNKE3CK48",
+        "name": "selling_prices.xlsx",
+        "size": 3833,
+        "kind": "excel",
+        "status": "profiled",
+        "sha256": "5eca1a13b6b20a8690e2c316696ff5d9689ee00bbe96119fc8060f5617141780",
+        "duplicate_of": null,
+        "error": null,
+        "created_at": "2026-11-03T08:34:49.993350+00:00",
+        "fingerprint": "07c63df410bea4d4",
+        "drift": null,
+        "tables": 1,
+        "sheets": [
+          "Price"
+        ]
+      }
+    ],
+    "customer": {
+      "id": "cus_01M6G8QXE7DYG03DQ2E05JB0VN",
+      "code": "EVAL-rel-20261103-a-R01_split",
+      "name": "EVAL-rel-20261103-a-R01_split"
+    },
+    "successor": null,
+    "predecessor": null,
+    "mappings": [
+      {
+        "id": "map_01M6G8SAWGJD5YPHMT0573Z8SP",
+        "customer_id": "cus_01M6G8QXE7DYG03DQ2E05JB0VN",
+        "round_id": "rnd_01M6G8QXRQ6MQJ99DBNKE3CK48",
+        "version": 1,
+        "status": "proposed",
+        "target_schema": "eval_rel-20261103-a_r01_split@1",
+        "confidence": 0.93,
+        "created_by": "ai",
+        "model": "deepseek-flash",
+        "policy": {
+          "checks": {
+            "drift": null,
+            "errors": 0,
+            "rows_out": 12,
+            "warnings": 0,
+            "agreement": {
+              "ops": 0,
+              "agree": 0,
+              "record": 3,
+              "dropped": 0,
+              "disagree": 3,
+              "model_only": 3
+            },
+            "llm_fallback": false,
+            "reused_approved": false,
+            "full_verification": true,
+            "mapping_confidence": 0.93,
+            "data_checks_trusted": false,
+            "low_confidence_high": [],
+            "unresolved_questions": 2,
+            "plausibility_warnings": 0,
+            "low_confidence_critical": [
+              "/price (0.70)",
+              "/currency (0.70)"
+            ]
+          },
+          "impact": {},
+          "source": "ai",
+          "reasons": [
+            "low confidence on critical fields: /price (0.70), /currency (0.70)",
+            "mapping confidence 0.93 < 0.95",
+            "first time this customer/format is seen",
+            "2 questions still need operator confirmation",
+            "the model selects rows differently from FORMA's matcher (records: dedupe; records: joins; records: root)"
+          ],
+          "sandbox": null,
+          "verdict": {
+            "word": "likely",
+            "stage": "mapping",
+            "digest": "1944baea2dba4e3683c8161eb84ca1f0",
+            "outcome": "answer",
+            "subject": {
+              "id": "map_01M6G8SAWGJD5YPHMT0573Z8SP",
+              "kind": "mapping",
+              "round_id": "rnd_01M6G8QXRQ6MQJ99DBNKE3CK48"
+            },
+            "evidence": [
+              {
+                "id": 1,
+                "kind": "rows",
+                "link": "/rounds/rnd_01M6G8QXRQ6MQJ99DBNKE3CK48",
+                "text": {
+                  "en": "12 records produced",
+                  "th": "สร้างได้ 12 รายการ"
+                },
+                "numbers": {
+                  "rows_out": 12
+                }
+              },
+              {
+                "id": 2,
+                "kind": "self_check",
+                "link": null,
+                "text": {
+                  "en": "The AI ran its mapping on the first 12 rows (0 look(s) at the file, 1 fix round(s)): 0 problem(s) left",
+                  "th": "AI ลองรัน mapping กับ 12 แถวแรก (ดูไฟล์ 0 ครั้ง แก้ 1 รอบ): เหลือปัญหา 0 ข้อ"
+                },
+                "numbers": {
+                  "rows": 12,
+                  "fix_rounds": 1,
+                  "inspections": 0,
+                  "problems_left": 0
+                }
+              },
+              {
+                "id": 3,
+                "kind": "questions",
+                "link": "/review?round=rnd_01M6G8QXRQ6MQJ99DBNKE3CK48",
+                "text": {
+                  "en": "2 fields below the confidence bar",
+                  "th": "2 ฟิลด์ยังไม่ถึงเกณฑ์ความมั่นใจ"
+                },
+                "numbers": {
+                  "count": 2
+                }
+              }
+            ],
+            "narrative": null,
+            "conclusion": {
+              "en": "First file from EVAL-rel-20261103-a-R01_split; 2 fields need a confirmation",
+              "th": "ไฟล์แรกของ EVAL-rel-20261103-a-R01_split มี 2 ฟิลด์ที่ต้องยืนยัน"
+            },
+            "confidence": 0.8,
+            "suppressed": {
+              "count": 0,
+              "groups": [
+                {
+                  "text": {
+                    "en": "2 notes from the mapper",
+                    "th": "หมายเหตุจากตัวจับคู่ 2 ข้อ"
+                  },
+                  "reason": "open_questions",
+                  "pointers": []
+                }
+              ]
+            },
+            "must_decide": [
+              {
+                "id": "/price",
+                "why": {
+                  "en": "Below the confidence bar for its risk",
+                  "th": "ความมั่นใจต่ำกว่าเกณฑ์ของระดับความเสี่ยงนี้"
+                },
+                "kind": "choice",
+                "scope": null,
+                "default": null,
+                "options": [
+                  "selling_price",
+                  "Material code"
+                ],
+                "question": {
+                  "en": "Which column holds Requested selling price, not cost.?",
+                  "th": "คอลัมน์ไหนคือราคาขาย?"
+                },
+                "semantic": "price.amount",
+                "allow_custom": false,
+                "evidence_ids": [
+                  3
+                ],
+                "option_labels": null
+              },
+              {
+                "id": "/currency",
+                "why": {
+                  "en": "Below the confidence bar for its risk",
+                  "th": "ความมั่นใจต่ำกว่าเกณฑ์ของระดับความเสี่ยงนี้"
+                },
+                "kind": "choice",
+                "scope": null,
+                "default": null,
+                "options": [
+                  "currency",
+                  "Description"
+                ],
+                "question": {
+                  "en": "Which column holds ISO 4217 code supported by the source.?",
+                  "th": "คอลัมน์ไหนคือสกุลเงิน?"
+                },
+                "semantic": "currency",
+                "allow_custom": false,
+                "evidence_ids": [
+                  3
+                ],
+                "option_labels": null
+              }
+            ],
+            "rules_fired": [
+              "first_time"
+            ],
+            "round_status": "review",
+            "rules_version": "2026.10.4",
+            "mapping_status": "proposed",
+            "policy_decision": "review"
+          },
+          "decision": "review",
+          "learning": null,
+          "priority": 75,
+          "agreement": {
+            "ops": [],
+            "agree": [],
+            "record": {
+              "root": {
+                "model": {
+                  "file": "fil_01M6G8QXWXQMT5TCYKVRHWSBBB",
+                  "sheet": "material",
+                  "filter": null,
+                  "rename": {
+                    "Description": "description",
+                    "Material code": "material_code"
+                  },
+                  "unpivot": null,
+                  "data_end": null,
+                  "fill_down": [],
+                  "data_start": null
+                },
+                "matcher": {
+                  "file": "fil_01M6G8QY09FF40461YKED03HRA",
+                  "sheet": "price",
+                  "filter": null,
+                  "rename": {},
+                  "unpivot": null,
+                  "data_end": null,
+                  "fill_down": [],
+                  "data_start": null
+                }
+              },
+              "joins": {
+                "model": [
+                  {
+                    "on": [
+                      {
+                        "left": "material_code",
+                        "right": "price_material_code"
+                      }
+                    ],
+                    "how": "left",
+                    "left": {
+                      "file": "fil_01M6G8QXWXQMT5TCYKVRHWSBBB",
+                      "sheet": "material",
+                      "filter": null,
+                      "rename": {
+                        "Description": "description",
+                        "Material code": "material_code"
+                      },
+                      "unpivot": null,
+                      "data_end": null,
+                      "fill_down": [],
+                      "data_start": null
+                    },
+                    "right": {
+                      "file": "fil_01M6G8QY09FF40461YKED03HRA",
+                      "sheet": "price",
+                      "filter": null,
+                      "rename": {
+                        "Currency": "currency",
+                        "Material code": "price_material_code",
+                        "Selling price": "selling_price"
+                      },
+                      "unpivot": null,
+                      "data_end": null,
+                      "fill_down": [],
+                      "data_start": null
+                    },
+                    "cardinality": "1:1",
+                    "on_unmatched": "keep",
+                    "normalize_keys": [
+                      "trim",
+                      "upper",
+                      "strip_leading_zeros"
+                    ]
+                  }
+                ],
+                "matcher": []
+              },
+              "dedupe": {
+                "model": {
+                  "keep": "first",
+                  "keys": [
+                    "/sku"
+                  ]
+                },
+                "matcher": {
+                  "keep": "first",
+                  "keys": []
+                }
+              }
+            },
+            "dropped": [],
+            "disagree": {
+              "/sku": {
+                "model": [
+                  "Material.material_code"
+                ],
+                "matcher": [
+                  "Price.Material code"
+                ]
+              },
+              "/price": {
+                "model": [
+                  "pricing.selling_price"
+                ],
+                "matcher": [
+                  "Price.Selling price"
+                ]
+              },
+              "/currency": {
+                "model": [
+                  "pricing.currency"
+                ],
+                "matcher": [
+                  "Price.Currency"
+                ]
+              }
+            },
+            "model_only": [
+              "/inventory/*/qty",
+              "/inventory/*/warehouse_code",
+              "/product_name"
+            ]
+          },
+          "risk_level": "high",
+          "risk_score": 0.838,
+          "self_check": {
+            "errors": 0,
+            "history": [
+              {
+                "turn": "ground",
+                "columns": 3
+              },
+              {
+                "turn": "mapping",
+                "complete": true,
+                "coverage": {
+                  "fields": {
+                    "/sku": {
+                      "risk": "medium",
+                      "records": 12,
+                      "records_filled": 12
+                    },
+                    "/price": {
+                      "risk": "critical",
+                      "records": 12,
+                      "records_filled": 0
+                    },
+                    "/currency": {
+                      "risk": "critical",
+                      "records": 12,
+                      "records_filled": 0
+                    },
+                    "/product_name": {
+                      "risk": "medium",
+                      "records": 12,
+                      "records_filled": 12
+                    },
+                    "/inventory/*/qty": {
+                      "risk": "high",
+                      "records": 12,
+                      "records_filled": 12
+                    },
+                    "/inventory/*/warehouse_code": {
+                      "risk": "high",
+                      "records": 12,
+                      "records_filled": 12
+                    }
+                  },
+                  "sources": {
+                    "pricing": 12,
+                    "products": 12,
+                    "inventory": 24
+                  },
+                  "collections": {
+                    "/inventory": 24
+                  },
+                  "invalid_records": 12
+                },
+                "problems": [
+                  "compile: source column 'products.selling_price' not found; values will be null",
+                  "compile: source column 'products.currency' not found; values will be null",
+                  "quality: /currency: 12 rows fail rule not_null",
+                  "validation: data.price must be number",
+                  "/price: empty in 12 of 12 records",
+                  "/currency: empty in 12 of 12 records"
+                ],
+                "rows_out": 12
+              },
+              {
+                "turn": "mapping",
+                "complete": true,
+                "coverage": {
+                  "fields": {
+                    "/sku": {
+                      "risk": "medium",
+                      "records": 12,
+                      "records_filled": 12
+                    },
+                    "/price": {
+                      "risk": "critical",
+                      "records": 12,
+                      "records_filled": 12
+                    },
+                    "/currency": {
+                      "risk": "critical",
+                      "records": 12,
+                      "records_filled": 12
+                    },
+                    "/product_name": {
+                      "risk": "medium",
+                      "records": 12,
+                      "records_filled": 12
+                    },
+                    "/inventory/*/qty": {
+                      "risk": "high",
+                      "records": 12,
+                      "records_filled": 12
+                    },
+                    "/inventory/*/warehouse_code": {
+                      "risk": "high",
+                      "records": 12,
+                      "records_filled": 12
+                    }
+                  },
+                  "sources": {
+                    "pricing": 12,
+                    "products": 12,
+                    "inventory": 24
+                  },
+                  "collections": {
+                    "/inventory": 24
+                  },
+                  "invalid_records": 0
+                },
+                "problems": [],
+                "rows_out": 12
+              }
+            ],
+            "complete": true,
+            "coverage": {
+              "fields": {
+                "/sku": {
+                  "risk": "medium",
+                  "records": 12,
+                  "records_filled": 12
+                },
+                "/price": {
+                  "risk": "critical",
+                  "records": 12,
+                  "records_filled": 12
+                },
+                "/currency": {
+                  "risk": "critical",
+                  "records": 12,
+                  "records_filled": 12
+                },
+                "/product_name": {
+                  "risk": "medium",
+                  "records": 12,
+                  "records_filled": 12
+                },
+                "/inventory/*/qty": {
+                  "risk": "high",
+                  "records": 12,
+                  "records_filled": 12
+                },
+                "/inventory/*/warehouse_code": {
+                  "risk": "high",
+                  "records": 12,
+                  "records_filled": 12
+                }
+              },
+              "sources": {
+                "pricing": 12,
+                "products": 12,
+                "inventory": 24
+              },
+              "collections": {
+                "/inventory": 24
+              },
+              "invalid_records": 0
+            },
+            "grounded": 3,
+            "rows_out": 12,
+            "fix_rounds": 1,
+            "inspections": 0,
+            "python_turns": 0,
+            "rows_checked": 12,
+            "problems_left": []
+          },
+          "simulation": {
+            "fill": {
+              "/sku": 1.0,
+              "/price": 1.0,
+              "/currency": 1.0,
+              "/product_name": 1.0,
+              "/inventory/*/qty": 1.0,
+              "/inventory/*/warehouse_code": 1.0
+            },
+            "rows_in": 12,
+            "sources": {
+              "pricing": 12,
+              "products": 12,
+              "inventory": 24
+            },
+            "complete": true,
+            "findings": {
+              "info": 0,
+              "error": 0,
+              "warning": 0
+            },
+            "rows_out": 12,
+            "collections": {
+              "/inventory": 24
+            },
+            "duration_ms": 174.9,
+            "identity_keys": [
+              "/sku"
+            ],
+            "invalid_records": 0
+          },
+          "reused_from": null,
+          "field_review": null,
+          "risk_factors": [
+            "ambiguous critical field (price, discount, identity …)"
+          ],
+          "verification": {
+            "scope": "Execution and contract checks; business ambiguities require operator answers",
+            "passed": true,
+            "version": 1,
+            "complete": true,
+            "coverage": {
+              "fields": {
+                "/sku": {
+                  "risk": "medium",
+                  "records": 12,
+                  "records_filled": 12
+                },
+                "/price": {
+                  "risk": "critical",
+                  "records": 12,
+                  "records_filled": 12
+                },
+                "/currency": {
+                  "risk": "critical",
+                  "records": 12,
+                  "records_filled": 12
+                },
+                "/product_name": {
+                  "risk": "medium",
+                  "records": 12,
+                  "records_filled": 12
+                },
+                "/inventory/*/qty": {
+                  "risk": "high",
+                  "records": 12,
+                  "records_filled": 12
+                },
+                "/inventory/*/warehouse_code": {
+                  "risk": "high",
+                  "records": 12,
+                  "records_filled": 12
+                }
+              },
+              "sources": {
+                "pricing": 12,
+                "products": 12,
+                "inventory": 24
+              },
+              "collections": {
+                "/inventory": 24
+              },
+              "invalid_records": 0
+            },
+            "problems": [],
+            "rows_out": 12,
+            "warnings": [],
+            "rows_checked": 12
+          },
+          "clarifications": [],
+          "confidence_basis": {
+            "capped": [
+              "/sku",
+              "/price",
+              "/currency"
+            ],
+            "raised": [],
+            "mapping_capped": false
+          },
+          "review_decisions": [],
+          "target_schema_hash": "db36122ac556b4fb",
+          "confirmed_decisions": []
+        },
+        "open_questions": [
+          "No SKU-like header found in root table; using 'Material code' as identity — confirm",
+          "Inventory table 'Stock' has no recognisable quantity column"
+        ],
+        "validation": {
+          "ok": true,
+          "issues": []
+        },
+        "parent_id": null,
+        "approved_by": null,
+        "approved_at": null,
+        "comment": null,
+        "created_at": "2026-11-03T08:35:35.982873+00:00",
+        "agent_log": [
+          {
+            "agent": "operator_requirements",
+            "sha256": "171c5160aa280393186b1cbd556486866da1ae64649f685e31dc194ce3021aeb",
+            "characters": 314,
+            "changed_since_approved": false
+          },
+          {
+            "agent": "heuristic",
+            "unmatched": {
+              "inventory": [
+                "Material code",
+                "Warehouse",
+                "Quantity pieces"
+              ]
+            },
+            "confidence": 0.7070000000000001,
+            "table_roles": {
+              "0": "other",
+              "1": "inventory",
+              "2": "products"
+            }
+          },
+          {
+            "data": {
+              "notes": [
+                "The three tables are related by Material code, which must be preserved as text rather than numeric so leading zeros survive.",
+                "Stock contains two warehouses, BKK and CNX; inventory must be emitted as one entry per warehouse and never summed across warehouses.",
+                "Price table explicitly states THB, so currency is supported by source evidence rather than inferred."
+              ],
+              "tables": [
+                {
+                  "role": "products",
+                  "reason": "Material master: one row per unique material code, each with a product description. This is the product population to preserve.",
+                  "columns": [
+                    {
+                      "name": "Material code",
+                      "reason": "Unique material identifier, 12 distinct values for 12 rows; values must be treated as text to preserve leading zeros (e.g. 000001).",
+                      "semantic": "identity.sku",
+                      "confidence": 0.98,
+                      "target_pointer": "/sku"
+                    },
+                    {
+                      "name": "Description",
+                      "reason": "Human-readable product description paired one-to-one with the material code.",
+                      "semantic": "product.name",
+                      "confidence": 0.96,
+                      "target_pointer": "/product_name"
+                    }
+                  ],
+                  "confidence": 0.98,
+                  "key_column": "Material code",
+                  "table_index": 0
+                },
+                {
+                  "role": "inventory",
+                  "reason": "Stock table: material code repeats for two warehouses (BKK and CNX), with a quantity per material-warehouse pair. The logical key is material code plus warehouse.",
+                  "columns": [
+                    {
+                      "name": "Material code",
+                      "reason": "Foreign key joining stock rows to the product master; each material appears once per warehouse.",
+                      "semantic": "identity.sku",
+                      "confidence": 0.96,
+                      "target_pointer": "/sku"
+                    },
+                    {
+                      "name": "Warehouse",
+                      "reason": "Two distinct warehouse codes, BKK and CNX, repeated across materials; directly represents warehouse_code in each inventory entry.",
+                      "semantic": "stock.warehouse",
+                      "confidence": 0.97,
+                      "target_pointer": "/inventory/*/warehouse_code"
+                    },
+                    {
+                      "name": "Quantity pieces",
+                      "reason": "Numeric stock quantity in individual pieces for each material-warehouse combination; distinct per row and within the stated 7–85 range.",
+                      "semantic": "stock.qty",
+                      "confidence": 0.96,
+                      "target_pointer": "/inventory/*/qty"
+                    }
+                  ],
+                  "confidence": 0.97,
+                  "key_column": "Material code",
+                  "table_index": 1
+                },
+                {
+                  "role": "pricing",
+                  "reason": "Price table: one selling price per unique material code, with a single explicit currency value (THB).",
+                  "columns": [
+                    {
+                      "name": "Material code",
+                      "reason": "Unique material identifier joining pricing rows to the product master; preserve leading zeros as text.",
+                      "semantic": "identity.sku",
+                      "confidence": 0.98,
+                      "target_pointer": "/sku"
+                    },
+                    {
+                      "name": "Selling price",
+                      "reason": "Monetary selling price per material, explicitly labeled Selling price and distinct for all 12 materials.",
+                      "semantic": "price.amount",
+                      "confidence": 0.96,
+                      "target_pointer": "/price"
+                    },
+                    {
+                      "name": "Currency",
+                      "reason": "Single distinct source value THB for every row, explicitly identifying the ISO currency.",
+                      "semantic": "currency",
+                      "confidence": 0.98,
+                      "target_pointer": "/currency"
+                    }
+                  ],
+                  "confidence": 0.98,
+                  "key_column": "Material code",
+                  "table_index": 2
+                }
+              ]
+            },
+            "agent": "schema",
+            "notes": [],
+            "usage": {
+              "calls": 1,
+              "model": "deepseek-flash",
+              "cost_usd": 0.008558,
+              "latency_ms": 5418.3,
+              "input_tokens": 4938,
+              "output_tokens": 905
+            },
+            "attempts": 1
+          },
+          {
+            "data": {
+              "confidence": 0.93,
+              "self_check": {
+                "errors": 0,
+                "history": [
+                  {
+                    "turn": "ground",
+                    "columns": 3
+                  },
+                  {
+                    "turn": "mapping",
+                    "complete": true,
+                    "coverage": {
+                      "fields": {
+                        "/sku": {
+                          "risk": "medium",
+                          "records": 12,
+                          "records_filled": 12
+                        },
+                        "/price": {
+                          "risk": "critical",
+                          "records": 12,
+                          "records_filled": 0
+                        },
+                        "/currency": {
+                          "risk": "critical",
+                          "records": 12,
+                          "records_filled": 0
+                        },
+                        "/product_name": {
+                          "risk": "medium",
+                          "records": 12,
+                          "records_filled": 12
+                        },
+                        "/inventory/*/qty": {
+                          "risk": "high",
+                          "records": 12,
+                          "records_filled": 12
+                        },
+                        "/inventory/*/warehouse_code": {
+                          "risk": "high",
+                          "records": 12,
+                          "records_filled": 12
+                        }
+                      },
+                      "sources": {
+                        "pricing": 12,
+                        "products": 12,
+                        "inventory": 24
+                      },
+                      "collections": {
+                        "/inventory": 24
+                      },
+                      "invalid_records": 12
+                    },
+                    "problems": [
+                      "compile: source column 'products.selling_price' not found; values will be null",
+                      "compile: source column 'products.currency' not found; values will be null",
+                      "quality: /currency: 12 rows fail rule not_null",
+                      "validation: data.price must be number",
+                      "/price: empty in 12 of 12 records",
+                      "/currency: empty in 12 of 12 records"
+                    ],
+                    "rows_out": 12
+                  },
+                  {
+                    "turn": "mapping",
+                    "complete": true,
+                    "coverage": {
+                      "fields": {
+                        "/sku": {
+                          "risk": "medium",
+                          "records": 12,
+                          "records_filled": 12
+                        },
+                        "/price": {
+                          "risk": "critical",
+                          "records": 12,
+                          "records_filled": 12
+                        },
+                        "/currency": {
+                          "risk": "critical",
+                          "records": 12,
+                          "records_filled": 12
+                        },
+                        "/product_name": {
+                          "risk": "medium",
+                          "records": 12,
+                          "records_filled": 12
+                        },
+                        "/inventory/*/qty": {
+                          "risk": "high",
+                          "records": 12,
+                          "records_filled": 12
+                        },
+                        "/inventory/*/warehouse_code": {
+                          "risk": "high",
+                          "records": 12,
+                          "records_filled": 12
+                        }
+                      },
+                      "sources": {
+                        "pricing": 12,
+                        "products": 12,
+                        "inventory": 24
+                      },
+                      "collections": {
+                        "/inventory": 24
+                      },
+                      "invalid_records": 0
+                    },
+                    "problems": [],
+                    "rows_out": 12
+                  }
+                ],
+                "complete": true,
+                "coverage": {
+                  "fields": {
+                    "/sku": {
+                      "risk": "medium",
+                      "records": 12,
+                      "records_filled": 12
+                    },
+                    "/price": {
+                      "risk": "critical",
+                      "records": 12,
+                      "records_filled": 12
+                    },
+                    "/currency": {
+                      "risk": "critical",
+                      "records": 12,
+                      "records_filled": 12
+                    },
+                    "/product_name": {
+                      "risk": "medium",
+                      "records": 12,
+                      "records_filled": 12
+                    },
+                    "/inventory/*/qty": {
+                      "risk": "high",
+                      "records": 12,
+                      "records_filled": 12
+                    },
+                    "/inventory/*/warehouse_code": {
+                      "risk": "high",
+                      "records": 12,
+                      "records_filled": 12
+                    }
+                  },
+                  "sources": {
+                    "pricing": 12,
+                    "products": 12,
+                    "inventory": 24
+                  },
+                  "collections": {
+                    "/inventory": 24
+                  },
+                  "invalid_records": 0
+                },
+                "grounded": 3,
+                "rows_out": 12,
+                "fix_rounds": 1,
+                "inspections": 0,
+                "python_turns": 0,
+                "rows_checked": 12,
+                "problems_left": []
+              },
+              "clarifications": [],
+              "changes_from_draft": [
+                "Repointed /price and /currency to the joined pricing frame by adding source='pricing' to their col nodes; the run showed 'products.selling_price' / 'products.currency' not found, which zero-filled 12 of 12 records and failed the number validation and /currency not_null rule.",
+                "Changed the record root to the Material master (products) so the 12-master population and identities are the record set, with Price left-joined 1:1 on material code.",
+                "Kept the /inventory collection over Stock with one entry per warehouse (BKK, CNX), 24 items for 12 products, deduped on /warehouse_code — quantities are not summed across warehouses.",
+                "All source ids, sheet selections and table specs from the draft were retained; only the join (products→pricing) and source-qualified column references were corrected.",
+                "Confirmed from source data: single currency value THB on every price row, so currency is explicit evidence, not inferred; prices used exactly as supplied (no rounding, no VAT adjustment).",
+                "Dropped the draft open questions: a unique material-code master exists in the Material sheet and 'Quantity pieces' is a recognisable, non-null quantity column. The earlier name_pattern hints ('^balances', '^selling_prices') that did not match the actual Material/Stock file assignments were removed in favour of sheet-based selection."
+              ]
+            },
+            "agent": "mapping",
+            "notes": [],
+            "usage": {
+              "calls": 2,
+              "model": "deepseek-flash",
+              "cost_usd": 0.052616,
+              "latency_ms": 34753.0,
+              "input_tokens": 24300,
+              "output_tokens": 7079
+            },
+            "attempts": 2
+          },
+          {
+            "ops": 0,
+            "agent": "agreement",
+            "agree": 0,
+            "record": 3,
+            "dropped": 0,
+            "disagree": 3,
+            "model_only": 3
+          }
+        ],
+        "sample": [
+          {
+            "sku": "000001",
+            "price": 113.0,
+            "currency": "THB",
+            "inventory": [
+              {
+                "qty": 8.0,
+                "warehouse_code": "CNX"
+              },
+              {
+                "qty": 7.0,
+                "warehouse_code": "BKK"
+              }
+            ],
+            "source_meta": {
+              "file": "materials.xlsx",
+              "lineage": {
+                "items": {
+                  "/inventory": [
+                    15,
+                    20
+                  ]
+                },
+                "joined": {
+                  "pricing": 6
+                },
+                "source": "products",
+                "root_row": 0
+              }
+            },
+            "product_name": "Coffee variant 01"
+          },
+          {
+            "sku": "000011",
+            "price": 243.0,
+            "currency": "THB",
+            "inventory": [
+              {
+                "qty": 78.0,
+                "warehouse_code": "CNX"
+              },
+              {
+                "qty": 77.0,
+                "warehouse_code": "BKK"
+              }
+            ],
+            "source_meta": {
+              "file": "materials.xlsx",
+              "lineage": {
+                "items": {
+                  "/inventory": [
+                    17,
+                    22
+                  ]
+                },
+                "joined": {
+                  "pricing": 0
+                },
+                "source": "products",
+                "root_row": 1
+              }
+            },
+            "product_name": "Soap variant 11"
+          },
+          {
+            "sku": "000002",
+            "price": 126.0,
+            "currency": "THB",
+            "inventory": [
+              {
+                "qty": 14.0,
+                "warehouse_code": "BKK"
+              },
+              {
+                "qty": 15.0,
+                "warehouse_code": "CNX"
+              }
+            ],
+            "source_meta": {
+              "file": "materials.xlsx",
+              "lineage": {
+                "items": {
+                  "/inventory": [
+                    12,
+                    18
+                  ]
+                },
+                "joined": {
+                  "pricing": 10
+                },
+                "source": "products",
+                "root_row": 2
+              }
+            },
+            "product_name": "Shampoo variant 02"
+          },
+          {
+            "sku": "000012",
+            "price": 256.0,
+            "currency": "THB",
+            "inventory": [
+              {
+                "qty": 84.0,
+                "warehouse_code": "BKK"
+              },
+              {
+                "qty": 85.0,
+                "warehouse_code": "CNX"
+              }
+            ],
+            "source_meta": {
+              "file": "materials.xlsx",
+              "lineage": {
+                "items": {
+                  "/inventory": [
+                    8,
+                    14
+                  ]
+                },
+                "joined": {
+                  "pricing": 7
+                },
+                "source": "products",
+                "root_row": 3
+              }
+            },
+            "product_name": "Tea variant 12"
+          },
+          {
+            "sku": "000009",
+            "price": 217.0,
+            "currency": "THB",
+            "inventory": [
+              {
+                "qty": 63.0,
+                "warehouse_code": "BKK"
+              },
+              {
+                "qty": 64.0,
+                "warehouse_code": "CNX"
+              }
+            ],
+            "source_meta": {
+              "file": "materials.xlsx",
+              "lineage": {
+                "items": {
+                  "/inventory": [
+                    0,
+                    19
+                  ]
+                },
+                "joined": {
+                  "pricing": 8
+                },
+                "source": "products",
+                "root_row": 4
+              }
+            },
+            "product_name": "Coffee variant 09"
+          }
+        ]
+      }
+    ],
+    "datasets": [],
+    "review_tasks": [
+      {
+        "id": "rev_01M6G8SAYYMGN8AF0PEEFQV83J",
+        "round_id": "rnd_01M6G8QXRQ6MQJ99DBNKE3CK48",
+        "customer_id": "cus_01M6G8QXE7DYG03DQ2E05JB0VN",
+        "mapping_version_id": "map_01M6G8SAWGJD5YPHMT0573Z8SP",
+        "dataset_version_id": null,
+        "kind": "mapping",
+        "priority": 75,
+        "status": "open",
+        "reasons": [
+          "low confidence on critical fields: /price (0.70), /currency (0.70)",
+          "mapping confidence 0.93 < 0.95",
+          "first time this customer/format is seen",
+          "2 questions still need operator confirmation",
+          "the model selects rows differently from FORMA's matcher (records: dedupe; records: joins; records: root)"
+        ],
+        "details": {
+          "impact": {},
+          "verdict": {
+            "word": "likely",
+            "stage": "mapping",
+            "digest": "1944baea2dba4e3683c8161eb84ca1f0",
+            "outcome": "answer",
+            "conclusion": {
+              "en": "First file from EVAL-rel-20261103-a-R01_split; 2 fields need a confirmation",
+              "th": "ไฟล์แรกของ EVAL-rel-20261103-a-R01_split มี 2 ฟิลด์ที่ต้องยืนยัน"
+            },
+            "confidence": 0.8,
+            "rules_fired": [
+              "first_time"
+            ]
+          },
+          "decision": "review",
+          "findings": [],
+          "risk_level": "high",
+          "risk_factors": [
+            "ambiguous critical field (price, discount, identity …)"
+          ],
+          "open_questions": [
+            "No SKU-like header found in root table; using 'Material code' as identity — confirm",
+            "Inventory table 'Stock' has no recognisable quantity column"
+          ]
+        },
+        "resolver": null,
+        "comment": null,
+        "created_at": "2026-11-03T08:35:36.030338+00:00",
+        "resolved_at": null,
+        "age_days": 0,
+        "waiting_until": null,
+        "waiting_note": null
+      }
+    ],
+    "jobs": [
+      {
+        "id": "job_01M6G8R12JYH3NG67FGPW3DJ59",
+        "kind": "propose_mapping",
+        "status": "done",
+        "progress": 100,
+        "message": null,
+        "error": null
+      },
+      {
+        "id": "job_01M6G8QY1QK1H4M5VMEHYSZD53",
+        "kind": "profile_round",
+        "status": "done",
+        "progress": 100,
+        "message": null,
+        "error": null
+      }
+    ]
+  },
+  "mapping": {
+    "id": "map_01M6G8SAWGJD5YPHMT0573Z8SP",
+    "customer_id": "cus_01M6G8QXE7DYG03DQ2E05JB0VN",
+    "round_id": "rnd_01M6G8QXRQ6MQJ99DBNKE3CK48",
+    "version": 1,
+    "status": "proposed",
+    "target_schema": "eval_rel-20261103-a_r01_split@1",
+    "confidence": 0.93,
+    "created_by": "ai",
+    "model": "deepseek-flash",
+    "policy": {
+      "checks": {
+        "drift": null,
+        "errors": 0,
+        "rows_out": 12,
+        "warnings": 0,
+        "agreement": {
+          "ops": 0,
+          "agree": 0,
+          "record": 3,
+          "dropped": 0,
+          "disagree": 3,
+          "model_only": 3
+        },
+        "llm_fallback": false,
+        "reused_approved": false,
+        "full_verification": true,
+        "mapping_confidence": 0.93,
+        "data_checks_trusted": false,
+        "low_confidence_high": [],
+        "unresolved_questions": 2,
+        "plausibility_warnings": 0,
+        "low_confidence_critical": [
+          "/price (0.70)",
+          "/currency (0.70)"
+        ]
+      },
+      "impact": {},
+      "source": "ai",
+      "reasons": [
+        "low confidence on critical fields: /price (0.70), /currency (0.70)",
+        "mapping confidence 0.93 < 0.95",
+        "first time this customer/format is seen",
+        "2 questions still need operator confirmation",
+        "the model selects rows differently from FORMA's matcher (records: dedupe; records: joins; records: root)"
+      ],
+      "sandbox": null,
+      "verdict": {
+        "word": "likely",
+        "stage": "mapping",
+        "digest": "1944baea2dba4e3683c8161eb84ca1f0",
+        "outcome": "answer",
+        "subject": {
+          "id": "map_01M6G8SAWGJD5YPHMT0573Z8SP",
+          "kind": "mapping",
+          "round_id": "rnd_01M6G8QXRQ6MQJ99DBNKE3CK48"
+        },
+        "evidence": [
+          {
+            "id": 1,
+            "kind": "rows",
+            "link": "/rounds/rnd_01M6G8QXRQ6MQJ99DBNKE3CK48",
+            "text": {
+              "en": "12 records produced",
+              "th": "สร้างได้ 12 รายการ"
+            },
+            "numbers": {
+              "rows_out": 12
+            }
+          },
+          {
+            "id": 2,
+            "kind": "self_check",
+            "link": null,
+            "text": {
+              "en": "The AI ran its mapping on the first 12 rows (0 look(s) at the file, 1 fix round(s)): 0 problem(s) left",
+              "th": "AI ลองรัน mapping กับ 12 แถวแรก (ดูไฟล์ 0 ครั้ง แก้ 1 รอบ): เหลือปัญหา 0 ข้อ"
+            },
+            "numbers": {
+              "rows": 12,
+              "fix_rounds": 1,
+              "inspections": 0,
+              "problems_left": 0
+            }
+          },
+          {
+            "id": 3,
+            "kind": "questions",
+            "link": "/review?round=rnd_01M6G8QXRQ6MQJ99DBNKE3CK48",
+            "text": {
+              "en": "2 fields below the confidence bar",
+              "th": "2 ฟิลด์ยังไม่ถึงเกณฑ์ความมั่นใจ"
+            },
+            "numbers": {
+              "count": 2
+            }
+          }
+        ],
+        "narrative": null,
+        "conclusion": {
+          "en": "First file from EVAL-rel-20261103-a-R01_split; 2 fields need a confirmation",
+          "th": "ไฟล์แรกของ EVAL-rel-20261103-a-R01_split มี 2 ฟิลด์ที่ต้องยืนยัน"
+        },
+        "confidence": 0.8,
+        "suppressed": {
+          "count": 0,
+          "groups": [
+            {
+              "text": {
+                "en": "2 notes from the mapper",
+                "th": "หมายเหตุจากตัวจับคู่ 2 ข้อ"
+              },
+              "reason": "open_questions",
+              "pointers": []
+            }
+          ]
+        },
+        "must_decide": [
+          {
+            "id": "/price",
+            "why": {
+              "en": "Below the confidence bar for its risk",
+              "th": "ความมั่นใจต่ำกว่าเกณฑ์ของระดับความเสี่ยงนี้"
+            },
+            "kind": "choice",
+            "scope": null,
+            "default": null,
+            "options": [
+              "selling_price",
+              "Material code"
+            ],
+            "question": {
+              "en": "Which column holds Requested selling price, not cost.?",
+              "th": "คอลัมน์ไหนคือราคาขาย?"
+            },
+            "semantic": "price.amount",
+            "allow_custom": false,
+            "evidence_ids": [
+              3
+            ],
+            "option_labels": null
+          },
+          {
+            "id": "/currency",
+            "why": {
+              "en": "Below the confidence bar for its risk",
+              "th": "ความมั่นใจต่ำกว่าเกณฑ์ของระดับความเสี่ยงนี้"
+            },
+            "kind": "choice",
+            "scope": null,
+            "default": null,
+            "options": [
+              "currency",
+              "Description"
+            ],
+            "question": {
+              "en": "Which column holds ISO 4217 code supported by the source.?",
+              "th": "คอลัมน์ไหนคือสกุลเงิน?"
+            },
+            "semantic": "currency",
+            "allow_custom": false,
+            "evidence_ids": [
+              3
+            ],
+            "option_labels": null
+          }
+        ],
+        "rules_fired": [
+          "first_time"
+        ],
+        "round_status": "review",
+        "rules_version": "2026.10.4",
+        "mapping_status": "proposed",
+        "policy_decision": "review"
+      },
+      "decision": "review",
+      "learning": null,
+      "priority": 75,
+      "agreement": {
+        "ops": [],
+        "agree": [],
+        "record": {
+          "root": {
+            "model": {
+              "file": "fil_01M6G8QXWXQMT5TCYKVRHWSBBB",
+              "sheet": "material",
+              "filter": null,
+              "rename": {
+                "Description": "description",
+                "Material code": "material_code"
+              },
+              "unpivot": null,
+              "data_end": null,
+              "fill_down": [],
+              "data_start": null
+            },
+            "matcher": {
+              "file": "fil_01M6G8QY09FF40461YKED03HRA",
+              "sheet": "price",
+              "filter": null,
+              "rename": {},
+              "unpivot": null,
+              "data_end": null,
+              "fill_down": [],
+              "data_start": null
+            }
+          },
+          "joins": {
+            "model": [
+              {
+                "on": [
+                  {
+                    "left": "material_code",
+                    "right": "price_material_code"
+                  }
+                ],
+                "how": "left",
+                "left": {
+                  "file": "fil_01M6G8QXWXQMT5TCYKVRHWSBBB",
+                  "sheet": "material",
+                  "filter": null,
+                  "rename": {
+                    "Description": "description",
+                    "Material code": "material_code"
+                  },
+                  "unpivot": null,
+                  "data_end": null,
+                  "fill_down": [],
+                  "data_start": null
+                },
+                "right": {
+                  "file": "fil_01M6G8QY09FF40461YKED03HRA",
+                  "sheet": "price",
+                  "filter": null,
+                  "rename": {
+                    "Currency": "currency",
+                    "Material code": "price_material_code",
+                    "Selling price": "selling_price"
+                  },
+                  "unpivot": null,
+                  "data_end": null,
+                  "fill_down": [],
+                  "data_start": null
+                },
+                "cardinality": "1:1",
+                "on_unmatched": "keep",
+                "normalize_keys": [
+                  "trim",
+                  "upper",
+                  "strip_leading_zeros"
+                ]
+              }
+            ],
+            "matcher": []
+          },
+          "dedupe": {
+            "model": {
+              "keep": "first",
+              "keys": [
+                "/sku"
+              ]
+            },
+            "matcher": {
+              "keep": "first",
+              "keys": []
+            }
+          }
+        },
+        "dropped": [],
+        "disagree": {
+          "/sku": {
+            "model": [
+              "Material.material_code"
+            ],
+            "matcher": [
+              "Price.Material code"
+            ]
+          },
+          "/price": {
+            "model": [
+              "pricing.selling_price"
+            ],
+            "matcher": [
+              "Price.Selling price"
+            ]
+          },
+          "/currency": {
+            "model": [
+              "pricing.currency"
+            ],
+            "matcher": [
+              "Price.Currency"
+            ]
+          }
+        },
+        "model_only": [
+          "/inventory/*/qty",
+          "/inventory/*/warehouse_code",
+          "/product_name"
+        ]
+      },
+      "risk_level": "high",
+      "risk_score": 0.838,
+      "self_check": {
+        "errors": 0,
+        "history": [
+          {
+            "turn": "ground",
+            "columns": 3
+          },
+          {
+            "turn": "mapping",
+            "complete": true,
+            "coverage": {
+              "fields": {
+                "/sku": {
+                  "risk": "medium",
+                  "records": 12,
+                  "records_filled": 12
+                },
+                "/price": {
+                  "risk": "critical",
+                  "records": 12,
+                  "records_filled": 0
+                },
+                "/currency": {
+                  "risk": "critical",
+                  "records": 12,
+                  "records_filled": 0
+                },
+                "/product_name": {
+                  "risk": "medium",
+                  "records": 12,
+                  "records_filled": 12
+                },
+                "/inventory/*/qty": {
+                  "risk": "high",
+                  "records": 12,
+                  "records_filled": 12
+                },
+                "/inventory/*/warehouse_code": {
+                  "risk": "high",
+                  "records": 12,
+                  "records_filled": 12
+                }
+              },
+              "sources": {
+                "pricing": 12,
+                "products": 12,
+                "inventory": 24
+              },
+              "collections": {
+                "/inventory": 24
+              },
+              "invalid_records": 12
+            },
+            "problems": [
+              "compile: source column 'products.selling_price' not found; values will be null",
+              "compile: source column 'products.currency' not found; values will be null",
+              "quality: /currency: 12 rows fail rule not_null",
+              "validation: data.price must be number",
+              "/price: empty in 12 of 12 records",
+              "/currency: empty in 12 of 12 records"
+            ],
+            "rows_out": 12
+          },
+          {
+            "turn": "mapping",
+            "complete": true,
+            "coverage": {
+              "fields": {
+                "/sku": {
+                  "risk": "medium",
+                  "records": 12,
+                  "records_filled": 12
+                },
+                "/price": {
+                  "risk": "critical",
+                  "records": 12,
+                  "records_filled": 12
+                },
+                "/currency": {
+                  "risk": "critical",
+                  "records": 12,
+                  "records_filled": 12
+                },
+                "/product_name": {
+                  "risk": "medium",
+                  "records": 12,
+                  "records_filled": 12
+                },
+                "/inventory/*/qty": {
+                  "risk": "high",
+                  "records": 12,
+                  "records_filled": 12
+                },
+                "/inventory/*/warehouse_code": {
+                  "risk": "high",
+                  "records": 12,
+                  "records_filled": 12
+                }
+              },
+              "sources": {
+                "pricing": 12,
+                "products": 12,
+                "inventory": 24
+              },
+              "collections": {
+                "/inventory": 24
+              },
+              "invalid_records": 0
+            },
+            "problems": [],
+            "rows_out": 12
+          }
+        ],
+        "complete": true,
+        "coverage": {
+          "fields": {
+            "/sku": {
+              "risk": "medium",
+              "records": 12,
+              "records_filled": 12
+            },
+            "/price": {
+              "risk": "critical",
+              "records": 12,
+              "records_filled": 12
+            },
+            "/currency": {
+              "risk": "critical",
+              "records": 12,
+              "records_filled": 12
+            },
+            "/product_name": {
+              "risk": "medium",
+              "records": 12,
+              "records_filled": 12
+            },
+            "/inventory/*/qty": {
+              "risk": "high",
+              "records": 12,
+              "records_filled": 12
+            },
+            "/inventory/*/warehouse_code": {
+              "risk": "high",
+              "records": 12,
+              "records_filled": 12
+            }
+          },
+          "sources": {
+            "pricing": 12,
+            "products": 12,
+            "inventory": 24
+          },
+          "collections": {
+            "/inventory": 24
+          },
+          "invalid_records": 0
+        },
+        "grounded": 3,
+        "rows_out": 12,
+        "fix_rounds": 1,
+        "inspections": 0,
+        "python_turns": 0,
+        "rows_checked": 12,
+        "problems_left": []
+      },
+      "simulation": {
+        "fill": {
+          "/sku": 1.0,
+          "/price": 1.0,
+          "/currency": 1.0,
+          "/product_name": 1.0,
+          "/inventory/*/qty": 1.0,
+          "/inventory/*/warehouse_code": 1.0
+        },
+        "rows_in": 12,
+        "sources": {
+          "pricing": 12,
+          "products": 12,
+          "inventory": 24
+        },
+        "complete": true,
+        "findings": {
+          "info": 0,
+          "error": 0,
+          "warning": 0
+        },
+        "rows_out": 12,
+        "collections": {
+          "/inventory": 24
+        },
+        "duration_ms": 174.9,
+        "identity_keys": [
+          "/sku"
+        ],
+        "invalid_records": 0
+      },
+      "reused_from": null,
+      "field_review": null,
+      "risk_factors": [
+        "ambiguous critical field (price, discount, identity …)"
+      ],
+      "verification": {
+        "scope": "Execution and contract checks; business ambiguities require operator answers",
+        "passed": true,
+        "version": 1,
+        "complete": true,
+        "coverage": {
+          "fields": {
+            "/sku": {
+              "risk": "medium",
+              "records": 12,
+              "records_filled": 12
+            },
+            "/price": {
+              "risk": "critical",
+              "records": 12,
+              "records_filled": 12
+            },
+            "/currency": {
+              "risk": "critical",
+              "records": 12,
+              "records_filled": 12
+            },
+            "/product_name": {
+              "risk": "medium",
+              "records": 12,
+              "records_filled": 12
+            },
+            "/inventory/*/qty": {
+              "risk": "high",
+              "records": 12,
+              "records_filled": 12
+            },
+            "/inventory/*/warehouse_code": {
+              "risk": "high",
+              "records": 12,
+              "records_filled": 12
+            }
+          },
+          "sources": {
+            "pricing": 12,
+            "products": 12,
+            "inventory": 24
+          },
+          "collections": {
+            "/inventory": 24
+          },
+          "invalid_records": 0
+        },
+        "problems": [],
+        "rows_out": 12,
+        "warnings": [],
+        "rows_checked": 12
+      },
+      "clarifications": [],
+      "confidence_basis": {
+        "capped": [
+          "/sku",
+          "/price",
+          "/currency"
+        ],
+        "raised": [],
+        "mapping_capped": false
+      },
+      "review_decisions": [],
+      "target_schema_hash": "db36122ac556b4fb",
+      "confirmed_decisions": []
+    },
+    "open_questions": [
+      "No SKU-like header found in root table; using 'Material code' as identity — confirm",
+      "Inventory table 'Stock' has no recognisable quantity column"
+    ],
+    "validation": {
+      "ok": true,
+      "issues": []
+    },
+    "parent_id": null,
+    "approved_by": null,
+    "approved_at": null,
+    "comment": null,
+    "created_at": "2026-11-03T08:35:35.982873+00:00",
+    "agent_log": [
+      {
+        "agent": "operator_requirements",
+        "sha256": "171c5160aa280393186b1cbd556486866da1ae64649f685e31dc194ce3021aeb",
+        "characters": 314,
+        "changed_since_approved": false
+      },
+      {
+        "agent": "heuristic",
+        "unmatched": {
+          "inventory": [
+            "Material code",
+            "Warehouse",
+            "Quantity pieces"
+          ]
+        },
+        "confidence": 0.7070000000000001,
+        "table_roles": {
+          "0": "other",
+          "1": "inventory",
+          "2": "products"
+        }
+      },
+      {
+        "data": {
+          "notes": [
+            "The three tables are related by Material code, which must be preserved as text rather than numeric so leading zeros survive.",
+            "Stock contains two warehouses, BKK and CNX; inventory must be emitted as one entry per warehouse and never summed across warehouses.",
+            "Price table explicitly states THB, so currency is supported by source evidence rather than inferred."
+          ],
+          "tables": [
+            {
+              "role": "products",
+              "reason": "Material master: one row per unique material code, each with a product description. This is the product population to preserve.",
+              "columns": [
+                {
+                  "name": "Material code",
+                  "reason": "Unique material identifier, 12 distinct values for 12 rows; values must be treated as text to preserve leading zeros (e.g. 000001).",
+                  "semantic": "identity.sku",
+                  "confidence": 0.98,
+                  "target_pointer": "/sku"
+                },
+                {
+                  "name": "Description",
+                  "reason": "Human-readable product description paired one-to-one with the material code.",
+                  "semantic": "product.name",
+                  "confidence": 0.96,
+                  "target_pointer": "/product_name"
+                }
+              ],
+              "confidence": 0.98,
+              "key_column": "Material code",
+              "table_index": 0
+            },
+            {
+              "role": "inventory",
+              "reason": "Stock table: material code repeats for two warehouses (BKK and CNX), with a quantity per material-warehouse pair. The logical key is material code plus warehouse.",
+              "columns": [
+                {
+                  "name": "Material code",
+                  "reason": "Foreign key joining stock rows to the product master; each material appears once per warehouse.",
+                  "semantic": "identity.sku",
+                  "confidence": 0.96,
+                  "target_pointer": "/sku"
+                },
+                {
+                  "name": "Warehouse",
+                  "reason": "Two distinct warehouse codes, BKK and CNX, repeated across materials; directly represents warehouse_code in each inventory entry.",
+                  "semantic": "stock.warehouse",
+                  "confidence": 0.97,
+                  "target_pointer": "/inventory/*/warehouse_code"
+                },
+                {
+                  "name": "Quantity pieces",
+                  "reason": "Numeric stock quantity in individual pieces for each material-warehouse combination; distinct per row and within the stated 7–85 range.",
+                  "semantic": "stock.qty",
+                  "confidence": 0.96,
+                  "target_pointer": "/inventory/*/qty"
+                }
+              ],
+              "confidence": 0.97,
+              "key_column": "Material code",
+              "table_index": 1
+            },
+            {
+              "role": "pricing",
+              "reason": "Price table: one selling price per unique material code, with a single explicit currency value (THB).",
+              "columns": [
+                {
+                  "name": "Material code",
+                  "reason": "Unique material identifier joining pricing rows to the product master; preserve leading zeros as text.",
+                  "semantic": "identity.sku",
+                  "confidence": 0.98,
+                  "target_pointer": "/sku"
+                },
+                {
+                  "name": "Selling price",
+                  "reason": "Monetary selling price per material, explicitly labeled Selling price and distinct for all 12 materials.",
+                  "semantic": "price.amount",
+                  "confidence": 0.96,
+                  "target_pointer": "/price"
+                },
+                {
+                  "name": "Currency",
+                  "reason": "Single distinct source value THB for every row, explicitly identifying the ISO currency.",
+                  "semantic": "currency",
+                  "confidence": 0.98,
+                  "target_pointer": "/currency"
+                }
+              ],
+              "confidence": 0.98,
+              "key_column": "Material code",
+              "table_index": 2
+            }
+          ]
+        },
+        "agent": "schema",
+        "notes": [],
+        "usage": {
+          "calls": 1,
+          "model": "deepseek-flash",
+          "cost_usd": 0.008558,
+          "latency_ms": 5418.3,
+          "input_tokens": 4938,
+          "output_tokens": 905
+        },
+        "attempts": 1
+      },
+      {
+        "data": {
+          "confidence": 0.93,
+          "self_check": {
+            "errors": 0,
+            "history": [
+              {
+                "turn": "ground",
+                "columns": 3
+              },
+              {
+                "turn": "mapping",
+                "complete": true,
+                "coverage": {
+                  "fields": {
+                    "/sku": {
+                      "risk": "medium",
+                      "records": 12,
+                      "records_filled": 12
+                    },
+                    "/price": {
+                      "risk": "critical",
+                      "records": 12,
+                      "records_filled": 0
+                    },
+                    "/currency": {
+                      "risk": "critical",
+                      "records": 12,
+                      "records_filled": 0
+                    },
+                    "/product_name": {
+                      "risk": "medium",
+                      "records": 12,
+                      "records_filled": 12
+                    },
+                    "/inventory/*/qty": {
+                      "risk": "high",
+                      "records": 12,
+                      "records_filled": 12
+                    },
+                    "/inventory/*/warehouse_code": {
+                      "risk": "high",
+                      "records": 12,
+                      "records_filled": 12
+                    }
+                  },
+                  "sources": {
+                    "pricing": 12,
+                    "products": 12,
+                    "inventory": 24
+                  },
+                  "collections": {
+                    "/inventory": 24
+                  },
+                  "invalid_records": 12
+                },
+                "problems": [
+                  "compile: source column 'products.selling_price' not found; values will be null",
+                  "compile: source column 'products.currency' not found; values will be null",
+                  "quality: /currency: 12 rows fail rule not_null",
+                  "validation: data.price must be number",
+                  "/price: empty in 12 of 12 records",
+                  "/currency: empty in 12 of 12 records"
+                ],
+                "rows_out": 12
+              },
+              {
+                "turn": "mapping",
+                "complete": true,
+                "coverage": {
+                  "fields": {
+                    "/sku": {
+                      "risk": "medium",
+                      "records": 12,
+                      "records_filled": 12
+                    },
+                    "/price": {
+                      "risk": "critical",
+                      "records": 12,
+                      "records_filled": 12
+                    },
+                    "/currency": {
+                      "risk": "critical",
+                      "records": 12,
+                      "records_filled": 12
+                    },
+                    "/product_name": {
+                      "risk": "medium",
+                      "records": 12,
+                      "records_filled": 12
+                    },
+                    "/inventory/*/qty": {
+                      "risk": "high",
+                      "records": 12,
+                      "records_filled": 12
+                    },
+                    "/inventory/*/warehouse_code": {
+                      "risk": "high",
+                      "records": 12,
+                      "records_filled": 12
+                    }
+                  },
+                  "sources": {
+                    "pricing": 12,
+                    "products": 12,
+                    "inventory": 24
+                  },
+                  "collections": {
+                    "/inventory": 24
+                  },
+                  "invalid_records": 0
+                },
+                "problems": [],
+                "rows_out": 12
+              }
+            ],
+            "complete": true,
+            "coverage": {
+              "fields": {
+                "/sku": {
+                  "risk": "medium",
+                  "records": 12,
+                  "records_filled": 12
+                },
+                "/price": {
+                  "risk": "critical",
+                  "records": 12,
+                  "records_filled": 12
+                },
+                "/currency": {
+                  "risk": "critical",
+                  "records": 12,
+                  "records_filled": 12
+                },
+                "/product_name": {
+                  "risk": "medium",
+                  "records": 12,
+                  "records_filled": 12
+                },
+                "/inventory/*/qty": {
+                  "risk": "high",
+                  "records": 12,
+                  "records_filled": 12
+                },
+                "/inventory/*/warehouse_code": {
+                  "risk": "high",
+                  "records": 12,
+                  "records_filled": 12
+                }
+              },
+              "sources": {
+                "pricing": 12,
+                "products": 12,
+                "inventory": 24
+              },
+              "collections": {
+                "/inventory": 24
+              },
+              "invalid_records": 0
+            },
+            "grounded": 3,
+            "rows_out": 12,
+            "fix_rounds": 1,
+            "inspections": 0,
+            "python_turns": 0,
+            "rows_checked": 12,
+            "problems_left": []
+          },
+          "clarifications": [],
+          "changes_from_draft": [
+            "Repointed /price and /currency to the joined pricing frame by adding source='pricing' to their col nodes; the run showed 'products.selling_price' / 'products.currency' not found, which zero-filled 12 of 12 records and failed the number validation and /currency not_null rule.",
+            "Changed the record root to the Material master (products) so the 12-master population and identities are the record set, with Price left-joined 1:1 on material code.",
+            "Kept the /inventory collection over Stock with one entry per warehouse (BKK, CNX), 24 items for 12 products, deduped on /warehouse_code — quantities are not summed across warehouses.",
+            "All source ids, sheet selections and table specs from the draft were retained; only the join (products→pricing) and source-qualified column references were corrected.",
+            "Confirmed from source data: single currency value THB on every price row, so currency is explicit evidence, not inferred; prices used exactly as supplied (no rounding, no VAT adjustment).",
+            "Dropped the draft open questions: a unique material-code master exists in the Material sheet and 'Quantity pieces' is a recognisable, non-null quantity column. The earlier name_pattern hints ('^balances', '^selling_prices') that did not match the actual Material/Stock file assignments were removed in favour of sheet-based selection."
+          ]
+        },
+        "agent": "mapping",
+        "notes": [],
+        "usage": {
+          "calls": 2,
+          "model": "deepseek-flash",
+          "cost_usd": 0.052616,
+          "latency_ms": 34753.0,
+          "input_tokens": 24300,
+          "output_tokens": 7079
+        },
+        "attempts": 2
+      },
+      {
+        "ops": 0,
+        "agent": "agreement",
+        "agree": 0,
+        "record": 3,
+        "dropped": 0,
+        "disagree": 3,
+        "model_only": 3
+      }
+    ],
+    "sample": [
+      {
+        "sku": "000001",
+        "price": 113.0,
+        "currency": "THB",
+        "inventory": [
+          {
+            "qty": 8.0,
+            "warehouse_code": "CNX"
+          },
+          {
+            "qty": 7.0,
+            "warehouse_code": "BKK"
+          }
+        ],
+        "source_meta": {
+          "file": "materials.xlsx",
+          "lineage": {
+            "items": {
+              "/inventory": [
+                15,
+                20
+              ]
+            },
+            "joined": {
+              "pricing": 6
+            },
+            "source": "products",
+            "root_row": 0
+          }
+        },
+        "product_name": "Coffee variant 01"
+      },
+      {
+        "sku": "000011",
+        "price": 243.0,
+        "currency": "THB",
+        "inventory": [
+          {
+            "qty": 78.0,
+            "warehouse_code": "CNX"
+          },
+          {
+            "qty": 77.0,
+            "warehouse_code": "BKK"
+          }
+        ],
+        "source_meta": {
+          "file": "materials.xlsx",
+          "lineage": {
+            "items": {
+              "/inventory": [
+                17,
+                22
+              ]
+            },
+            "joined": {
+              "pricing": 0
+            },
+            "source": "products",
+            "root_row": 1
+          }
+        },
+        "product_name": "Soap variant 11"
+      },
+      {
+        "sku": "000002",
+        "price": 126.0,
+        "currency": "THB",
+        "inventory": [
+          {
+            "qty": 14.0,
+            "warehouse_code": "BKK"
+          },
+          {
+            "qty": 15.0,
+            "warehouse_code": "CNX"
+          }
+        ],
+        "source_meta": {
+          "file": "materials.xlsx",
+          "lineage": {
+            "items": {
+              "/inventory": [
+                12,
+                18
+              ]
+            },
+            "joined": {
+              "pricing": 10
+            },
+            "source": "products",
+            "root_row": 2
+          }
+        },
+        "product_name": "Shampoo variant 02"
+      },
+      {
+        "sku": "000012",
+        "price": 256.0,
+        "currency": "THB",
+        "inventory": [
+          {
+            "qty": 84.0,
+            "warehouse_code": "BKK"
+          },
+          {
+            "qty": 85.0,
+            "warehouse_code": "CNX"
+          }
+        ],
+        "source_meta": {
+          "file": "materials.xlsx",
+          "lineage": {
+            "items": {
+              "/inventory": [
+                8,
+                14
+              ]
+            },
+            "joined": {
+              "pricing": 7
+            },
+            "source": "products",
+            "root_row": 3
+          }
+        },
+        "product_name": "Tea variant 12"
+      },
+      {
+        "sku": "000009",
+        "price": 217.0,
+        "currency": "THB",
+        "inventory": [
+          {
+            "qty": 63.0,
+            "warehouse_code": "BKK"
+          },
+          {
+            "qty": 64.0,
+            "warehouse_code": "CNX"
+          }
+        ],
+        "source_meta": {
+          "file": "materials.xlsx",
+          "lineage": {
+            "items": {
+              "/inventory": [
+                0,
+                19
+              ]
+            },
+            "joined": {
+              "pricing": 8
+            },
+            "source": "products",
+            "root_row": 4
+          }
+        },
+        "product_name": "Coffee variant 09"
+      }
+    ],
+    "document": {
+      "meta": {
+        "model": "deepseek-flash",
+        "notes": "Root = Material master; price/currency joined from Price; inventory built as nested array from Stock keyed by material code. Joined columns are referenced with an explicit source id.",
+        "version": 1,
+        "evidence": [
+          "Three sheets delivered together: Material (12 rows, one per material code) = product population, Stock (24 rows = 12 materials × warehouses BKK/CNX) = inventory, Price (12 rows, one price + currency per material) = pricing.",
+          "Material code is zero-padded text ('000001'…'000012') in all three tables; kept as string so leading zeros survive.",
+          "Price sheet carries one explicit currency value 'THB' on all 12 rows — currency is stated by the source, not inferred.",
+          "Stock holds exactly one row per material-warehouse pair, so inventory needs no lot aggregation; warehouses are emitted separately and never summed."
+        ],
+        "confidence": 0.93,
+        "created_by": "ai",
+        "customer_id": "cus_01M6G8QXE7DYG03DQ2E05JB0VN",
+        "fingerprints": {
+          "pricing": "07c63df410bea4d4",
+          "products": "820912e8c46d6019",
+          "inventory": "506c072c3a2c0c2d"
+        },
+        "target_schema": "eval_rel-20261103-a_r01_split@1"
+      },
+      "joins": [
+        {
+          "on": [
+            {
+              "left": "material_code",
+              "right": "price_material_code"
+            }
+          ],
+          "how": "left",
+          "left": "products",
+          "right": "pricing",
+          "cardinality": "1:1",
+          "on_unmatched": "keep",
+          "normalize_keys": [
+            "trim",
+            "upper",
+            "strip_leading_zeros"
+          ]
+        }
+      ],
+      "fields": [
+        {
+          "expr": {
+            "op": "trim",
+            "args": [
+              {
+                "op": "cast",
+                "args": [
+                  {
+                    "op": "col",
+                    "name": "material_code"
+                  }
+                ],
+                "params": {
+                  "to": "string"
+                }
+              }
+            ],
+            "params": {}
+          },
+          "target": "/sku",
+          "evidence": [
+            "Material master 'Material code' is unique per row (12 distinct of 12) — the product identity.",
+            "Source values are zero-padded ('000001'…'000012'); cast to string + trim preserves the leading zeros required by the contract.",
+            "FORMA's matcher read Price.Material code instead: confidence 0.97 → 0.70"
+          ],
+          "confidence": 0.7
+        },
+        {
+          "expr": {
+            "op": "normalize_whitespace",
+            "args": [
+              {
+                "op": "col",
+                "name": "description"
+              }
+            ],
+            "params": {}
+          },
+          "target": "/product_name",
+          "evidence": [
+            "'Description' holds the human-readable product name (e.g. 'Coffee variant 01'), one per material code, no blanks."
+          ],
+          "confidence": 0.96
+        },
+        {
+          "expr": {
+            "op": "parse_number_th",
+            "args": [
+              {
+                "op": "col",
+                "name": "selling_price",
+                "source": "pricing"
+              }
+            ],
+            "params": {}
+          },
+          "note": "Column read from the joined 'pricing' source; the previous draft referenced it on the root frame, which produced nulls.",
+          "target": "/price",
+          "evidence": [
+            "Price sheet 'Selling price' (12 distinct values 113–256, no blanks) joined 1:1 on material code.",
+            "Contract asks for the requested selling price, not cost; used exactly as supplied, no rounding or VAT adjustment.",
+            "FORMA's matcher read Price.Selling price instead: confidence 0.93 → 0.70"
+          ],
+          "confidence": 0.7
+        },
+        {
+          "expr": {
+            "op": "map_values",
+            "args": [
+              {
+                "op": "col",
+                "name": "currency",
+                "source": "pricing"
+              }
+            ],
+            "params": {
+              "mapping": {
+                "cny": "CNY",
+                "eur": "EUR",
+                "jpy": "JPY",
+                "thb": "THB",
+                "usd": "USD",
+                "฿": "THB",
+                "baht": "THB",
+                "บาท": "THB"
+              },
+              "keep_unmapped": true
+            }
+          },
+          "note": "Column read from the joined 'pricing' source; the previous draft referenced it on the root frame, which produced nulls.",
+          "target": "/currency",
+          "evidence": [
+            "'Currency' has a single distinct source value 'THB' across all 12 price rows — an explicit ISO 4217 code from the source.",
+            "FORMA's matcher read Price.Currency instead: confidence 0.97 → 0.70"
+          ],
+          "confidence": 0.7
+        }
+      ],
+      "record": {
+        "dedupe": {
+          "keep": "first",
+          "keys": [
+            "/sku"
+          ]
+        },
+        "filters": [],
+        "root_source": "products"
+      },
+      "quality": [
+        {
+          "rule": "not_null",
+          "params": {},
+          "target": "/sku",
+          "severity": "error"
+        },
+        {
+          "rule": "unique",
+          "params": {},
+          "target": "/sku",
+          "severity": "error"
+        },
+        {
+          "rule": "not_null",
+          "params": {},
+          "target": "/product_name",
+          "severity": "warning"
+        },
+        {
+          "rule": "positive",
+          "params": {},
+          "target": "/price",
+          "severity": "error"
+        },
+        {
+          "rule": "not_null",
+          "params": {},
+          "target": "/currency",
+          "severity": "error"
+        },
+        {
+          "rule": "not_null",
+          "params": {},
+          "target": "/inventory/*/qty",
+          "severity": "error"
+        },
+        {
+          "rule": "not_null",
+          "params": {},
+          "target": "/inventory",
+          "severity": "warning"
+        }
+      ],
+      "sources": [
+        {
+          "id": "products",
+          "csv": {
+            "encoding": "auto",
+            "delimiter": "auto",
+            "quote_char": "\""
+          },
+          "file": {
+            "sheet_names_any": [
+              "Material"
+            ]
+          },
+          "role": "products",
+          "sheet": {
+            "name": "Material"
+          },
+          "table": {
+            "fill_down": [],
+            "header_row": 0,
+            "header_rows": 1,
+            "last_column": 2,
+            "first_column": 0,
+            "drop_total_rows": true,
+            "drop_empty_columns": true,
+            "stop_at_blank_rows": 2,
+            "drop_repeated_headers": true
+          },
+          "rename": {
+            "Description": "description",
+            "Material code": "material_code"
+          },
+          "description": "Material master: one row per material code with a product description."
+        },
+        {
+          "id": "pricing",
+          "csv": {
+            "encoding": "auto",
+            "delimiter": "auto",
+            "quote_char": "\""
+          },
+          "file": {
+            "sheet_names_any": [
+              "Price"
+            ]
+          },
+          "role": "pricing",
+          "sheet": {
+            "name": "Price"
+          },
+          "table": {
+            "fill_down": [],
+            "header_row": 0,
+            "header_rows": 1,
+            "last_column": 3,
+            "first_column": 0,
+            "drop_total_rows": true,
+            "drop_empty_columns": true,
+            "stop_at_blank_rows": 2,
+            "drop_repeated_headers": true
+          },
+          "rename": {
+            "Currency": "currency",
+            "Material code": "price_material_code",
+            "Selling price": "selling_price"
+          },
+          "description": "Selling price and ISO currency per material code."
+        },
+        {
+          "id": "inventory",
+          "csv": {
+            "encoding": "auto",
+            "delimiter": "auto",
+            "quote_char": "\""
+          },
+          "file": {
+            "sheet_names_any": [
+              "Stock"
+            ]
+          },
+          "role": "inventory",
+          "sheet": {
+            "name": "Stock"
+          },
+          "table": {
+            "fill_down": [],
+            "header_row": 0,
+            "header_rows": 1,
+            "last_column": 3,
+            "first_column": 0,
+            "drop_total_rows": true,
+            "drop_empty_columns": true,
+            "stop_at_blank_rows": 2,
+            "drop_repeated_headers": true
+          },
+          "rename": {
+            "Warehouse": "warehouse",
+            "Material code": "stock_material_code",
+            "Quantity pieces": "quantity_pieces"
+          },
+          "description": "Stock quantity in individual pieces per material code and warehouse (BKK, CNX)."
+        }
+      ],
+      "provenance": true,
+      "collections": [
+        {
+          "link": [
+            {
+              "left": "material_code",
+              "right": "stock_material_code"
+            }
+          ],
+          "fields": [
+            {
+              "expr": {
+                "op": "trim",
+                "args": [
+                  {
+                    "op": "cast",
+                    "args": [
+                      {
+                        "op": "col",
+                        "name": "warehouse"
+                      }
+                    ],
+                    "params": {
+                      "to": "string"
+                    }
+                  }
+                ],
+                "params": {}
+              },
+              "target": "/inventory/*/warehouse_code",
+              "evidence": [
+                "Stock 'Warehouse' has two distinct codes, BKK and CNX, repeated across materials — maps directly to warehouse_code.",
+                "Contract: one entry per warehouse, never summed together."
+              ],
+              "confidence": 0.97
+            },
+            {
+              "expr": {
+                "op": "parse_number_th",
+                "args": [
+                  {
+                    "op": "col",
+                    "name": "quantity_pieces"
+                  }
+                ],
+                "params": {}
+              },
+              "target": "/inventory/*/qty",
+              "evidence": [
+                "Stock 'Quantity pieces' is a numeric piece count per row (range 7–85, no blanks), already in individual pieces as the contract requires.",
+                "24 stock rows = 12 materials × 2 warehouses, so no additional lot aggregation is needed."
+              ],
+              "confidence": 0.94
+            }
+          ],
+          "source": "inventory",
+          "target": "/inventory",
+          "dedupe_keys": [
+            "/warehouse_code"
+          ],
+          "normalize_keys": [
+            "trim",
+            "upper",
+            "strip_leading_zeros"
+          ]
+        }
+      ],
+      "attributes_passthrough": false
+    }
+  },
+  "questions": {
+    "mapping_id": "map_01M6G8SAWGJD5YPHMT0573Z8SP",
+    "round_id": "rnd_01M6G8QXRQ6MQJ99DBNKE3CK48",
+    "status": "proposed",
+    "blocked": false,
+    "questions": [
+      {
+        "id": "/price",
+        "field": {
+          "pointer": "/price",
+          "name": "price",
+          "json_type": [
+            "number"
+          ],
+          "semantic": "price.amount",
+          "risk": "critical",
+          "required": true,
+          "nullable": false,
+          "enum": null,
+          "format": null,
+          "synonyms_en": [],
+          "synonyms_th": [],
+          "description": "Requested selling price, not cost.",
+          "description_th": null,
+          "in_collection": null,
+          "is_collection": false,
+          "system": false,
+          "default": null,
+          "examples": []
+        },
+        "kind": "choice",
+        "options": [
+          "selling_price",
+          "Material code"
+        ],
+        "current": {
+          "op": "parse_number_th",
+          "args": [
+            {
+              "op": "col",
+              "name": "selling_price",
+              "source": "pricing"
+            }
+          ],
+          "params": {}
+        },
+        "evidence": [
+          "Price sheet 'Selling price' (12 distinct values 113–256, no blanks) joined 1:1 on material code.",
+          "Contract asks for the requested selling price, not cost; used exactly as supplied, no rounding or VAT adjustment.",
+          "FORMA's matcher read Price.Selling price instead: confidence 0.93 → 0.70",
+          "FORMA's matcher read Selling price for this field"
+        ],
+        "note": "Column read from the joined 'pricing' source; the previous draft referenced it on the root frame, which produced nulls.",
+        "contested": true
+      },
+      {
+        "id": "/currency",
+        "field": {
+          "pointer": "/currency",
+          "name": "currency",
+          "json_type": [
+            "string"
+          ],
+          "semantic": "currency",
+          "risk": "critical",
+          "required": true,
+          "nullable": false,
+          "enum": null,
+          "format": null,
+          "synonyms_en": [],
+          "synonyms_th": [],
+          "description": "ISO 4217 code supported by the source.",
+          "description_th": null,
+          "in_collection": null,
+          "is_collection": false,
+          "system": false,
+          "default": null,
+          "examples": []
+        },
+        "kind": "choice",
+        "options": [
+          "currency",
+          "Description"
+        ],
+        "current": {
+          "op": "map_values",
+          "args": [
+            {
+              "op": "col",
+              "name": "currency",
+              "source": "pricing"
+            }
+          ],
+          "params": {
+            "mapping": {
+              "cny": "CNY",
+              "eur": "EUR",
+              "jpy": "JPY",
+              "thb": "THB",
+              "usd": "USD",
+              "฿": "THB",
+              "baht": "THB",
+              "บาท": "THB"
+            },
+            "keep_unmapped": true
+          }
+        },
+        "evidence": [
+          "'Currency' has a single distinct source value 'THB' across all 12 price rows — an explicit ISO 4217 code from the source.",
+          "FORMA's matcher read Price.Currency instead: confidence 0.97 → 0.70",
+          "FORMA's matcher read Currency for this field"
+        ],
+        "note": "Column read from the joined 'pricing' source; the previous draft referenced it on the root frame, which produced nulls.",
+        "contested": true
+      }
+    ],
+    "open_questions": [
+      "No SKU-like header found in root table; using 'Material code' as identity — confirm",
+      "Inventory table 'Stock' has no recognisable quantity column"
+    ],
+    "reasons": [
+      "low confidence on critical fields: /price (0.70), /currency (0.70)",
+      "mapping confidence 0.93 < 0.95",
+      "first time this customer/format is seen",
+      "2 questions still need operator confirmation",
+      "the model selects rows differently from FORMA's matcher (records: dedupe; records: joins; records: root)"
+    ],
+    "sample": [
+      {
+        "sku": "000001",
+        "price": 113.0,
+        "currency": "THB",
+        "inventory": [
+          {
+            "qty": 8.0,
+            "warehouse_code": "CNX"
+          },
+          {
+            "qty": 7.0,
+            "warehouse_code": "BKK"
+          }
+        ],
+        "source_meta": {
+          "file": "materials.xlsx",
+          "lineage": {
+            "items": {
+              "/inventory": [
+                15,
+                20
+              ]
+            },
+            "joined": {
+              "pricing": 6
+            },
+            "source": "products",
+            "root_row": 0
+          }
+        },
+        "product_name": "Coffee variant 01"
+      },
+      {
+        "sku": "000011",
+        "price": 243.0,
+        "currency": "THB",
+        "inventory": [
+          {
+            "qty": 78.0,
+            "warehouse_code": "CNX"
+          },
+          {
+            "qty": 77.0,
+            "warehouse_code": "BKK"
+          }
+        ],
+        "source_meta": {
+          "file": "materials.xlsx",
+          "lineage": {
+            "items": {
+              "/inventory": [
+                17,
+                22
+              ]
+            },
+            "joined": {
+              "pricing": 0
+            },
+            "source": "products",
+            "root_row": 1
+          }
+        },
+        "product_name": "Soap variant 11"
+      },
+      {
+        "sku": "000002",
+        "price": 126.0,
+        "currency": "THB",
+        "inventory": [
+          {
+            "qty": 14.0,
+            "warehouse_code": "BKK"
+          },
+          {
+            "qty": 15.0,
+            "warehouse_code": "CNX"
+          }
+        ],
+        "source_meta": {
+          "file": "materials.xlsx",
+          "lineage": {
+            "items": {
+              "/inventory": [
+                12,
+                18
+              ]
+            },
+            "joined": {
+              "pricing": 10
+            },
+            "source": "products",
+            "root_row": 2
+          }
+        },
+        "product_name": "Shampoo variant 02"
+      }
+    ],
+    "context": {
+      "customer": {
+        "code": "EVAL-rel-20261103-a-R01_split",
+        "name": "EVAL-rel-20261103-a-R01_split"
+      },
+      "round_label": "EVAL rel-20261103-a R01_split_r1",
+      "files": [
+        {
+          "id": "fil_01M6G8QXWXQMT5TCYKVRHWSBBB",
+          "name": "materials.xlsx"
+        },
+        {
+          "id": "fil_01M6G8QXYVY5MC7C0TKK66T82Y",
+          "name": "balances.xlsx"
+        },
+        {
+          "id": "fil_01M6G8QY09FF40461YKED03HRA",
+          "name": "selling_prices.xlsx"
+        }
+      ],
+      "mapping_version": 1
+    },
+    "changes": [],
+    "comparison_dataset_id": null,
+    "checks": {
+      "drift": null,
+      "errors": 0,
+      "rows_out": 12,
+      "warnings": 0,
+      "agreement": {
+        "ops": 0,
+        "agree": 0,
+        "record": 3,
+        "dropped": 0,
+        "disagree": 3,
+        "model_only": 3
+      },
+      "llm_fallback": false,
+      "reused_approved": false,
+      "full_verification": true,
+      "mapping_confidence": 0.93,
+      "data_checks_trusted": false,
+      "low_confidence_high": [],
+      "unresolved_questions": 2,
+      "plausibility_warnings": 0,
+      "low_confidence_critical": [
+        "/price (0.70)",
+        "/currency (0.70)"
+      ]
+    },
+    "impact": {},
+    "fields": [
+      {
+        "pointer": "/sku",
+        "name": "sku",
+        "json_type": [
+          "string"
+        ],
+        "semantic": "identity.sku",
+        "risk": "medium",
+        "required": true,
+        "nullable": false,
+        "enum": null,
+        "format": null,
+        "synonyms_en": [],
+        "synonyms_th": [],
+        "description": "Unique SKU identifier; preserve leading zeros.",
+        "description_th": null,
+        "in_collection": null,
+        "is_collection": false,
+        "system": false,
+        "default": null,
+        "examples": []
+      },
+      {
+        "pointer": "/price",
+        "name": "price",
+        "json_type": [
+          "number"
+        ],
+        "semantic": "price.amount",
+        "risk": "critical",
+        "required": true,
+        "nullable": false,
+        "enum": null,
+        "format": null,
+        "synonyms_en": [],
+        "synonyms_th": [],
+        "description": "Requested selling price, not cost.",
+        "description_th": null,
+        "in_collection": null,
+        "is_collection": false,
+        "system": false,
+        "default": null,
+        "examples": []
+      },
+      {
+        "pointer": "/currency",
+        "name": "currency",
+        "json_type": [
+          "string"
+        ],
+        "semantic": "currency",
+        "risk": "critical",
+        "required": true,
+        "nullable": false,
+        "enum": null,
+        "format": null,
+        "synonyms_en": [],
+        "synonyms_th": [],
+        "description": "ISO 4217 code supported by the source.",
+        "description_th": null,
+        "in_collection": null,
+        "is_collection": false,
+        "system": false,
+        "default": null,
+        "examples": []
+      },
+      {
+        "pointer": "/inventory/*/qty",
+        "name": "qty",
+        "json_type": [
+          "number"
+        ],
+        "semantic": "stock.qty",
+        "risk": "high",
+        "required": true,
+        "nullable": false,
+        "enum": null,
+        "format": null,
+        "synonyms_en": [],
+        "synonyms_th": [],
+        "description": "Stock in individual pieces, summed across lots in this warehouse.",
+        "description_th": null,
+        "in_collection": "/inventory",
+        "is_collection": false,
+        "system": false,
+        "default": null,
+        "examples": []
+      },
+      {
+        "pointer": "/inventory/*/warehouse_code",
+        "name": "warehouse_code",
+        "json_type": [
+          "string"
+        ],
+        "semantic": "stock.warehouse",
+        "risk": "high",
+        "required": true,
+        "nullable": false,
+        "enum": null,
+        "format": null,
+        "synonyms_en": [],
+        "synonyms_th": [],
+        "description": "Warehouse identifier.",
+        "description_th": null,
+        "in_collection": "/inventory",
+        "is_collection": false,
+        "system": false,
+        "default": null,
+        "examples": []
+      },
+      {
+        "pointer": "/product_name",
+        "name": "product_name",
+        "json_type": [
+          "string"
+        ],
+        "semantic": "product.name",
+        "risk": "medium",
+        "required": true,
+        "nullable": false,
+        "enum": null,
+        "format": null,
+        "synonyms_en": [],
+        "synonyms_th": [],
+        "description": "Product name from the master list.",
+        "description_th": null,
+        "in_collection": null,
+        "is_collection": false,
+        "system": false,
+        "default": null,
+        "examples": []
+      }
+    ]
+  },
+  "preview": {
+    "ok": true,
+    "validation": {
+      "ok": true,
+      "issues": []
+    },
+    "records": [
+      {
+        "sku": "000001",
+        "product_name": "Coffee variant 01",
+        "price": 113.0,
+        "currency": "THB",
+        "inventory": [
+          {
+            "warehouse_code": "CNX",
+            "qty": 8.0
+          },
+          {
+            "warehouse_code": "BKK",
+            "qty": 7.0
+          }
+        ],
+        "source_meta": {
+          "file": "materials.xlsx",
+          "lineage": {
+            "root_row": 0,
+            "source": "products",
+            "items": {
+              "/inventory": [
+                15,
+                20
+              ]
+            },
+            "joined": {
+              "pricing": 6
+            }
+          }
+        }
+      },
+      {
+        "sku": "000011",
+        "product_name": "Soap variant 11",
+        "price": 243.0,
+        "currency": "THB",
+        "inventory": [
+          {
+            "warehouse_code": "CNX",
+            "qty": 78.0
+          },
+          {
+            "warehouse_code": "BKK",
+            "qty": 77.0
+          }
+        ],
+        "source_meta": {
+          "file": "materials.xlsx",
+          "lineage": {
+            "root_row": 1,
+            "source": "products",
+            "items": {
+              "/inventory": [
+                17,
+                22
+              ]
+            },
+            "joined": {
+              "pricing": 0
+            }
+          }
+        }
+      },
+      {
+        "sku": "000002",
+        "product_name": "Shampoo variant 02",
+        "price": 126.0,
+        "currency": "THB",
+        "inventory": [
+          {
+            "warehouse_code": "BKK",
+            "qty": 14.0
+          },
+          {
+            "warehouse_code": "CNX",
+            "qty": 15.0
+          }
+        ],
+        "source_meta": {
+          "file": "materials.xlsx",
+          "lineage": {
+            "root_row": 2,
+            "source": "products",
+            "items": {
+              "/inventory": [
+                12,
+                18
+              ]
+            },
+            "joined": {
+              "pricing": 10
+            }
+          }
+        }
+      },
+      {
+        "sku": "000012",
+        "product_name": "Tea variant 12",
+        "price": 256.0,
+        "currency": "THB",
+        "inventory": [
+          {
+            "warehouse_code": "BKK",
+            "qty": 84.0
+          },
+          {
+            "warehouse_code": "CNX",
+            "qty": 85.0
+          }
+        ],
+        "source_meta": {
+          "file": "materials.xlsx",
+          "lineage": {
+            "root_row": 3,
+            "source": "products",
+            "items": {
+              "/inventory": [
+                8,
+                14
+              ]
+            },
+            "joined": {
+              "pricing": 7
+            }
+          }
+        }
+      },
+      {
+        "sku": "000009",
+        "product_name": "Coffee variant 09",
+        "price": 217.0,
+        "currency": "THB",
+        "inventory": [
+          {
+            "warehouse_code": "BKK",
+            "qty": 63.0
+          },
+          {
+            "warehouse_code": "CNX",
+            "qty": 64.0
+          }
+        ],
+        "source_meta": {
+          "file": "materials.xlsx",
+          "lineage": {
+            "root_row": 4,
+            "source": "products",
+            "items": {
+              "/inventory": [
+                0,
+                19
+              ]
+            },
+            "joined": {
+              "pricing": 8
+            }
+          }
+        }
+      },
+      {
+        "sku": "000008",
+        "product_name": "Tea variant 08",
+        "price": 204.0,
+        "currency": "THB",
+        "inventory": [
+          {
+            "warehouse_code": "BKK",
+            "qty": 56.0
+          },
+          {
+            "warehouse_code": "CNX",
+            "qty": 57.0
+          }
+        ],
+        "source_meta": {
+          "file": "materials.xlsx",
+          "lineage": {
+            "root_row": 5,
+            "source": "products",
+            "items": {
+              "/inventory": [
+                9,
+                13
+              ]
+            },
+            "joined": {
+              "pricing": 3
+            }
+          }
+        }
+      },
+      {
+        "sku": "000007",
+        "product_name": "Soap variant 07",
+        "price": 191.0,
+        "currency": "THB",
+        "inventory": [
+          {
+            "warehouse_code": "CNX",
+            "qty": 50.0
+          },
+          {
+            "warehouse_code": "BKK",
+            "qty": 49.0
+          }
+        ],
+        "source_meta": {
+          "file": "materials.xlsx",
+          "lineage": {
+            "root_row": 6,
+            "source": "products",
+            "items": {
+              "/inventory": [
+                10,
+                21
+              ]
+            },
+            "joined": {
+              "pricing": 2
+            }
+          }
+        }
+      },
+      {
+        "sku": "000003",
+        "product_name": "Soap variant 03",
+        "price": 139.0,
+        "currency": "THB",
+        "inventory": [
+          {
+            "warehouse_code": "CNX",
+            "qty": 22.0
+          },
+          {
+            "warehouse_code": "BKK",
+            "qty": 21.0
+          }
+        ],
+        "source_meta": {
+          "file": "materials.xlsx",
+          "lineage": {
+            "root_row": 7,
+            "source": "products",
+            "items": {
+              "/inventory": [
+                7,
+                11
+              ]
+            },
+            "joined": {
+              "pricing": 11
+            }
+          }
+        }
+      },
+      {
+        "sku": "000004",
+        "product_name": "Tea variant 04",
+        "price": 152.0,
+        "currency": "THB",
+        "inventory": [
+          {
+            "warehouse_code": "BKK",
+            "qty": 28.0
+          },
+          {
+            "warehouse_code": "CNX",
+            "qty": 29.0
+          }
+        ],
+        "source_meta": {
+          "file": "materials.xlsx",
+          "lineage": {
+            "root_row": 8,
+            "source": "products",
+            "items": {
+              "/inventory": [
+                4,
+                16
+              ]
+            },
+            "joined": {
+              "pricing": 9
+            }
+          }
+        }
+      },
+      {
+        "sku": "000006",
+        "product_name": "Shampoo variant 06",
+        "price": 178.0,
+        "currency": "THB",
+        "inventory": [
+          {
+            "warehouse_code": "BKK",
+            "qty": 42.0
+          },
+          {
+            "warehouse_code": "CNX",
+            "qty": 43.0
+          }
+        ],
+        "source_meta": {
+          "file": "materials.xlsx",
+          "lineage": {
+            "root_row": 9,
+            "source": "products",
+            "items": {
+              "/inventory": [
+                2,
+                5
+              ]
+            },
+            "joined": {
+              "pricing": 5
+            }
+          }
+        }
+      },
+      {
+        "sku": "000010",
+        "product_name": "Shampoo variant 10",
+        "price": 230.0,
+        "currency": "THB",
+        "inventory": [
+          {
+            "warehouse_code": "CNX",
+            "qty": 71.0
+          },
+          {
+            "warehouse_code": "BKK",
+            "qty": 70.0
+          }
+        ],
+        "source_meta": {
+          "file": "materials.xlsx",
+          "lineage": {
+            "root_row": 10,
+            "source": "products",
+            "items": {
+              "/inventory": [
+                1,
+                6
+              ]
+            },
+            "joined": {
+              "pricing": 4
+            }
+          }
+        }
+      },
+      {
+        "sku": "000005",
+        "product_name": "Coffee variant 05",
+        "price": 165.0,
+        "currency": "THB",
+        "inventory": [
+          {
+            "warehouse_code": "CNX",
+            "qty": 36.0
+          },
+          {
+            "warehouse_code": "BKK",
+            "qty": 35.0
+          }
+        ],
+        "source_meta": {
+          "file": "materials.xlsx",
+          "lineage": {
+            "root_row": 11,
+            "source": "products",
+            "items": {
+              "/inventory": [
+                3,
+                23
+              ]
+            },
+            "joined": {
+              "pricing": 1
+            }
+          }
+        }
+      }
+    ],
+    "findings": [],
+    "stats": {
+      "rows_in": 12,
+      "rows_out": 12,
+      "sources": {
+        "products": 12,
+        "pricing": 12,
+        "inventory": 24
+      },
+      "collections": {
+        "/inventory": 24
+      },
+      "duration_ms": 521.4,
+      "identity_keys": [
+        "/sku"
+      ],
+      "invalid_records": 0
+    }
+  }
+}

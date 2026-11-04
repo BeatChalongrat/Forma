@@ -106,6 +106,15 @@ def _dataset(c: TestClient, root: Path, stock_extra: list[list[Any]] | None = No
     r = c.post("/api/rounds", json={"customer_id": cust}).json()["id"]
     _upload(c, r, p)
     mv = _run(c, r)["result"]["mapping_version_id"]
+    if stock_extra:
+        # Historical datasets can contain orphan rows. New approvals must reject them; seed
+        # the legacy approved state explicitly to retain the assistant's lookback regression.
+        assert c.post(f"/api/mappings/{mv}/approve", json={}).status_code == 422
+        from forma.db.models import MappingVersion
+        from forma.db.session import session_scope
+
+        with session_scope() as session:
+            session.get(MappingVersion, mv).status = "approved"
     assert c.post(f"/api/mappings/{mv}/approve", json={}).status_code == 200
     _job(c, f"/api/rounds/{r}/transform")
     return cust, mv, c.get(f"/api/rounds/{r}").json()["datasets"][0]["id"]

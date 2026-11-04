@@ -159,7 +159,9 @@ def test_verification_report_fails_closed(schema: TargetSchema) -> None:
     assert not partial["passed"] and "Only a sample was checked" in partial["problems"]
     empty = verification(result([]), schema, complete=True)
     assert "No output records" in empty["problems"]
-    orphan = SimpleNamespace(severity="warning", message="/inventory: 6 items reference unknown root records")
+    orphan = SimpleNamespace(
+        severity="warning", kind="relation", message="/inventory: 6 items reference unknown root records"
+    )
     with_orphans = verification(result(good, [orphan]), schema, complete=True)
     assert not with_orphans["passed"] and orphan.message in with_orphans["problems"]
     carried = verification(result(good), schema, complete=True, self_check={"problems_left": ["left over"]})

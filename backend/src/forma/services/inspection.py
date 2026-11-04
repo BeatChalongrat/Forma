@@ -138,7 +138,15 @@ def mapping_trace(session: Session, m: MappingVersion, *, offset: int = 0, limit
                 "effect_check": policy.get("answer_effect_check"),
                 "checks": {
                     k: policy.get(k)
-                    for k in ("source", "decision", "self_check", "verification", "agreement", "reused_from")
+                    for k in (
+                        "source",
+                        "decision",
+                        "self_check",
+                        "verification",
+                        "agreement",
+                        "reused_from",
+                        "workflow",
+                    )
                 },
                 "knowledge": [{"id": a.entity_id, **a.details} for a in references],
                 "logs": {

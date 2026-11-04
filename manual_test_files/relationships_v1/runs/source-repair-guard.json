@@ -1,0 +1,291 @@
+{
+  "mapping_id": "map_01M6JTE9M7HPG1XZQMPNHZ5SNE",
+  "questions": {
+    "mapping_id": "map_01M6JTE9M7HPG1XZQMPNHZ5SNE",
+    "round_id": "rnd_01M6JT9TJY43W5243TQYDQJT2W",
+    "status": "proposed",
+    "blocked": false,
+    "questions": [
+      {
+        "id": "/qty",
+        "field": {
+          "pointer": "/qty",
+          "name": "qty",
+          "json_type": [
+            "number",
+            "null"
+          ],
+          "semantic": "stock.qty",
+          "risk": "high",
+          "required": true,
+          "nullable": true,
+          "enum": null,
+          "format": null,
+          "synonyms_en": [],
+          "synonyms_th": [],
+          "description": "Stock in individual pieces. Missing evidence is null, never zero.",
+          "description_th": null,
+          "in_collection": null,
+          "is_collection": false,
+          "system": false,
+          "default": null,
+          "examples": []
+        },
+        "kind": "confirm",
+        "options": [],
+        "question": "How many individual pieces does one carton hold for these SKUs? The 'Pack factors' sheet (B2:B13) is empty and Export!C multiplies Counts!B by a factor from the external workbook 'missing-pack.xlsx', which was not supplied — please give the pieces-per-carton number(s) or provide the recalculated workbook with that link.",
+        "current": {
+          "op": "multiply",
+          "args": [
+            {
+              "op": "col",
+              "name": "cartons",
+              "source": "counts_1"
+            },
+            {
+              "op": "col",
+              "name": "pieces_per_carton",
+              "source": "pack_factors_2"
+            }
+          ],
+          "params": {}
+        },
+        "evidence": [
+          "Export!C2 formula ='Counts'!B2*'[missing-pack.xlsx]Pack factors'!B2: pieces = cartons x pieces-per-carton. Reproduced exactly as Counts.cartons x Pack factors.pieces_per_carton.",
+          "Counts!B2:B13 is fully populated (3..14) but Pack factors!B2:B13 ('Pieces per carton') is blank and the referenced workbook 'missing-pack.xlsx' was not supplied, so the product is null for every SKU instead of an invented number.",
+          "The 999 cached in Export!C2:C13 is a single repeated placeholder from the unresolved external formula and is deliberately not used."
+        ],
+        "note": "The required /qty (stock in individual pieces) can only be reproduced as cartons x pieces-per-carton; without the pack factor the value stays null. The cached 999 is a single repeated placeholder, not per-product stock, so it cannot be used.",
+        "contested": true,
+        "action": "request_source",
+        "scope": "source_file",
+        "allow_custom": false
+      }
+    ],
+    "open_questions": [
+      "How many individual pieces does one carton hold for these SKUs? The 'Pack factors' sheet (B2:B13) is empty and Export!C multiplies Counts!B by a factor from the external workbook 'missing-pack.xlsx', which was not supplied — please give the pieces-per-carton number(s) or provide the recalculated workbook with that link."
+    ],
+    "reasons": [
+      "products_0: formula values are saved Excel caches; FORMA does not recalculate or verify cache freshness",
+      "low confidence on high-risk fields: /qty (0.30)",
+      "mapping confidence 0.60 < 0.95",
+      "first time this customer/format is seen",
+      "1 questions still need operator confirmation",
+      "the model selects rows differently from FORMA's matcher (records: dedupe; records: joins)",
+      "verification: /qty: empty in 12 of 12 records"
+    ],
+    "sample": [
+      {
+        "qty": null,
+        "sku": "000001",
+        "source_meta": {
+          "file": "delivery.xlsx",
+          "lineage": {
+            "joined": {
+              "counts_1": 0,
+              "pack_factors_2": 0
+            },
+            "source": "products_0",
+            "root_row": 0
+          }
+        },
+        "product_name": "Coffee variant 01"
+      },
+      {
+        "qty": null,
+        "sku": "000002",
+        "source_meta": {
+          "file": "delivery.xlsx",
+          "lineage": {
+            "joined": {
+              "counts_1": 1,
+              "pack_factors_2": 1
+            },
+            "source": "products_0",
+            "root_row": 1
+          }
+        },
+        "product_name": "Shampoo variant 02"
+      },
+      {
+        "qty": null,
+        "sku": "000003",
+        "source_meta": {
+          "file": "delivery.xlsx",
+          "lineage": {
+            "joined": {
+              "counts_1": 2,
+              "pack_factors_2": 2
+            },
+            "source": "products_0",
+            "root_row": 2
+          }
+        },
+        "product_name": "Soap variant 03"
+      }
+    ],
+    "context": {
+      "customer": {
+        "code": "EVAL-rel-20261104-fixed1-T08",
+        "name": "EVAL-rel-20261104-fixed1-T08"
+      },
+      "round_label": "EVAL rel-20261104-fixed1 T08_r1",
+      "files": [
+        {
+          "id": "fil_01M6JT9TNAHXDC9GWGRKCCM5SS",
+          "name": "delivery.xlsx"
+        }
+      ],
+      "mapping_version": 1
+    },
+    "changes": [],
+    "comparison_dataset_id": null,
+    "checks": {
+      "drift": null,
+      "errors": 0,
+      "rows_out": 12,
+      "warnings": 2,
+      "agreement": {
+        "ops": 1,
+        "agree": 2,
+        "record": 2,
+        "dropped": 0,
+        "disagree": 0,
+        "model_only": 1
+      },
+      "llm_fallback": false,
+      "reused_approved": false,
+      "full_verification": false,
+      "mapping_confidence": 0.6,
+      "data_checks_trusted": false,
+      "low_confidence_high": [
+        "/qty (0.30)"
+      ],
+      "unresolved_questions": 1,
+      "plausibility_warnings": 1,
+      "source_review_required": true,
+      "low_confidence_critical": [],
+      "verification": {
+        "scope": "Execution and contract checks; business ambiguities require operator answers",
+        "passed": false,
+        "version": 1,
+        "complete": true,
+        "coverage": {
+          "fields": {
+            "/qty": {
+              "risk": "high",
+              "records": 12,
+              "records_filled": 0
+            },
+            "/sku": {
+              "risk": "medium",
+              "records": 12,
+              "records_filled": 12
+            },
+            "/product_name": {
+              "risk": "medium",
+              "records": 12,
+              "records_filled": 12
+            }
+          },
+          "sources": {
+            "counts_1": 12,
+            "products_0": 12,
+            "pack_factors_2": 12
+          },
+          "collections": {},
+          "invalid_records": 0
+        },
+        "problems": [
+          "/qty: empty in 12 of 12 records"
+        ],
+        "rows_out": 12,
+        "warnings": [
+          "/qty: empty in 12 of 12 records"
+        ],
+        "rows_checked": 12
+      }
+    },
+    "impact": {},
+    "fields": [
+      {
+        "pointer": "/qty",
+        "name": "qty",
+        "json_type": [
+          "number",
+          "null"
+        ],
+        "semantic": "stock.qty",
+        "risk": "high",
+        "required": true,
+        "nullable": true,
+        "enum": null,
+        "format": null,
+        "synonyms_en": [],
+        "synonyms_th": [],
+        "description": "Stock in individual pieces. Missing evidence is null, never zero.",
+        "description_th": null,
+        "in_collection": null,
+        "is_collection": false,
+        "system": false,
+        "default": null,
+        "examples": []
+      },
+      {
+        "pointer": "/sku",
+        "name": "sku",
+        "json_type": [
+          "string"
+        ],
+        "semantic": "identity.sku",
+        "risk": "medium",
+        "required": true,
+        "nullable": false,
+        "enum": null,
+        "format": null,
+        "synonyms_en": [],
+        "synonyms_th": [],
+        "description": "Unique SKU identifier; preserve leading zeros.",
+        "description_th": null,
+        "in_collection": null,
+        "is_collection": false,
+        "system": false,
+        "default": null,
+        "examples": []
+      },
+      {
+        "pointer": "/product_name",
+        "name": "product_name",
+        "json_type": [
+          "string"
+        ],
+        "semantic": "product.name",
+        "risk": "medium",
+        "required": true,
+        "nullable": false,
+        "enum": null,
+        "format": null,
+        "synonyms_en": [],
+        "synonyms_th": [],
+        "description": "Product name from the master list.",
+        "description_th": null,
+        "in_collection": null,
+        "is_collection": false,
+        "system": false,
+        "default": null,
+        "examples": []
+      }
+    ]
+  },
+  "attempted_answer": {
+    "answers": {
+      "/qty": "confirm"
+    }
+  },
+  "status": 422,
+  "response": {
+    "error": "validation_failed",
+    "message": "Provide or repair the source file, then run mapping again; this request cannot be answered by confirming a value",
+    "details": {}
+  }
+}

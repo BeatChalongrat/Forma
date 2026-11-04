@@ -1,0 +1,1112 @@
+{
+  "round": {
+    "id": "rnd_01M6GAA670E8VMGP3Y7S3ZC6KF",
+    "customer_id": "cus_01M6GAA5P941NZMQE50ZSN86NX",
+    "label": "EVAL rel-20261103-b T12_r1",
+    "status": "blocked",
+    "target_schema": "eval_rel-20261103-b_t12@1",
+    "notes": "Map the supplied ERP export(s) to the supplied JSON Schema. Preserve the master product population and identities. Do not invent business facts. Ask a specific question if required facts cannot be established.\nReturn RETAIL THB price valid on 2026-11-03. Inventory is in individual pieces, one entry per warehouse, summed across lots. CASE conversion differs by product in Pack sizes; PCS already means individual pieces. Do not multiply PCS balances.",
+    "summary": {
+      "drift": null,
+      "profile": [
+        {
+          "name": "delivery.xlsx",
+          "drift": null,
+          "tables": 4,
+          "file_id": "fil_01M6GAA691QYQVXRYETYVTKX1R",
+          "fingerprint": "f5b139264e4e844a"
+        }
+      ],
+      "verdict": {
+        "word": "likely",
+        "stage": "mapping",
+        "digest": "30af46c1fcc1d08ae6e8f1c7c30755a8",
+        "outcome": "fix_mapping",
+        "subject": {
+          "id": "map_01M6GAADPP522JT75C0AV5SWS4",
+          "kind": "mapping",
+          "round_id": "rnd_01M6GAA670E8VMGP3Y7S3ZC6KF"
+        },
+        "evidence": [
+          {
+            "id": 1,
+            "kind": "errors",
+            "link": "/rounds/rnd_01M6GAA670E8VMGP3Y7S3ZC6KF/mapping/map_01M6GAADPP522JT75C0AV5SWS4?tab=findings",
+            "text": {
+              "en": "1 engine or validation errors",
+              "th": "ข้อผิดพลาดของ engine/การตรวจ 1 จุด"
+            },
+            "numbers": {
+              "errors": 1
+            }
+          },
+          {
+            "id": 2,
+            "kind": "ai",
+            "link": null,
+            "text": {
+              "en": "AI was unavailable; the deterministic draft is in use",
+              "th": "AI ใช้งานไม่ได้ ใช้ร่างจากกฎแทน"
+            },
+            "numbers": {}
+          },
+          {
+            "id": 3,
+            "kind": "questions",
+            "link": "/review?round=rnd_01M6GAA670E8VMGP3Y7S3ZC6KF",
+            "text": {
+              "en": "1 fields below the confidence bar",
+              "th": "1 ฟิลด์ยังไม่ถึงเกณฑ์ความมั่นใจ"
+            },
+            "numbers": {
+              "count": 1
+            }
+          }
+        ],
+        "narrative": null,
+        "conclusion": {
+          "en": "The policy blocks this mapping: transformation produced zero records",
+          "th": "กฎระงับการจับคู่นี้: transformation produced zero records"
+        },
+        "confidence": 0.7,
+        "suppressed": {
+          "count": 0,
+          "groups": [
+            {
+              "text": {
+                "en": "2 notes from the mapper",
+                "th": "หมายเหตุจากตัวจับคู่ 2 ข้อ"
+              },
+              "reason": "open_questions",
+              "pointers": []
+            }
+          ]
+        },
+        "must_decide": [
+          {
+            "id": "/price",
+            "why": {
+              "en": "Below the confidence bar for its risk",
+              "th": "ความมั่นใจต่ำกว่าเกณฑ์ของระดับความเสี่ยงนี้"
+            },
+            "kind": "choice",
+            "scope": null,
+            "default": null,
+            "options": [
+              "Price list",
+              "Selling price"
+            ],
+            "question": {
+              "en": "Which column holds Requested selling price, not cost.?",
+              "th": "คอลัมน์ไหนคือราคาขาย?"
+            },
+            "semantic": "price.amount",
+            "allow_custom": false,
+            "evidence_ids": [
+              3
+            ],
+            "option_labels": null
+          }
+        ],
+        "rules_fired": [
+          "blocked"
+        ],
+        "round_status": "blocked",
+        "rules_version": "2026.10.4",
+        "mapping_status": "proposed",
+        "policy_decision": "block"
+      },
+      "decision": "block",
+      "simulation": null,
+      "drift_report": null,
+      "format_memory": {
+        "status": "new",
+        "mapping_id": null,
+        "target_schema": "eval_rel-20261103-b_t12@1",
+        "mapping_version": null
+      },
+      "skipped_files": 0,
+      "profiled_files": 1,
+      "mapping_version_id": "map_01M6GAADPP522JT75C0AV5SWS4",
+      "has_previous_approval": false,
+      "matches_other_customer": null
+    },
+    "created_at": "2026-11-03T09:02:16.800968+00:00",
+    "updated_at": "2026-11-03T09:02:24.485514+00:00",
+    "successor_id": null,
+    "predecessor_id": null,
+    "files": [
+      {
+        "id": "fil_01M6GAA691QYQVXRYETYVTKX1R",
+        "round_id": "rnd_01M6GAA670E8VMGP3Y7S3ZC6KF",
+        "name": "delivery.xlsx",
+        "size": 8511,
+        "kind": "excel",
+        "status": "profiled",
+        "sha256": "4d0dcc4ddcc2d48ac9c1aafe8dedd04554321609af3d7cb3eddca000f3b4ed90",
+        "duplicate_of": null,
+        "error": null,
+        "created_at": "2026-11-03T09:02:16.865417+00:00",
+        "fingerprint": "f5b139264e4e844a",
+        "drift": null,
+        "tables": 4,
+        "sheets": [
+          "Material",
+          "Batches",
+          "Pack sizes",
+          "Price history"
+        ]
+      }
+    ],
+    "customer": {
+      "id": "cus_01M6GAA5P941NZMQE50ZSN86NX",
+      "code": "EVAL-rel-20261103-b-T12",
+      "name": "EVAL-rel-20261103-b-T12"
+    },
+    "successor": null,
+    "predecessor": null,
+    "mappings": [
+      {
+        "id": "map_01M6GAADPP522JT75C0AV5SWS4",
+        "customer_id": "cus_01M6GAA5P941NZMQE50ZSN86NX",
+        "round_id": "rnd_01M6GAA670E8VMGP3Y7S3ZC6KF",
+        "version": 1,
+        "status": "proposed",
+        "target_schema": "eval_rel-20261103-b_t12@1",
+        "confidence": 0.7070000000000001,
+        "created_by": "system",
+        "model": null,
+        "policy": {
+          "checks": {
+            "drift": null,
+            "errors": 1,
+            "rows_out": 0,
+            "warnings": 0,
+            "llm_fallback": true,
+            "reused_approved": false,
+            "full_verification": false,
+            "unresolved_questions": 2,
+            "plausibility_warnings": 0
+          },
+          "impact": {},
+          "source": "heuristic",
+          "reasons": [
+            "transformation produced zero records",
+            "2 questions still need operator confirmation",
+            "verification: missing_required: required target /product_name is not mapped",
+            "verification: No transformation result was verified"
+          ],
+          "sandbox": null,
+          "verdict": {
+            "word": "likely",
+            "stage": "mapping",
+            "digest": "30af46c1fcc1d08ae6e8f1c7c30755a8",
+            "outcome": "fix_mapping",
+            "subject": {
+              "id": "map_01M6GAADPP522JT75C0AV5SWS4",
+              "kind": "mapping",
+              "round_id": "rnd_01M6GAA670E8VMGP3Y7S3ZC6KF"
+            },
+            "evidence": [
+              {
+                "id": 1,
+                "kind": "errors",
+                "link": "/rounds/rnd_01M6GAA670E8VMGP3Y7S3ZC6KF/mapping/map_01M6GAADPP522JT75C0AV5SWS4?tab=findings",
+                "text": {
+                  "en": "1 engine or validation errors",
+                  "th": "ข้อผิดพลาดของ engine/การตรวจ 1 จุด"
+                },
+                "numbers": {
+                  "errors": 1
+                }
+              },
+              {
+                "id": 2,
+                "kind": "ai",
+                "link": null,
+                "text": {
+                  "en": "AI was unavailable; the deterministic draft is in use",
+                  "th": "AI ใช้งานไม่ได้ ใช้ร่างจากกฎแทน"
+                },
+                "numbers": {}
+              },
+              {
+                "id": 3,
+                "kind": "questions",
+                "link": "/review?round=rnd_01M6GAA670E8VMGP3Y7S3ZC6KF",
+                "text": {
+                  "en": "1 fields below the confidence bar",
+                  "th": "1 ฟิลด์ยังไม่ถึงเกณฑ์ความมั่นใจ"
+                },
+                "numbers": {
+                  "count": 1
+                }
+              }
+            ],
+            "narrative": null,
+            "conclusion": {
+              "en": "The policy blocks this mapping: transformation produced zero records",
+              "th": "กฎระงับการจับคู่นี้: transformation produced zero records"
+            },
+            "confidence": 0.7,
+            "suppressed": {
+              "count": 0,
+              "groups": [
+                {
+                  "text": {
+                    "en": "2 notes from the mapper",
+                    "th": "หมายเหตุจากตัวจับคู่ 2 ข้อ"
+                  },
+                  "reason": "open_questions",
+                  "pointers": []
+                }
+              ]
+            },
+            "must_decide": [
+              {
+                "id": "/price",
+                "why": {
+                  "en": "Below the confidence bar for its risk",
+                  "th": "ความมั่นใจต่ำกว่าเกณฑ์ของระดับความเสี่ยงนี้"
+                },
+                "kind": "choice",
+                "scope": null,
+                "default": null,
+                "options": [
+                  "Price list",
+                  "Selling price"
+                ],
+                "question": {
+                  "en": "Which column holds Requested selling price, not cost.?",
+                  "th": "คอลัมน์ไหนคือราคาขาย?"
+                },
+                "semantic": "price.amount",
+                "allow_custom": false,
+                "evidence_ids": [
+                  3
+                ],
+                "option_labels": null
+              }
+            ],
+            "rules_fired": [
+              "blocked"
+            ],
+            "round_status": "blocked",
+            "rules_version": "2026.10.4",
+            "mapping_status": "proposed",
+            "policy_decision": "block"
+          },
+          "decision": "block",
+          "learning": null,
+          "priority": 50,
+          "agreement": null,
+          "risk_level": "high",
+          "risk_score": 1.0,
+          "self_check": null,
+          "simulation": null,
+          "reused_from": null,
+          "field_review": null,
+          "risk_factors": [
+            "blocked by policy",
+            "validation or engine errors"
+          ],
+          "verification": {
+            "passed": false,
+            "version": 1,
+            "complete": false,
+            "problems": [
+              "missing_required: required target /product_name is not mapped",
+              "No transformation result was verified"
+            ],
+            "warnings": []
+          },
+          "clarifications": [],
+          "confidence_basis": null,
+          "review_decisions": [],
+          "target_schema_hash": "9288bcb550d9ef70",
+          "confirmed_decisions": []
+        },
+        "open_questions": [
+          "No SKU-like header found in root table; using 'Material code' as identity — confirm",
+          "Inventory table 'Batches' has no recognisable quantity column"
+        ],
+        "validation": {
+          "ok": false,
+          "issues": [
+            {
+              "code": "missing_required",
+              "path": "/fields",
+              "level": "error",
+              "message": "required target /product_name is not mapped"
+            }
+          ]
+        },
+        "parent_id": null,
+        "approved_by": null,
+        "approved_at": null,
+        "comment": null,
+        "created_at": "2026-11-03T09:02:24.472522+00:00",
+        "agent_log": [
+          {
+            "agent": "operator_requirements",
+            "sha256": "3fcf6fe04ba6d032d10b0c0f219864b6a6b2ab5500433b08913ba2acb5501fb4",
+            "characters": 451,
+            "changed_since_approved": false
+          },
+          {
+            "agent": "heuristic",
+            "unmatched": {
+              "products": [
+                "Valid from",
+                "Valid to",
+                "Selling price"
+              ],
+              "inventory": [
+                "Material code",
+                "Warehouse",
+                "Lot",
+                "Stock quantity",
+                "Unit"
+              ]
+            },
+            "confidence": 0.7070000000000001,
+            "table_roles": {
+              "0": "other",
+              "1": "inventory",
+              "2": "other",
+              "3": "products"
+            }
+          },
+          {
+            "agent": "llm",
+            "error": "LLMError: openai HTTP 503: {\"error\":{\"message\":\"Service is too busy. We advise users to temporarily switch to alternative LLM API service providers. (request_id: 9909df8c-88f9-4909-920e-1699f61452ca)\",\"type\":\"service_unavailable_error\",\"param\":null,\"code\":\"service_unavailable_error\"}}",
+            "fallback": "heuristic"
+          }
+        ],
+        "sample": []
+      }
+    ],
+    "datasets": [],
+    "review_tasks": [
+      {
+        "id": "rev_01M6GAADQ3C2YJQ6M67WVZCX5G",
+        "round_id": "rnd_01M6GAA670E8VMGP3Y7S3ZC6KF",
+        "customer_id": "cus_01M6GAA5P941NZMQE50ZSN86NX",
+        "mapping_version_id": "map_01M6GAADPP522JT75C0AV5SWS4",
+        "dataset_version_id": null,
+        "kind": "blocked",
+        "priority": 50,
+        "status": "open",
+        "reasons": [
+          "transformation produced zero records",
+          "2 questions still need operator confirmation",
+          "verification: missing_required: required target /product_name is not mapped",
+          "verification: No transformation result was verified"
+        ],
+        "details": {
+          "impact": {},
+          "verdict": {
+            "word": "likely",
+            "stage": "mapping",
+            "digest": "30af46c1fcc1d08ae6e8f1c7c30755a8",
+            "outcome": "fix_mapping",
+            "conclusion": {
+              "en": "The policy blocks this mapping: transformation produced zero records",
+              "th": "กฎระงับการจับคู่นี้: transformation produced zero records"
+            },
+            "confidence": 0.7,
+            "rules_fired": [
+              "blocked"
+            ]
+          },
+          "decision": "block",
+          "findings": [
+            {
+              "kind": "binding",
+              "message": "missing_required: required target /product_name is not mapped",
+              "severity": "error"
+            }
+          ],
+          "risk_level": "high",
+          "risk_factors": [
+            "blocked by policy",
+            "validation or engine errors"
+          ],
+          "open_questions": [
+            "No SKU-like header found in root table; using 'Material code' as identity — confirm",
+            "Inventory table 'Batches' has no recognisable quantity column"
+          ]
+        },
+        "resolver": null,
+        "comment": null,
+        "created_at": "2026-11-03T09:02:24.483961+00:00",
+        "resolved_at": null,
+        "age_days": 0,
+        "waiting_until": null,
+        "waiting_note": null
+      }
+    ],
+    "jobs": [
+      {
+        "id": "job_01M6GAA9BSS4ZYCVC38E1GZGMY",
+        "kind": "propose_mapping",
+        "status": "done",
+        "progress": 100,
+        "message": null,
+        "error": null
+      },
+      {
+        "id": "job_01M6GAA6A32KE2TD8RS8QANSBH",
+        "kind": "profile_round",
+        "status": "done",
+        "progress": 100,
+        "message": null,
+        "error": null
+      }
+    ]
+  },
+  "mapping": {
+    "id": "map_01M6GAADPP522JT75C0AV5SWS4",
+    "customer_id": "cus_01M6GAA5P941NZMQE50ZSN86NX",
+    "round_id": "rnd_01M6GAA670E8VMGP3Y7S3ZC6KF",
+    "version": 1,
+    "status": "proposed",
+    "target_schema": "eval_rel-20261103-b_t12@1",
+    "confidence": 0.7070000000000001,
+    "created_by": "system",
+    "model": null,
+    "policy": {
+      "checks": {
+        "drift": null,
+        "errors": 1,
+        "rows_out": 0,
+        "warnings": 0,
+        "llm_fallback": true,
+        "reused_approved": false,
+        "full_verification": false,
+        "unresolved_questions": 2,
+        "plausibility_warnings": 0
+      },
+      "impact": {},
+      "source": "heuristic",
+      "reasons": [
+        "transformation produced zero records",
+        "2 questions still need operator confirmation",
+        "verification: missing_required: required target /product_name is not mapped",
+        "verification: No transformation result was verified"
+      ],
+      "sandbox": null,
+      "verdict": {
+        "word": "likely",
+        "stage": "mapping",
+        "digest": "30af46c1fcc1d08ae6e8f1c7c30755a8",
+        "outcome": "fix_mapping",
+        "subject": {
+          "id": "map_01M6GAADPP522JT75C0AV5SWS4",
+          "kind": "mapping",
+          "round_id": "rnd_01M6GAA670E8VMGP3Y7S3ZC6KF"
+        },
+        "evidence": [
+          {
+            "id": 1,
+            "kind": "errors",
+            "link": "/rounds/rnd_01M6GAA670E8VMGP3Y7S3ZC6KF/mapping/map_01M6GAADPP522JT75C0AV5SWS4?tab=findings",
+            "text": {
+              "en": "1 engine or validation errors",
+              "th": "ข้อผิดพลาดของ engine/การตรวจ 1 จุด"
+            },
+            "numbers": {
+              "errors": 1
+            }
+          },
+          {
+            "id": 2,
+            "kind": "ai",
+            "link": null,
+            "text": {
+              "en": "AI was unavailable; the deterministic draft is in use",
+              "th": "AI ใช้งานไม่ได้ ใช้ร่างจากกฎแทน"
+            },
+            "numbers": {}
+          },
+          {
+            "id": 3,
+            "kind": "questions",
+            "link": "/review?round=rnd_01M6GAA670E8VMGP3Y7S3ZC6KF",
+            "text": {
+              "en": "1 fields below the confidence bar",
+              "th": "1 ฟิลด์ยังไม่ถึงเกณฑ์ความมั่นใจ"
+            },
+            "numbers": {
+              "count": 1
+            }
+          }
+        ],
+        "narrative": null,
+        "conclusion": {
+          "en": "The policy blocks this mapping: transformation produced zero records",
+          "th": "กฎระงับการจับคู่นี้: transformation produced zero records"
+        },
+        "confidence": 0.7,
+        "suppressed": {
+          "count": 0,
+          "groups": [
+            {
+              "text": {
+                "en": "2 notes from the mapper",
+                "th": "หมายเหตุจากตัวจับคู่ 2 ข้อ"
+              },
+              "reason": "open_questions",
+              "pointers": []
+            }
+          ]
+        },
+        "must_decide": [
+          {
+            "id": "/price",
+            "why": {
+              "en": "Below the confidence bar for its risk",
+              "th": "ความมั่นใจต่ำกว่าเกณฑ์ของระดับความเสี่ยงนี้"
+            },
+            "kind": "choice",
+            "scope": null,
+            "default": null,
+            "options": [
+              "Price list",
+              "Selling price"
+            ],
+            "question": {
+              "en": "Which column holds Requested selling price, not cost.?",
+              "th": "คอลัมน์ไหนคือราคาขาย?"
+            },
+            "semantic": "price.amount",
+            "allow_custom": false,
+            "evidence_ids": [
+              3
+            ],
+            "option_labels": null
+          }
+        ],
+        "rules_fired": [
+          "blocked"
+        ],
+        "round_status": "blocked",
+        "rules_version": "2026.10.4",
+        "mapping_status": "proposed",
+        "policy_decision": "block"
+      },
+      "decision": "block",
+      "learning": null,
+      "priority": 50,
+      "agreement": null,
+      "risk_level": "high",
+      "risk_score": 1.0,
+      "self_check": null,
+      "simulation": null,
+      "reused_from": null,
+      "field_review": null,
+      "risk_factors": [
+        "blocked by policy",
+        "validation or engine errors"
+      ],
+      "verification": {
+        "passed": false,
+        "version": 1,
+        "complete": false,
+        "problems": [
+          "missing_required: required target /product_name is not mapped",
+          "No transformation result was verified"
+        ],
+        "warnings": []
+      },
+      "clarifications": [],
+      "confidence_basis": null,
+      "review_decisions": [],
+      "target_schema_hash": "9288bcb550d9ef70",
+      "confirmed_decisions": []
+    },
+    "open_questions": [
+      "No SKU-like header found in root table; using 'Material code' as identity — confirm",
+      "Inventory table 'Batches' has no recognisable quantity column"
+    ],
+    "validation": {
+      "ok": false,
+      "issues": [
+        {
+          "code": "missing_required",
+          "path": "/fields",
+          "level": "error",
+          "message": "required target /product_name is not mapped"
+        }
+      ]
+    },
+    "parent_id": null,
+    "approved_by": null,
+    "approved_at": null,
+    "comment": null,
+    "created_at": "2026-11-03T09:02:24.472522+00:00",
+    "agent_log": [
+      {
+        "agent": "operator_requirements",
+        "sha256": "3fcf6fe04ba6d032d10b0c0f219864b6a6b2ab5500433b08913ba2acb5501fb4",
+        "characters": 451,
+        "changed_since_approved": false
+      },
+      {
+        "agent": "heuristic",
+        "unmatched": {
+          "products": [
+            "Valid from",
+            "Valid to",
+            "Selling price"
+          ],
+          "inventory": [
+            "Material code",
+            "Warehouse",
+            "Lot",
+            "Stock quantity",
+            "Unit"
+          ]
+        },
+        "confidence": 0.7070000000000001,
+        "table_roles": {
+          "0": "other",
+          "1": "inventory",
+          "2": "other",
+          "3": "products"
+        }
+      },
+      {
+        "agent": "llm",
+        "error": "LLMError: openai HTTP 503: {\"error\":{\"message\":\"Service is too busy. We advise users to temporarily switch to alternative LLM API service providers. (request_id: 9909df8c-88f9-4909-920e-1699f61452ca)\",\"type\":\"service_unavailable_error\",\"param\":null,\"code\":\"service_unavailable_error\"}}",
+        "fallback": "heuristic"
+      }
+    ],
+    "sample": [],
+    "document": {
+      "meta": {
+        "version": 1,
+        "evidence": [
+          "root table: sheet 'Price history' (48 rows) classified as products"
+        ],
+        "confidence": 0.7070000000000001,
+        "created_by": "system",
+        "customer_id": "cus_01M6GAA5P941NZMQE50ZSN86NX",
+        "fingerprints": {
+          "products": "f5b139264e4e844a",
+          "inventory": "f5b139264e4e844a"
+        },
+        "target_schema": "eval_rel-20261103-b_t12@1"
+      },
+      "joins": [],
+      "fields": [
+        {
+          "expr": {
+            "op": "map_values",
+            "args": [
+              {
+                "op": "col",
+                "name": "Currency"
+              }
+            ],
+            "params": {
+              "mapping": {
+                "$": "USD",
+                "¥": "JPY",
+                "aud": "AUD",
+                "cny": "CNY",
+                "eur": "EUR",
+                "gbp": "GBP",
+                "hkd": "HKD",
+                "jpy": "JPY",
+                "rmb": "CNY",
+                "sgd": "SGD",
+                "thb": "THB",
+                "us$": "USD",
+                "usd": "USD",
+                "฿": "THB",
+                "€": "EUR",
+                "baht": "THB",
+                "dollar": "USD",
+                "บาท": "THB",
+                "เยน": "JPY",
+                "ยูโร": "EUR",
+                "หยวน": "CNY",
+                "ดอลลาร์": "USD"
+              },
+              "keep_unmapped": true
+            }
+          },
+          "target": "/currency",
+          "evidence": [
+            "header 'Currency' == synonym 'currency'"
+          ],
+          "confidence": 1.0
+        },
+        {
+          "expr": {
+            "op": "parse_number_th",
+            "args": [
+              {
+                "op": "col",
+                "name": "Price list"
+              }
+            ],
+            "params": {}
+          },
+          "target": "/price",
+          "evidence": [
+            "header 'Price list' ≈ synonym 'price' (0.85)"
+          ],
+          "confidence": 0.92
+        },
+        {
+          "expr": {
+            "op": "normalize_whitespace",
+            "args": [
+              {
+                "op": "col",
+                "name": "Material code"
+              }
+            ],
+            "params": {}
+          },
+          "target": "/sku",
+          "evidence": [
+            "fallback: key candidate 'Material code'"
+          ],
+          "confidence": 0.4
+        }
+      ],
+      "record": {
+        "dedupe": {
+          "keep": "first",
+          "keys": []
+        },
+        "filters": [],
+        "root_source": "products"
+      },
+      "quality": [
+        {
+          "rule": "unique",
+          "params": {},
+          "target": "/sku",
+          "severity": "warning"
+        },
+        {
+          "rule": "positive",
+          "params": {},
+          "target": "/price",
+          "severity": "warning"
+        }
+      ],
+      "sources": [
+        {
+          "id": "inventory",
+          "csv": {
+            "encoding": "auto",
+            "delimiter": "auto",
+            "quote_char": "\""
+          },
+          "file": {
+            "name_pattern": "(?i)^delivery",
+            "sheet_names_any": [
+              "Batches"
+            ]
+          },
+          "role": "inventory",
+          "sheet": {
+            "name": "Batches"
+          },
+          "table": {
+            "fill_down": [],
+            "header_row": 0,
+            "header_rows": 1,
+            "last_column": 5,
+            "first_column": 0,
+            "drop_total_rows": true,
+            "drop_empty_columns": true,
+            "stop_at_blank_rows": 2,
+            "drop_repeated_headers": true
+          },
+          "rename": {}
+        },
+        {
+          "id": "products",
+          "csv": {
+            "encoding": "auto",
+            "delimiter": "auto",
+            "quote_char": "\""
+          },
+          "file": {
+            "name_pattern": "(?i)^delivery",
+            "sheet_names_any": [
+              "Price history"
+            ]
+          },
+          "role": "products",
+          "sheet": {
+            "name": "Price history"
+          },
+          "table": {
+            "fill_down": [],
+            "header_row": 0,
+            "header_rows": 1,
+            "last_column": 6,
+            "first_column": 0,
+            "drop_total_rows": true,
+            "drop_empty_columns": true,
+            "stop_at_blank_rows": 2,
+            "drop_repeated_headers": true
+          },
+          "rename": {}
+        }
+      ],
+      "provenance": true,
+      "collections": [],
+      "attributes_passthrough": true
+    }
+  },
+  "questions": {
+    "mapping_id": "map_01M6GAADPP522JT75C0AV5SWS4",
+    "round_id": "rnd_01M6GAA670E8VMGP3Y7S3ZC6KF",
+    "status": "proposed",
+    "blocked": true,
+    "questions": [
+      {
+        "id": "/price",
+        "field": {
+          "pointer": "/price",
+          "name": "price",
+          "json_type": [
+            "number"
+          ],
+          "semantic": "price.amount",
+          "risk": "critical",
+          "required": true,
+          "nullable": false,
+          "enum": null,
+          "format": null,
+          "synonyms_en": [],
+          "synonyms_th": [],
+          "description": "Requested selling price, not cost.",
+          "description_th": null,
+          "in_collection": null,
+          "is_collection": false,
+          "system": false,
+          "default": null,
+          "examples": []
+        },
+        "kind": "choice",
+        "options": [
+          "Price list",
+          "Selling price"
+        ],
+        "current": {
+          "op": "parse_number_th",
+          "args": [
+            {
+              "op": "col",
+              "name": "Price list"
+            }
+          ],
+          "params": {}
+        },
+        "evidence": [
+          "header 'Price list' ≈ synonym 'price' (0.85)"
+        ],
+        "note": null,
+        "contested": false
+      }
+    ],
+    "open_questions": [
+      "No SKU-like header found in root table; using 'Material code' as identity — confirm",
+      "Inventory table 'Batches' has no recognisable quantity column"
+    ],
+    "reasons": [
+      "transformation produced zero records",
+      "2 questions still need operator confirmation",
+      "verification: missing_required: required target /product_name is not mapped",
+      "verification: No transformation result was verified"
+    ],
+    "sample": [],
+    "context": {
+      "customer": {
+        "code": "EVAL-rel-20261103-b-T12",
+        "name": "EVAL-rel-20261103-b-T12"
+      },
+      "round_label": "EVAL rel-20261103-b T12_r1",
+      "files": [
+        {
+          "id": "fil_01M6GAA691QYQVXRYETYVTKX1R",
+          "name": "delivery.xlsx"
+        }
+      ],
+      "mapping_version": 1
+    },
+    "changes": [],
+    "comparison_dataset_id": null,
+    "checks": {
+      "drift": null,
+      "errors": 1,
+      "rows_out": 0,
+      "warnings": 0,
+      "llm_fallback": true,
+      "reused_approved": false,
+      "full_verification": false,
+      "unresolved_questions": 2,
+      "plausibility_warnings": 0
+    },
+    "impact": {},
+    "fields": [
+      {
+        "pointer": "/sku",
+        "name": "sku",
+        "json_type": [
+          "string"
+        ],
+        "semantic": "identity.sku",
+        "risk": "medium",
+        "required": true,
+        "nullable": false,
+        "enum": null,
+        "format": null,
+        "synonyms_en": [],
+        "synonyms_th": [],
+        "description": "Unique SKU identifier; preserve leading zeros.",
+        "description_th": null,
+        "in_collection": null,
+        "is_collection": false,
+        "system": false,
+        "default": null,
+        "examples": []
+      },
+      {
+        "pointer": "/price",
+        "name": "price",
+        "json_type": [
+          "number"
+        ],
+        "semantic": "price.amount",
+        "risk": "critical",
+        "required": true,
+        "nullable": false,
+        "enum": null,
+        "format": null,
+        "synonyms_en": [],
+        "synonyms_th": [],
+        "description": "Requested selling price, not cost.",
+        "description_th": null,
+        "in_collection": null,
+        "is_collection": false,
+        "system": false,
+        "default": null,
+        "examples": []
+      },
+      {
+        "pointer": "/currency",
+        "name": "currency",
+        "json_type": [
+          "string"
+        ],
+        "semantic": "currency",
+        "risk": "critical",
+        "required": true,
+        "nullable": false,
+        "enum": null,
+        "format": null,
+        "synonyms_en": [],
+        "synonyms_th": [],
+        "description": "ISO 4217 code supported by the source.",
+        "description_th": null,
+        "in_collection": null,
+        "is_collection": false,
+        "system": false,
+        "default": null,
+        "examples": []
+      },
+      {
+        "pointer": "/inventory/*/qty",
+        "name": "qty",
+        "json_type": [
+          "number"
+        ],
+        "semantic": "stock.qty",
+        "risk": "high",
+        "required": true,
+        "nullable": false,
+        "enum": null,
+        "format": null,
+        "synonyms_en": [],
+        "synonyms_th": [],
+        "description": "Stock in individual pieces, summed across lots in this warehouse.",
+        "description_th": null,
+        "in_collection": "/inventory",
+        "is_collection": false,
+        "system": false,
+        "default": null,
+        "examples": []
+      },
+      {
+        "pointer": "/inventory/*/warehouse_code",
+        "name": "warehouse_code",
+        "json_type": [
+          "string"
+        ],
+        "semantic": "stock.warehouse",
+        "risk": "high",
+        "required": true,
+        "nullable": false,
+        "enum": null,
+        "format": null,
+        "synonyms_en": [],
+        "synonyms_th": [],
+        "description": "Warehouse identifier.",
+        "description_th": null,
+        "in_collection": "/inventory",
+        "is_collection": false,
+        "system": false,
+        "default": null,
+        "examples": []
+      },
+      {
+        "pointer": "/product_name",
+        "name": "product_name",
+        "json_type": [
+          "string"
+        ],
+        "semantic": "product.name",
+        "risk": "medium",
+        "required": true,
+        "nullable": false,
+        "enum": null,
+        "format": null,
+        "synonyms_en": [],
+        "synonyms_th": [],
+        "description": "Product name from the master list.",
+        "description_th": null,
+        "in_collection": null,
+        "is_collection": false,
+        "system": false,
+        "default": null,
+        "examples": []
+      }
+    ]
+  },
+  "preview": {
+    "ok": false,
+    "validation": {
+      "ok": false,
+      "issues": [
+        {
+          "level": "error",
+          "code": "missing_required",
+          "message": "required target /product_name is not mapped",
+          "path": "/fields"
+        }
+      ]
+    },
+    "records": [],
+    "findings": []
+  }
+}

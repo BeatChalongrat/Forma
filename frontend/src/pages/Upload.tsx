@@ -5,17 +5,27 @@ import { Workflow } from '../components/Workflow'
 import { VerdictLine } from '../components/VerdictCard'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { ArrowRight, CircleAlert, CircleCheck, Download, FileSpreadsheet, LoaderCircle, Upload, UserPlus, X } from 'lucide-react'
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { ArrowLeft, ArrowRight, CircleAlert, CircleCheck, Download, FileSpreadsheet, LoaderCircle, Upload, UserPlus, X } from 'lucide-react'
 import { api, type BatchItem, type BatchItemState } from '../lib/api'
 import { cn, fmtBytes, fmtDate, fmtInt } from '../lib/utils'
 import { Badge, PageHeader, Section, Spinner, Modal } from '../components/ui'
 import { useToast } from '../lib/toast'
 import { RoundMenu } from '../components/RoundMenu'
+import { FileMenu } from '../components/FileMenu'
 import { refusedNames, splitReadable, UPLOAD_ACCEPT, UPLOAD_TYPES } from '../lib/uploads'
+
+function UploadBackLink({ fallback = '/imports' }: { fallback?: string }) {
+  const { t } = usePreferences()
+  const { state } = useLocation()
+  const origin = state as { uploadReturnTo?: unknown; uploadReturnState?: unknown } | null
+  const target = typeof origin?.uploadReturnTo === 'string' && /^\/(?:imports(?:\?|$)|uploads\/[^/?#]+(?:\?|$))/.test(origin.uploadReturnTo) ? origin.uploadReturnTo : fallback
+  return <Link to={target} state={origin?.uploadReturnState} className="btn btn-ghost btn-sm mb-5"><ArrowLeft size={15} />{target.startsWith('/uploads/') ? t('Back to this round', 'กลับรอบงานนี้') : t('Back to upload history', 'กลับประวัติไฟล์')}</Link>
+}
 
 /** Upload many files at once: each is matched to its customer by format and becomes one JSON (ADR-027). */
 export function BulkUpload() {
+  const receipt = useRef<{ files: File[]; options: string; key: string } | null>(null)
   const { t, prefs } = usePreferences()
   const [params] = useSearchParams()
   const [batchId, setBatchId] = useState(params.get('batch') || '')
@@ -38,7 +48,8 @@ export function BulkUpload() {
       const { names, more } = refusedNames(refused)
       toast.push({ kind: 'bad', title: t('FORMA cannot read these files', 'FORMA อ่านไฟล์เหล่านี้ไม่ได้'), detail: `${names}${more ? t(` and ${more} more`, ` และอีก ${more} ไฟล์`) : ''} · ${t('Accepted', 'รับ')} ${UPLOAD_TYPES.join(' ')}` })
     }
-    setFiles((xs) => [...xs, ...readable.filter((f) => !xs.some((x) => x.name === f.name && x.size === f.size))])
+    // Same name and size do not imply equal contents. The server compares SHA-256.
+    setFiles((xs) => [...xs, ...readable])
   }, [t, toast])
   const qc = useQueryClient()
   const upload = useMutation({
@@ -49,7 +60,13 @@ export function BulkUpload() {
       for (let at = 0; at < files.length;) {
         const chunk: File[] = []; let bytes = 0
         while (at < files.length && chunk.length < 10 && (!chunk.length || bytes + files[at].size <= 20 * 1024 * 1024)) { const f = files[at++]; chunk.push(f); bytes += f.size }
-        if (!id) { const b = await api.createUpload(chunk, { label: label.trim() || t(`Round ${workDate}`, `รอบ ${workDate}`), work_date: workDate, auto_publish: auto }); id = b.id; setBatchId(id) }
+        if (!id) {
+          const options = { label: label.trim() || t(`Round ${workDate}`, `รอบ ${workDate}`), work_date: workDate, auto_publish: auto }
+          const signature = JSON.stringify(options)
+          if (!receipt.current || receipt.current.options !== signature || receipt.current.files.length !== chunk.length || chunk.some((f, i) => f !== receipt.current!.files[i])) receipt.current = { files: chunk, options: signature, key: crypto.randomUUID() }
+          const b = await api.createUpload(chunk, { ...options, upload_key: receipt.current.key })
+          skipped += b.skipped; id = b.id; setBatchId(id)
+        }
         else { const b = await api.appendUpload(id, chunk); skipped += b.skipped }
         completed += chunk.length; setProgress(completed)
       }
@@ -61,6 +78,7 @@ export function BulkUpload() {
   const total = files.reduce((a, f) => a + f.size, 0)
   return (
     <>
+      <UploadBackLink fallback={params.get('batch') ? `/uploads/${encodeURIComponent(params.get('batch')!)}` : '/imports'} />
       <PageHeader title={t("Upload files", "อัปโหลดไฟล์")} subtitle={t("Process each file separately, from one or several customers. Choose a work round and add more files to it later.", "ประมวลผลแยกทีละไฟล์ อัปโหลดของลูกค้ารายเดียวหรือหลายรายได้ เลือกรอบงานและทยอยเพิ่มไฟล์เข้ารอบเดิมได้")} />
       <Workflow />
       <div className="grid lg:grid-cols-[1fr_360px] gap-5">
@@ -161,6 +179,7 @@ const STATE: Record<BatchItemState, { label: string; tone: 'ok' | 'warn' | 'bad'
 /** One upload: every file, where it stands, and what to do — plus all the JSON in one zip. */
 export function UploadPage() {
   const { t, prefs } = usePreferences()
+  const location = useLocation()
   const { batchId = '' } = useParams()
   const [filters, setFilters] = useSearchParams()
   const [editing, setEditing] = useState(false), [roundLabel, setRoundLabel] = useState(''), [roundDate, setRoundDate] = useState('')
@@ -186,18 +205,18 @@ export function UploadPage() {
     onError: (e: Error) => toast.push({ kind: 'bad', title: 'Not resumed', detail: e.message }),
   })
   const unknown = useMemo(() => (b?.items ?? []).filter((i) => i.state === 'needs_customer'), [b])
-  if (!b) return <div className="p-10 text-center">{isError ? <button className="btn" onClick={() => void refetch()}>{t('Could not load round. Retry', 'โหลดรอบงานไม่ได้ ลองอีกครั้ง')}</button> : <Spinner />}</div>
+  if (!b) return <><UploadBackLink /><div className="p-10 text-center">{isError ? <button className="btn" onClick={() => void refetch()}>{t('Could not load round. Retry', 'โหลดรอบงานไม่ได้ ลองอีกครั้ง')}</button> : <Spinner />}</div></>
   const c = b.counts
   const ready = c.ready ?? 0
-  const visible = b.items.filter(i => (!state || (state === 'needs_you' ? ['needs_customer', 'needs_review', 'needs_data_check'].includes(i.state) : i.state === state)) && (!search || `${i.file_name} ${i.customer?.code || ''}`.toLocaleLowerCase().includes(search.toLocaleLowerCase())))
+  const visible = b.items.filter(i => (!state || (state === 'needs_you' ? ['needs_customer', 'needs_review', 'needs_data_check'].includes(i.state) : i.state === state)) && (!search || `${i.current_file_name || i.file_name} ${i.customer?.code || ''}`.toLocaleLowerCase().includes(search.toLocaleLowerCase())))
   return (
     <>
+      <UploadBackLink />
       <PageHeader
-        crumbs={<><Link to="/imports" className="hover:text-ink">{t('All work rounds', 'รอบงานทั้งหมด')}</Link><span>/</span><span>{t('This round', 'รอบนี้')}</span></>}
         title={b.label ?? 'Upload'}
         subtitle={<span className="flex items-center gap-2 flex-wrap"><span>{t('Round date', 'วันที่รอบงาน')}: {b.work_date || t('Not set', 'ยังไม่ได้กำหนด')} · {fmtInt(b.total)} {t('files', 'ไฟล์')} · {t('Created', 'สร้างเมื่อ')} {fmtDate(b.created_at)}</span><Badge tone={b.complete ? 'ok' : 'neutral'}>{b.complete ? t('Received files ready', 'ไฟล์ที่รับมาพร้อมแล้ว') : t('Work remaining', 'ยังมีงานต้องทำ')}</Badge></span>}
         hint="แต่ละไฟล์อยู่ขั้นไหน และต้องทำอะไรต่อ — ไฟล์ที่พร้อมดาวน์โหลด JSON ได้ทันที"
-        actions={<><Link className="btn" to={'/imports/new?batch=' + b.id}><Upload size={15} />{t('Add files to this round', 'เพิ่มไฟล์เข้ารอบนี้')}</Link><a className={cn('btn btn-primary', !ready && 'pointer-events-none')} href={api.uploadDownloadUrl(b.id)} aria-disabled={!ready} tabIndex={ready ? 0 : -1} onClick={e => { if (!ready) e.preventDefault() }}><Download size={15} />{t('Download ready files', 'ดาวน์โหลดไฟล์ที่พร้อม')} ({ready})</a></>}
+        actions={<><Link className="btn" to={'/imports/new?batch=' + b.id} state={{ uploadReturnTo: location.pathname + location.search, uploadReturnState: location.state }}><Upload size={15} />{t('Add files to this round', 'เพิ่มไฟล์เข้ารอบนี้')}</Link><a className={cn('btn btn-primary', !ready && 'pointer-events-none')} href={api.uploadDownloadUrl(b.id)} aria-disabled={!ready} tabIndex={ready ? 0 : -1} onClick={e => { if (!ready) e.preventDefault() }}><Download size={15} />{t('Download ready files', 'ดาวน์โหลดไฟล์ที่พร้อม')} ({ready})</a></>}
       />
 
       <button className="btn btn-sm mb-4" onClick={() => { setRoundLabel(b.label || ''); setRoundDate(b.work_date || dateInZone(prefs.timezone)); edit.reset(); setEditing(true) }}>{t('Edit round name / date', 'แก้ชื่อ / วันที่รอบงาน')}</button>
@@ -268,7 +287,7 @@ function ItemRow({ i }: { i: BatchItem }) {
         : i.round_id ? <Link className="btn btn-ghost btn-sm" to={`/rounds/${i.round_id}`}><Localized>Open round</Localized></Link> : null
   return (
     <tr>
-      <td><div className="flex items-center gap-2"><FileSpreadsheet size={15} className="text-signal shrink-0" /><span className="font-semibold text-navy truncate max-w-[260px]" title={i.file_name}>{i.file_name}</span></div><div className="text-[11.5px] text-muted pl-6">{fmtBytes(i.size)}</div></td>
+      <td><div className="flex items-center gap-2"><FileSpreadsheet size={15} className="text-signal shrink-0" /><span className="font-semibold text-navy truncate max-w-[260px]" title={i.current_file_name || i.file_name}>{i.current_file_name || i.file_name}</span></div><div className="text-[11.5px] text-muted pl-6">{fmtBytes(i.current_file_size ?? i.size)}</div></td>
       <td>
         {i.customer ? <span className="font-semibold">{i.customer.code}</span> : <span className="text-ink-3">—</span>}
         {i.match && <div className="text-[11.5px] text-muted">{i.match.kind === 'known'
@@ -301,7 +320,7 @@ function ItemRow({ i }: { i: BatchItem }) {
         <div className="text-[11.5px] text-muted mt-1 max-w-[280px]">{i.verdict && i.state !== 'ready' && i.state !== 'processing' ? <VerdictLine v={i.verdict} /> : i.state === 'needs_data_check' && i.reasons?.length ? i.reasons.join(' · ') : i.message}</div>
       </td>
       <td className="text-right tnum">{fmtInt(i.rows)}</td>
-      <td className="text-right"><span className="inline-flex items-center gap-1">{action}{i.round_id && i.round_status && i.customer && i.state !== 'closed' && <RoundMenu compact round={{ id: i.round_id, status: i.round_status, customer_id: i.customer.id, label: i.file_name }} />}</span></td>
+      <td className="text-right"><span className="inline-flex items-center gap-1">{action}{i.round_id && i.round_status && i.customer && (i.source_file_id ? <FileMenu roundId={i.round_id} customerId={i.customer.id} status={i.round_status} file={{ id: i.source_file_id, name: i.current_file_name || i.file_name, size: i.current_file_size ?? i.size }} /> : i.state !== 'closed' && <RoundMenu compact round={{ id: i.round_id, status: i.round_status, customer_id: i.customer.id, label: i.file_name }} />)}</span></td>
     </tr>
   )
 }

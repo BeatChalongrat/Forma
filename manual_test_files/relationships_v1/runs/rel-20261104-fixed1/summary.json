@@ -1,0 +1,4909 @@
+[
+  {
+    "case": "T01",
+    "title": "Three files, shuffled joins",
+    "round_id": "rnd_01M6JSV25J967X8B9GM50FK4DM",
+    "state_complete": true,
+    "mode": "map",
+    "failed_stage": null,
+    "elapsed_seconds": 185.26,
+    "score": {
+      "field_accuracy": 1.0,
+      "penalized_accuracy": 1.0,
+      "exact_record_accuracy": 1.0,
+      "correct_fields": 96,
+      "expected_fields": 96,
+      "rows_got": 12,
+      "rows_expected": 12,
+      "identity_precision": 1.0,
+      "identity_recall": 1.0,
+      "duplicate_records": 0,
+      "missing_rows": [],
+      "extra_rows": [],
+      "wrong": [],
+      "extra_values": [],
+      "expected_questions": [],
+      "phase": "Before human assistance; unresolved oracle-only facts scored separately in report."
+    },
+    "mapping_id": "map_01M6JT0NDJ0MSN23N0H439Y22W",
+    "decision": "review",
+    "verification": {
+      "scope": "Execution and contract checks; business ambiguities require operator answers",
+      "passed": true,
+      "version": 1,
+      "complete": true,
+      "coverage": {
+        "fields": {
+          "/sku": {
+            "risk": "medium",
+            "records": 12,
+            "records_filled": 12
+          },
+          "/price": {
+            "risk": "critical",
+            "records": 12,
+            "records_filled": 12
+          },
+          "/currency": {
+            "risk": "critical",
+            "records": 12,
+            "records_filled": 12
+          },
+          "/product_name": {
+            "risk": "medium",
+            "records": 12,
+            "records_filled": 12
+          },
+          "/inventory/*/qty": {
+            "risk": "high",
+            "records": 12,
+            "records_filled": 12
+          },
+          "/inventory/*/warehouse_code": {
+            "risk": "high",
+            "records": 12,
+            "records_filled": 12
+          }
+        },
+        "sources": {
+          "prices": 12,
+          "products": 12,
+          "inventory": 24
+        },
+        "collections": {
+          "/inventory": 24
+        },
+        "invalid_records": 0
+      },
+      "problems": [],
+      "rows_out": 12,
+      "warnings": [],
+      "rows_checked": 12
+    },
+    "self_check": {
+      "errors": 0,
+      "history": [
+        {
+          "turn": "ground",
+          "columns": 3
+        },
+        {
+          "turn": "inspect",
+          "requests": 2
+        },
+        {
+          "code": "import json, openpyxl\nm=json.load(open('inputs/manifest.json'))\nprint(json.dumps(m)[:800])\nimport glob\nfor p in glob.glob('inputs/*.xlsx'):\n    print('FILE',p)\n    wb=openpyxl.load_workbook(p, data_only=True)\n    for ws in wb.worksheets:\n        print(' sheet',ws.title, ws.max_row, ws.max_column)\n        for r in range(1,4):\n            row=[]\n            for c in range(1,min(3,ws.max_column)+1):\n                cell=ws.cell(r,c)\n                row.append((cell.coordinate, repr(cell.value), cell.data_type, cell.number_format))\n            print('  ',row)\n",
+          "turn": "python",
+          "result": {
+            "note": "Sandbox output is untrusted evidence. Full engine validation is mandatory.",
+            "inputs": [
+              {
+                "name": "materials.xlsx",
+                "path": "inputs/sources/fil_01M6JSV2FJN10KY4BER4S74XDD.xlsx",
+                "sha256": "3c382c035dd238c20d5a423d4140c4523d38a4dea2cb750cad8b4363f7d407ef",
+                "file_id": "fil_01M6JSV2FJN10KY4BER4S74XDD"
+              },
+              {
+                "name": "balances.xlsx",
+                "path": "inputs/sources/fil_01M6JSV2GGSH6Y57Y7CXMMWBQC.xlsx",
+                "sha256": "d5bc5f15904cee6758ced5a8ab400ee4ec4dcaf87039b3bab824bce570c4c38b",
+                "file_id": "fil_01M6JSV2GGSH6Y57Y7CXMMWBQC"
+              },
+              {
+                "name": "selling_prices.xlsx",
+                "path": "inputs/sources/fil_01M6JSV2HPFX72MY05BCC7E3DM.xlsx",
+                "sha256": "5eca1a13b6b20a8690e2c316696ff5d9689ee00bbe96119fc8060f5617141780",
+                "file_id": "fil_01M6JSV2HPFX72MY05BCC7E3DM"
+              }
+            ],
+            "status": "ok",
+            "stderr": "",
+            "stdout": "[{\"file_id\": \"fil_01M6JSV2FJN10KY4BER4S74XDD\", \"name\": \"materials.xlsx\", \"path\": \"inputs/sources/fil_01M6JSV2FJN10KY4BER4S74XDD.xlsx\", \"sha256\": \"3c382c035dd238c20d5a423d4140c4523d38a4dea2cb750cad8b4363f7d407ef\"}, {\"file_id\": \"fil_01M6JSV2GGSH6Y57Y7CXMMWBQC\", \"name\": \"balances.xlsx\", \"path\": \"inputs/sources/fil_01M6JSV2GGSH6Y57Y7CXMMWBQC.xlsx\", \"sha256\": \"d5bc5f15904cee6758ced5a8ab400ee4ec4dcaf87039b3bab824bce570c4c38b\"}, {\"file_id\": \"fil_01M6JSV2HPFX72MY05BCC7E3DM\", \"name\": \"selling_prices.xlsx\", \"path\": \"inputs/sources/fil_01M6JSV2HPFX72MY05BCC7E3DM.xlsx\", \"sha256\": \"5eca1a13b6b20a8690e2c316696ff5d9689ee00bbe96119fc8060f5617141780\"}]\n",
+            "omitted": [],
+            "exit_code": 0,
+            "code_sha256": "faae645fb29c43276a395ce3768cbbaf130f26aa690f97d4c9f7b631deaeaade",
+            "duration_ms": 622
+          }
+        },
+        {
+          "code": "import json, openpyxl, collections\nm=json.load(open('inputs/manifest.json'))\npaths={x['name']:x['path'] for x in m}\nfor name in ['materials.xlsx','balances.xlsx','selling_prices.xlsx']:\n    wb=openpyxl.load_workbook(paths[name], data_only=True)\n    print('FILE',name,wb.sheetnames)\n    for ws in wb.worksheets:\n        print(' SHEET',ws.title,'rows',ws.max_row,'cols',ws.max_column)\n        hdr=[ws.cell(1,c).value for c in range(1,ws.max_column+1)]\n        print('  HDR',hdr)\n        for r in range(2,min(5,ws.max_row)+1):\n            vals=[ws.cell(r,c).value for c in range(1,ws.max_column+1)]\n            print('  ROW',r,[(type(v).__name__,repr(v)) for v in vals])\n# join coverage and grouping\nwb=openpyxl.load_workbook(paths['materials.xlsx'],data_only=True); ws=wb['Material']\nmats=[ws.cell(r,1).value for r in range(2,ws.max_row+1)]\nwb=openpyxl.load_workbook(paths['selling_prices.xlsx'],data_only=True); ws=wb['Price']\nprices=[ws.cell(r,1).value for r in range(2,ws.max_row+1)]\nprint('materials',mats,'prices',prices,'missing_prices',set(map(str,mats))-set(map(str,prices)))\nwb=openpyxl.load_workbook(paths['balances.xlsx'],data_only=True); ws=wb['Stock']\ncnt=collections.Counter((str(ws.cell(r,1).value),str(ws.cell(r,2).value)) for r in range(2,ws.max_row+1))\nprint('stock_rows',ws.max_row-1,'material_wh_counts',dict(cnt))\nprint('stock_missing_materials',set(k[0] for k in cnt)-set(map(str,mats)))\n",
+          "turn": "python",
+          "result": {
+            "note": "Sandbox output is untrusted evidence. Full engine validation is mandatory.",
+            "inputs": [
+              {
+                "name": "materials.xlsx",
+                "path": "inputs/sources/fil_01M6JSV2FJN10KY4BER4S74XDD.xlsx",
+                "sha256": "3c382c035dd238c20d5a423d4140c4523d38a4dea2cb750cad8b4363f7d407ef",
+                "file_id": "fil_01M6JSV2FJN10KY4BER4S74XDD"
+              },
+              {
+                "name": "balances.xlsx",
+                "path": "inputs/sources/fil_01M6JSV2GGSH6Y57Y7CXMMWBQC.xlsx",
+                "sha256": "d5bc5f15904cee6758ced5a8ab400ee4ec4dcaf87039b3bab824bce570c4c38b",
+                "file_id": "fil_01M6JSV2GGSH6Y57Y7CXMMWBQC"
+              },
+              {
+                "name": "selling_prices.xlsx",
+                "path": "inputs/sources/fil_01M6JSV2HPFX72MY05BCC7E3DM.xlsx",
+                "sha256": "5eca1a13b6b20a8690e2c316696ff5d9689ee00bbe96119fc8060f5617141780",
+                "file_id": "fil_01M6JSV2HPFX72MY05BCC7E3DM"
+              }
+            ],
+            "status": "ok",
+            "stderr": "",
+            "stdout": "FILE materials.xlsx ['Material']\n SHEET Material rows 13 cols 2\n  HDR ['Material code', 'Description']\n  ROW 2 [('str', \"'000001'\"), ('str', \"'Coffee variant 01'\")]\n  ROW 3 [('str', \"'000011'\"), ('str', \"'Soap variant 11'\")]\n  ROW 4 [('str', \"'000002'\"), ('str', \"'Shampoo variant 02'\")]\n  ROW 5 [('str', \"'000012'\"), ('str', \"'Tea variant 12'\")]\nFILE balances.xlsx ['Stock']\n SHEET Stock rows 25 cols 3\n  HDR ['Material code', 'Warehouse', 'Quantity pieces']\n  ROW 2 [('str', \"'000009'\"), ('str', \"'BKK'\"), ('int', '63')]\n  ROW 3 [('str', \"'000010'\"), ('str', \"'CNX'\"), ('int', '71')]\n  ROW 4 [('str', \"'000006'\"), ('str', \"'BKK'\"), ('int', '42')]\n  ROW 5 [('str', \"'000005'\"), ('str', \"'CNX'\"), ('int', '36')]\nFILE selling_prices.xlsx ['Price']\n SHEET Price rows 13 cols 3\n  HDR ['Material code', 'Selling price', 'Currency']\n  ROW 2 [('str', \"'000011'\"), ('int', '243'), ('str', \"'THB'\")]\n  ROW 3 [('str', \"'000005'\"), ('int', '165'), ('str', \"'THB'\")]\n  ROW 4 [('str', \"'000007'\"), ('int', '191'), ('str', \"'THB'\")]\n  ROW 5 [('str', \"'000008'\"), ('int', '204'), ('str', \"'THB'\")]\nmaterials ['000001', '000011', '000002', '000012', '000009', '000008', '000007', '000003', '000004', '000006', '000010', '000005'] prices ['000011', '000005', '000007', '000008', '000010', '000006', '000001', '000012', '000009', '000004', '000002', '000003'] missing_prices set()\nstock_rows 24 material_wh_counts {('000009', 'BKK'): 1, ('000010', 'CNX'): 1, ('000006', 'BKK'): 1, ('000005', 'CNX'): 1, ('000004', 'BKK'): 1, ('000006', 'CNX'): 1, ('000010', 'BKK'): 1, ('000003', 'CNX'): 1, ('000012', 'BKK'): 1, ('000008', 'BKK'): 1, ('000007', 'CNX'): 1, ('000003', 'BKK'): 1, ('000002', 'BKK'): 1, ('000008', 'CNX'): 1, ('000012', 'CNX'): 1, ('000001', 'CNX'): 1, ('000004', 'CNX'): 1, ('000011', 'CNX'): 1, ('000002', 'CNX'): 1, ('000009', 'CNX'): 1, ('000001', 'BKK'): 1, ('000007', 'BKK'): 1, ('000011', 'BKK'): 1, ('000005', 'BKK'): 1}\nstock_missing_materials set()\n",
+            "omitted": [],
+            "exit_code": 0,
+            "code_sha256": "6dae19dae8d105ce4ccb633c0e9601d44e86032e52eb0b05c6bd07a0b0f4fc9b",
+            "duration_ms": 577
+          }
+        },
+        {
+          "turn": "mapping",
+          "complete": true,
+          "coverage": {
+            "fields": {
+              "/sku": {
+                "risk": "medium",
+                "records": 12,
+                "records_filled": 12
+              },
+              "/price": {
+                "risk": "critical",
+                "records": 12,
+                "records_filled": 0
+              },
+              "/currency": {
+                "risk": "critical",
+                "records": 12,
+                "records_filled": 0
+              },
+              "/product_name": {
+                "risk": "medium",
+                "records": 12,
+                "records_filled": 12
+              },
+              "/inventory/*/qty": {
+                "risk": "high",
+                "records": 12,
+                "records_filled": 12
+              },
+              "/inventory/*/warehouse_code": {
+                "risk": "high",
+                "records": 12,
+                "records_filled": 12
+              }
+            },
+            "sources": {
+              "prices": 12,
+              "products": 12,
+              "inventory": 24
+            },
+            "collections": {
+              "/inventory": 24
+            },
+            "invalid_records": 12
+          },
+          "problems": [
+            "compile: source column 'products.Selling price' not found; values will be null",
+            "compile: source column 'products.Currency' not found; values will be null",
+            "quality: /currency: 12 rows fail rule not_null",
+            "validation: data.price must be number",
+            "/price: empty in 12 of 12 records",
+            "/currency: empty in 12 of 12 records"
+          ],
+          "rows_out": 12
+        },
+        {
+          "turn": "mapping",
+          "complete": true,
+          "coverage": {
+            "fields": {
+              "/sku": {
+                "risk": "medium",
+                "records": 12,
+                "records_filled": 12
+              },
+              "/price": {
+                "risk": "critical",
+                "records": 12,
+                "records_filled": 12
+              },
+              "/currency": {
+                "risk": "critical",
+                "records": 12,
+                "records_filled": 12
+              },
+              "/product_name": {
+                "risk": "medium",
+                "records": 12,
+                "records_filled": 12
+              },
+              "/inventory/*/qty": {
+                "risk": "high",
+                "records": 12,
+                "records_filled": 12
+              },
+              "/inventory/*/warehouse_code": {
+                "risk": "high",
+                "records": 12,
+                "records_filled": 12
+              }
+            },
+            "sources": {
+              "prices": 12,
+              "products": 12,
+              "inventory": 24
+            },
+            "collections": {
+              "/inventory": 24
+            },
+            "invalid_records": 0
+          },
+          "problems": [],
+          "rows_out": 12
+        }
+      ],
+      "complete": true,
+      "coverage": {
+        "fields": {
+          "/sku": {
+            "risk": "medium",
+            "records": 12,
+            "records_filled": 12
+          },
+          "/price": {
+            "risk": "critical",
+            "records": 12,
+            "records_filled": 12
+          },
+          "/currency": {
+            "risk": "critical",
+            "records": 12,
+            "records_filled": 12
+          },
+          "/product_name": {
+            "risk": "medium",
+            "records": 12,
+            "records_filled": 12
+          },
+          "/inventory/*/qty": {
+            "risk": "high",
+            "records": 12,
+            "records_filled": 12
+          },
+          "/inventory/*/warehouse_code": {
+            "risk": "high",
+            "records": 12,
+            "records_filled": 12
+          }
+        },
+        "sources": {
+          "prices": 12,
+          "products": 12,
+          "inventory": 24
+        },
+        "collections": {
+          "/inventory": 24
+        },
+        "invalid_records": 0
+      },
+      "grounded": 3,
+      "rows_out": 12,
+      "fix_rounds": 1,
+      "inspections": 1,
+      "python_turns": 2,
+      "rows_checked": 12,
+      "problems_left": []
+    },
+    "agreement": {
+      "ops": [
+        "/currency",
+        "/price"
+      ],
+      "agree": [
+        "/currency",
+        "/price"
+      ],
+      "record": {
+        "root": {
+          "model": {
+            "file": "fil_01M6JSV2FJN10KY4BER4S74XDD",
+            "sheet": "material",
+            "filter": null,
+            "rename": {},
+            "unpivot": null,
+            "data_end": null,
+            "fill_down": [],
+            "data_start": null,
+            "last_column": 2,
+            "first_column": 0
+          },
+          "matcher": {
+            "file": "fil_01M6JSV2HPFX72MY05BCC7E3DM",
+            "sheet": "price",
+            "filter": null,
+            "rename": {},
+            "unpivot": null,
+            "data_end": null,
+            "fill_down": [],
+            "data_start": null,
+            "last_column": 3,
+            "first_column": 0
+          }
+        },
+        "joins": {
+          "model": [
+            {
+              "on": [
+                {
+                  "left": "Material code",
+                  "right": "Material code"
+                }
+              ],
+              "how": "left",
+              "left": {
+                "file": "fil_01M6JSV2FJN10KY4BER4S74XDD",
+                "sheet": "material",
+                "filter": null,
+                "rename": {},
+                "unpivot": null,
+                "data_end": null,
+                "fill_down": [],
+                "data_start": null,
+                "last_column": 2,
+                "first_column": 0
+              },
+              "right": {
+                "file": "fil_01M6JSV2HPFX72MY05BCC7E3DM",
+                "sheet": "price",
+                "filter": null,
+                "rename": {},
+                "unpivot": null,
+                "data_end": null,
+                "fill_down": [],
+                "data_start": null,
+                "last_column": 3,
+                "first_column": 0
+              },
+              "cardinality": "1:1",
+              "on_unmatched": "keep",
+              "normalize_keys": [
+                "trim"
+              ]
+            }
+          ],
+          "matcher": []
+        }
+      },
+      "dropped": [],
+      "disagree": {
+        "/sku": {
+          "model": [
+            "products.Material code"
+          ],
+          "matcher": [
+            "Price.Material code"
+          ]
+        }
+      },
+      "model_only": [
+        "/inventory/*/qty",
+        "/inventory/*/warehouse_code",
+        "/product_name"
+      ]
+    },
+    "disagree_count": 1,
+    "questions": [],
+    "open_questions": [],
+    "reasons": [
+      "first time this customer/format is seen",
+      "the model selects rows differently from FORMA's matcher (records: joins; records: root)"
+    ],
+    "preview_ok": true,
+    "agent_events": [
+      "operator_requirements",
+      "heuristic",
+      "schema",
+      "mapping",
+      "agreement",
+      "question_reconciliation"
+    ],
+    "cost_usd": 0.206657,
+    "calls": 7,
+    "input_tokens": 88105,
+    "output_tokens": 29638,
+    "llm_failures": [],
+    "flags": [],
+    "profile_job": {
+      "status": "done",
+      "error": null,
+      "duration_ms": 1564.3,
+      "started_at": "2026-11-04T08:12:08.115584+00:00",
+      "finished_at": "2026-11-04T08:12:09.679887+00:00"
+    },
+    "propose_job": {
+      "status": "done",
+      "error": null,
+      "duration_ms": 179701.9,
+      "started_at": "2026-11-04T08:12:11.133851+00:00",
+      "finished_at": "2026-11-04T08:15:10.835736+00:00"
+    },
+    "time_basis": "wall clock from case start to propose completion, including upload/profile/queue; independent of client resume"
+  },
+  {
+    "case": "T02",
+    "title": "Company + item composite key",
+    "round_id": "rnd_01M6JSV21WMKW8XFSEPZSVQK1H",
+    "state_complete": true,
+    "mode": "map",
+    "failed_stage": null,
+    "elapsed_seconds": 50.84,
+    "score": {
+      "field_accuracy": 1.0,
+      "penalized_accuracy": 1.0,
+      "exact_record_accuracy": 1.0,
+      "correct_fields": 36,
+      "expected_fields": 36,
+      "rows_got": 12,
+      "rows_expected": 12,
+      "identity_precision": 1.0,
+      "identity_recall": 1.0,
+      "duplicate_records": 0,
+      "missing_rows": [],
+      "extra_rows": [],
+      "wrong": [],
+      "extra_values": [],
+      "expected_questions": [],
+      "phase": "Before human assistance; unresolved oracle-only facts scored separately in report."
+    },
+    "mapping_id": "map_01M6JSWJ1WNM1DCAEBNCBVEX63",
+    "decision": "review",
+    "verification": {
+      "scope": "Execution and contract checks; business ambiguities require operator answers",
+      "passed": true,
+      "version": 1,
+      "complete": true,
+      "coverage": {
+        "fields": {
+          "/qty": {
+            "risk": "high",
+            "records": 12,
+            "records_filled": 12
+          },
+          "/sku": {
+            "risk": "medium",
+            "records": 12,
+            "records_filled": 12
+          },
+          "/product_name": {
+            "risk": "medium",
+            "records": 12,
+            "records_filled": 12
+          }
+        },
+        "sources": {
+          "stock": 12,
+          "products": 12
+        },
+        "collections": {},
+        "invalid_records": 0
+      },
+      "problems": [],
+      "rows_out": 12,
+      "warnings": [],
+      "rows_checked": 12
+    },
+    "self_check": {
+      "errors": 0,
+      "history": [
+        {
+          "code": "import json, os, glob\np='inputs/manifest.json'\nprint('manifest exists', os.path.exists(p))\nmf=json.load(open(p))\nprint(json.dumps(mf)[:1500])\nfiles=[]\nfor root,d,fs in os.walk('inputs'):\n    for f in fs:\n        files.append(os.path.join(root,f))\nprint(files[:20])\nimport openpyxl\npath=[f for f in files if f.lower().endswith('.xlsx')]\nprint(path)\nwb=openpyxl.load_workbook(path[0], data_only=True)\nfor ws in wb.worksheets:\n    print('SHEET', ws.title, ws.max_row, ws.max_column)\n    for r in range(1, min(5, ws.max_row)+1):\n        vals=[(c.coordinate, repr(c.value), c.data_type) for c in ws[r]]\n        print(vals)\n    # last rows\n    for r in range(max(1,ws.max_row-2), ws.max_row+1):\n        print('tail',[(c.coordinate, repr(c.value), c.data_type) for c in ws[r]])\n    # distinct types per column\n    from collections import Counter\n    for col in range(1, ws.max_column+1):\n        cnt=Counter()\n        for r in range(2, ws.max_row+1):\n            c=ws.cell(row=r,column=col)\n            cnt[(c.data_type, type(c.value).__name__)]+=1\n        print('col', col, ws.cell(row=1,column=col).value, dict(cnt))\n",
+          "turn": "python",
+          "result": {
+            "note": "Sandbox output is untrusted evidence. Full engine validation is mandatory.",
+            "inputs": [
+              {
+                "name": "delivery.xlsx",
+                "path": "inputs/sources/fil_01M6JSV2F1GS3RDJB9K0YE960N.xlsx",
+                "sha256": "b9309d4272423027fdb2db74d3bfd5db6e8f7a62ee7f45314c45999f659ee572",
+                "file_id": "fil_01M6JSV2F1GS3RDJB9K0YE960N"
+              }
+            ],
+            "status": "ok",
+            "stderr": "",
+            "stdout": "manifest exists True\n[{\"file_id\": \"fil_01M6JSV2F1GS3RDJB9K0YE960N\", \"name\": \"delivery.xlsx\", \"path\": \"inputs/sources/fil_01M6JSV2F1GS3RDJB9K0YE960N.xlsx\", \"sha256\": \"b9309d4272423027fdb2db74d3bfd5db6e8f7a62ee7f45314c45999f659ee572\"}]\n['inputs/target_schema.json', 'inputs/manifest.json', 'inputs/sources/fil_01M6JSV2F1GS3RDJB9K0YE960N.xlsx']\n['inputs/sources/fil_01M6JSV2F1GS3RDJB9K0YE960N.xlsx']\nSHEET Master 13 4\n[('A1', \"'SKU'\", 's'), ('B1', \"'Company'\", 's'), ('C1', \"'Item code'\", 's'), ('D1', \"'Description'\", 's')]\n[('A2', \"'TH-0001'\", 's'), ('B2', \"'TH'\", 's'), ('C2', \"'0001'\", 's'), ('D2', \"'TH item 1'\", 's')]\n[('A3', \"'MY-0003'\", 's'), ('B3', \"'MY'\", 's'), ('C3', \"'0003'\", 's'), ('D3', \"'MY item 3'\", 's')]\n[('A4', \"'MY-0001'\", 's'), ('B4', \"'MY'\", 's'), ('C4', \"'0001'\", 's'), ('D4', \"'MY item 1'\", 's')]\n[('A5', \"'TH-0006'\", 's'), ('B5', \"'TH'\", 's'), ('C5', \"'0006'\", 's'), ('D5', \"'TH item 6'\", 's')]\ntail [('A11', \"'MY-0002'\", 's'), ('B11', \"'MY'\", 's'), ('C11', \"'0002'\", 's'), ('D11', \"'MY item 2'\", 's')]\ntail [('A12', \"'MY-0005'\", 's'), ('B12', \"'MY'\", 's'), ('C12', \"'0005'\", 's'), ('D12', \"'MY item 5'\", 's')]\ntail [('A13', \"'TH-0004'\", 's'), ('B13', \"'TH'\", 's'), ('C13', \"'0004'\", 's'), ('D13', \"'TH item 4'\", 's')]\ncol 1 SKU {('s', 'str'): 12}\ncol 2 Company {('s', 'str'): 12}\ncol 3 Item code {('s', 'str'): 12}\ncol 4 Description {('s', 'str'): 12}\nSHEET Stock 13 3\n[('A1', \"'Company'\", 's'), ('B1', \"'Item code'\", 's'), ('C1', \"'Quantity pieces'\", 's')]\n[('A2', \"'MY'\", 's'), ('B2', \"'0005'\", 's'), ('C2', '155', 'n')]\n[('A3', \"'TH'\", 's'), ('B3', \"'0003'\", 's'), ('C3', '33', 'n')]\n[('A4', \"'TH'\", 's'), ('B4', \"'0006'\", 's'), ('C4', '66', 'n')]\n[('A5', \"'MY'\", 's'), ('B5', \"'0002'\", 's'), ('C5', '122', 'n')]\ntail [('A11', \"'MY'\", 's'), ('B11', \"'0004'\", 's'), ('C11', '144', 'n')]\ntail [('A12', \"'MY'\", 's'), ('B12', \"'0001'\", 's'), ('C12', '111', 'n')]\ntail [('A13', \"'TH'\", 's'), ('B13', \"'0002'\", 's'), ('C13', '22', 'n')]\ncol 1 Company {('s', 'str'): 12}\ncol 2 Item code {('s', 'str'): 12}\ncol 3 Quantity pieces {('n', 'int'): 12}\n",
+            "omitted": [],
+            "exit_code": 0,
+            "code_sha256": "0c2434a0c18f4db230b7e80a010797cba8dd80bac3abc24d0138a5334c1b6bca",
+            "duration_ms": 969
+          }
+        },
+        {
+          "turn": "mapping",
+          "complete": true,
+          "coverage": {
+            "fields": {
+              "/qty": {
+                "risk": "high",
+                "records": 12,
+                "records_filled": 0
+              },
+              "/sku": {
+                "risk": "medium",
+                "records": 12,
+                "records_filled": 12
+              },
+              "/product_name": {
+                "risk": "medium",
+                "records": 12,
+                "records_filled": 12
+              }
+            },
+            "sources": {
+              "stock": 12,
+              "products": 12
+            },
+            "collections": {},
+            "invalid_records": 0
+          },
+          "problems": [
+            "compile: source column 'products.Quantity pieces' not found; values will be null",
+            "/qty: empty in 12 of 12 records"
+          ],
+          "rows_out": 12
+        },
+        {
+          "turn": "mapping",
+          "complete": true,
+          "coverage": {
+            "fields": {
+              "/qty": {
+                "risk": "high",
+                "records": 12,
+                "records_filled": 12
+              },
+              "/sku": {
+                "risk": "medium",
+                "records": 12,
+                "records_filled": 12
+              },
+              "/product_name": {
+                "risk": "medium",
+                "records": 12,
+                "records_filled": 12
+              }
+            },
+            "sources": {
+              "stock": 12,
+              "products": 12
+            },
+            "collections": {},
+            "invalid_records": 0
+          },
+          "problems": [],
+          "rows_out": 12
+        }
+      ],
+      "complete": true,
+      "coverage": {
+        "fields": {
+          "/qty": {
+            "risk": "high",
+            "records": 12,
+            "records_filled": 12
+          },
+          "/sku": {
+            "risk": "medium",
+            "records": 12,
+            "records_filled": 12
+          },
+          "/product_name": {
+            "risk": "medium",
+            "records": 12,
+            "records_filled": 12
+          }
+        },
+        "sources": {
+          "stock": 12,
+          "products": 12
+        },
+        "collections": {},
+        "invalid_records": 0
+      },
+      "grounded": 0,
+      "rows_out": 12,
+      "fix_rounds": 1,
+      "inspections": 0,
+      "python_turns": 1,
+      "rows_checked": 12,
+      "problems_left": []
+    },
+    "agreement": {
+      "ops": [
+        "/sku"
+      ],
+      "agree": [
+        "/sku"
+      ],
+      "record": {
+        "joins": {
+          "model": [
+            {
+              "on": [
+                {
+                  "left": "Company",
+                  "right": "Company"
+                },
+                {
+                  "left": "Item code",
+                  "right": "Item code"
+                }
+              ],
+              "how": "left",
+              "left": {
+                "file": "fil_01M6JSV2F1GS3RDJB9K0YE960N",
+                "sheet": "master",
+                "filter": null,
+                "rename": {},
+                "unpivot": null,
+                "data_end": null,
+                "fill_down": [],
+                "data_start": null,
+                "last_column": 4,
+                "first_column": 0
+              },
+              "right": {
+                "file": "fil_01M6JSV2F1GS3RDJB9K0YE960N",
+                "sheet": "stock",
+                "filter": null,
+                "rename": {},
+                "unpivot": null,
+                "data_end": null,
+                "fill_down": [],
+                "data_start": null,
+                "last_column": 3,
+                "first_column": 0
+              },
+              "cardinality": "1:1",
+              "on_unmatched": "keep",
+              "normalize_keys": [
+                "trim",
+                "upper",
+                "strip_leading_zeros"
+              ]
+            }
+          ],
+          "matcher": []
+        }
+      },
+      "dropped": [],
+      "disagree": {},
+      "model_only": [
+        "/product_name",
+        "/qty"
+      ]
+    },
+    "disagree_count": 0,
+    "questions": [],
+    "open_questions": [],
+    "reasons": [
+      "first time this customer/format is seen",
+      "the model selects rows differently from FORMA's matcher (records: joins)"
+    ],
+    "preview_ok": true,
+    "agent_events": [
+      "operator_requirements",
+      "heuristic",
+      "schema",
+      "mapping",
+      "agreement"
+    ],
+    "cost_usd": 0.065964,
+    "calls": 4,
+    "input_tokens": 37768,
+    "output_tokens": 7049,
+    "llm_failures": [],
+    "flags": [],
+    "profile_job": {
+      "status": "done",
+      "error": null,
+      "duration_ms": 1564.1,
+      "started_at": "2026-11-04T08:12:08.112625+00:00",
+      "finished_at": "2026-11-04T08:12:09.676676+00:00"
+    },
+    "propose_job": {
+      "status": "done",
+      "error": null,
+      "duration_ms": 45287.3,
+      "started_at": "2026-11-04T08:12:11.127023+00:00",
+      "finished_at": "2026-11-04T08:12:56.414321+00:00"
+    },
+    "time_basis": "wall clock from case start to propose completion, including upload/profile/queue; independent of client resume"
+  },
+  {
+    "case": "T03",
+    "title": "Date + currency + price list",
+    "round_id": "rnd_01M6JSWPKYC41VFF7Q5H780T9K",
+    "state_complete": true,
+    "mode": "map",
+    "failed_stage": null,
+    "elapsed_seconds": 97.84,
+    "score": {
+      "field_accuracy": 1.0,
+      "penalized_accuracy": 1.0,
+      "exact_record_accuracy": 1.0,
+      "correct_fields": 48,
+      "expected_fields": 48,
+      "rows_got": 12,
+      "rows_expected": 12,
+      "identity_precision": 1.0,
+      "identity_recall": 1.0,
+      "duplicate_records": 0,
+      "missing_rows": [],
+      "extra_rows": [],
+      "wrong": [],
+      "extra_values": [],
+      "expected_questions": [],
+      "phase": "Before human assistance; unresolved oracle-only facts scored separately in report."
+    },
+    "mapping_id": "map_01M6JSZN2HRBRGDZ89ZYTSPGMK",
+    "decision": "review",
+    "verification": {
+      "scope": "Execution and contract checks; business ambiguities require operator answers",
+      "passed": true,
+      "version": 1,
+      "complete": true,
+      "coverage": {
+        "fields": {
+          "/sku": {
+            "risk": "medium",
+            "records": 12,
+            "records_filled": 12
+          },
+          "/price": {
+            "risk": "critical",
+            "records": 12,
+            "records_filled": 12
+          },
+          "/currency": {
+            "risk": "critical",
+            "records": 12,
+            "records_filled": 12
+          },
+          "/product_name": {
+            "risk": "medium",
+            "records": 12,
+            "records_filled": 12
+          }
+        },
+        "sources": {
+          "material": 12,
+          "price_history": 12
+        },
+        "collections": {},
+        "invalid_records": 0
+      },
+      "problems": [],
+      "rows_out": 12,
+      "warnings": [],
+      "rows_checked": 12
+    },
+    "self_check": {
+      "errors": 0,
+      "history": [
+        {
+          "turn": "ground",
+          "columns": 6
+        },
+        {
+          "turn": "inspect",
+          "requests": 2
+        },
+        {
+          "turn": "mapping",
+          "complete": true,
+          "coverage": {
+            "fields": {
+              "/sku": {
+                "risk": "medium",
+                "records": 12,
+                "records_filled": 12
+              },
+              "/price": {
+                "risk": "critical",
+                "records": 12,
+                "records_filled": 0
+              },
+              "/currency": {
+                "risk": "critical",
+                "records": 12,
+                "records_filled": 0
+              },
+              "/product_name": {
+                "risk": "medium",
+                "records": 12,
+                "records_filled": 12
+              }
+            },
+            "sources": {
+              "material": 12,
+              "price_history": 12
+            },
+            "collections": {},
+            "invalid_records": 12
+          },
+          "problems": [
+            "compile: source column 'material.Selling price' not found; values will be null",
+            "compile: source column 'material.Currency' not found; values will be null",
+            "quality: /currency: 12 rows fail rule not_null",
+            "validation: data.price must be number",
+            "/price: empty in 12 of 12 records",
+            "/currency: empty in 12 of 12 records"
+          ],
+          "rows_out": 12
+        },
+        {
+          "turn": "mapping",
+          "complete": true,
+          "coverage": {
+            "fields": {
+              "/sku": {
+                "risk": "medium",
+                "records": 12,
+                "records_filled": 12
+              },
+              "/price": {
+                "risk": "critical",
+                "records": 12,
+                "records_filled": 12
+              },
+              "/currency": {
+                "risk": "critical",
+                "records": 12,
+                "records_filled": 12
+              },
+              "/product_name": {
+                "risk": "medium",
+                "records": 12,
+                "records_filled": 12
+              }
+            },
+            "sources": {
+              "material": 12,
+              "price_history": 12
+            },
+            "collections": {},
+            "invalid_records": 0
+          },
+          "problems": [],
+          "rows_out": 12
+        }
+      ],
+      "complete": true,
+      "coverage": {
+        "fields": {
+          "/sku": {
+            "risk": "medium",
+            "records": 12,
+            "records_filled": 12
+          },
+          "/price": {
+            "risk": "critical",
+            "records": 12,
+            "records_filled": 12
+          },
+          "/currency": {
+            "risk": "critical",
+            "records": 12,
+            "records_filled": 12
+          },
+          "/product_name": {
+            "risk": "medium",
+            "records": 12,
+            "records_filled": 12
+          }
+        },
+        "sources": {
+          "material": 12,
+          "price_history": 12
+        },
+        "collections": {},
+        "invalid_records": 0
+      },
+      "grounded": 6,
+      "rows_out": 12,
+      "fix_rounds": 1,
+      "inspections": 1,
+      "python_turns": 0,
+      "rows_checked": 12,
+      "problems_left": []
+    },
+    "agreement": {
+      "ops": [],
+      "agree": [],
+      "record": {
+        "root": {
+          "model": {
+            "file": "fil_01M6JSWPQ0GHCXJAQ2SDDSB06A",
+            "sheet": "material",
+            "filter": null,
+            "rename": {},
+            "unpivot": null,
+            "data_end": null,
+            "fill_down": [],
+            "data_start": null,
+            "last_column": 2,
+            "first_column": 0
+          },
+          "matcher": {
+            "file": "fil_01M6JSWPQ0GHCXJAQ2SDDSB06A",
+            "sheet": "price history",
+            "filter": null,
+            "rename": {},
+            "unpivot": null,
+            "data_end": null,
+            "fill_down": [],
+            "data_start": null,
+            "last_column": 6,
+            "first_column": 0
+          }
+        },
+        "joins": {
+          "model": [
+            {
+              "on": [
+                {
+                  "left": "Material code",
+                  "right": "price_mat_code"
+                }
+              ],
+              "how": "inner",
+              "left": {
+                "file": "fil_01M6JSWPQ0GHCXJAQ2SDDSB06A",
+                "sheet": "material",
+                "filter": null,
+                "rename": {},
+                "unpivot": null,
+                "data_end": null,
+                "fill_down": [],
+                "data_start": null,
+                "last_column": 2,
+                "first_column": 0
+              },
+              "right": {
+                "file": "fil_01M6JSWPQ0GHCXJAQ2SDDSB06A",
+                "sheet": "price history",
+                "filter": {
+                  "op": "and",
+                  "args": [
+                    {
+                      "op": "eq",
+                      "args": [
+                        {
+                          "op": "upper",
+                          "args": [
+                            {
+                              "op": "trim",
+                              "args": [
+                                {
+                                  "op": "col",
+                                  "name": "Price list"
+                                }
+                              ],
+                              "params": {}
+                            }
+                          ],
+                          "params": {}
+                        },
+                        {
+                          "op": "const",
+                          "value": "RETAIL"
+                        }
+                      ],
+                      "params": {}
+                    },
+                    {
+                      "op": "eq",
+                      "args": [
+                        {
+                          "op": "upper",
+                          "args": [
+                            {
+                              "op": "trim",
+                              "args": [
+                                {
+                                  "op": "col",
+                                  "name": "Currency"
+                                }
+                              ],
+                              "params": {}
+                            }
+                          ],
+                          "params": {}
+                        },
+                        {
+                          "op": "const",
+                          "value": "THB"
+                        }
+                      ],
+                      "params": {}
+                    },
+                    {
+                      "op": "lte",
+                      "args": [
+                        {
+                          "op": "parse_date_th",
+                          "args": [
+                            {
+                              "op": "col",
+                              "name": "Valid from"
+                            }
+                          ],
+                          "params": {
+                            "formats": [
+                              "%Y-%m-%d",
+                              "%d/%m/%Y"
+                            ]
+                          }
+                        },
+                        {
+                          "op": "parse_date_th",
+                          "args": [
+                            {
+                              "op": "const",
+                              "value": "2026-11-03"
+                            }
+                          ],
+                          "params": {
+                            "formats": [
+                              "%Y-%m-%d"
+                            ]
+                          }
+                        }
+                      ],
+                      "params": {}
+                    },
+                    {
+                      "op": "gte",
+                      "args": [
+                        {
+                          "op": "parse_date_th",
+                          "args": [
+                            {
+                              "op": "col",
+                              "name": "Valid to"
+                            }
+                          ],
+                          "params": {
+                            "formats": [
+                              "%Y-%m-%d",
+                              "%d/%m/%Y"
+                            ]
+                          }
+                        },
+                        {
+                          "op": "parse_date_th",
+                          "args": [
+                            {
+                              "op": "const",
+                              "value": "2026-11-03"
+                            }
+                          ],
+                          "params": {
+                            "formats": [
+                              "%Y-%m-%d"
+                            ]
+                          }
+                        }
+                      ],
+                      "params": {}
+                    }
+                  ],
+                  "params": {}
+                },
+                "rename": {
+                  "Material code": "price_mat_code"
+                },
+                "unpivot": null,
+                "data_end": null,
+                "fill_down": [],
+                "data_start": null,
+                "last_column": 6,
+                "first_column": 0
+              },
+              "cardinality": "1:1",
+              "on_unmatched": "drop",
+              "normalize_keys": [
+                "trim",
+                "upper",
+                "strip_leading_zeros"
+              ]
+            }
+          ],
+          "matcher": []
+        },
+        "dedupe": {
+          "model": {
+            "keep": "first",
+            "keys": [
+              "/sku"
+            ]
+          },
+          "matcher": {
+            "keep": "first",
+            "keys": []
+          }
+        }
+      },
+      "dropped": [],
+      "disagree": {
+        "/sku": {
+          "model": [
+            "material.Material code"
+          ],
+          "matcher": [
+            "Price history.Material code"
+          ]
+        },
+        "/price": {
+          "model": [
+            "price_history.Selling price"
+          ],
+          "matcher": [
+            "Price history.Price list"
+          ]
+        },
+        "/currency": {
+          "model": [
+            "price_history.Currency"
+          ],
+          "matcher": [
+            "Price history.Currency"
+          ]
+        }
+      },
+      "model_only": [
+        "/product_name"
+      ]
+    },
+    "disagree_count": 3,
+    "questions": [
+      {
+        "id": "/price",
+        "kind": "confirm",
+        "action": null,
+        "title": null,
+        "question": null,
+        "note": "Column must be read from the price_history frame; the joined root frame 'material' has no price column.",
+        "options": [],
+        "evidence": [
+          "Header 'Selling price' = requested selling price, not cost.",
+          "Source frame 'price_history' is pre-filtered to RETAIL + THB + valid on 2026-11-03, leaving exactly one row per material code (12 rows).",
+          "Values are plain integers 2..256 with no currency or percent decoration.",
+          "FORMA's matcher read Price history.Price list instead: confidence 0.93 → 0.70",
+          "FORMA's matcher read Price list for this field"
+        ],
+        "contested": true
+      },
+      {
+        "id": "/currency",
+        "kind": "confirm",
+        "action": null,
+        "title": null,
+        "question": null,
+        "note": "Read from the price_history frame after the join.",
+        "options": [],
+        "evidence": [
+          "Header 'Currency' holds ISO codes THB and USD.",
+          "The price_history filter keeps only TBH rows, so every surviving record carries 'THB'.",
+          "FORMA's matcher read Price history.Currency instead: confidence 0.97 → 0.70",
+          "FORMA's matcher read Currency for this field"
+        ],
+        "contested": true
+      }
+    ],
+    "open_questions": [],
+    "reasons": [
+      "low confidence on critical fields: /price (0.70), /currency (0.70)",
+      "mapping confidence 0.94 < 0.95",
+      "first time this customer/format is seen",
+      "the model selects rows differently from FORMA's matcher (records: dedupe; records: joins; records: root)"
+    ],
+    "preview_ok": true,
+    "agent_events": [
+      "operator_requirements",
+      "heuristic",
+      "schema",
+      "mapping",
+      "agreement",
+      "question_reconciliation"
+    ],
+    "cost_usd": 0.110267,
+    "calls": 4,
+    "input_tokens": 43699,
+    "output_tokens": 16642,
+    "llm_failures": [],
+    "flags": [],
+    "profile_job": {
+      "status": "done",
+      "error": null,
+      "duration_ms": 623.5,
+      "started_at": "2026-11-04T08:13:01.565817+00:00",
+      "finished_at": "2026-11-04T08:13:02.189352+00:00"
+    },
+    "propose_job": {
+      "status": "done",
+      "error": null,
+      "duration_ms": 93093.1,
+      "started_at": "2026-11-04T08:13:04.592822+00:00",
+      "finished_at": "2026-11-04T08:14:37.685935+00:00"
+    },
+    "time_basis": "wall clock from case start to propose completion, including upload/profile/queue; independent of client resume"
+  },
+  {
+    "case": "T04",
+    "title": "Merged headings and currency outside table",
+    "round_id": "rnd_01M6JSZSNG1ARRHXAB7JJ93C60",
+    "state_complete": true,
+    "mode": "map",
+    "failed_stage": null,
+    "elapsed_seconds": 38.13,
+    "score": {
+      "field_accuracy": 1.0,
+      "penalized_accuracy": 1.0,
+      "exact_record_accuracy": 1.0,
+      "correct_fields": 60,
+      "expected_fields": 60,
+      "rows_got": 12,
+      "rows_expected": 12,
+      "identity_precision": 1.0,
+      "identity_recall": 1.0,
+      "duplicate_records": 0,
+      "missing_rows": [],
+      "extra_rows": [],
+      "wrong": [],
+      "extra_values": [],
+      "expected_questions": [],
+      "phase": "Before human assistance; unresolved oracle-only facts scored separately in report."
+    },
+    "mapping_id": "map_01M6JT0XQETM5XQWQ1WQ4V281T",
+    "decision": "review",
+    "verification": {
+      "scope": "Execution and contract checks; business ambiguities require operator answers",
+      "passed": true,
+      "version": 1,
+      "complete": true,
+      "coverage": {
+        "fields": {
+          "/qty": {
+            "risk": "high",
+            "records": 12,
+            "records_filled": 12
+          },
+          "/sku": {
+            "risk": "medium",
+            "records": 12,
+            "records_filled": 12
+          },
+          "/price": {
+            "risk": "critical",
+            "records": 12,
+            "records_filled": 12
+          },
+          "/currency": {
+            "risk": "critical",
+            "records": 12,
+            "records_filled": 12
+          },
+          "/product_name": {
+            "risk": "medium",
+            "records": 12,
+            "records_filled": 12
+          }
+        },
+        "sources": {
+          "products": 12
+        },
+        "collections": {},
+        "invalid_records": 0
+      },
+      "problems": [],
+      "rows_out": 12,
+      "warnings": [],
+      "rows_checked": 12
+    },
+    "self_check": {
+      "errors": 0,
+      "history": [
+        {
+          "turn": "ground",
+          "columns": 2
+        },
+        {
+          "turn": "inspect",
+          "requests": 1
+        },
+        {
+          "code": "import json, os\nbase='inputs'\nprint(sorted(os.listdir(base))[:20])\ntry:\n    m=json.load(open(os.path.join(base,'manifest.json')))\n    print(json.dumps(m)[:1500])\nexcept Exception as e:\n    print('manifest err', e)\nimport glob\nfiles=glob.glob('inputs/**/*.xlsx', recursive=True)+glob.glob('*.xlsx')\nprint('files', files[:5])\ntry:\n    import openpyxl\n    p=files[0]\n    wb=openpyxl.load_workbook(p, data_only=True)\n    ws=wb[wb.sheetnames[0]]\n    print('sheet', ws.title, ws.max_row, ws.max_column)\n    for coord in ['A1','A2','A4','C4','A5','B5','C5','D5','A6','B6','C6','D6','A17','A18','C18','D18']:\n        c=ws[coord]\n        print(coord, repr(c.value), c.data_type, c.number_format)\nexcept Exception as e:\n    print('xl err', e)\n",
+          "turn": "python",
+          "result": {
+            "note": "Sandbox output is untrusted evidence. Full engine validation is mandatory.",
+            "inputs": [
+              {
+                "name": "report.xlsx",
+                "path": "inputs/sources/fil_01M6JSZSQ9K0VFC6FG0QCY82N6.xlsx",
+                "sha256": "e3520c2b8a1f331d4737bdff986c4a580ae191ad2baa931c7d0287490e189fc2",
+                "file_id": "fil_01M6JSZSQ9K0VFC6FG0QCY82N6"
+              }
+            ],
+            "status": "ok",
+            "stderr": "",
+            "stdout": "['manifest.json', 'sources', 'target_schema.json']\n[{\"file_id\": \"fil_01M6JSZSQ9K0VFC6FG0QCY82N6\", \"name\": \"report.xlsx\", \"path\": \"inputs/sources/fil_01M6JSZSQ9K0VFC6FG0QCY82N6.xlsx\", \"sha256\": \"e3520c2b8a1f331d4737bdff986c4a580ae191ad2baa931c7d0287490e189fc2\"}]\nfiles ['inputs/sources/fil_01M6JSZSQ9K0VFC6FG0QCY82N6.xlsx']\nsheet Report 18 4\nA1 'Inventory and price list' s General\nA2 'Currency: EUR; price per individual piece; stock below is in pieces.' s General\nA4 'Identity' s General\nC4 'Commercial' s General\nA5 'SKU' s General\nB5 'Product name' s General\nC5 'Selling price' s General\nD5 'Stock pieces' s General\nA6 '000001' s General\nB6 'Coffee variant 01' s General\nC6 67 n General\nD6 3 n General\nA17 '000012' s General\nA18 'TOTAL' s General\nC18 1926 n General\nD18 234 n General\n",
+            "omitted": [],
+            "exit_code": 0,
+            "code_sha256": "915e56eb894dc28e00dfc20e02cb72b45c4c5bd76a78c51464d6b4d30187cc05",
+            "duration_ms": 519
+          }
+        },
+        {
+          "turn": "mapping",
+          "complete": true,
+          "coverage": {
+            "fields": {
+              "/qty": {
+                "risk": "high",
+                "records": 12,
+                "records_filled": 12
+              },
+              "/sku": {
+                "risk": "medium",
+                "records": 12,
+                "records_filled": 12
+              },
+              "/price": {
+                "risk": "critical",
+                "records": 12,
+                "records_filled": 12
+              },
+              "/currency": {
+                "risk": "critical",
+                "records": 12,
+                "records_filled": 12
+              },
+              "/product_name": {
+                "risk": "medium",
+                "records": 12,
+                "records_filled": 12
+              }
+            },
+            "sources": {
+              "products": 12
+            },
+            "collections": {},
+            "invalid_records": 0
+          },
+          "problems": [],
+          "rows_out": 12
+        }
+      ],
+      "complete": true,
+      "coverage": {
+        "fields": {
+          "/qty": {
+            "risk": "high",
+            "records": 12,
+            "records_filled": 12
+          },
+          "/sku": {
+            "risk": "medium",
+            "records": 12,
+            "records_filled": 12
+          },
+          "/price": {
+            "risk": "critical",
+            "records": 12,
+            "records_filled": 12
+          },
+          "/currency": {
+            "risk": "critical",
+            "records": 12,
+            "records_filled": 12
+          },
+          "/product_name": {
+            "risk": "medium",
+            "records": 12,
+            "records_filled": 12
+          }
+        },
+        "sources": {
+          "products": 12
+        },
+        "collections": {},
+        "invalid_records": 0
+      },
+      "grounded": 2,
+      "rows_out": 12,
+      "fix_rounds": 0,
+      "inspections": 1,
+      "python_turns": 1,
+      "rows_checked": 12,
+      "problems_left": []
+    },
+    "agreement": {
+      "ops": [
+        "/sku"
+      ],
+      "agree": [
+        "/price",
+        "/product_name",
+        "/sku"
+      ],
+      "record": {
+        "dedupe": {
+          "model": {
+            "keep": "first",
+            "keys": [
+              "/sku"
+            ]
+          },
+          "matcher": {
+            "keep": "first",
+            "keys": []
+          }
+        },
+        "filters": {
+          "model": [
+            {
+              "op": "neq",
+              "args": [
+                {
+                  "op": "trim",
+                  "args": [
+                    {
+                      "op": "cast",
+                      "args": [
+                        {
+                          "op": "col",
+                          "name": "SKU",
+                          "source": {
+                            "file": "fil_01M6JSZSQ9K0VFC6FG0QCY82N6",
+                            "sheet": "report",
+                            "filter": null,
+                            "unpivot": null,
+                            "data_end": null,
+                            "fill_down": [],
+                            "data_start": null,
+                            "last_column": 4,
+                            "first_column": 0
+                          }
+                        }
+                      ],
+                      "params": {
+                        "to": "string"
+                      }
+                    }
+                  ],
+                  "params": {}
+                },
+                {
+                  "op": "const",
+                  "value": "TOTAL"
+                }
+              ],
+              "params": {}
+            }
+          ],
+          "matcher": []
+        }
+      },
+      "dropped": [],
+      "disagree": {
+        "/currency": {
+          "model": [
+            "{\"op\": \"const\", \"value\": \"EUR\"}"
+          ],
+          "matcher": [
+            "{\"op\": \"const\", \"value\": \"THB\"}"
+          ]
+        }
+      },
+      "model_only": [
+        "/qty"
+      ]
+    },
+    "disagree_count": 1,
+    "questions": [
+      {
+        "id": "/currency",
+        "kind": "confirm",
+        "action": null,
+        "title": null,
+        "question": null,
+        "note": null,
+        "options": [],
+        "evidence": [
+          "A2 subtitle of sheet 'Report': 'Currency: EUR; price per individual piece; stock below is in pieces.' — the currency is declared explicitly in the workbook, not inferred from retail convention",
+          "EUR is a valid ISO 4217 code",
+          "FORMA's matcher read {\"op\": \"const\", \"value\": \"THB\"} instead: confidence 0.93 → 0.70",
+          "FORMA's matcher read {\"op\": \"const\", \"value\": \"THB\"} for this field"
+        ],
+        "contested": true
+      }
+    ],
+    "open_questions": [],
+    "reasons": [
+      "low confidence on critical fields: /currency (0.70)",
+      "first time this customer/format is seen",
+      "the model selects rows differently from FORMA's matcher (records: dedupe; records: filters)"
+    ],
+    "preview_ok": true,
+    "agent_events": [
+      "operator_requirements",
+      "heuristic",
+      "schema",
+      "mapping",
+      "agreement"
+    ],
+    "cost_usd": 0.058012,
+    "calls": 4,
+    "input_tokens": 37392,
+    "output_tokens": 5155,
+    "llm_failures": [],
+    "flags": [],
+    "profile_job": {
+      "status": "done",
+      "error": null,
+      "duration_ms": 195.2,
+      "started_at": "2026-11-04T08:14:42.833578+00:00",
+      "finished_at": "2026-11-04T08:14:43.028777+00:00"
+    },
+    "propose_job": {
+      "status": "done",
+      "error": null,
+      "duration_ms": 33491.9,
+      "started_at": "2026-11-04T08:14:45.838691+00:00",
+      "finished_at": "2026-11-04T08:15:19.330640+00:00"
+    },
+    "time_basis": "wall clock from case start to propose completion, including upload/profile/queue; independent of client resume"
+  },
+  {
+    "case": "T05",
+    "title": "Cross-sheet formula with correct cache",
+    "round_id": "rnd_01M6JT0QGNP56YV4H8BB231HQ3",
+    "state_complete": true,
+    "mode": "map",
+    "failed_stage": null,
+    "elapsed_seconds": 107.17,
+    "score": {
+      "field_accuracy": 1.0,
+      "penalized_accuracy": 1.0,
+      "exact_record_accuracy": 1.0,
+      "correct_fields": 36,
+      "expected_fields": 36,
+      "rows_got": 12,
+      "rows_expected": 12,
+      "identity_precision": 1.0,
+      "identity_recall": 1.0,
+      "duplicate_records": 0,
+      "missing_rows": [],
+      "extra_rows": [],
+      "wrong": [],
+      "extra_values": [],
+      "expected_questions": [],
+      "phase": "Before human assistance; unresolved oracle-only facts scored separately in report."
+    },
+    "mapping_id": "map_01M6JT3ZKBV7AGH329ZV162DHB",
+    "decision": "review",
+    "verification": {
+      "scope": "Execution and contract checks; business ambiguities require operator answers",
+      "passed": true,
+      "version": 1,
+      "complete": true,
+      "coverage": {
+        "fields": {
+          "/qty": {
+            "risk": "high",
+            "records": 12,
+            "records_filled": 12
+          },
+          "/sku": {
+            "risk": "medium",
+            "records": 12,
+            "records_filled": 12
+          },
+          "/product_name": {
+            "risk": "medium",
+            "records": 12,
+            "records_filled": 12
+          }
+        },
+        "sources": {
+          "products_0": 12,
+          "products_1": 12,
+          "products_2": 12
+        },
+        "collections": {},
+        "invalid_records": 0
+      },
+      "problems": [],
+      "rows_out": 12,
+      "warnings": [],
+      "rows_checked": 12
+    },
+    "self_check": {
+      "errors": 0,
+      "history": [
+        {
+          "code": "import json, glob\nres={}\ncands = sorted(glob.glob('inputs/*')) + sorted(glob.glob('/inputs/*')) + sorted(glob.glob('*'))\nres['cands']=cands[:40]\nxlsx=[c for c in cands if c.lower().endswith(('.xlsx','.xlsm'))]\nres['xlsx']=xlsx\ntry:\n    man=[c for c in cands if c.endswith('manifest.json')]\n    if man:\n        res['manifest']=json.load(open(man[0]))\nexcept Exception as e:\n    res['man_err']=repr(e)\ntry:\n    import openpyxl\n    p=xlsx[0]\n    wf=openpyxl.load_workbook(p, data_only=False)\n    wv=openpyxl.load_workbook(p, data_only=True)\n    sheets={}\n    for nm in wf.sheetnames:\n        sf=wf[nm]; sv=wv[nm]\n        sample=[]\n        for r in range(1, min(sf.max_row,3)+1):\n            for c in range(1, sf.max_column+1):\n                cf=sf.cell(r,c); cv=sv.cell(r,c)\n                sample.append([cf.coordinate, repr(cf.value)[:90], cf.data_type, cf.number_format, repr(cv.value)[:60]])\n        sheets[nm]=sample\n    res['sheets']=sheets\n    sv=wv['Export']; sf=wf['Export']\n    res['export_C']=[[sv.cell(r,3).coordinate, repr(sv.cell(r,3).value)] for r in range(1, sv.max_row+1)]\n    res['export_A']=[[sf.cell(r,1).coordinate, repr(sf.cell(r,1).value), sf.cell(r,1).data_type, sf.cell(r,1).number_format] for r in range(1, min(sf.max_row,13)+1)]\n    sv1=wv['Counts']; sv2=wv['Pack factors']\n    res['counts']=[[repr(sv1.cell(r,1).value), repr(sv1.cell(r,2).value)] for r in range(2, sv1.max_row+1)]\n    res['pack']=[[repr(sv2.cell(r,1).value), repr(sv2.cell(r,2).value)] for r in range(2, sv2.max_row+1)]\nexcept Exception as e:\n    res['xl_err']=repr(e)\nprint(json.dumps(res, ensure_ascii=False, default=str)[:9000])",
+          "turn": "python",
+          "result": {
+            "note": "Sandbox output is untrusted evidence. Full engine validation is mandatory.",
+            "inputs": [
+              {
+                "name": "delivery.xlsx",
+                "path": "inputs/sources/fil_01M6JT0QJHVBA6WMK0WD329VQV.xlsx",
+                "sha256": "f8ece32cd65e7c0e1b55b05224965cc6e5c815736526ea45b4ba3a4ba3894439",
+                "file_id": "fil_01M6JT0QJHVBA6WMK0WD329VQV"
+              }
+            ],
+            "status": "ok",
+            "stderr": "",
+            "stdout": "{\"cands\": [\"inputs/manifest.json\", \"inputs/sources\", \"inputs/target_schema.json\", \"code.py\", \"inputs\", \"look\", \"outputs\", \"tmp\"], \"xlsx\": [], \"manifest\": [{\"file_id\": \"fil_01M6JT0QJHVBA6WMK0WD329VQV\", \"name\": \"delivery.xlsx\", \"path\": \"inputs/sources/fil_01M6JT0QJHVBA6WMK0WD329VQV.xlsx\", \"sha256\": \"f8ece32cd65e7c0e1b55b05224965cc6e5c815736526ea45b4ba3a4ba3894439\"}], \"xl_err\": \"IndexError('list index out of range')\"}\n",
+            "omitted": [],
+            "exit_code": 0,
+            "code_sha256": "9236de91bd88ac4aaabe76cf5a59d6bf8ac128a84d80310477aeafca1d01e2c5",
+            "duration_ms": 721
+          }
+        },
+        {
+          "code": "import json, openpyxl\np='inputs/sources/fil_01M6JT0QJHVBA6WMK0WD329VQV.xlsx'\nwf=openpyxl.load_workbook(p, data_only=False)\nwv=openpyxl.load_workbook(p, data_only=True)\nout={}\nfor nm in wf.sheetnames:\n    sf=wf[nm]; sv=wv[nm]\n    rows=[]\n    for r in range(1, sf.max_row+1):\n        row=[]\n        for c in range(1, sf.max_column+1):\n            cf=sf.cell(r,c); cv=sv.cell(r,c)\n            row.append([cf.coordinate, repr(cf.value)[:70], cf.data_type, cf.number_format, repr(cv.value)[:40]])\n        rows.append(row)\n    out[nm]=rows\nprint(json.dumps(out, ensure_ascii=False, default=str)[:9000])",
+          "turn": "python",
+          "result": {
+            "note": "Sandbox output is untrusted evidence. Full engine validation is mandatory.",
+            "inputs": [
+              {
+                "name": "delivery.xlsx",
+                "path": "inputs/sources/fil_01M6JT0QJHVBA6WMK0WD329VQV.xlsx",
+                "sha256": "f8ece32cd65e7c0e1b55b05224965cc6e5c815736526ea45b4ba3a4ba3894439",
+                "file_id": "fil_01M6JT0QJHVBA6WMK0WD329VQV"
+              }
+            ],
+            "status": "ok",
+            "stderr": "",
+            "stdout": "{\"Export\": [[[\"A1\", \"'SKU'\", \"s\", \"General\", \"'SKU'\"], [\"B1\", \"'Product name'\", \"s\", \"General\", \"'Product name'\"], [\"C1\", \"'Stock pieces'\", \"s\", \"General\", \"'Stock pieces'\"]], [[\"A2\", \"'000001'\", \"s\", \"General\", \"'000001'\"], [\"B2\", \"'Coffee variant 01'\", \"s\", \"General\", \"'Coffee variant 01'\"], [\"C2\", \"\\\"='Counts'!B2*'Pack factors'!B2\\\"\", \"f\", \"General\", \"36\"]], [[\"A3\", \"'000002'\", \"s\", \"General\", \"'000002'\"], [\"B3\", \"'Shampoo variant 02'\", \"s\", \"General\", \"'Shampoo variant 02'\"], [\"C3\", \"\\\"='Counts'!B3*'Pack factors'!B3\\\"\", \"f\", \"General\", \"96\"]], [[\"A4\", \"'000003'\", \"s\", \"General\", \"'000003'\"], [\"B4\", \"'Soap variant 03'\", \"s\", \"General\", \"'Soap variant 03'\"], [\"C4\", \"\\\"='Counts'!B4*'Pack factors'!B4\\\"\", \"f\", \"General\", \"30\"]], [[\"A5\", \"'000004'\", \"s\", \"General\", \"'000004'\"], [\"B5\", \"'Tea variant 04'\", \"s\", \"General\", \"'Tea variant 04'\"], [\"C5\", \"\\\"='Counts'!B5*'Pack factors'!B5\\\"\", \"f\", \"General\", \"72\"]], [[\"A6\", \"'000005'\", \"s\", \"General\", \"'000005'\"], [\"B6\", \"'Coffee variant 05'\", \"s\", \"General\", \"'Coffee variant 05'\"], [\"C6\", \"\\\"='Counts'!B6*'Pack factors'!B6\\\"\", \"f\", \"General\", \"168\"]], [[\"A7\", \"'000006'\", \"s\", \"General\", \"'000006'\"], [\"B7\", \"'Shampoo variant 06'\", \"s\", \"General\", \"'Shampoo variant 06'\"], [\"C7\", \"\\\"='Counts'!B7*'Pack factors'!B7\\\"\", \"f\", \"General\", \"48\"]], [[\"A8\", \"'000007'\", \"s\", \"General\", \"'000007'\"], [\"B8\", \"'Soap variant 07'\", \"s\", \"General\", \"'Soap variant 07'\"], [\"C8\", \"\\\"='Counts'!B8*'Pack factors'!B8\\\"\", \"f\", \"General\", \"108\"]], [[\"A9\", \"'000008'\", \"s\", \"General\", \"'000008'\"], [\"B9\", \"'Tea variant 08'\", \"s\", \"General\", \"'Tea variant 08'\"], [\"C9\", \"\\\"='Counts'!B9*'Pack factors'!B9\\\"\", \"f\", \"General\", \"240\"]], [[\"A10\", \"'000009'\", \"s\", \"General\", \"'000009'\"], [\"B10\", \"'Coffee variant 09'\", \"s\", \"General\", \"'Coffee variant 09'\"], [\"C10\", \"\\\"='Counts'!B10*'Pack factors'!B10\\\"\", \"f\", \"General\", \"66\"]], [[\"A11\", \"'000010'\", \"s\", \"General\", \"'000010'\"], [\"B11\", \"'Shampoo variant 10'\", \"s\", \"General\", \"'Shampoo variant 10'\"], [\"C11\", \"\\\"='Counts'!B11*'Pack factors'!B11\\\"\", \"f\", \"General\", \"144\"]], [[\"A12\", \"'000011'\", \"s\", \"General\", \"'000011'\"], [\"B12\", \"'Soap variant 11'\", \"s\", \"General\", \"'Soap variant 11'\"], [\"C12\", \"\\\"='Counts'!B12*'Pack factors'!B12\\\"\", \"f\", \"General\", \"312\"]], [[\"A13\", \"'000012'\", \"s\", \"General\", \"'000012'\"], [\"B13\", \"'Tea variant 12'\", \"s\", \"General\", \"'Tea variant 12'\"], [\"C13\", \"\\\"='Counts'!B13*'Pack factors'!B13\\\"\", \"f\", \"General\", \"84\"]]], \"Counts\": [[[\"A1\", \"'SKU'\", \"s\", \"General\", \"'SKU'\"], [\"B1\", \"'Cartons'\", \"s\", \"General\", \"'Cartons'\"]], [[\"A2\", \"'000001'\", \"s\", \"General\", \"'000001'\"], [\"B2\", \"3\", \"n\", \"General\", \"3\"]], [[\"A3\", \"'000002'\", \"s\", \"General\", \"'000002'\"], [\"B3\", \"4\", \"n\", \"General\", \"4\"]], [[\"A4\", \"'000003'\", \"s\", \"General\", \"'000003'\"], [\"B4\", \"5\", \"n\", \"General\", \"5\"]], [[\"A5\", \"'000004'\", \"s\", \"General\", \"'000004'\"], [\"B5\", \"6\", \"n\", \"General\", \"6\"]], [[\"A6\", \"'000005'\", \"s\", \"General\", \"'000005'\"], [\"B6\", \"7\", \"n\", \"General\", \"7\"]], [[\"A7\", \"'000006'\", \"s\", \"General\", \"'000006'\"], [\"B7\", \"8\", \"n\", \"General\", \"8\"]], [[\"A8\", \"'000007'\", \"s\", \"General\", \"'000007'\"], [\"B8\", \"9\", \"n\", \"General\", \"9\"]], [[\"A9\", \"'000008'\", \"s\", \"General\", \"'000008'\"], [\"B9\", \"10\", \"n\", \"General\", \"10\"]], [[\"A10\", \"'000009'\", \"s\", \"General\", \"'000009'\"], [\"B10\", \"11\", \"n\", \"General\", \"11\"]], [[\"A11\", \"'000010'\", \"s\", \"General\", \"'000010'\"], [\"B11\", \"12\", \"n\", \"General\", \"12\"]], [[\"A12\", \"'000011'\", \"s\", \"General\", \"'000011'\"], [\"B12\", \"13\", \"n\", \"General\", \"13\"]], [[\"A13\", \"'000012'\", \"s\", \"General\", \"'000012'\"], [\"B13\", \"14\", \"n\", \"General\", \"14\"]]], \"Pack factors\": [[[\"A1\", \"'SKU'\", \"s\", \"General\", \"'SKU'\"], [\"B1\", \"'Pieces per carton'\", \"s\", \"General\", \"'Pieces per carton'\"]], [[\"A2\", \"'000001'\", \"s\", \"General\", \"'000001'\"], [\"B2\", \"12\", \"n\", \"General\", \"12\"]], [[\"A3\", \"'000002'\", \"s\", \"General\", \"'000002'\"], [\"B3\", \"24\", \"n\", \"General\", \"24\"]], [[\"A4\", \"'000003'\", \"s\", \"General\", \"'000003'\"], [\"B4\", \"6\", \"n\", \"General\", \"6\"]], [[\"A5\", \"'000004'\", \"s\", \"General\", \"'000004'\"], [\"B5\", \"12\", \"n\", \"General\", \"12\"]], [[\"A6\", \"'000005'\", \"s\", \"General\", \"'000005'\"], [\"B6\", \"24\", \"n\", \"General\", \"24\"]], [[\"A7\", \"'000006'\", \"s\", \"General\", \"'000006'\"], [\"B7\", \"6\", \"n\", \"General\", \"6\"]], [[\"A8\", \"'000007'\", \"s\", \"General\", \"'000007'\"], [\"B8\", \"12\", \"n\", \"General\", \"12\"]], [[\"A9\", \"'000008'\", \"s\", \"General\", \"'000008'\"], [\"B9\", \"24\", \"n\", \"General\", \"24\"]], [[\"A10\", \"'000009'\", \"s\", \"General\", \"'000009'\"], [\"B10\", \"6\", \"n\", \"General\", \"6\"]], [[\"A11\", \"'000010'\", \"s\", \"General\", \"'000010'\"], [\"B11\", \"12\", \"n\", \"General\", \"12\"]], [[\"A12\", \"'000011'\", \"s\", \"General\", \"'000011'\"], [\"B12\", \"24\", \"n\", \"General\", \"24\"]], [[\"A13\", \"'000012'\", \"s\", \"General\", \"'000012'\"], [\"B13\", \"6\", \"n\", \"General\", \"6\"]]]}\n",
+            "omitted": [],
+            "exit_code": 0,
+            "code_sha256": "0d69ae96b00f7f6b159b9b38bacbbceab90826ed033fbbcd7c8e7fd2856d706f",
+            "duration_ms": 570
+          }
+        },
+        {
+          "turn": "mapping",
+          "complete": true,
+          "coverage": {
+            "fields": {
+              "/qty": {
+                "risk": "high",
+                "records": 12,
+                "records_filled": 12
+              },
+              "/sku": {
+                "risk": "medium",
+                "records": 12,
+                "records_filled": 12
+              },
+              "/product_name": {
+                "risk": "medium",
+                "records": 12,
+                "records_filled": 12
+              }
+            },
+            "sources": {
+              "products_0": 12,
+              "products_1": 12,
+              "products_2": 12
+            },
+            "collections": {},
+            "invalid_records": 0
+          },
+          "problems": [
+            "compile: source column 'products_0.Cartons' not found; values will be null",
+            "compile: source column 'products_0.Pieces per carton' not found; values will be null"
+          ],
+          "rows_out": 12
+        },
+        {
+          "turn": "mapping",
+          "complete": true,
+          "coverage": {
+            "fields": {
+              "/qty": {
+                "risk": "high",
+                "records": 12,
+                "records_filled": 12
+              },
+              "/sku": {
+                "risk": "medium",
+                "records": 12,
+                "records_filled": 12
+              },
+              "/product_name": {
+                "risk": "medium",
+                "records": 12,
+                "records_filled": 12
+              }
+            },
+            "sources": {
+              "products_0": 12,
+              "products_1": 12,
+              "products_2": 12
+            },
+            "collections": {},
+            "invalid_records": 0
+          },
+          "problems": [],
+          "rows_out": 12
+        }
+      ],
+      "complete": true,
+      "coverage": {
+        "fields": {
+          "/qty": {
+            "risk": "high",
+            "records": 12,
+            "records_filled": 12
+          },
+          "/sku": {
+            "risk": "medium",
+            "records": 12,
+            "records_filled": 12
+          },
+          "/product_name": {
+            "risk": "medium",
+            "records": 12,
+            "records_filled": 12
+          }
+        },
+        "sources": {
+          "products_0": 12,
+          "products_1": 12,
+          "products_2": 12
+        },
+        "collections": {},
+        "invalid_records": 0
+      },
+      "grounded": 0,
+      "rows_out": 12,
+      "fix_rounds": 1,
+      "inspections": 0,
+      "python_turns": 2,
+      "rows_checked": 12,
+      "problems_left": []
+    },
+    "agreement": {
+      "ops": [
+        "/product_name",
+        "/sku"
+      ],
+      "agree": [
+        "/product_name",
+        "/sku"
+      ],
+      "record": {
+        "joins": {
+          "model": [
+            {
+              "on": [
+                {
+                  "left": "SKU",
+                  "right": "SKU"
+                }
+              ],
+              "how": "left",
+              "left": {
+                "file": "fil_01M6JT0QJHVBA6WMK0WD329VQV",
+                "sheet": "export",
+                "filter": null,
+                "rename": {},
+                "unpivot": null,
+                "data_end": null,
+                "fill_down": [],
+                "data_start": null,
+                "last_column": 3,
+                "first_column": 0
+              },
+              "right": {
+                "file": "fil_01M6JT0QJHVBA6WMK0WD329VQV",
+                "sheet": "counts",
+                "filter": null,
+                "rename": {},
+                "unpivot": null,
+                "data_end": null,
+                "fill_down": [],
+                "data_start": null,
+                "last_column": 2,
+                "first_column": 0
+              },
+              "cardinality": "1:1",
+              "on_unmatched": "keep",
+              "normalize_keys": [
+                "trim"
+              ]
+            },
+            {
+              "on": [
+                {
+                  "left": "SKU",
+                  "right": "SKU"
+                }
+              ],
+              "how": "left",
+              "left": {
+                "file": "fil_01M6JT0QJHVBA6WMK0WD329VQV",
+                "sheet": "export",
+                "filter": null,
+                "rename": {},
+                "unpivot": null,
+                "data_end": null,
+                "fill_down": [],
+                "data_start": null,
+                "last_column": 3,
+                "first_column": 0
+              },
+              "right": {
+                "file": "fil_01M6JT0QJHVBA6WMK0WD329VQV",
+                "sheet": "pack factors",
+                "filter": null,
+                "rename": {},
+                "unpivot": null,
+                "data_end": null,
+                "fill_down": [],
+                "data_start": null,
+                "last_column": 2,
+                "first_column": 0
+              },
+              "cardinality": "1:1",
+              "on_unmatched": "keep",
+              "normalize_keys": [
+                "trim"
+              ]
+            }
+          ],
+          "matcher": []
+        },
+        "dedupe": {
+          "model": {
+            "keep": "first",
+            "keys": [
+              "/sku"
+            ]
+          },
+          "matcher": {
+            "keep": "first",
+            "keys": []
+          }
+        }
+      },
+      "dropped": [],
+      "disagree": {},
+      "model_only": [
+        "/qty"
+      ]
+    },
+    "disagree_count": 0,
+    "questions": [],
+    "open_questions": [],
+    "reasons": [
+      "products_0: formula values are saved Excel caches; FORMA does not recalculate or verify cache freshness",
+      "mapping confidence 0.94 < 0.95",
+      "first time this customer/format is seen",
+      "the model selects rows differently from FORMA's matcher (records: dedupe; records: joins)"
+    ],
+    "preview_ok": true,
+    "agent_events": [
+      "operator_requirements",
+      "heuristic",
+      "schema",
+      "mapping",
+      "agreement"
+    ],
+    "cost_usd": 0.146978,
+    "calls": 7,
+    "input_tokens": 76274,
+    "output_tokens": 17676,
+    "llm_failures": [],
+    "flags": [],
+    "profile_job": {
+      "status": "done",
+      "error": null,
+      "duration_ms": 212.3,
+      "started_at": "2026-11-04T08:15:13.400026+00:00",
+      "finished_at": "2026-11-04T08:15:13.612326+00:00"
+    },
+    "propose_job": {
+      "status": "done",
+      "error": null,
+      "duration_ms": 103123.3,
+      "started_at": "2026-11-04T08:15:16.406527+00:00",
+      "finished_at": "2026-11-04T08:16:59.529832+00:00"
+    },
+    "time_basis": "wall clock from case start to propose completion, including upload/profile/queue; independent of client resume"
+  },
+  {
+    "case": "T06",
+    "title": "Formula result cache contradicts inputs",
+    "round_id": "rnd_01M6JT11J0KCRS1N0XZFEQWX0C",
+    "state_complete": true,
+    "mode": "detect",
+    "failed_stage": null,
+    "elapsed_seconds": 330.88,
+    "score": {
+      "field_accuracy": 1.0,
+      "penalized_accuracy": 1.0,
+      "exact_record_accuracy": 1.0,
+      "correct_fields": 36,
+      "expected_fields": 36,
+      "rows_got": 12,
+      "rows_expected": 12,
+      "identity_precision": 1.0,
+      "identity_recall": 1.0,
+      "duplicate_records": 0,
+      "missing_rows": [],
+      "extra_rows": [],
+      "wrong": [],
+      "extra_values": [],
+      "expected_questions": [
+        {
+          "topic": "stale",
+          "acceptable": "Explain the specific formula/source issue and request recalculation or missing source, or safely recompute from complete internal operands with traceable evidence.",
+          "must_not": "Silently trust stale caches, substitute zero, or fabricate external quantities."
+        }
+      ],
+      "phase": "Before human assistance; unresolved oracle-only facts scored separately in report."
+    },
+    "mapping_id": "map_01M6JTB3HG6DVMWT9BDP0VE2M8",
+    "decision": "review",
+    "verification": {
+      "scope": "Execution and contract checks; business ambiguities require operator answers",
+      "passed": true,
+      "version": 1,
+      "complete": true,
+      "coverage": {
+        "fields": {
+          "/qty": {
+            "risk": "high",
+            "records": 12,
+            "records_filled": 12
+          },
+          "/sku": {
+            "risk": "medium",
+            "records": 12,
+            "records_filled": 12
+          },
+          "/product_name": {
+            "risk": "medium",
+            "records": 12,
+            "records_filled": 12
+          }
+        },
+        "sources": {
+          "products_0": 12,
+          "products_1": 12,
+          "products_2": 12
+        },
+        "collections": {},
+        "invalid_records": 0
+      },
+      "problems": [],
+      "rows_out": 12,
+      "warnings": [],
+      "rows_checked": 12
+    },
+    "self_check": {
+      "errors": 0,
+      "history": [
+        {
+          "code": "import json, glob\nfrom openpyxl import load_workbook\n\nprint('manifest:', open('inputs/manifest.json').read()[:800] if __import__('os').path.exists('inputs/manifest.json') else 'none')\npaths = sorted(glob.glob('inputs/*.xls*'))\nprint('files:', paths)\np = paths[0]\nwf = load_workbook(p, data_only=False)\nwv = load_workbook(p, data_only=True)\nprint('sheets:', wf.sheetnames)\nfor name in wf.sheetnames:\n    sf, sv = wf[name], wv[name]\n    print('---', name, 'dims', sf.dimensions, 'max_row', sf.max_row, 'max_col', sf.max_column)\n    for r in range(1, min(sf.max_row, 14) + 1):\n        row = []\n        for c in range(1, min(sf.max_column, 4) + 1):\n            cf = sf.cell(r, c)\n            cv = sv.cell(r, c).value\n            row.append({'cell': cf.coordinate, 'formula': cf.value, 'cached': cv, 'fmt': cf.number_format, 'type': cf.data_type})\n        print(row)\n\n# cross check on Export\nse, sv = wf['Export'], wv['Export']\ncarts = {wv['Counts'].cell(r,1).value: wv['Counts'].cell(r,2).value for r in range(2, wv['Counts'].max_row+1)}\npack = {wv['Pack factors'].cell(r,1).value: wv['Pack factors'].cell(r,2).value for r in range(2, wv['Pack factors'].max_row+1)}\nprint('counts keys', list(carts.items())[:4], 'pack sample', list(pack.items())[:4])\nfor r in range(2, se.max_row+1):\n    sku = sv.cell(r,1).value\n    cached = sv.cell(r,3).value\n    formula = se.cell(r,3).value\n    c = carts.get(sku); pk = pack.get(sku)\n    calc = (c*pk) if (c is not None and pk is not None) else None\n    print(sku, 'formula=', formula, 'cached=', cached, 'cartons=', c, 'pack=', pk, 'calc=', calc, 'diff=', (cached-calc) if (cached is not None and calc is not None) else None)\n",
+          "turn": "python",
+          "result": {
+            "note": "Sandbox output is untrusted evidence. Full engine validation is mandatory.",
+            "inputs": [
+              {
+                "name": "delivery.xlsx",
+                "path": "inputs/sources/fil_01M6JT11MC0429DDCKRHZRZBFA.xlsx",
+                "sha256": "9afc276bfd19ba29226ef0f21de3bb8b2d53240c25244c631f31f0684d120590",
+                "file_id": "fil_01M6JT11MC0429DDCKRHZRZBFA"
+              }
+            ],
+            "status": "error",
+            "stderr": "Traceback (most recent call last):\n  File \"/workspace/run-tdo76woo/code.py\", line 7, in <module>\n    p = paths[0]\n        ~~~~~^^^\nIndexError: list index out of range\n",
+            "stdout": "manifest: [{\"file_id\": \"fil_01M6JT11MC0429DDCKRHZRZBFA\", \"name\": \"delivery.xlsx\", \"path\": \"inputs/sources/fil_01M6JT11MC0429DDCKRHZRZBFA.xlsx\", \"sha256\": \"9afc276bfd19ba29226ef0f21de3bb8b2d53240c25244c631f31f0684d120590\"}]\nfiles: []\n",
+            "omitted": [],
+            "exit_code": 1,
+            "code_sha256": "a01d69caec2b5f33e7e41a97258a47a6e72a7087a0c4001e9f7f0b062c562258",
+            "duration_ms": 622
+          }
+        },
+        {
+          "code": "import json\nfrom openpyxl import load_workbook\n\np = 'inputs/sources/fil_01M6JT11MC0429DDCKRHZRZBFA.xlsx'\nwf = load_workbook(p, data_only=False)\nwv = load_workbook(p, data_only=True)\nprint('sheets:', wf.sheetnames)\nfor name in wf.sheetnames:\n    sf, sv = wf[name], wv[name]\n    print('---', name, 'dims', sf.dimensions)\n    for r in range(1, min(sf.max_row, 14) + 1):\n        row = []\n        for c in range(1, min(sf.max_column, 4) + 1):\n            cf = sf.cell(r, c)\n            row.append((cf.coordinate, cf.value, sv.cell(r, c).value, cf.number_format))\n        print(row)\n",
+          "turn": "python",
+          "result": {
+            "note": "Sandbox output is untrusted evidence. Full engine validation is mandatory.",
+            "inputs": [
+              {
+                "name": "delivery.xlsx",
+                "path": "inputs/sources/fil_01M6JT11MC0429DDCKRHZRZBFA.xlsx",
+                "sha256": "9afc276bfd19ba29226ef0f21de3bb8b2d53240c25244c631f31f0684d120590",
+                "file_id": "fil_01M6JT11MC0429DDCKRHZRZBFA"
+              }
+            ],
+            "status": "ok",
+            "stderr": "",
+            "stdout": "sheets: ['Export', 'Counts', 'Pack factors']\n--- Export dims A1:C13\n[('A1', 'SKU', 'SKU', 'General'), ('B1', 'Product name', 'Product name', 'General'), ('C1', 'Stock pieces', 'Stock pieces', 'General')]\n[('A2', '000001', '000001', 'General'), ('B2', 'Coffee variant 01', 'Coffee variant 01', 'General'), ('C2', \"='Counts'!B2*'Pack factors'!B2\", 813.0, 'General')]\n[('A3', '000002', '000002', 'General'), ('B3', 'Shampoo variant 02', 'Shampoo variant 02', 'General'), ('C3', \"='Counts'!B3*'Pack factors'!B3\", 873.0, 'General')]\n[('A4', '000003', '000003', 'General'), ('B4', 'Soap variant 03', 'Soap variant 03', 'General'), ('C4', \"='Counts'!B4*'Pack factors'!B4\", 807.0, 'General')]\n[('A5', '000004', '000004', 'General'), ('B5', 'Tea variant 04', 'Tea variant 04', 'General'), ('C5', \"='Counts'!B5*'Pack factors'!B5\", 849.0, 'General')]\n[('A6', '000005', '000005', 'General'), ('B6', 'Coffee variant 05', 'Coffee variant 05', 'General'), ('C6', \"='Counts'!B6*'Pack factors'!B6\", 945.0, 'General')]\n[('A7', '000006', '000006', 'General'), ('B7', 'Shampoo variant 06', 'Shampoo variant 06', 'General'), ('C7', \"='Counts'!B7*'Pack factors'!B7\", 825.0, 'General')]\n[('A8', '000007', '000007', 'General'), ('B8', 'Soap variant 07', 'Soap variant 07', 'General'), ('C8', \"='Counts'!B8*'Pack factors'!B8\", 885.0, 'General')]\n[('A9', '000008', '000008', 'General'), ('B9', 'Tea variant 08', 'Tea variant 08', 'General'), ('C9', \"='Counts'!B9*'Pack factors'!B9\", 1017.0, 'General')]\n[('A10', '000009', '000009', 'General'), ('B10', 'Coffee variant 09', 'Coffee variant 09', 'General'), ('C10', \"='Counts'!B10*'Pack factors'!B10\", 843.0, 'General')]\n[('A11', '000010', '000010', 'General'), ('B11', 'Shampoo variant 10', 'Shampoo variant 10', 'General'), ('C11', \"='Counts'!B11*'Pack factors'!B11\", 921.0, 'General')]\n[('A12', '000011', '000011', 'General'), ('B12', 'Soap variant 11', 'Soap variant 11', 'General'), ('C12', \"='Counts'!B12*'Pack factors'!B12\", 1089.0, 'General')]\n[('A13', '000012', '000012', 'General'), ('B13', 'Tea variant 12', 'Tea variant 12', 'General'), ('C13', \"='Counts'!B13*'Pack factors'!B13\", 861.0, 'General')]\n--- Counts dims A1:B13\n[('A1', 'SKU', 'SKU', 'General'), ('B1', 'Cartons', 'Cartons', 'General')]\n[('A2', '000001', '000001', 'General'), ('B2', 3, 3, 'General')]\n[('A3', '000002', '000002', 'General'), ('B3', 4, 4, 'General')]\n[('A4', '000003', '000003', 'General'), ('B4', 5, 5, 'General')]\n[('A5', '000004', '000004', 'General'), ('B5', 6, 6, 'General')]\n[('A6', '000005', '000005', 'General'), ('B6', 7, 7, 'General')]\n[('A7', '000006', '000006', 'General'), ('B7', 8, 8, 'General')]\n[('A8', '000007', '000007', 'General'), ('B8', 9, 9, 'General')]\n[('A9', '000008', '000008', 'General'), ('B9', 10, 10, 'General')]\n[('A10', '000009', '000009', 'General'), ('B10', 11, 11, 'General')]\n[('A11', '000010', '000010', 'General'), ('B11', 12, 12, 'General')]\n[('A12', '000011', '000011', 'General'), ('B12', 13, 13, 'General')]\n[('A13', '000012', '000012', 'General'), ('B13', 14, 14, 'General')]\n--- Pack factors dims A1:B13\n[('A1', 'SKU', 'SKU', 'General'), ('B1', 'Pieces per carton', 'Pieces per carton', 'General')]\n[('A2', '000001', '000001', 'General'), ('B2', 12, 12, 'General')]\n[('A3', '000002', '000002', 'General'), ('B3', 24, 24, 'General')]\n[('A4', '000003', '000003', 'General'), ('B4', 6, 6, 'General')]\n[('A5', '000004', '000004', 'General'), ('B5', 12, 12, 'General')]\n[('A6', '000005', '000005', 'General'), ('B6', 24, 24, 'General')]\n[('A7', '000006', '000006', 'General'), ('B7', 6, 6, 'General')]\n[('A8', '000007', '000007', 'General'), ('B8', 12, 12, 'General')]\n[('A9', '000008', '000008', 'General'), ('B9', 24, 24, 'General')]\n[('A10', '000009', '000009', 'General'), ('B10', 6, 6, 'General')]\n[('A11', '000010', '000010', 'General'), ('B11', 12, 12, 'General')]\n[('A12', '000011', '000011', 'General'), ('B12', 24, 24, 'General')]\n[('A13', '000012', '000012', 'General'), ('B13', 6, 6, 'General')]\n",
+            "omitted": [],
+            "exit_code": 0,
+            "code_sha256": "da02dd72aa6e48d7d3963808f3be38b9529064e7201421f8c1914499f563756b",
+            "duration_ms": 1195
+          }
+        },
+        {
+          "turn": "mapping",
+          "complete": true,
+          "coverage": {
+            "fields": {
+              "/qty": {
+                "risk": "high",
+                "records": 12,
+                "records_filled": 0
+              },
+              "/sku": {
+                "risk": "medium",
+                "records": 12,
+                "records_filled": 12
+              },
+              "/product_name": {
+                "risk": "medium",
+                "records": 12,
+                "records_filled": 12
+              }
+            },
+            "sources": {
+              "products_0": 12,
+              "products_1": 12,
+              "products_2": 12
+            },
+            "collections": {},
+            "invalid_records": 0
+          },
+          "problems": [
+            "compile: source column 'products_0.Cartons' not found; values will be null",
+            "compile: source column 'products_0.Pieces per carton' not found; values will be null",
+            "/qty: empty in 12 of 12 records"
+          ],
+          "rows_out": 12
+        },
+        {
+          "turn": "mapping",
+          "complete": true,
+          "coverage": {
+            "fields": {
+              "/qty": {
+                "risk": "high",
+                "records": 12,
+                "records_filled": 12
+              },
+              "/sku": {
+                "risk": "medium",
+                "records": 12,
+                "records_filled": 12
+              },
+              "/product_name": {
+                "risk": "medium",
+                "records": 12,
+                "records_filled": 12
+              }
+            },
+            "sources": {
+              "products_0": 12,
+              "products_1": 12,
+              "products_2": 12
+            },
+            "collections": {},
+            "invalid_records": 0
+          },
+          "problems": [],
+          "rows_out": 12
+        }
+      ],
+      "complete": true,
+      "coverage": {
+        "fields": {
+          "/qty": {
+            "risk": "high",
+            "records": 12,
+            "records_filled": 12
+          },
+          "/sku": {
+            "risk": "medium",
+            "records": 12,
+            "records_filled": 12
+          },
+          "/product_name": {
+            "risk": "medium",
+            "records": 12,
+            "records_filled": 12
+          }
+        },
+        "sources": {
+          "products_0": 12,
+          "products_1": 12,
+          "products_2": 12
+        },
+        "collections": {},
+        "invalid_records": 0
+      },
+      "grounded": 0,
+      "rows_out": 12,
+      "fix_rounds": 1,
+      "inspections": 0,
+      "python_turns": 2,
+      "rows_checked": 12,
+      "problems_left": []
+    },
+    "agreement": {
+      "ops": [
+        "/product_name",
+        "/sku"
+      ],
+      "agree": [
+        "/product_name",
+        "/sku"
+      ],
+      "record": {
+        "joins": {
+          "model": [
+            {
+              "on": [
+                {
+                  "left": "SKU",
+                  "right": "counts_sku"
+                }
+              ],
+              "how": "left",
+              "left": {
+                "file": "fil_01M6JT11MC0429DDCKRHZRZBFA",
+                "sheet": "export",
+                "filter": null,
+                "rename": {},
+                "unpivot": null,
+                "data_end": null,
+                "fill_down": [],
+                "data_start": null,
+                "last_column": 3,
+                "first_column": 0
+              },
+              "right": {
+                "file": "fil_01M6JT11MC0429DDCKRHZRZBFA",
+                "sheet": "counts",
+                "filter": null,
+                "rename": {
+                  "SKU": "counts_sku"
+                },
+                "unpivot": null,
+                "data_end": null,
+                "fill_down": [],
+                "data_start": null,
+                "last_column": 2,
+                "first_column": 0
+              },
+              "cardinality": "1:1",
+              "on_unmatched": "review",
+              "normalize_keys": [
+                "trim",
+                "upper"
+              ]
+            },
+            {
+              "on": [
+                {
+                  "left": "SKU",
+                  "right": "pack_sku"
+                }
+              ],
+              "how": "left",
+              "left": {
+                "file": "fil_01M6JT11MC0429DDCKRHZRZBFA",
+                "sheet": "export",
+                "filter": null,
+                "rename": {},
+                "unpivot": null,
+                "data_end": null,
+                "fill_down": [],
+                "data_start": null,
+                "last_column": 3,
+                "first_column": 0
+              },
+              "right": {
+                "file": "fil_01M6JT11MC0429DDCKRHZRZBFA",
+                "sheet": "pack factors",
+                "filter": null,
+                "rename": {
+                  "SKU": "pack_sku"
+                },
+                "unpivot": null,
+                "data_end": null,
+                "fill_down": [],
+                "data_start": null,
+                "last_column": 2,
+                "first_column": 0
+              },
+              "cardinality": "1:1",
+              "on_unmatched": "review",
+              "normalize_keys": [
+                "trim",
+                "upper"
+              ]
+            }
+          ],
+          "matcher": []
+        },
+        "dedupe": {
+          "model": {
+            "keep": "first",
+            "keys": [
+              "/sku"
+            ]
+          },
+          "matcher": {
+            "keep": "first",
+            "keys": []
+          }
+        }
+      },
+      "dropped": [],
+      "disagree": {},
+      "model_only": [
+        "/qty"
+      ]
+    },
+    "disagree_count": 0,
+    "questions": [],
+    "open_questions": [],
+    "reasons": [
+      "products_0: formula values are saved Excel caches; FORMA does not recalculate or verify cache freshness",
+      "low confidence on high-risk fields: /qty (0.72)",
+      "mapping confidence 0.85 < 0.95",
+      "first time this customer/format is seen",
+      "the model selects rows differently from FORMA's matcher (records: dedupe; records: joins)"
+    ],
+    "preview_ok": true,
+    "agent_events": [
+      "operator_requirements",
+      "heuristic",
+      "schema",
+      "mapping",
+      "agreement"
+    ],
+    "cost_usd": 0.191003,
+    "calls": 6,
+    "input_tokens": 68911,
+    "output_tokens": 30523,
+    "llm_failures": [],
+    "flags": [],
+    "profile_job": {
+      "status": "done",
+      "error": null,
+      "duration_ms": 241.0,
+      "started_at": "2026-11-04T08:15:23.426102+00:00",
+      "finished_at": "2026-11-04T08:15:23.667150+00:00"
+    },
+    "propose_job": {
+      "status": "done",
+      "error": null,
+      "duration_ms": 326520.4,
+      "started_at": "2026-11-04T08:15:26.430485+00:00",
+      "finished_at": "2026-11-04T08:20:52.950839+00:00"
+    },
+    "time_basis": "wall clock from case start to propose completion, including upload/profile/queue; independent of client resume"
+  },
+  {
+    "case": "T07",
+    "title": "Formula has no stored result",
+    "round_id": "rnd_01M6JT42RP78BWG37G9W6FJ91Z",
+    "state_complete": true,
+    "mode": "detect",
+    "failed_stage": null,
+    "elapsed_seconds": 174.58,
+    "score": {
+      "field_accuracy": 1.0,
+      "penalized_accuracy": 1.0,
+      "exact_record_accuracy": 1.0,
+      "correct_fields": 36,
+      "expected_fields": 36,
+      "rows_got": 12,
+      "rows_expected": 12,
+      "identity_precision": 1.0,
+      "identity_recall": 1.0,
+      "duplicate_records": 0,
+      "missing_rows": [],
+      "extra_rows": [],
+      "wrong": [],
+      "extra_values": [],
+      "expected_questions": [
+        {
+          "topic": "uncached",
+          "acceptable": "Explain the specific formula/source issue and request recalculation or missing source, or safely recompute from complete internal operands with traceable evidence.",
+          "must_not": "Silently trust stale caches, substitute zero, or fabricate external quantities."
+        }
+      ],
+      "phase": "Before human assistance; unresolved oracle-only facts scored separately in report."
+    },
+    "mapping_id": "map_01M6JT9CJV41MW9BYRNK1WGPSZ",
+    "decision": "review",
+    "verification": {
+      "scope": "Execution and contract checks; business ambiguities require operator answers",
+      "passed": true,
+      "version": 1,
+      "complete": true,
+      "coverage": {
+        "fields": {
+          "/qty": {
+            "risk": "high",
+            "records": 12,
+            "records_filled": 12
+          },
+          "/sku": {
+            "risk": "medium",
+            "records": 12,
+            "records_filled": 12
+          },
+          "/product_name": {
+            "risk": "medium",
+            "records": 12,
+            "records_filled": 12
+          }
+        },
+        "sources": {
+          "products_0": 12,
+          "products_1": 12,
+          "products_2": 12
+        },
+        "collections": {},
+        "invalid_records": 0
+      },
+      "problems": [],
+      "rows_out": 12,
+      "warnings": [],
+      "rows_checked": 12
+    },
+    "self_check": {
+      "errors": 0,
+      "history": [
+        {
+          "code": "import json,os\np='inputs/manifest.json'\nprint(open(p).read()[:2000])\nprint(os.listdir('inputs'))\n",
+          "turn": "python",
+          "result": {
+            "note": "Sandbox output is untrusted evidence. Full engine validation is mandatory.",
+            "inputs": [
+              {
+                "name": "delivery.xlsx",
+                "path": "inputs/sources/fil_01M6JT431ADAA56DGYHN5YC58J.xlsx",
+                "sha256": "a679c827464915d9df0961fd8e5cf84c352f02b01c009ce2f42de56cbd86114c",
+                "file_id": "fil_01M6JT431ADAA56DGYHN5YC58J"
+              }
+            ],
+            "status": "ok",
+            "stderr": "",
+            "stdout": "[{\"file_id\": \"fil_01M6JT431ADAA56DGYHN5YC58J\", \"name\": \"delivery.xlsx\", \"path\": \"inputs/sources/fil_01M6JT431ADAA56DGYHN5YC58J.xlsx\", \"sha256\": \"a679c827464915d9df0961fd8e5cf84c352f02b01c009ce2f42de56cbd86114c\"}]\n['target_schema.json', 'manifest.json', 'sources']\n",
+            "omitted": [],
+            "exit_code": 0,
+            "code_sha256": "9ad402aaefd7e3d9d8a3b149a85f0f8fed5c1a3943d87d9126cb18dd9c12eb8e",
+            "duration_ms": 322
+          }
+        },
+        {
+          "code": "import openpyxl\nwb=openpyxl.load_workbook('inputs/sources/fil_01M6JT431ADAA56DGYHN5YC58J.xlsx',data_only=False)\nfor ws in wb.worksheets:\n    print('SHEET',ws.title,ws.dimensions)\n    for row in ws.iter_rows(min_row=1,max_row=min(ws.max_row,15),max_col=min(ws.max_column,5)):\n        cells=[(c.coordinate,c.value) for c in row if c.value is not None]\n        if cells: print(cells)\n    print('---')\n",
+          "turn": "python",
+          "result": {
+            "note": "Sandbox output is untrusted evidence. Full engine validation is mandatory.",
+            "inputs": [
+              {
+                "name": "delivery.xlsx",
+                "path": "inputs/sources/fil_01M6JT431ADAA56DGYHN5YC58J.xlsx",
+                "sha256": "a679c827464915d9df0961fd8e5cf84c352f02b01c009ce2f42de56cbd86114c",
+                "file_id": "fil_01M6JT431ADAA56DGYHN5YC58J"
+              }
+            ],
+            "status": "ok",
+            "stderr": "",
+            "stdout": "SHEET Export A1:C13\n[('A1', 'SKU'), ('B1', 'Product name'), ('C1', 'Stock pieces')]\n[('A2', '000001'), ('B2', 'Coffee variant 01'), ('C2', \"='Counts'!B2*'Pack factors'!B2\")]\n[('A3', '000002'), ('B3', 'Shampoo variant 02'), ('C3', \"='Counts'!B3*'Pack factors'!B3\")]\n[('A4', '000003'), ('B4', 'Soap variant 03'), ('C4', \"='Counts'!B4*'Pack factors'!B4\")]\n[('A5', '000004'), ('B5', 'Tea variant 04'), ('C5', \"='Counts'!B5*'Pack factors'!B5\")]\n[('A6', '000005'), ('B6', 'Coffee variant 05'), ('C6', \"='Counts'!B6*'Pack factors'!B6\")]\n[('A7', '000006'), ('B7', 'Shampoo variant 06'), ('C7', \"='Counts'!B7*'Pack factors'!B7\")]\n[('A8', '000007'), ('B8', 'Soap variant 07'), ('C8', \"='Counts'!B8*'Pack factors'!B8\")]\n[('A9', '000008'), ('B9', 'Tea variant 08'), ('C9', \"='Counts'!B9*'Pack factors'!B9\")]\n[('A10', '000009'), ('B10', 'Coffee variant 09'), ('C10', \"='Counts'!B10*'Pack factors'!B10\")]\n[('A11', '000010'), ('B11', 'Shampoo variant 10'), ('C11', \"='Counts'!B11*'Pack factors'!B11\")]\n[('A12', '000011'), ('B12', 'Soap variant 11'), ('C12', \"='Counts'!B12*'Pack factors'!B12\")]\n[('A13', '000012'), ('B13', 'Tea variant 12'), ('C13', \"='Counts'!B13*'Pack factors'!B13\")]\n---\nSHEET Counts A1:B13\n[('A1', 'SKU'), ('B1', 'Cartons')]\n[('A2', '000001'), ('B2', 3)]\n[('A3', '000002'), ('B3', 4)]\n[('A4', '000003'), ('B4', 5)]\n[('A5', '000004'), ('B5', 6)]\n[('A6', '000005'), ('B6', 7)]\n[('A7', '000006'), ('B7', 8)]\n[('A8', '000007'), ('B8', 9)]\n[('A9', '000008'), ('B9', 10)]\n[('A10', '000009'), ('B10', 11)]\n[('A11', '000010'), ('B11', 12)]\n[('A12', '000011'), ('B12', 13)]\n[('A13', '000012'), ('B13', 14)]\n---\nSHEET Pack factors A1:B13\n[('A1', 'SKU'), ('B1', 'Pieces per carton')]\n[('A2', '000001'), ('B2', 12)]\n[('A3', '000002'), ('B3', 24)]\n[('A4', '000003'), ('B4', 6)]\n[('A5', '000004'), ('B5', 12)]\n[('A6', '000005'), ('B6', 24)]\n[('A7', '000006'), ('B7', 6)]\n[('A8', '000007'), ('B8', 12)]\n[('A9', '000008'), ('B9', 24)]\n[('A10', '000009'), ('B10', 6)]\n[('A11', '000010'), ('B11', 12)]\n[('A12', '000011'), ('B12', 24)]\n[('A13', '000012'), ('B13', 6)]\n---\n",
+            "omitted": [],
+            "exit_code": 0,
+            "code_sha256": "e2f95be8cb500f21fbff4bd645fbbe4a93435af898e8086c0f331ed89b90d14e",
+            "duration_ms": 1636
+          }
+        },
+        {
+          "turn": "mapping",
+          "complete": true,
+          "coverage": {
+            "fields": {
+              "/qty": {
+                "risk": "high",
+                "records": 12,
+                "records_filled": 12
+              },
+              "/sku": {
+                "risk": "medium",
+                "records": 12,
+                "records_filled": 12
+              },
+              "/product_name": {
+                "risk": "medium",
+                "records": 12,
+                "records_filled": 12
+              }
+            },
+            "sources": {
+              "products_0": 12,
+              "products_1": 12,
+              "products_2": 12
+            },
+            "collections": {},
+            "invalid_records": 0
+          },
+          "problems": [],
+          "rows_out": 12
+        }
+      ],
+      "complete": true,
+      "coverage": {
+        "fields": {
+          "/qty": {
+            "risk": "high",
+            "records": 12,
+            "records_filled": 12
+          },
+          "/sku": {
+            "risk": "medium",
+            "records": 12,
+            "records_filled": 12
+          },
+          "/product_name": {
+            "risk": "medium",
+            "records": 12,
+            "records_filled": 12
+          }
+        },
+        "sources": {
+          "products_0": 12,
+          "products_1": 12,
+          "products_2": 12
+        },
+        "collections": {},
+        "invalid_records": 0
+      },
+      "grounded": 0,
+      "rows_out": 12,
+      "fix_rounds": 0,
+      "inspections": 0,
+      "python_turns": 2,
+      "rows_checked": 12,
+      "problems_left": []
+    },
+    "agreement": {
+      "ops": [],
+      "agree": [],
+      "record": {
+        "root": {
+          "model": {
+            "file": "fil_01M6JT431ADAA56DGYHN5YC58J",
+            "sheet": "export",
+            "filter": null,
+            "rename": {},
+            "unpivot": null,
+            "data_end": null,
+            "fill_down": [],
+            "data_start": null,
+            "last_column": 2,
+            "first_column": 0
+          },
+          "matcher": {
+            "file": "fil_01M6JT431ADAA56DGYHN5YC58J",
+            "sheet": "export",
+            "filter": null,
+            "rename": {},
+            "unpivot": null,
+            "data_end": null,
+            "fill_down": [],
+            "data_start": null,
+            "last_column": 3,
+            "first_column": 0
+          }
+        },
+        "joins": {
+          "model": [
+            {
+              "on": [
+                {
+                  "left": "SKU",
+                  "right": "SKU"
+                }
+              ],
+              "how": "left",
+              "left": {
+                "file": "fil_01M6JT431ADAA56DGYHN5YC58J",
+                "sheet": "export",
+                "filter": null,
+                "rename": {},
+                "unpivot": null,
+                "data_end": null,
+                "fill_down": [],
+                "data_start": null,
+                "last_column": 2,
+                "first_column": 0
+              },
+              "right": {
+                "file": "fil_01M6JT431ADAA56DGYHN5YC58J",
+                "sheet": "counts",
+                "filter": null,
+                "rename": {},
+                "unpivot": null,
+                "data_end": null,
+                "fill_down": [],
+                "data_start": null,
+                "last_column": 2,
+                "first_column": 0
+              },
+              "cardinality": "1:1",
+              "on_unmatched": "keep",
+              "normalize_keys": [
+                "trim",
+                "upper",
+                "strip_leading_zeros"
+              ]
+            },
+            {
+              "on": [
+                {
+                  "left": "SKU",
+                  "right": "SKU"
+                }
+              ],
+              "how": "left",
+              "left": {
+                "file": "fil_01M6JT431ADAA56DGYHN5YC58J",
+                "sheet": "export",
+                "filter": null,
+                "rename": {},
+                "unpivot": null,
+                "data_end": null,
+                "fill_down": [],
+                "data_start": null,
+                "last_column": 2,
+                "first_column": 0
+              },
+              "right": {
+                "file": "fil_01M6JT431ADAA56DGYHN5YC58J",
+                "sheet": "pack factors",
+                "filter": null,
+                "rename": {},
+                "unpivot": null,
+                "data_end": null,
+                "fill_down": [],
+                "data_start": null,
+                "last_column": 2,
+                "first_column": 0
+              },
+              "cardinality": "1:1",
+              "on_unmatched": "keep",
+              "normalize_keys": [
+                "trim",
+                "upper",
+                "strip_leading_zeros"
+              ]
+            }
+          ],
+          "matcher": []
+        },
+        "dedupe": {
+          "model": {
+            "keep": "first",
+            "keys": [
+              "/sku"
+            ]
+          },
+          "matcher": {
+            "keep": "first",
+            "keys": []
+          }
+        }
+      },
+      "dropped": [],
+      "disagree": {
+        "/sku": {
+          "model": [
+            "products_0.SKU"
+          ],
+          "matcher": [
+            "Export.SKU"
+          ]
+        },
+        "/product_name": {
+          "model": [
+            "products_0.Product name"
+          ],
+          "matcher": [
+            "Export.Product name"
+          ]
+        }
+      },
+      "model_only": [
+        "/qty"
+      ]
+    },
+    "disagree_count": 2,
+    "questions": [],
+    "open_questions": [],
+    "reasons": [
+      "products_0: formula values are saved Excel caches; FORMA does not recalculate or verify cache freshness",
+      "mapping confidence 0.93 < 0.95",
+      "first time this customer/format is seen",
+      "the model selects rows differently from FORMA's matcher (records: dedupe; records: joins; records: root)"
+    ],
+    "preview_ok": true,
+    "agent_events": [
+      "operator_requirements",
+      "heuristic",
+      "schema",
+      "mapping",
+      "agreement"
+    ],
+    "cost_usd": 0.088295,
+    "calls": 5,
+    "input_tokens": 47455,
+    "output_tokens": 10210,
+    "llm_failures": [],
+    "flags": [],
+    "profile_job": {
+      "status": "done",
+      "error": null,
+      "duration_ms": 163.0,
+      "started_at": "2026-11-04T08:17:03.314679+00:00",
+      "finished_at": "2026-11-04T08:17:03.477695+00:00"
+    },
+    "propose_job": {
+      "status": "done",
+      "error": null,
+      "duration_ms": 170519.8,
+      "started_at": "2026-11-04T08:17:06.326410+00:00",
+      "finished_at": "2026-11-04T08:19:56.846161+00:00"
+    },
+    "time_basis": "wall clock from case start to propose completion, including upload/profile/queue; independent of client resume"
+  },
+  {
+    "case": "T08",
+    "title": "Missing external formula workbook",
+    "round_id": "rnd_01M6JT9TJY43W5243TQYDQJT2W",
+    "state_complete": true,
+    "mode": "detect",
+    "failed_stage": null,
+    "elapsed_seconds": 147.82,
+    "score": {
+      "field_accuracy": 1.0,
+      "penalized_accuracy": 1.0,
+      "exact_record_accuracy": 1.0,
+      "correct_fields": 36,
+      "expected_fields": 36,
+      "rows_got": 12,
+      "rows_expected": 12,
+      "identity_precision": 1.0,
+      "identity_recall": 1.0,
+      "duplicate_records": 0,
+      "missing_rows": [],
+      "extra_rows": [],
+      "wrong": [],
+      "extra_values": [],
+      "expected_questions": [
+        {
+          "topic": "external",
+          "acceptable": "Explain the specific formula/source issue and request recalculation or missing source, or safely recompute from complete internal operands with traceable evidence.",
+          "must_not": "Silently trust stale caches, substitute zero, or fabricate external quantities."
+        }
+      ],
+      "phase": "Before human assistance; unresolved oracle-only facts scored separately in report."
+    },
+    "mapping_id": "map_01M6JTE9M7HPG1XZQMPNHZ5SNE",
+    "decision": "review",
+    "verification": {
+      "scope": "Execution and contract checks; business ambiguities require operator answers",
+      "passed": false,
+      "version": 1,
+      "complete": true,
+      "coverage": {
+        "fields": {
+          "/qty": {
+            "risk": "high",
+            "records": 12,
+            "records_filled": 0
+          },
+          "/sku": {
+            "risk": "medium",
+            "records": 12,
+            "records_filled": 12
+          },
+          "/product_name": {
+            "risk": "medium",
+            "records": 12,
+            "records_filled": 12
+          }
+        },
+        "sources": {
+          "counts_1": 12,
+          "products_0": 12,
+          "pack_factors_2": 12
+        },
+        "collections": {},
+        "invalid_records": 0
+      },
+      "problems": [
+        "/qty: empty in 12 of 12 records"
+      ],
+      "rows_out": 12,
+      "warnings": [
+        "/qty: empty in 12 of 12 records"
+      ],
+      "rows_checked": 12
+    },
+    "self_check": {
+      "errors": 0,
+      "history": [
+        {
+          "code": "import openpyxl, json\nwb = openpyxl.load_workbook('delivery.xlsx', data_only=False)\nprint('sheets', wb.sheetnames)\nfor ws in wb.worksheets:\n    print('---', ws.title, ws.dimensions, ws.max_row, ws.max_column)\n    for row in ws.iter_rows(min_row=1, max_row=min(ws.max_row,14), max_col=min(ws.max_column,6)):\n        out=[]\n        for c in row:\n            if c.value is not None:\n                out.append(f'{c.coordinate}={c.value!r}')\n        if out: print(' | '.join(out))\nprint('=== cached values ===')\nwb2 = openpyxl.load_workbook('delivery.xlsx', data_only=True)\nfor ws in wb2.worksheets:\n    print('---', ws.title)\n    for row in ws.iter_rows(min_row=1, max_row=min(ws.max_row,14), max_col=min(ws.max_column,6)):\n        out=[]\n        for c in row:\n            if c.value is not None:\n                out.append(f'{c.coordinate}={c.value!r}')\n        if out: print(' | '.join(out))\n",
+          "turn": "python",
+          "result": {
+            "note": "Sandbox output is untrusted evidence. Full engine validation is mandatory.",
+            "inputs": [
+              {
+                "name": "delivery.xlsx",
+                "path": "inputs/sources/fil_01M6JT9TNAHXDC9GWGRKCCM5SS.xlsx",
+                "sha256": "8aea9aee3923d5068ee713dfb0c4b1afe1d290168fc656ad806cf0d6542d52a4",
+                "file_id": "fil_01M6JT9TNAHXDC9GWGRKCCM5SS"
+              }
+            ],
+            "status": "error",
+            "stderr": "Traceback (most recent call last):\n  File \"/workspace/run-oo39l7j3/code.py\", line 2, in <module>\n    wb = openpyxl.load_workbook('delivery.xlsx', data_only=False)\n         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/usr/local/lib/python3.12/site-packages/openpyxl/reader/excel.py\", line 346, in load_workbook\n    reader = ExcelReader(filename, read_only, keep_vba,\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/usr/local/lib/python3.12/site-packages/openpyxl/reader/excel.py\", line 123, in __init__\n    self.archive = _validate_archive(fn)\n                   ^^^^^^^^^^^^^^^^^^^^^\n  File \"/usr/local/lib/python3.12/site-packages/openpyxl/reader/excel.py\", line 95, in _validate_archive\n    archive = ZipFile(filename, 'r')\n              ^^^^^^^^^^^^^^^^^^^^^^\n  File \"/usr/local/lib/python3.12/zipfile/__init__.py\", line 1352, in __init__\n    self.fp = io.open(file, filemode)\n              ^^^^^^^^^^^^^^^^^^^^^^^\nFileNotFoundError: [Errno 2] No such file or directory: 'delivery.xlsx'\n",
+            "stdout": "",
+            "omitted": [],
+            "exit_code": 1,
+            "code_sha256": "2ffef0b319dc73f95f5642b3b05c65f11ebd42d611ad7d1c5145065b59441bac",
+            "duration_ms": 973
+          }
+        },
+        {
+          "code": "import openpyxl\np='inputs/sources/fil_01M6JT9TNAHXDC9GWGRKCCM5SS.xlsx'\nwb=openpyxl.load_workbook(p, data_only=False)\nfor ws in wb.worksheets:\n    print('---', ws.title, ws.max_row, ws.max_column)\n    for row in ws.iter_rows(min_row=1, max_row=ws.max_row, max_col=ws.max_column):\n        out=[f'{c.coordinate}={c.value!r}' for c in row if c.value is not None]\n        if out: print(' | '.join(out))\nprint('=== cached ===')\nwb2=openpyxl.load_workbook(p, data_only=True)\nfor ws in wb2.worksheets:\n    print('---', ws.title)\n    for row in ws.iter_rows(min_row=1, max_row=ws.max_row, max_col=ws.max_column):\n        out=[f'{c.coordinate}={c.value!r}' for c in row if c.value is not None]\n        if out: print(' | '.join(out))\n",
+          "turn": "python",
+          "result": {
+            "note": "Sandbox output is untrusted evidence. Full engine validation is mandatory.",
+            "inputs": [
+              {
+                "name": "delivery.xlsx",
+                "path": "inputs/sources/fil_01M6JT9TNAHXDC9GWGRKCCM5SS.xlsx",
+                "sha256": "8aea9aee3923d5068ee713dfb0c4b1afe1d290168fc656ad806cf0d6542d52a4",
+                "file_id": "fil_01M6JT9TNAHXDC9GWGRKCCM5SS"
+              }
+            ],
+            "status": "ok",
+            "stderr": "",
+            "stdout": "--- Export 13 3\nA1='SKU' | B1='Product name' | C1='Stock pieces'\nA2='000001' | B2='Coffee variant 01' | C2=\"='Counts'!B2*'[missing-pack.xlsx]Pack factors'!B2\"\nA3='000002' | B3='Shampoo variant 02' | C3=\"='Counts'!B3*'[missing-pack.xlsx]Pack factors'!B3\"\nA4='000003' | B4='Soap variant 03' | C4=\"='Counts'!B4*'[missing-pack.xlsx]Pack factors'!B4\"\nA5='000004' | B5='Tea variant 04' | C5=\"='Counts'!B5*'[missing-pack.xlsx]Pack factors'!B5\"\nA6='000005' | B6='Coffee variant 05' | C6=\"='Counts'!B6*'[missing-pack.xlsx]Pack factors'!B6\"\nA7='000006' | B7='Shampoo variant 06' | C7=\"='Counts'!B7*'[missing-pack.xlsx]Pack factors'!B7\"\nA8='000007' | B8='Soap variant 07' | C8=\"='Counts'!B8*'[missing-pack.xlsx]Pack factors'!B8\"\nA9='000008' | B9='Tea variant 08' | C9=\"='Counts'!B9*'[missing-pack.xlsx]Pack factors'!B9\"\nA10='000009' | B10='Coffee variant 09' | C10=\"='Counts'!B10*'[missing-pack.xlsx]Pack factors'!B10\"\nA11='000010' | B11='Shampoo variant 10' | C11=\"='Counts'!B11*'[missing-pack.xlsx]Pack factors'!B11\"\nA12='000011' | B12='Soap variant 11' | C12=\"='Counts'!B12*'[missing-pack.xlsx]Pack factors'!B12\"\nA13='000012' | B13='Tea variant 12' | C13=\"='Counts'!B13*'[missing-pack.xlsx]Pack factors'!B13\"\n--- Counts 13 2\nA1='SKU' | B1='Cartons'\nA2='000001' | B2=3\nA3='000002' | B3=4\nA4='000003' | B4=5\nA5='000004' | B5=6\nA6='000005' | B6=7\nA7='000006' | B7=8\nA8='000007' | B8=9\nA9='000008' | B9=10\nA10='000009' | B10=11\nA11='000010' | B11=12\nA12='000011' | B12=13\nA13='000012' | B13=14\n--- Pack factors 13 2\nA1='SKU' | B1='Pieces per carton'\nA2='000001'\nA3='000002'\nA4='000003'\nA5='000004'\nA6='000005'\nA7='000006'\nA8='000007'\nA9='000008'\nA10='000009'\nA11='000010'\nA12='000011'\nA13='000012'\n=== cached ===\n--- Export\nA1='SKU' | B1='Product name' | C1='Stock pieces'\nA2='000001' | B2='Coffee variant 01' | C2=999\nA3='000002' | B3='Shampoo variant 02' | C3=999\nA4='000003' | B4='Soap variant 03' | C4=999\nA5='000004' | B5='Tea variant 04' | C5=999\nA6='000005' | B6='Coffee variant 05' | C6=999\nA7='000006' | B7='Shampoo variant 06' | C7=999\nA8='000007' | B8='Soap variant 07' | C8=999\nA9='000008' | B9='Tea variant 08' | C9=999\nA10='000009' | B10='Coffee variant 09' | C10=999\nA11='000010' | B11='Shampoo variant 10' | C11=999\nA12='000011' | B12='Soap variant 11' | C12=999\nA13='000012' | B13='Tea variant 12' | C13=999\n--- Counts\nA1='SKU' | B1='Cartons'\nA2='000001' | B2=3\nA3='000002' | B3=4\nA4='000003' | B4=5\nA5='000004' | B5=6\nA6='000005' | B6=7\nA7='000006' | B7=8\nA8='000007' | B8=9\nA9='000008' | B9=10\nA10='000009' | B10=11\nA11='000010' | B11=12\nA12='000011' | B12=13\nA13='000012' | B13=14\n--- Pack factors\nA1='SKU' | B1='Pieces per carton'\nA2='000001'\nA3='000002'\nA4='000003'\nA5='000004'\nA6='000005'\nA7='000006'\nA8='000007'\nA9='000008'\nA10='000009'\nA11='000010'\nA12='000011'\nA13='000012'\n",
+            "omitted": [],
+            "exit_code": 0,
+            "code_sha256": "a9fbae4e1a277eb4c49d8bd21bc7a66a52aae6ee4b272be15dfcb83cc760a9e8",
+            "duration_ms": 925
+          }
+        },
+        {
+          "turn": "mapping",
+          "complete": true,
+          "coverage": {
+            "fields": {
+              "/qty": {
+                "risk": "high",
+                "records": 12,
+                "records_filled": 0
+              },
+              "/sku": {
+                "risk": "medium",
+                "records": 12,
+                "records_filled": 12
+              },
+              "/product_name": {
+                "risk": "medium",
+                "records": 12,
+                "records_filled": 12
+              }
+            },
+            "sources": {
+              "counts_1": 12,
+              "products_0": 12,
+              "pack_factors_2": 12
+            },
+            "collections": {},
+            "invalid_records": 0
+          },
+          "problems": [
+            "compile: source column 'products_0.cartons' not found; values will be null",
+            "compile: source column 'products_0.pieces_per_carton' not found; values will be null",
+            "/qty: empty in 12 of 12 records"
+          ],
+          "rows_out": 12
+        },
+        {
+          "turn": "mapping",
+          "complete": true,
+          "coverage": {
+            "fields": {
+              "/qty": {
+                "risk": "high",
+                "records": 12,
+                "records_filled": 0
+              },
+              "/sku": {
+                "risk": "medium",
+                "records": 12,
+                "records_filled": 12
+              },
+              "/product_name": {
+                "risk": "medium",
+                "records": 12,
+                "records_filled": 12
+              }
+            },
+            "sources": {
+              "counts_1": 12,
+              "products_0": 12,
+              "pack_factors_2": 12
+            },
+            "collections": {},
+            "invalid_records": 0
+          },
+          "problems": [
+            "/qty: empty in 12 of 12 records"
+          ],
+          "rows_out": 12
+        },
+        {
+          "turn": "mapping",
+          "complete": true,
+          "coverage": {
+            "fields": {
+              "/qty": {
+                "risk": "high",
+                "records": 12,
+                "records_filled": 0
+              },
+              "/sku": {
+                "risk": "medium",
+                "records": 12,
+                "records_filled": 12
+              },
+              "/product_name": {
+                "risk": "medium",
+                "records": 12,
+                "records_filled": 12
+              }
+            },
+            "sources": {
+              "counts_1": 12,
+              "products_0": 12,
+              "pack_factors_2": 12
+            },
+            "collections": {},
+            "invalid_records": 0
+          },
+          "problems": [
+            "/qty: empty in 12 of 12 records"
+          ],
+          "rows_out": 12
+        }
+      ],
+      "complete": true,
+      "coverage": {
+        "fields": {
+          "/qty": {
+            "risk": "high",
+            "records": 12,
+            "records_filled": 0
+          },
+          "/sku": {
+            "risk": "medium",
+            "records": 12,
+            "records_filled": 12
+          },
+          "/product_name": {
+            "risk": "medium",
+            "records": 12,
+            "records_filled": 12
+          }
+        },
+        "sources": {
+          "counts_1": 12,
+          "products_0": 12,
+          "pack_factors_2": 12
+        },
+        "collections": {},
+        "invalid_records": 0
+      },
+      "grounded": 0,
+      "rows_out": 12,
+      "fix_rounds": 2,
+      "inspections": 0,
+      "python_turns": 2,
+      "rows_checked": 12,
+      "problems_left": [
+        "/qty: empty in 12 of 12 records"
+      ]
+    },
+    "agreement": {
+      "ops": [
+        "/sku"
+      ],
+      "agree": [
+        "/product_name",
+        "/sku"
+      ],
+      "record": {
+        "joins": {
+          "model": [
+            {
+              "on": [
+                {
+                  "left": "SKU",
+                  "right": "count_sku"
+                }
+              ],
+              "how": "left",
+              "left": {
+                "file": "fil_01M6JT9TNAHXDC9GWGRKCCM5SS",
+                "sheet": "export",
+                "filter": null,
+                "rename": {},
+                "unpivot": null,
+                "data_end": null,
+                "fill_down": [],
+                "data_start": null,
+                "last_column": 3,
+                "first_column": 0
+              },
+              "right": {
+                "file": "fil_01M6JT9TNAHXDC9GWGRKCCM5SS",
+                "sheet": "counts",
+                "filter": null,
+                "rename": {
+                  "SKU": "count_sku",
+                  "Cartons": "cartons"
+                },
+                "unpivot": null,
+                "data_end": null,
+                "fill_down": [],
+                "data_start": null,
+                "last_column": 2,
+                "first_column": 0
+              },
+              "cardinality": "1:1",
+              "on_unmatched": "keep",
+              "normalize_keys": [
+                "trim",
+                "strip_leading_zeros"
+              ]
+            },
+            {
+              "on": [
+                {
+                  "left": "SKU",
+                  "right": "pack_sku"
+                }
+              ],
+              "how": "left",
+              "left": {
+                "file": "fil_01M6JT9TNAHXDC9GWGRKCCM5SS",
+                "sheet": "export",
+                "filter": null,
+                "rename": {},
+                "unpivot": null,
+                "data_end": null,
+                "fill_down": [],
+                "data_start": null,
+                "last_column": 3,
+                "first_column": 0
+              },
+              "right": {
+                "file": "fil_01M6JT9TNAHXDC9GWGRKCCM5SS",
+                "sheet": "pack factors",
+                "filter": null,
+                "rename": {
+                  "SKU": "pack_sku",
+                  "Pieces per carton": "pieces_per_carton"
+                },
+                "unpivot": null,
+                "data_end": null,
+                "fill_down": [],
+                "data_start": null,
+                "last_column": 2,
+                "first_column": 0
+              },
+              "cardinality": "1:1",
+              "on_unmatched": "keep",
+              "normalize_keys": [
+                "trim",
+                "strip_leading_zeros"
+              ]
+            }
+          ],
+          "matcher": []
+        },
+        "dedupe": {
+          "model": {
+            "keep": "first",
+            "keys": [
+              "/sku"
+            ]
+          },
+          "matcher": {
+            "keep": "first",
+            "keys": []
+          }
+        }
+      },
+      "dropped": [],
+      "disagree": {},
+      "model_only": [
+        "/qty"
+      ]
+    },
+    "disagree_count": 0,
+    "questions": [
+      {
+        "id": "/qty",
+        "kind": "number",
+        "action": "constant",
+        "title": null,
+        "question": "How many individual pieces does one carton hold for these SKUs? The 'Pack factors' sheet (B2:B13) is empty and Export!C multiplies Counts!B by a factor from the external workbook 'missing-pack.xlsx', which was not supplied — please give the pieces-per-carton number(s) or provide the recalculated workbook with that link.",
+        "note": "The required /qty (stock in individual pieces) can only be reproduced as cartons x pieces-per-carton; without the pack factor the value stays null. The cached 999 is a single repeated placeholder, not per-product stock, so it cannot be used.",
+        "options": [],
+        "evidence": [
+          "Export!C2 formula ='Counts'!B2*'[missing-pack.xlsx]Pack factors'!B2: pieces = cartons x pieces-per-carton. Reproduced exactly as Counts.cartons x Pack factors.pieces_per_carton.",
+          "Counts!B2:B13 is fully populated (3..14) but Pack factors!B2:B13 ('Pieces per carton') is blank and the referenced workbook 'missing-pack.xlsx' was not supplied, so the product is null for every SKU instead of an invented number.",
+          "The 999 cached in Export!C2:C13 is a single repeated placeholder from the unresolved external formula and is deliberately not used."
+        ],
+        "contested": true
+      }
+    ],
+    "open_questions": [
+      "How many individual pieces does one carton hold for these SKUs? The 'Pack factors' sheet (B2:B13) is empty and Export!C multiplies Counts!B by a factor from the external workbook 'missing-pack.xlsx', which was not supplied — please give the pieces-per-carton number(s) or provide the recalculated workbook with that link."
+    ],
+    "reasons": [
+      "products_0: formula values are saved Excel caches; FORMA does not recalculate or verify cache freshness",
+      "low confidence on high-risk fields: /qty (0.30)",
+      "mapping confidence 0.60 < 0.95",
+      "first time this customer/format is seen",
+      "1 questions still need operator confirmation",
+      "the model selects rows differently from FORMA's matcher (records: dedupe; records: joins)",
+      "verification: /qty: empty in 12 of 12 records"
+    ],
+    "preview_ok": true,
+    "agent_events": [
+      "operator_requirements",
+      "heuristic",
+      "schema",
+      "mapping",
+      "agreement"
+    ],
+    "cost_usd": 0.20731,
+    "calls": 9,
+    "input_tokens": 106274,
+    "output_tokens": 25259,
+    "llm_failures": [],
+    "flags": [
+      "verification false"
+    ],
+    "profile_job": {
+      "status": "done",
+      "error": null,
+      "duration_ms": 1547.4,
+      "started_at": "2026-11-04T08:20:11.392505+00:00",
+      "finished_at": "2026-11-04T08:20:12.939922+00:00"
+    },
+    "propose_job": {
+      "status": "done",
+      "error": null,
+      "duration_ms": 143120.6,
+      "started_at": "2026-11-04T08:20:14.367240+00:00",
+      "finished_at": "2026-11-04T08:22:37.487842+00:00"
+    },
+    "time_basis": "wall clock from case start to propose completion, including upload/profile/queue; independent of client resume"
+  },
+  {
+    "case": "T09",
+    "title": "Undefined unit in separate reference sheet",
+    "round_id": "rnd_01M6JTBGBWXJ2P0V55ZCE8H7BC",
+    "state_complete": true,
+    "mode": "ask",
+    "failed_stage": null,
+    "elapsed_seconds": 77.23,
+    "score": {
+      "field_accuracy": 0.6666666666666666,
+      "penalized_accuracy": 0.6666666666666666,
+      "exact_record_accuracy": 0.0,
+      "correct_fields": 24,
+      "expected_fields": 36,
+      "rows_got": 12,
+      "rows_expected": 12,
+      "identity_precision": 1.0,
+      "identity_recall": 1.0,
+      "duplicate_records": 0,
+      "missing_rows": [],
+      "extra_rows": [],
+      "wrong": [
+        {
+          "key": "'000001'",
+          "path": "/sell_unit",
+          "expected": "BOTTLE",
+          "actual": "BT",
+          "missing": false
+        },
+        {
+          "key": "'000002'",
+          "path": "/sell_unit",
+          "expected": "BOTTLE",
+          "actual": "BT",
+          "missing": false
+        },
+        {
+          "key": "'000003'",
+          "path": "/sell_unit",
+          "expected": "BOTTLE",
+          "actual": "BT",
+          "missing": false
+        },
+        {
+          "key": "'000004'",
+          "path": "/sell_unit",
+          "expected": "BOTTLE",
+          "actual": "BT",
+          "missing": false
+        },
+        {
+          "key": "'000005'",
+          "path": "/sell_unit",
+          "expected": "BOTTLE",
+          "actual": "BT",
+          "missing": false
+        },
+        {
+          "key": "'000006'",
+          "path": "/sell_unit",
+          "expected": "BOTTLE",
+          "actual": "BT",
+          "missing": false
+        },
+        {
+          "key": "'000007'",
+          "path": "/sell_unit",
+          "expected": "BOTTLE",
+          "actual": "BT",
+          "missing": false
+        },
+        {
+          "key": "'000008'",
+          "path": "/sell_unit",
+          "expected": "BOTTLE",
+          "actual": "BT",
+          "missing": false
+        },
+        {
+          "key": "'000009'",
+          "path": "/sell_unit",
+          "expected": "BOTTLE",
+          "actual": "BT",
+          "missing": false
+        },
+        {
+          "key": "'000010'",
+          "path": "/sell_unit",
+          "expected": "BOTTLE",
+          "actual": "BT",
+          "missing": false
+        },
+        {
+          "key": "'000011'",
+          "path": "/sell_unit",
+          "expected": "BOTTLE",
+          "actual": "BT",
+          "missing": false
+        },
+        {
+          "key": "'000012'",
+          "path": "/sell_unit",
+          "expected": "BOTTLE",
+          "actual": "BT",
+          "missing": false
+        }
+      ],
+      "extra_values": [],
+      "expected_questions": [
+        {
+          "topic": "unit_BT",
+          "answer": "BOTTLE",
+          "acceptable": "Ask what BT means before asserting a full unit name."
+        }
+      ],
+      "phase": "Before human assistance; unresolved oracle-only facts scored separately in report."
+    },
+    "mapping_id": "map_01M6JTDV0REYAA500D4Y1BCB5Q",
+    "decision": "review",
+    "verification": {
+      "scope": "Execution and contract checks; business ambiguities require operator answers",
+      "passed": true,
+      "version": 1,
+      "complete": true,
+      "coverage": {
+        "fields": {
+          "/sku": {
+            "risk": "medium",
+            "records": 12,
+            "records_filled": 12
+          },
+          "/sell_unit": {
+            "risk": "high",
+            "records": 12,
+            "records_filled": 12
+          },
+          "/product_name": {
+            "risk": "medium",
+            "records": 12,
+            "records_filled": 12
+          }
+        },
+        "sources": {
+          "products": 12,
+          "sales_units": 12
+        },
+        "collections": {},
+        "invalid_records": 0
+      },
+      "problems": [],
+      "rows_out": 12,
+      "warnings": [],
+      "rows_checked": 12
+    },
+    "self_check": {
+      "errors": 0,
+      "history": [
+        {
+          "turn": "ground",
+          "columns": 2
+        },
+        {
+          "turn": "inspect",
+          "requests": 2
+        },
+        {
+          "code": "import json, openpyxl\nfrom pathlib import Path\nm=json.loads(Path('inputs/manifest.json').read_text())\nprint('manifest keys', list(m)[:20])\nprint(json.dumps(m, ensure_ascii=False)[:2000])\n# find delivery.xlsx\npaths=[]\nfor k,v in m.items():\n    if isinstance(v,list):\n        for x in v:\n            if isinstance(x,dict):\n                s=json.dumps(x,ensure_ascii=False)\n                if 'delivery.xlsx' in s:\n                    print('entry',k,json.dumps(x,ensure_ascii=False)[:1000])\n                    for kk in ('path','file_path','local_path','stored_path'):\n                        if kk in x: paths.append(x[kk])\nfor p in paths[:3]:\n    print('PATH',p,Path(p).exists())\n    wb=openpyxl.load_workbook(p, data_only=False)\n    for sn in wb.sheetnames:\n        ws=wb[sn]\n        print('SHEET',sn,ws.max_row,ws.max_column)\n        for r in range(1,min(ws.max_row,14)+1):\n            c=ws.cell(r,1)\n            c2=ws.cell(r,2)\n            print('row',r,'A',repr(c.value),c.data_type,c.number_format,'B',repr(c2.value),c2.data_type,c2.number_format)\n        if sn=='Material':\n            print('col widths', {k:v.width for k,v in ws.column_dimensions.items()})\n",
+          "turn": "python",
+          "result": {
+            "note": "Sandbox output is untrusted evidence. Full engine validation is mandatory.",
+            "inputs": [
+              {
+                "name": "delivery.xlsx",
+                "path": "inputs/sources/fil_01M6JTBGEKPFQGGH696V7DPY91.xlsx",
+                "sha256": "1120a30a06cc9b4118939dee15ce24d99441118270e2573edd426d537b25cfe0",
+                "file_id": "fil_01M6JTBGEKPFQGGH696V7DPY91"
+              }
+            ],
+            "status": "error",
+            "stderr": "Traceback (most recent call last):\n  File \"/workspace/run-hpm81983/code.py\", line 8, in <module>\n    for k,v in m.items():\n               ^^^^^^^\nAttributeError: 'list' object has no attribute 'items'\n",
+            "stdout": "manifest keys [{'file_id': 'fil_01M6JTBGEKPFQGGH696V7DPY91', 'name': 'delivery.xlsx', 'path': 'inputs/sources/fil_01M6JTBGEKPFQGGH696V7DPY91.xlsx', 'sha256': '1120a30a06cc9b4118939dee15ce24d99441118270e2573edd426d537b25cfe0'}]\n[{\"file_id\": \"fil_01M6JTBGEKPFQGGH696V7DPY91\", \"name\": \"delivery.xlsx\", \"path\": \"inputs/sources/fil_01M6JTBGEKPFQGGH696V7DPY91.xlsx\", \"sha256\": \"1120a30a06cc9b4118939dee15ce24d99441118270e2573edd426d537b25cfe0\"}]\n",
+            "omitted": [],
+            "exit_code": 1,
+            "code_sha256": "cf242450e0c1e180281ae2d2261ccb07a9e74b1e244e0afc4eb8bf4a6a0c1bcd",
+            "duration_ms": 773
+          }
+        },
+        {
+          "code": "import json, openpyxl\nfrom pathlib import Path\nmani=json.loads(Path('inputs/manifest.json').read_text())\np=mani[0]['path']\nwb=openpyxl.load_workbook(p, data_only=False)\nprint('sheets', [(ws.title, ws.sheet_state, ws.max_row, ws.max_column) for ws in wb.worksheets])\nprint('defined_names', list(wb.defined_names))\nfor sn in wb.sheetnames:\n    ws=wb[sn]\n    codes=[]\n    for r in range(2, ws.max_row+1):\n        a=ws.cell(r,1); b=ws.cell(r,2)\n        codes.append(a.value)\n        if r<4 or r==ws.max_row:\n            print(sn, r, 'A', repr(a.value), a.data_type, a.number_format, '| B', repr(b.value), b.data_type, b.number_format, '| comment', a.comment, b.comment)\n    print(sn, 'codes', sorted(codes), 'types', set(ws.cell(r,1).data_type for r in range(2, ws.max_row+1)))\n    print(sn, 'comments any', [ (c.coordinate, c.comment.text) for row in ws.iter_rows() for c in row if c.comment ])\n    print(sn, 'merged', ws.merged_cells.ranges, 'colwidths', {k:v.width for k,v in ws.column_dimensions.items()})\n",
+          "turn": "python",
+          "result": {
+            "note": "Sandbox output is untrusted evidence. Full engine validation is mandatory.",
+            "inputs": [
+              {
+                "name": "delivery.xlsx",
+                "path": "inputs/sources/fil_01M6JTBGEKPFQGGH696V7DPY91.xlsx",
+                "sha256": "1120a30a06cc9b4118939dee15ce24d99441118270e2573edd426d537b25cfe0",
+                "file_id": "fil_01M6JTBGEKPFQGGH696V7DPY91"
+              }
+            ],
+            "status": "ok",
+            "stderr": "",
+            "stdout": "sheets [('Material', 'visible', 13, 2), ('Sales units', 'visible', 13, 2)]\ndefined_names []\nMaterial 2 A '000001' s General | B 'Coffee variant 01' s General | comment None None\nMaterial 3 A '000011' s General | B 'Soap variant 11' s General | comment None None\nMaterial 13 A '000005' s General | B 'Coffee variant 05' s General | comment None None\nMaterial codes ['000001', '000002', '000003', '000004', '000005', '000006', '000007', '000008', '000009', '000010', '000011', '000012'] types {'s'}\nMaterial comments any []\nMaterial merged set() colwidths {'A': 23.0, 'B': 23.0}\nSales units 2 A '000001' s General | B 'BT' s General | comment None None\nSales units 3 A '000010' s General | B 'BT' s General | comment None None\nSales units 13 A '000006' s General | B 'BT' s General | comment None None\nSales units codes ['000001', '000002', '000003', '000004', '000005', '000006', '000007', '000008', '000009', '000010', '000011', '000012'] types {'s'}\nSales units comments any []\nSales units merged set() colwidths {'A': 23.0, 'B': 23.0}\n",
+            "omitted": [],
+            "exit_code": 0,
+            "code_sha256": "a155e8e5438a59361370abe0d91c9991625be621b1d879a030bd53c828f27439",
+            "duration_ms": 468
+          }
+        },
+        {
+          "turn": "mapping",
+          "complete": true,
+          "coverage": {
+            "fields": {
+              "/sku": {
+                "risk": "medium",
+                "records": 12,
+                "records_filled": 12
+              },
+              "/sell_unit": {
+                "risk": "high",
+                "records": 12,
+                "records_filled": 12
+              },
+              "/product_name": {
+                "risk": "medium",
+                "records": 12,
+                "records_filled": 12
+              }
+            },
+            "sources": {
+              "products": 12,
+              "sales_units": 12
+            },
+            "collections": {},
+            "invalid_records": 0
+          },
+          "problems": [],
+          "rows_out": 12
+        }
+      ],
+      "complete": true,
+      "coverage": {
+        "fields": {
+          "/sku": {
+            "risk": "medium",
+            "records": 12,
+            "records_filled": 12
+          },
+          "/sell_unit": {
+            "risk": "high",
+            "records": 12,
+            "records_filled": 12
+          },
+          "/product_name": {
+            "risk": "medium",
+            "records": 12,
+            "records_filled": 12
+          }
+        },
+        "sources": {
+          "products": 12,
+          "sales_units": 12
+        },
+        "collections": {},
+        "invalid_records": 0
+      },
+      "grounded": 2,
+      "rows_out": 12,
+      "fix_rounds": 0,
+      "inspections": 1,
+      "python_turns": 2,
+      "rows_checked": 12,
+      "problems_left": []
+    },
+    "agreement": {
+      "ops": [
+        "/sku"
+      ],
+      "agree": [
+        "/sku"
+      ],
+      "record": {
+        "joins": {
+          "model": [
+            {
+              "on": [
+                {
+                  "left": "Material code",
+                  "right": "Material code"
+                }
+              ],
+              "how": "left",
+              "left": {
+                "file": "fil_01M6JTBGEKPFQGGH696V7DPY91",
+                "sheet": "material",
+                "filter": null,
+                "rename": {},
+                "unpivot": null,
+                "data_end": null,
+                "fill_down": [],
+                "data_start": null,
+                "last_column": 2,
+                "first_column": 0
+              },
+              "right": {
+                "file": "fil_01M6JTBGEKPFQGGH696V7DPY91",
+                "sheet": "sales units",
+                "filter": null,
+                "rename": {
+                  "Unit code": "sell_unit_code"
+                },
+                "unpivot": null,
+                "data_end": null,
+                "fill_down": [],
+                "data_start": null,
+                "last_column": 2,
+                "first_column": 0
+              },
+              "cardinality": "1:1",
+              "on_unmatched": "keep",
+              "normalize_keys": [
+                "trim"
+              ]
+            }
+          ],
+          "matcher": []
+        },
+        "dedupe": {
+          "model": {
+            "keep": "first",
+            "keys": [
+              "/sku"
+            ]
+          },
+          "matcher": {
+            "keep": "first",
+            "keys": []
+          }
+        }
+      },
+      "dropped": [],
+      "disagree": {},
+      "model_only": [
+        "/product_name",
+        "/sell_unit"
+      ]
+    },
+    "disagree_count": 0,
+    "questions": [
+      {
+        "id": "/sell_unit:value:9ed0965ce03b",
+        "kind": "text",
+        "action": "value_map",
+        "title": null,
+        "question": "What full selling-unit name does the unit code 'BT' mean for these 12 materials (for example 'Bottle', 'Box', 'Carton')?",
+        "note": "Sheet 'Sales units' gives only the abbreviation 'BT' on every row, and neither sheet documents it. The contract requires a full selling-unit name, so a business decision is needed; the answer will replace the code 'BT' only.",
+        "options": [
+          "Bottle",
+          "Box",
+          "Carton",
+          "Bag",
+          "Piece"
+        ],
+        "evidence": [
+          "Sheet 'Sales units' column B 'Unit code' holds the only unit evidence in the workbook: distinct=1, value 'BT' on all 12 rows.",
+          "Joined 1:1 to the product master on Material code (both sheets cover exactly 000001..000012).",
+          "No legend, comment, defined name or second code exists to expand 'BT' into a full selling-unit name; the operator requirement states the meaning of BT is unspecified."
+        ],
+        "contested": true
+      }
+    ],
+    "open_questions": [
+      "What full selling-unit name does the unit code 'BT' mean for these 12 materials (for example 'Bottle', 'Box', 'Carton')?"
+    ],
+    "reasons": [
+      "low confidence on high-risk fields: /sell_unit (0.30)",
+      "mapping confidence 0.72 < 0.95",
+      "first time this customer/format is seen",
+      "1 questions still need operator confirmation",
+      "the model selects rows differently from FORMA's matcher (records: dedupe; records: joins)"
+    ],
+    "preview_ok": true,
+    "agent_events": [
+      "operator_requirements",
+      "heuristic",
+      "schema",
+      "mapping",
+      "agreement",
+      "question_reconciliation"
+    ],
+    "cost_usd": 0.105103,
+    "calls": 6,
+    "input_tokens": 61427,
+    "output_tokens": 10919,
+    "llm_failures": [],
+    "flags": [],
+    "profile_job": {
+      "status": "done",
+      "error": null,
+      "duration_ms": 3802.2,
+      "started_at": "2026-11-04T08:21:06.493884+00:00",
+      "finished_at": "2026-11-04T08:21:10.296121+00:00"
+    },
+    "propose_job": {
+      "status": "done",
+      "error": null,
+      "duration_ms": 69851.8,
+      "started_at": "2026-11-04T08:21:12.665965+00:00",
+      "finished_at": "2026-11-04T08:22:22.517764+00:00"
+    },
+    "time_basis": "wall clock from case start to propose completion, including upload/profile/queue; independent of client resume"
+  },
+  {
+    "case": "T10",
+    "title": "Duplicate price key without precedence",
+    "round_id": "rnd_01M6JTDY5FQXGZQ5FRPHD30XMS",
+    "state_complete": true,
+    "mode": "ask",
+    "failed_stage": null,
+    "elapsed_seconds": 208.73,
+    "score": {
+      "field_accuracy": 0.9791666666666666,
+      "penalized_accuracy": 0.9791666666666666,
+      "exact_record_accuracy": 0.9166666666666666,
+      "correct_fields": 47,
+      "expected_fields": 48,
+      "rows_got": 12,
+      "rows_expected": 12,
+      "identity_precision": 1.0,
+      "identity_recall": 1.0,
+      "duplicate_records": 0,
+      "missing_rows": [],
+      "extra_rows": [],
+      "wrong": [
+        {
+          "key": "'000004'",
+          "path": "/price",
+          "expected": 152,
+          "actual": 9999.0,
+          "missing": false
+        }
+      ],
+      "extra_values": [],
+      "expected_questions": [
+        {
+          "topic": "duplicate_price_000004",
+          "answer": 152,
+          "acceptable": "Identify the two conflicting prices 152 and 9999 for SKU 000004 and ask which is correct; no first/last-row guess."
+        }
+      ],
+      "phase": "Before human assistance; unresolved oracle-only facts scored separately in report."
+    },
+    "mapping_id": "map_01M6JTM93DMD5MXK2FBWE0WHCW",
+    "decision": "review",
+    "verification": {
+      "scope": "Execution and contract checks; business ambiguities require operator answers",
+      "passed": false,
+      "version": 1,
+      "complete": true,
+      "coverage": {
+        "fields": {
+          "/sku": {
+            "risk": "medium",
+            "records": 12,
+            "records_filled": 12
+          },
+          "/price": {
+            "risk": "critical",
+            "records": 12,
+            "records_filled": 12
+          },
+          "/currency": {
+            "risk": "critical",
+            "records": 12,
+            "records_filled": 12
+          },
+          "/product_name": {
+            "risk": "medium",
+            "records": 12,
+            "records_filled": 12
+          }
+        },
+        "sources": {
+          "prices": 13,
+          "products": 12
+        },
+        "collections": {},
+        "invalid_records": 0
+      },
+      "problems": [
+        "1 duplicate identities on ['/sku'] (1 of them with different values in Selling price, /price; keep=review)",
+        "dedupe: 1 duplicate identities on ['/sku'] (1 of them with different values in Selling price, /price; keep=review)"
+      ],
+      "rows_out": 12,
+      "warnings": [],
+      "rows_checked": 12
+    },
+    "self_check": {
+      "errors": 1,
+      "history": [
+        {
+          "turn": "ground",
+          "columns": 3
+        },
+        {
+          "turn": "inspect",
+          "requests": 2
+        },
+        {
+          "turn": "mapping",
+          "complete": true,
+          "coverage": {
+            "fields": {
+              "/sku": {
+                "risk": "medium",
+                "records": 12,
+                "records_filled": 12
+              },
+              "/price": {
+                "risk": "critical",
+                "records": 12,
+                "records_filled": 12
+              },
+              "/currency": {
+                "risk": "critical",
+                "records": 12,
+                "records_filled": 12
+              },
+              "/product_name": {
+                "risk": "medium",
+                "records": 12,
+                "records_filled": 12
+              }
+            },
+            "sources": {
+              "prices": 13,
+              "products": 12
+            },
+            "collections": {},
+            "invalid_records": 0
+          },
+          "problems": [
+            "dedupe: 1 duplicate identities on ['/sku'] (1 of them with different values in Selling price, /price; keep=review)"
+          ],
+          "rows_out": 12
+        },
+        {
+          "turn": "mapping",
+          "complete": true,
+          "coverage": {
+            "fields": {
+              "/sku": {
+                "risk": "medium",
+                "records": 12,
+                "records_filled": 12
+              },
+              "/price": {
+                "risk": "critical",
+                "records": 12,
+                "records_filled": 12
+              },
+              "/currency": {
+                "risk": "critical",
+                "records": 12,
+                "records_filled": 12
+              },
+              "/product_name": {
+                "risk": "medium",
+                "records": 12,
+                "records_filled": 12
+              }
+            },
+            "sources": {
+              "prices": 13,
+              "products": 12
+            },
+            "collections": {},
+            "invalid_records": 0
+          },
+          "problems": [
+            "dedupe: 1 duplicate identities on ['/sku'] (1 of them with different values in Selling price, /price; keep=review)"
+          ],
+          "rows_out": 12
+        },
+        {
+          "turn": "mapping",
+          "complete": true,
+          "coverage": {
+            "fields": {
+              "/sku": {
+                "risk": "medium",
+                "records": 12,
+                "records_filled": 12
+              },
+              "/price": {
+                "risk": "critical",
+                "records": 12,
+                "records_filled": 12
+              },
+              "/currency": {
+                "risk": "critical",
+                "records": 12,
+                "records_filled": 12
+              },
+              "/product_name": {
+                "risk": "medium",
+                "records": 12,
+                "records_filled": 12
+              }
+            },
+            "sources": {
+              "prices": 13,
+              "products": 12
+            },
+            "collections": {},
+            "invalid_records": 0
+          },
+          "problems": [
+            "dedupe: 1 duplicate identities on ['/sku'] (1 of them with different values in Selling price, /price; keep=last)"
+          ],
+          "rows_out": 12
+        }
+      ],
+      "complete": true,
+      "coverage": {
+        "fields": {
+          "/sku": {
+            "risk": "medium",
+            "records": 12,
+            "records_filled": 12
+          },
+          "/price": {
+            "risk": "critical",
+            "records": 12,
+            "records_filled": 12
+          },
+          "/currency": {
+            "risk": "critical",
+            "records": 12,
+            "records_filled": 12
+          },
+          "/product_name": {
+            "risk": "medium",
+            "records": 12,
+            "records_filled": 12
+          }
+        },
+        "sources": {
+          "prices": 13,
+          "products": 12
+        },
+        "collections": {},
+        "invalid_records": 0
+      },
+      "grounded": 3,
+      "rows_out": 12,
+      "fix_rounds": 2,
+      "inspections": 1,
+      "python_turns": 0,
+      "rows_checked": 12,
+      "problems_left": [
+        "dedupe: 1 duplicate identities on ['/sku'] (1 of them with different values in Selling price, /price; keep=review)"
+      ]
+    },
+    "agreement": {
+      "ops": [
+        "/currency",
+        "/price"
+      ],
+      "agree": [
+        "/currency",
+        "/price"
+      ],
+      "record": {
+        "root": {
+          "model": {
+            "file": "fil_01M6JTDY82WAJQ2984NPE7APDP",
+            "sheet": "material",
+            "filter": null,
+            "rename": {},
+            "unpivot": null,
+            "data_end": null,
+            "fill_down": [],
+            "data_start": null,
+            "last_column": 2,
+            "first_column": 0
+          },
+          "matcher": {
+            "file": "fil_01M6JTDY82WAJQ2984NPE7APDP",
+            "sheet": "prices",
+            "filter": null,
+            "rename": {},
+            "unpivot": null,
+            "data_end": null,
+            "fill_down": [],
+            "data_start": null,
+            "last_column": 3,
+            "first_column": 0
+          }
+        },
+        "joins": {
+          "model": [
+            {
+              "on": [
+                {
+                  "left": "Material code",
+                  "right": "Material code"
+                }
+              ],
+              "how": "left",
+              "left": {
+                "file": "fil_01M6JTDY82WAJQ2984NPE7APDP",
+                "sheet": "material",
+                "filter": null,
+                "rename": {},
+                "unpivot": null,
+                "data_end": null,
+                "fill_down": [],
+                "data_start": null,
+                "last_column": 2,
+                "first_column": 0
+              },
+              "right": {
+                "file": "fil_01M6JTDY82WAJQ2984NPE7APDP",
+                "sheet": "prices",
+                "filter": null,
+                "rename": {},
+                "unpivot": null,
+                "data_end": null,
+                "fill_down": [],
+                "data_start": null,
+                "last_column": 3,
+                "first_column": 0
+              },
+              "cardinality": "1:N",
+              "on_unmatched": "keep",
+              "normalize_keys": [
+                "trim",
+                "strip_leading_zeros"
+              ]
+            }
+          ],
+          "matcher": []
+        },
+        "dedupe": {
+          "model": {
+            "keep": "review",
+            "keys": [
+              "/sku"
+            ]
+          },
+          "matcher": {
+            "keep": "first",
+            "keys": []
+          }
+        }
+      },
+      "dropped": [],
+      "disagree": {
+        "/sku": {
+          "model": [
+            "products.Material code"
+          ],
+          "matcher": [
+            "Prices.Selling price"
+          ]
+        }
+      },
+      "model_only": [
+        "/product_name"
+      ]
+    },
+    "disagree_count": 1,
+    "questions": [
+      {
+        "id": "/price:value:03cc69a0db45",
+        "kind": "text",
+        "action": "value_map",
+        "title": null,
+        "question": "Material code 000004 appears twice in Prices with selling prices 9999 and 152 THB (9999 is a strong outlier). Which price should be delivered for this SKU?",
+        "note": "The target schema allows only one /price per SKU and the source gives no precedence rule. Choosing one of the two prices silently would fabricate a business decision.",
+        "options": [
+          "152",
+          "9999"
+        ],
+        "evidence": [
+          "Header 'Selling price' is the only monetary column and matches the requested selling price.",
+          "Values range from 113 to 256 except for one 9999 outlier.",
+          "Material code 000004 appears twice with prices 9999 and 152, so this field needs operator clarification.",
+          "FORMA's matcher reads this field the same way: confidence 0.55 → 0.90"
+        ],
+        "contested": true
+      }
+    ],
+    "open_questions": [
+      "No SKU-like header found in root table; using 'Selling price' as identity — confirm",
+      "Material code 000004 appears twice in Prices with selling prices 9999 and 152 THB (9999 is a strong outlier). Which price should be delivered for this SKU?"
+    ],
+    "reasons": [
+      "mapping confidence 0.72 < 0.95",
+      "1 engine/validation errors",
+      "first time this customer/format is seen",
+      "2 questions still need operator confirmation",
+      "the model selects rows differently from FORMA's matcher (records: dedupe; records: joins; records: root)",
+      "verification: 1 duplicate identities on ['/sku'] (1 of them with different values in Selling price, /price; keep=review)",
+      "verification: dedupe: 1 duplicate identities on ['/sku'] (1 of them with different values in Selling price, /price; keep=review)"
+    ],
+    "preview_ok": false,
+    "agent_events": [
+      "operator_requirements",
+      "heuristic",
+      "schema",
+      "mapping",
+      "agreement"
+    ],
+    "cost_usd": 0.241225,
+    "calls": 9,
+    "input_tokens": 105833,
+    "output_tokens": 33848,
+    "llm_failures": [],
+    "flags": [
+      "verification false"
+    ],
+    "profile_job": {
+      "status": "done",
+      "error": null,
+      "duration_ms": 848.0,
+      "started_at": "2026-11-04T08:22:26.356021+00:00",
+      "finished_at": "2026-11-04T08:22:27.203989+00:00"
+    },
+    "propose_job": {
+      "status": "done",
+      "error": null,
+      "duration_ms": 204416.8,
+      "started_at": "2026-11-04T08:22:29.143712+00:00",
+      "finished_at": "2026-11-04T08:25:53.560521+00:00"
+    },
+    "time_basis": "wall clock from case start to propose completion, including upload/profile/queue; independent of client resume"
+  },
+  {
+    "case": "T11",
+    "title": "Unmatched stock keys and missing stock",
+    "round_id": "rnd_01M6JTEC22H234VVX3YD01TBS2",
+    "state_complete": true,
+    "mode": "detect",
+    "failed_stage": null,
+    "elapsed_seconds": 46.07,
+    "score": {
+      "field_accuracy": 1.0,
+      "penalized_accuracy": 1.0,
+      "exact_record_accuracy": 1.0,
+      "correct_fields": 36,
+      "expected_fields": 36,
+      "rows_got": 12,
+      "rows_expected": 12,
+      "identity_precision": 1.0,
+      "identity_recall": 1.0,
+      "duplicate_records": 0,
+      "missing_rows": [],
+      "extra_rows": [],
+      "wrong": [],
+      "extra_values": [],
+      "expected_questions": [
+        {
+          "topic": "unmatched_000007_999999",
+          "acceptable": "Flag missing stock for 000007 and stock for unknown 999999. Preserve all master products; do not create a new product or invent zero."
+        }
+      ],
+      "phase": "Before human assistance; unresolved oracle-only facts scored separately in report."
+    },
+    "mapping_id": "map_01M6JTFRCT7GX6F62QJF2BJW98",
+    "decision": "review",
+    "verification": {
+      "scope": "Execution and contract checks; business ambiguities require operator answers",
+      "passed": true,
+      "version": 1,
+      "complete": true,
+      "coverage": {
+        "fields": {
+          "/qty": {
+            "risk": "high",
+            "records": 12,
+            "records_filled": 11
+          },
+          "/sku": {
+            "risk": "medium",
+            "records": 12,
+            "records_filled": 12
+          },
+          "/product_name": {
+            "risk": "medium",
+            "records": 12,
+            "records_filled": 12
+          }
+        },
+        "sources": {
+          "stock": 12,
+          "products": 12
+        },
+        "collections": {},
+        "invalid_records": 0
+      },
+      "problems": [],
+      "rows_out": 12,
+      "warnings": [],
+      "rows_checked": 12
+    },
+    "self_check": {
+      "errors": 0,
+      "history": [
+        {
+          "turn": "ground",
+          "columns": 2
+        },
+        {
+          "code": "import openpyxl, json\nwb = openpyxl.load_workbook('inputs/delivery.xlsx', data_only=False)\nfor ws in wb.worksheets:\n    print('SHEET', ws.title, ws.max_row, ws.max_column)\n    for r in ws.iter_rows(min_row=1, max_row=4, max_col=2):\n        for c in r:\n            print(ws.title, c.coordinate, repr(c.value), c.data_type, c.number_format)\n",
+          "turn": "python",
+          "result": {
+            "note": "Sandbox output is untrusted evidence. Full engine validation is mandatory.",
+            "inputs": [
+              {
+                "name": "delivery.xlsx",
+                "path": "inputs/sources/fil_01M6JTEC3W3FDMHAX27WVKQVJ4.xlsx",
+                "sha256": "9b310bec2c5b15b5d461ad7bc88bc3617e4bdb4e96ac99cee1bd53ebeb6ba4c0",
+                "file_id": "fil_01M6JTEC3W3FDMHAX27WVKQVJ4"
+              }
+            ],
+            "status": "error",
+            "stderr": "Traceback (most recent call last):\n  File \"/workspace/run-2l3is_xe/code.py\", line 2, in <module>\n    wb = openpyxl.load_workbook('inputs/delivery.xlsx', data_only=False)\n         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/usr/local/lib/python3.12/site-packages/openpyxl/reader/excel.py\", line 346, in load_workbook\n    reader = ExcelReader(filename, read_only, keep_vba,\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/usr/local/lib/python3.12/site-packages/openpyxl/reader/excel.py\", line 123, in __init__\n    self.archive = _validate_archive(fn)\n                   ^^^^^^^^^^^^^^^^^^^^^\n  File \"/usr/local/lib/python3.12/site-packages/openpyxl/reader/excel.py\", line 95, in _validate_archive\n    archive = ZipFile(filename, 'r')\n              ^^^^^^^^^^^^^^^^^^^^^^\n  File \"/usr/local/lib/python3.12/zipfile/__init__.py\", line 1352, in __init__\n    self.fp = io.open(file, filemode)\n              ^^^^^^^^^^^^^^^^^^^^^^^\nFileNotFoundError: [Errno 2] No such file or directory: 'inputs/delivery.xlsx'\n",
+            "stdout": "",
+            "omitted": [],
+            "exit_code": 1,
+            "code_sha256": "59d9ee7c2f1fabfebfa054cde14d08c02e300d5ffce88d829a26ba3c46b50dfb",
+            "duration_ms": 784
+          }
+        },
+        {
+          "code": "import json, openpyxl\nm=json.load(open('inputs/manifest.json'))\nprint(json.dumps(m, ensure_ascii=False)[:800])\nimport glob\nprint(glob.glob('inputs/**/*.xlsx', recursive=True))\npath=glob.glob('inputs/**/*.xlsx', recursive=True)[0]\nwb=openpyxl.load_workbook(path, data_only=False)\nfor ws in wb.worksheets:\n    print('SHEET', ws.title, ws.max_row, ws.max_column)\n    for r in ws.iter_rows(min_row=1, max_row=min(ws.max_row,14), max_col=2):\n        out=[]\n        for c in r:\n            out.append((c.coordinate, repr(c.value), c.data_type, c.number_format))\n        print(out)\n",
+          "turn": "python",
+          "result": {
+            "note": "Sandbox output is untrusted evidence. Full engine validation is mandatory.",
+            "inputs": [
+              {
+                "name": "delivery.xlsx",
+                "path": "inputs/sources/fil_01M6JTEC3W3FDMHAX27WVKQVJ4.xlsx",
+                "sha256": "9b310bec2c5b15b5d461ad7bc88bc3617e4bdb4e96ac99cee1bd53ebeb6ba4c0",
+                "file_id": "fil_01M6JTEC3W3FDMHAX27WVKQVJ4"
+              }
+            ],
+            "status": "ok",
+            "stderr": "",
+            "stdout": "[{\"file_id\": \"fil_01M6JTEC3W3FDMHAX27WVKQVJ4\", \"name\": \"delivery.xlsx\", \"path\": \"inputs/sources/fil_01M6JTEC3W3FDMHAX27WVKQVJ4.xlsx\", \"sha256\": \"9b310bec2c5b15b5d461ad7bc88bc3617e4bdb4e96ac99cee1bd53ebeb6ba4c0\"}]\n['inputs/sources/fil_01M6JTEC3W3FDMHAX27WVKQVJ4.xlsx']\nSHEET Material 13 2\n[('A1', \"'Material code'\", 's', 'General'), ('B1', \"'Description'\", 's', 'General')]\n[('A2', \"'000001'\", 's', 'General'), ('B2', \"'Coffee variant 01'\", 's', 'General')]\n[('A3', \"'000011'\", 's', 'General'), ('B3', \"'Soap variant 11'\", 's', 'General')]\n[('A4', \"'000002'\", 's', 'General'), ('B4', \"'Shampoo variant 02'\", 's', 'General')]\n[('A5', \"'000012'\", 's', 'General'), ('B5', \"'Tea variant 12'\", 's', 'General')]\n[('A6', \"'000009'\", 's', 'General'), ('B6', \"'Coffee variant 09'\", 's', 'General')]\n[('A7', \"'000008'\", 's', 'General'), ('B7', \"'Tea variant 08'\", 's', 'General')]\n[('A8', \"'000007'\", 's', 'General'), ('B8', \"'Soap variant 07'\", 's', 'General')]\n[('A9', \"'000003'\", 's', 'General'), ('B9', \"'Soap variant 03'\", 's', 'General')]\n[('A10', \"'000004'\", 's', 'General'), ('B10', \"'Tea variant 04'\", 's', 'General')]\n[('A11', \"'000006'\", 's', 'General'), ('B11', \"'Shampoo variant 06'\", 's', 'General')]\n[('A12', \"'000010'\", 's', 'General'), ('B12', \"'Shampoo variant 10'\", 's', 'General')]\n[('A13', \"'000005'\", 's', 'General'), ('B13', \"'Coffee variant 05'\", 's', 'General')]\nSHEET Stock 13 2\n[('A1', \"'Material code'\", 's', 'General'), ('B1', \"'Stock pieces'\", 's', 'General')]\n[('A2', \"'000003'\", 's', 'General'), ('B2', '15', 'n', 'General')]\n[('A3', \"'000002'\", 's', 'General'), ('B3', '10', 'n', 'General')]\n[('A4', \"'000011'\", 's', 'General'), ('B4', '55', 'n', 'General')]\n[('A5', \"'999999'\", 's', 'General'), ('B5', '888', 'n', 'General')]\n[('A6', \"'000009'\", 's', 'General'), ('B6', '45', 'n', 'General')]\n[('A7', \"'000010'\", 's', 'General'), ('B7', '50', 'n', 'General')]\n[('A8', \"'000006'\", 's', 'General'), ('B8', '30', 'n', 'General')]\n[('A9', \"'000004'\", 's', 'General'), ('B9', '20', 'n', 'General')]\n[('A10', \"'000001'\", 's', 'General'), ('B10', '5', 'n', 'General')]\n[('A11', \"'000012'\", 's', 'General'), ('B11', '60', 'n', 'General')]\n[('A12', \"'000008'\", 's', 'General'), ('B12', '40', 'n', 'General')]\n[('A13', \"'000005'\", 's', 'General'), ('B13', '25', 'n', 'General')]\n",
+            "omitted": [],
+            "exit_code": 0,
+            "code_sha256": "e3315cb1f6fa2f10149ebdd572a9c6ce59a5d30d4ac939f977fd46be81af3149",
+            "duration_ms": 670
+          }
+        },
+        {
+          "turn": "mapping",
+          "complete": true,
+          "coverage": {
+            "fields": {
+              "/qty": {
+                "risk": "high",
+                "records": 12,
+                "records_filled": 11
+              },
+              "/sku": {
+                "risk": "medium",
+                "records": 12,
+                "records_filled": 12
+              },
+              "/product_name": {
+                "risk": "medium",
+                "records": 12,
+                "records_filled": 12
+              }
+            },
+            "sources": {
+              "stock": 12,
+              "products": 12
+            },
+            "collections": {},
+            "invalid_records": 0
+          },
+          "problems": [],
+          "rows_out": 12
+        }
+      ],
+      "complete": true,
+      "coverage": {
+        "fields": {
+          "/qty": {
+            "risk": "high",
+            "records": 12,
+            "records_filled": 11
+          },
+          "/sku": {
+            "risk": "medium",
+            "records": 12,
+            "records_filled": 12
+          },
+          "/product_name": {
+            "risk": "medium",
+            "records": 12,
+            "records_filled": 12
+          }
+        },
+        "sources": {
+          "stock": 12,
+          "products": 12
+        },
+        "collections": {},
+        "invalid_records": 0
+      },
+      "grounded": 2,
+      "rows_out": 12,
+      "fix_rounds": 0,
+      "inspections": 0,
+      "python_turns": 2,
+      "rows_checked": 12,
+      "problems_left": []
+    },
+    "agreement": {
+      "ops": [
+        "/sku"
+      ],
+      "agree": [
+        "/sku"
+      ],
+      "record": {
+        "joins": {
+          "model": [
+            {
+              "on": [
+                {
+                  "left": "Material code",
+                  "right": "Material code"
+                }
+              ],
+              "how": "left",
+              "left": {
+                "file": "fil_01M6JTEC3W3FDMHAX27WVKQVJ4",
+                "sheet": "material",
+                "filter": null,
+                "rename": {},
+                "unpivot": null,
+                "data_end": null,
+                "fill_down": [],
+                "data_start": null,
+                "last_column": 2,
+                "first_column": 0
+              },
+              "right": {
+                "file": "fil_01M6JTEC3W3FDMHAX27WVKQVJ4",
+                "sheet": "stock",
+                "filter": null,
+                "rename": {},
+                "unpivot": null,
+                "data_end": null,
+                "fill_down": [],
+                "data_start": null,
+                "last_column": 2,
+                "first_column": 0
+              },
+              "cardinality": "1:1",
+              "on_unmatched": "keep",
+              "normalize_keys": [
+                "trim",
+                "normalize_whitespace"
+              ]
+            }
+          ],
+          "matcher": []
+        },
+        "dedupe": {
+          "model": {
+            "keep": "first",
+            "keys": [
+              "/sku"
+            ]
+          },
+          "matcher": {
+            "keep": "first",
+            "keys": []
+          }
+        }
+      },
+      "dropped": [],
+      "disagree": {},
+      "model_only": [
+        "/product_name",
+        "/qty"
+      ]
+    },
+    "disagree_count": 0,
+    "questions": [],
+    "open_questions": [],
+    "reasons": [
+      "mapping confidence 0.90 < 0.95",
+      "first time this customer/format is seen",
+      "the model selects rows differently from FORMA's matcher (records: dedupe; records: joins)"
+    ],
+    "preview_ok": true,
+    "agent_events": [
+      "operator_requirements",
+      "heuristic",
+      "schema",
+      "mapping",
+      "agreement",
+      "question_reconciliation"
+    ],
+    "cost_usd": 0.06055,
+    "calls": 4,
+    "input_tokens": 35930,
+    "output_tokens": 6155,
+    "llm_failures": [],
+    "flags": [],
+    "profile_job": {
+      "status": "done",
+      "error": null,
+      "duration_ms": 192.5,
+      "started_at": "2026-11-04T08:22:40.169808+00:00",
+      "finished_at": "2026-11-04T08:22:40.362346+00:00"
+    },
+    "propose_job": {
+      "status": "done",
+      "error": null,
+      "duration_ms": 42189.2,
+      "started_at": "2026-11-04T08:22:43.176651+00:00",
+      "finished_at": "2026-11-04T08:23:25.365848+00:00"
+    },
+    "time_basis": "wall clock from case start to propose completion, including upload/profile/queue; independent of client resume"
+  },
+  {
+    "case": "T12",
+    "title": "Lots + units + validity + multiple sheets",
+    "round_id": "rnd_01M6JTFWGQ839P65CPTN827E2A",
+    "state_complete": true,
+    "mode": "map",
+    "failed_stage": null,
+    "elapsed_seconds": 223.34,
+    "score": {
+      "field_accuracy": 1.0,
+      "penalized_accuracy": 1.0,
+      "exact_record_accuracy": 1.0,
+      "correct_fields": 96,
+      "expected_fields": 96,
+      "rows_got": 12,
+      "rows_expected": 12,
+      "identity_precision": 1.0,
+      "identity_recall": 1.0,
+      "duplicate_records": 0,
+      "missing_rows": [],
+      "extra_rows": [],
+      "wrong": [],
+      "extra_values": [],
+      "expected_questions": [],
+      "phase": "Before human assistance; unresolved oracle-only facts scored separately in report."
+    },
+    "mapping_id": "map_01M6JTPNVXMH8HPCYHK2BSR511",
+    "decision": "review",
+    "verification": {
+      "scope": "Execution and contract checks; business ambiguities require operator answers",
+      "passed": true,
+      "version": 1,
+      "complete": true,
+      "coverage": {
+        "fields": {
+          "/sku": {
+            "risk": "medium",
+            "records": 12,
+            "records_filled": 12
+          },
+          "/price": {
+            "risk": "critical",
+            "records": 12,
+            "records_filled": 12
+          },
+          "/currency": {
+            "risk": "critical",
+            "records": 12,
+            "records_filled": 12
+          },
+          "/product_name": {
+            "risk": "medium",
+            "records": 12,
+            "records_filled": 12
+          },
+          "/inventory/*/qty": {
+            "risk": "high",
+            "records": 12,
+            "records_filled": 12
+          },
+          "/inventory/*/warehouse_code": {
+            "risk": "high",
+            "records": 12,
+            "records_filled": 12
+          }
+        },
+        "sources": {
+          "pack": 12,
+          "price": 12,
+          "batches": 72,
+          "material": 12
+        },
+        "collections": {
+          "/inventory": 24
+        },
+        "invalid_records": 0
+      },
+      "problems": [],
+      "rows_out": 12,
+      "warnings": [],
+      "rows_checked": 12
+    },
+    "self_check": {
+      "errors": 0,
+      "history": [
+        {
+          "turn": "ground",
+          "columns": 6
+        },
+        {
+          "code": "import glob\nfrom collections import Counter, defaultdict\nimport openpyxl\n\npaths = [p for p in glob.glob('**/*.xlsx', recursive=True) if not p.split('/')[-1].startswith('~$')]\nprint('FILES', paths[:6])\np = next((x for x in paths if 'delivery' in x.lower()), paths[0])\nwb = openpyxl.load_workbook(p, data_only=True)\nprint('SHEETS', wb.sheetnames)\n\nws = wb['Material']\nprint('MATERIAL rows', ws.max_row)\nprint('MATERIAL head', [r for r in ws.iter_rows(min_row=1, max_row=4, values_only=True)])\nprint('MATERIAL types', [tuple(type(c).__name__ for c in r) for r in ws.iter_rows(min_row=1, max_row=3, values_only=True)])\n\nws = wb['Pack sizes']\nprint('PACK', [(r[0], r[1], type(r[1]).__name__) for r in ws.iter_rows(min_row=2, values_only=True)])\n\nws = wb['Price history']\npr = [r for r in ws.iter_rows(min_row=2, values_only=True) if any(c is not None for c in r)]\nprint('PRICE rows', len(pr))\nprint('COMBOS', Counter((str(r[1]).strip().upper(), str(r[2]).strip().upper(), str(r[3])[:10], str(r[4])[:10]) for r in pr))\nsel = [r for r in pr if str(r[1]).strip().upper() == 'RETAIL' and str(r[2]).strip().upper() == 'THB']\nprint('RETAIL THB count', len(sel), Counter(str(r[0]) for r in sel))\nsel2 = [r for r in sel if str(r[3])[:10] <= '2026-11-03' <= str(r[4])[:10]]\nprint('RETAIL THB covering 2026-11-03', len(sel2), sorted((str(r[0]), r[5]) for r in sel2))\nprint('price cell types', Counter(type(r[5]).__name__ for r in pr))\n\nws = wb['Batches']\nbr = [r for r in ws.iter_rows(min_row=2, values_only=True) if any(c is not None for c in r)]\nprint('BATCH rows', len(br), 'qty types', Counter(type(r[3]).__name__ for r in br))\nd = defaultdict(lambda: defaultdict(list))\nfor r in br:\n    d[str(r[0])][str(r[4]).strip().upper()].append((str(r[1]), str(r[2]), r[3]))\nfor k in sorted(d):\n    print(k, {u: len(v) for u, v in d[k].items()}, {u: sorted(set(x[0] for x in v)) for u, v in d[k].items()})\nprint('BATCH sample', br[:3])\n",
+          "turn": "python",
+          "result": {
+            "note": "Sandbox output is untrusted evidence. Full engine validation is mandatory.",
+            "inputs": [
+              {
+                "name": "delivery.xlsx",
+                "path": "inputs/sources/fil_01M6JTFWJPWBC6EDDMP7HAJPEA.xlsx",
+                "sha256": "4d0dcc4ddcc2d48ac9c1aafe8dedd04554321609af3d7cb3eddca000f3b4ed90",
+                "file_id": "fil_01M6JTFWJPWBC6EDDMP7HAJPEA"
+              }
+            ],
+            "status": "ok",
+            "stderr": "",
+            "stdout": "FILES ['inputs/sources/fil_01M6JTFWJPWBC6EDDMP7HAJPEA.xlsx']\nSHEETS ['Material', 'Batches', 'Pack sizes', 'Price history']\nMATERIAL rows 13\nMATERIAL head [('Material code', 'Description'), ('000001', 'Coffee variant 01'), ('000011', 'Soap variant 11'), ('000002', 'Shampoo variant 02')]\nMATERIAL types [('str', 'str'), ('str', 'str'), ('str', 'str')]\nPACK [('000005', 24, 'int'), ('000007', 12, 'int'), ('000009', 6, 'int'), ('000001', 12, 'int'), ('000003', 6, 'int'), ('000004', 12, 'int'), ('000011', 24, 'int'), ('000006', 6, 'int'), ('000002', 24, 'int'), ('000008', 24, 'int'), ('000012', 6, 'int'), ('000010', 12, 'int')]\nPRICE rows 48\nCOMBOS Counter({('RETAIL', 'THB', '2026-01-01', '2026-10-31'): 12, ('WHOLESALE', 'THB', '2026-11-01', '2026-11-30'): 12, ('RETAIL', 'THB', '2026-11-01', '2026-11-30'): 12, ('RETAIL', 'USD', '2026-11-01', '2026-11-30'): 12})\nRETAIL THB count 24 Counter({'000008': 2, '000009': 2, '000001': 2, '000012': 2, '000006': 2, '000010': 2, '000007': 2, '000003': 2, '000002': 2, '000011': 2, '000005': 2, '000004': 2})\nRETAIL THB covering 2026-11-03 12 [('000001', 113), ('000002', 126), ('000003', 139), ('000004', 152), ('000005', 165), ('000006', 178), ('000007', 191), ('000008', 204), ('000009', 217), ('000010', 230), ('000011', 243), ('000012', 256)]\nprice cell types Counter({'int': 48})\nBATCH rows 72 qty types Counter({'int': 72})\n000001 {'CASE': 4, 'PCS': 2} {'CASE': ['BKK', 'CNX'], 'PCS': ['BKK', 'CNX']}\n000002 {'PCS': 2, 'CASE': 4} {'PCS': ['BKK', 'CNX'], 'CASE': ['BKK', 'CNX']}\n000003 {'CASE': 4, 'PCS': 2} {'CASE': ['BKK', 'CNX'], 'PCS': ['BKK', 'CNX']}\n000004 {'CASE': 4, 'PCS': 2} {'CASE': ['BKK', 'CNX'], 'PCS': ['BKK', 'CNX']}\n000005 {'CASE': 4, 'PCS': 2} {'CASE': ['BKK', 'CNX'], 'PCS': ['BKK', 'CNX']}\n000006 {'PCS': 2, 'CASE': 4} {'PCS': ['BKK', 'CNX'], 'CASE': ['BKK', 'CNX']}\n000007 {'CASE': 4, 'PCS': 2} {'CASE': ['BKK', 'CNX'], 'PCS': ['BKK', 'CNX']}\n000008 {'CASE': 4, 'PCS': 2} {'CASE': ['BKK', 'CNX'], 'PCS': ['BKK', 'CNX']}\n000009 {'CASE': 4, 'PCS': 2} {'CASE': ['BKK', 'CNX'], 'PCS': ['BKK', 'CNX']}\n000010 {'CASE': 4, 'PCS': 2} {'CASE': ['BKK', 'CNX'], 'PCS': ['BKK', 'CNX']}\n000011 {'PCS': 2, 'CASE': 4} {'PCS': ['BKK', 'CNX'], 'CASE': ['BKK', 'CNX']}\n000012 {'CASE': 4, 'PCS': 2} {'CASE': ['BKK', 'CNX'], 'PCS': ['BKK', 'CNX']}\nBATCH sample [('000008', 'CNX', 'L1', 9, 'CASE'), ('000008', 'BKK', 'L1', 8, 'CASE'), ('000006', 'BKK', 'L3', 3, 'PCS')]\n",
+            "omitted": [],
+            "exit_code": 0,
+            "code_sha256": "9c5f56b8f67e48c49d9589729839c079f44d5fb7cdfd70d78c93410094c09929",
+            "duration_ms": 570
+          }
+        },
+        {
+          "turn": "mapping",
+          "complete": true,
+          "coverage": {
+            "fields": {
+              "/sku": {
+                "risk": "medium",
+                "records": 12,
+                "records_filled": 12
+              },
+              "/price": {
+                "risk": "critical",
+                "records": 12,
+                "records_filled": 0
+              },
+              "/currency": {
+                "risk": "critical",
+                "records": 12,
+                "records_filled": 0
+              },
+              "/product_name": {
+                "risk": "medium",
+                "records": 12,
+                "records_filled": 12
+              },
+              "/inventory/*/qty": {
+                "risk": "high",
+                "records": 12,
+                "records_filled": 0
+              },
+              "/inventory/*/warehouse_code": {
+                "risk": "high",
+                "records": 12,
+                "records_filled": 12
+              }
+            },
+            "sources": {
+              "pack": 12,
+              "price": 12,
+              "batches": 72,
+              "material": 12
+            },
+            "collections": {
+              "/inventory": 24
+            },
+            "invalid_records": 12
+          },
+          "problems": [
+            "compile: source column 'material.Selling price' not found; values will be null",
+            "compile: source column 'material.Currency' not found; values will be null",
+            "compile: /inventory: source column 'batches.Pieces per CASE' not found",
+            "aggregate: /inventory: 24 totals have missing inputs; supply them before summing",
+            "quality: /currency: 12 rows fail rule not_null",
+            "validation: data.price must be number"
+          ],
+          "rows_out": 12
+        },
+        {
+          "turn": "mapping",
+          "complete": true,
+          "coverage": {
+            "fields": {
+              "/sku": {
+                "risk": "medium",
+                "records": 12,
+                "records_filled": 12
+              },
+              "/price": {
+                "risk": "critical",
+                "records": 12,
+                "records_filled": 12
+              },
+              "/currency": {
+                "risk": "critical",
+                "records": 12,
+                "records_filled": 12
+              },
+              "/product_name": {
+                "risk": "medium",
+                "records": 12,
+                "records_filled": 12
+              },
+              "/inventory/*/qty": {
+                "risk": "high",
+                "records": 12,
+                "records_filled": 12
+              },
+              "/inventory/*/warehouse_code": {
+                "risk": "high",
+                "records": 12,
+                "records_filled": 12
+              }
+            },
+            "sources": {
+              "pack": 12,
+              "price": 12,
+              "batches": 72,
+              "material": 12
+            },
+            "collections": {
+              "/inventory": 24
+            },
+            "invalid_records": 0
+          },
+          "problems": [],
+          "rows_out": 12
+        }
+      ],
+      "complete": true,
+      "coverage": {
+        "fields": {
+          "/sku": {
+            "risk": "medium",
+            "records": 12,
+            "records_filled": 12
+          },
+          "/price": {
+            "risk": "critical",
+            "records": 12,
+            "records_filled": 12
+          },
+          "/currency": {
+            "risk": "critical",
+            "records": 12,
+            "records_filled": 12
+          },
+          "/product_name": {
+            "risk": "medium",
+            "records": 12,
+            "records_filled": 12
+          },
+          "/inventory/*/qty": {
+            "risk": "high",
+            "records": 12,
+            "records_filled": 12
+          },
+          "/inventory/*/warehouse_code": {
+            "risk": "high",
+            "records": 12,
+            "records_filled": 12
+          }
+        },
+        "sources": {
+          "pack": 12,
+          "price": 12,
+          "batches": 72,
+          "material": 12
+        },
+        "collections": {
+          "/inventory": 24
+        },
+        "invalid_records": 0
+      },
+      "grounded": 6,
+      "rows_out": 12,
+      "fix_rounds": 1,
+      "inspections": 0,
+      "python_turns": 1,
+      "rows_checked": 12,
+      "problems_left": []
+    },
+    "agreement": {
+      "ops": [],
+      "agree": [],
+      "record": {
+        "root": {
+          "model": {
+            "file": "fil_01M6JTFWJPWBC6EDDMP7HAJPEA",
+            "sheet": "material",
+            "filter": null,
+            "rename": {},
+            "unpivot": null,
+            "data_end": null,
+            "fill_down": [],
+            "data_start": null,
+            "last_column": 2,
+            "first_column": 0
+          },
+          "matcher": {
+            "file": "fil_01M6JTFWJPWBC6EDDMP7HAJPEA",
+            "sheet": "price history",
+            "filter": null,
+            "rename": {},
+            "unpivot": null,
+            "data_end": null,
+            "fill_down": [],
+            "data_start": null,
+            "last_column": 6,
+            "first_column": 0
+          }
+        },
+        "joins": {
+          "model": [
+            {
+              "on": [
+                {
+                  "left": "Material code",
+                  "right": "Material code"
+                }
+              ],
+              "how": "left",
+              "left": {
+                "file": "fil_01M6JTFWJPWBC6EDDMP7HAJPEA",
+                "sheet": "material",
+                "filter": null,
+                "rename": {},
+                "unpivot": null,
+                "data_end": null,
+                "fill_down": [],
+                "data_start": null,
+                "last_column": 2,
+                "first_column": 0
+              },
+              "right": {
+                "file": "fil_01M6JTFWJPWBC6EDDMP7HAJPEA",
+                "sheet": "price history",
+                "filter": {
+                  "op": "and",
+                  "args": [
+                    {
+                      "op": "eq",
+                      "args": [
+                        {
+                          "op": "upper",
+                          "args": [
+                            {
+                              "op": "trim",
+                              "args": [
+                                {
+                                  "op": "col",
+                                  "name": "Price list"
+                                }
+                              ],
+                              "params": {}
+                            }
+                          ],
+                          "params": {}
+                        },
+                        {
+                          "op": "const",
+                          "value": "RETAIL"
+                        }
+                      ],
+                      "params": {}
+                    },
+                    {
+                      "op": "eq",
+                      "args": [
+                        {
+                          "op": "upper",
+                          "args": [
+                            {
+                              "op": "trim",
+                              "args": [
+                                {
+                                  "op": "col",
+                                  "name": "Currency"
+                                }
+                              ],
+                              "params": {}
+                            }
+                          ],
+                          "params": {}
+                        },
+                        {
+                          "op": "const",
+                          "value": "THB"
+                        }
+                      ],
+                      "params": {}
+                    },
+                    {
+                      "op": "lte",
+                      "args": [
+                        {
+                          "op": "cast",
+                          "args": [
+                            {
+                              "op": "col",
+                              "name": "Valid from"
+                            }
+                          ],
+                          "params": {
+                            "to": "date"
+                          }
+                        },
+                        {
+                          "op": "cast",
+                          "args": [
+                            {
+                              "op": "const",
+                              "value": "2026-11-03"
+                            }
+                          ],
+                          "params": {
+                            "to": "date"
+                          }
+                        }
+                      ],
+                      "params": {}
+                    },
+                    {
+                      "op": "gte",
+                      "args": [
+                        {
+                          "op": "cast",
+                          "args": [
+                            {
+                              "op": "col",
+                              "name": "Valid to"
+                            }
+                          ],
+                          "params": {
+                            "to": "date"
+                          }
+                        },
+                        {
+                          "op": "cast",
+                          "args": [
+                            {
+                              "op": "const",
+                              "value": "2026-11-03"
+                            }
+                          ],
+                          "params": {
+                            "to": "date"
+                          }
+                        }
+                      ],
+                      "params": {}
+                    }
+                  ],
+                  "params": {}
+                },
+                "rename": {},
+                "unpivot": null,
+                "data_end": null,
+                "fill_down": [],
+                "data_start": null,
+                "last_column": 6,
+                "first_column": 0
+              },
+              "cardinality": "1:1",
+              "on_unmatched": "keep",
+              "normalize_keys": [
+                "trim",
+                "upper",
+                "strip_leading_zeros"
+              ]
+            },
+            {
+              "on": [
+                {
+                  "left": "Material code",
+                  "right": "Material code"
+                }
+              ],
+              "how": "left",
+              "left": {
+                "file": "fil_01M6JTFWJPWBC6EDDMP7HAJPEA",
+                "sheet": "batches",
+                "filter": null,
+                "rename": {},
+                "unpivot": null,
+                "data_end": null,
+                "fill_down": [],
+                "data_start": null,
+                "last_column": 5,
+                "first_column": 0
+              },
+              "right": {
+                "file": "fil_01M6JTFWJPWBC6EDDMP7HAJPEA",
+                "sheet": "pack sizes",
+                "filter": null,
+                "rename": {},
+                "unpivot": null,
+                "data_end": null,
+                "fill_down": [],
+                "data_start": null,
+                "last_column": 2,
+                "first_column": 0
+              },
+              "cardinality": "N:1",
+              "on_unmatched": "keep",
+              "normalize_keys": [
+                "trim",
+                "upper",
+                "strip_leading_zeros"
+              ]
+            }
+          ],
+          "matcher": []
+        },
+        "dedupe": {
+          "model": {
+            "keep": "first",
+            "keys": [
+              "/sku"
+            ]
+          },
+          "matcher": {
+            "keep": "first",
+            "keys": []
+          }
+        }
+      },
+      "dropped": [],
+      "disagree": {
+        "/sku": {
+          "model": [
+            "material.Material code"
+          ],
+          "matcher": [
+            "Price history.Material code"
+          ]
+        },
+        "/price": {
+          "model": [
+            "price.Selling price"
+          ],
+          "matcher": [
+            "Price history.Price list"
+          ]
+        },
+        "/currency": {
+          "model": [
+            "price.Currency"
+          ],
+          "matcher": [
+            "Price history.Currency"
+          ]
+        }
+      },
+      "model_only": [
+        "/inventory/*/qty",
+        "/inventory/*/warehouse_code",
+        "/product_name"
+      ]
+    },
+    "disagree_count": 3,
+    "questions": [
+      {
+        "id": "/price",
+        "kind": "confirm",
+        "action": null,
+        "title": null,
+        "question": null,
+        "note": "Frame reference fixed to the joined price source so the value is not looked up in the material frame.",
+        "options": [],
+        "evidence": [
+          "Price history 'Selling price' is the selling amount, read from the joined price row (source column referenced from the price frame)",
+          "The price source is pre-filtered to Price list=RETAIL, Currency=THB and validity covering 2026-11-03, leaving exactly one row per material (verified: 12 rows, values 113..256)",
+          "FORMA's matcher read Price history.Price list instead: confidence 0.93 → 0.70",
+          "FORMA's matcher read Price list for this field"
+        ],
+        "contested": true
+      },
+      {
+        "id": "/currency",
+        "kind": "confirm",
+        "action": null,
+        "title": null,
+        "question": null,
+        "note": null,
+        "options": [],
+        "evidence": [
+          "Price history 'Currency' holds ISO codes THB/USD; the source filter keeps only the THB row per material, so the emitted code is THB",
+          "FORMA's matcher read Price history.Currency instead: confidence 0.95 → 0.70",
+          "FORMA's matcher read Currency for this field"
+        ],
+        "contested": true
+      }
+    ],
+    "open_questions": [
+      "Inventory table 'Batches' has no recognisable quantity column"
+    ],
+    "reasons": [
+      "low confidence on critical fields: /price (0.70), /currency (0.70)",
+      "mapping confidence 0.88 < 0.95",
+      "first time this customer/format is seen",
+      "1 questions still need operator confirmation",
+      "the model selects rows differently from FORMA's matcher (records: dedupe; records: joins; records: root)"
+    ],
+    "preview_ok": true,
+    "agent_events": [
+      "operator_requirements",
+      "heuristic",
+      "schema",
+      "mapping",
+      "agreement",
+      "question_reconciliation"
+    ],
+    "cost_usd": 0.148094,
+    "calls": 4,
+    "input_tokens": 53282,
+    "output_tokens": 23703,
+    "llm_failures": [],
+    "flags": [],
+    "profile_job": {
+      "status": "done",
+      "error": null,
+      "duration_ms": 517.3,
+      "started_at": "2026-11-04T08:23:29.782655+00:00",
+      "finished_at": "2026-11-04T08:23:30.299984+00:00"
+    },
+    "propose_job": {
+      "status": "done",
+      "error": null,
+      "duration_ms": 219393.0,
+      "started_at": "2026-11-04T08:23:32.787867+00:00",
+      "finished_at": "2026-11-04T08:27:12.180887+00:00"
+    },
+    "time_basis": "wall clock from case start to propose completion, including upload/profile/queue; independent of client resume"
+  }
+]

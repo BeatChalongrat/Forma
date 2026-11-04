@@ -18,11 +18,24 @@ export function OpsPage() {
   const qc = useQueryClient()
   const toast = useToast()
   const { data: ops, isError, error } = useQuery({ queryKey: ['ops'], queryFn: api.ops, refetchInterval: 5000 })
+  const { data: running } = useQuery({ queryKey: ['running-jobs'], queryFn: () => api.jobs({ status: 'running', limit: 50 }), refetchInterval: 5000 })
+  const { data: stopped } = useQuery({ queryKey: ['stopped-jobs'], queryFn: () => api.jobs({ status: 'cancelled', limit: 10 }), refetchInterval: 5000 })
+  const cancel = useMutation({
+    mutationFn: api.cancelJob,
+    onSuccess: () => {
+      toast.push({ kind: 'ok', title: t('Processing stopped', 'หยุดประมวลผลแล้ว') })
+      qc.invalidateQueries({ queryKey: ['running-jobs'] })
+      qc.invalidateQueries({ queryKey: ['stopped-jobs'] })
+      qc.invalidateQueries({ queryKey: ['ops'] })
+    },
+    onError: (e: Error) => toast.push({ kind: 'bad', title: t('Could not stop job', 'หยุดงานไม่สำเร็จ'), detail: e.message }),
+  })
   const retry = useMutation({
     mutationFn: (id: string) => api.retryJob(id),
     onSuccess: () => {
       toast.push({ kind: 'ok', title: 'Job re-queued' })
       qc.invalidateQueries({ queryKey: ['ops'] })
+      qc.invalidateQueries({ queryKey: ['stopped-jobs'] })
     },
     onError: (e: Error) => toast.push({ kind: 'bad', title: 'Retry failed', detail: e.message }),
   })
@@ -53,6 +66,27 @@ export function OpsPage() {
         <Stat label={t('Retention', 'ลบข้อมูลเก่า')} tone={house.retention.schedule_h ? undefined : 'warn'} value={house.retention.last_at ? timeAgo(house.retention.last_at) : t('Not yet', 'ยังไม่เคยรัน')} hint={!house.retention.schedule_h ? t('No schedule set', 'ยังไม่ได้ตั้งเวลา') : house.retention.last_at ? (house.retention.last_applied ? t(`Removed ${fmtInt(purged)} items`, `ลบไป ${fmtInt(purged)} รายการ`) : t(`Plan only: ${fmtInt(purged)} items would go`, `แค่วางแผน: จะลบ ${fmtInt(purged)} รายการ`)) : t(`Every ${house.retention.schedule_h} h`, `ทุก ${house.retention.schedule_h} ชม.`)} />
         <Stat label={t('Last backup', 'backup ล่าสุด')} tone={backupLate || backupPartial ? 'warn' : undefined} value={house.backup.last_at ? timeAgo(house.backup.last_at) : t('Never', 'ยังไม่เคย')} hint={backupLate ? t('Older than a day', 'เก่ากว่า 1 วัน') : backupPartial ? t('Database only, no files', 'มีแค่ฐานข้อมูล ไม่มีไฟล์') : t(`Database and files, ${fmtBytes(house.backup.bytes ?? 0)}`, `ฐานข้อมูลและไฟล์ ${fmtBytes(house.backup.bytes ?? 0)}`)} />
       </div>}
+
+      {!!running?.length && <Section title={t('Processing now', 'กำลังประมวลผล')} className="mb-4">
+        <div className="overflow-x-auto"><table className="table">
+          <thead><tr><th>{t('File delivery', 'ชุดไฟล์')}</th><th>{t('Current step', 'ขั้นตอนปัจจุบัน')}</th><th>{t('Last worker signal', 'สัญญาณล่าสุดจากตัวประมวลผล')}</th><th></th></tr></thead>
+          <tbody>{running.map(j => <tr key={j.id}>
+            <td>{j.round_id ? <Link className="text-signal" to={`/rounds/${j.round_id}`}>{t('Open file', 'เปิดดูไฟล์')}</Link> : j.kind}</td>
+            <td>{j.message || t('Processing', 'กำลังทำงาน')} · {j.progress}%</td>
+            <td>{j.heartbeat_at ? timeAgo(j.heartbeat_at) : '–'}</td>
+            <td className="text-right"><button className="btn btn-ghost btn-sm" disabled={cancel.isPending} onClick={() => {
+              if (window.confirm(t('Stop this job? Completed steps will be kept. The source file will not be deleted.', 'หยุดงานนี้หรือไม่? ขั้นตอนที่เสร็จจะยังเก็บไว้ และไม่ลบไฟล์ต้นทาง'))) cancel.mutate(j.id)
+            }}>{t('Stop processing', 'หยุดประมวลผล')}</button></td>
+          </tr>)}</tbody>
+        </table></div>
+      </Section>}
+
+      {!!stopped?.length && <Section title={t('Recently stopped', 'งานที่หยุดไว้ล่าสุด')} className="mb-4">
+        <div className="divide-y divide-line">{stopped.map(j => <div key={j.id} className="p-4 flex items-center justify-between gap-4">
+          <span>{j.message || t('Processing stopped', 'หยุดประมวลผลแล้ว')}</span>
+          <button className="btn btn-ghost btn-sm" disabled={retry.isPending || j.can_retry === false} onClick={() => retry.mutate(j.id)}>{j.can_retry === false ? t('File no longer active', 'ไฟล์นี้เลิกใช้แล้ว') : t('Continue', 'ทำต่อ')}</button>
+        </div>)}</div>
+      </Section>}
 
       <div className="grid lg:grid-cols-[1.3fr_1fr] gap-4">
         <Section title="Failed jobs" actions={<span className="text-[12px] text-muted">{ops?.failed_jobs.length ?? 0} shown</span>}>

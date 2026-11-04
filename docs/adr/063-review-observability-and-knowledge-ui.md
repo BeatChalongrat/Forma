@@ -20,7 +20,7 @@ Expose the existing backend's approval and learning boundaries in the UI, rather
 1. Review a file → **Decision & AI history**; or round page → **Decision and AI history** → inspect round.
 2. Settings → **What FORMA learned** → filter → select field → inspect original decision, compare expressions or open mapping for a revised version.
 3. Settings → **Audit log** → select dates/actor/action/entity → page through full events.
-4. Assistant response → **Inspect evidence snapshots**.
+4. Assistant response → visible **Evidence snapshots** section.
 5. Dataset grid → select number format → open a record/collection → edit typed values or nested JSON → review pending changes → save a new version.
 
 ## Validation
@@ -28,5 +28,15 @@ Expose the existing backend's approval and learning boundaries in the UI, rather
 API regression tests cover answer-check persistence, original-version isolation, usage links, log pagination, scoped access, conflicting/retired knowledge, audit filters, stable pagination and credential masking. Frontend tests cover explicit locale parsing, dates, booleans, container types, pointer escaping and prototype-safe overlays. Existing backend, corpus, frontend and production-build checks remain required. No provider/API key, source fixture, mapping approval or customer output is changed by opening an inspection view.
 
 ## Limits
+
+### Presentation revision (2026-11-03)
+
+Knowledge details show the confirmed answer first, followed by visible scope/requirements,
+side-by-side rule expressions (stacked on narrow screens), conflicts and usage history.
+These sections and monthly statistics do not use disclosure/accordion controls. Mapping
+checks, recorded events, execution logs and assistant evidence snapshots are also visible
+without nested disclosures. Long technical payloads keep a bounded scroll area; empty
+event lists show a message instead of disabled pagination. This changes presentation only,
+not knowledge eligibility, approval or stored data.
 
 This release cannot retroactively supply checks or per-use timestamps that old versions never stored. Retiring knowledge does not rewrite an already approved mapping or export. A new rule still needs a reviewed version and approval. Accuracy on real ERP files requires a separate acceptance pilot; UI observability does not raise the measured mapping score by itself.

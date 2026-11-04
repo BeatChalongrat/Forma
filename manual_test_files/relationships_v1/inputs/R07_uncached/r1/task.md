@@ -1,0 +1,2 @@
+Map the supplied ERP export(s) to the supplied JSON Schema. Preserve the master product population and identities. Do not invent business facts. Ask a specific question if required facts cannot be established.
+Use Export as the product list. Quantities must be supported by the workbook dependencies. If a referenced input is unavailable, do not infer its value.

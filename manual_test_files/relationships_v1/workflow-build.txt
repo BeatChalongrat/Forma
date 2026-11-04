@@ -1,0 +1,258 @@
+ Image forma-api Building 
+ Image forma-migrate Building 
+ Image forma-worker Building 
+#1 [internal] load local bake definitions
+#1 reading from stdin 1.39kB done
+#1 DONE 0.0s
+
+#2 [api internal] load build definition from Dockerfile
+#2 transferring dockerfile: 1.19kB 0.0s done
+#2 DONE 0.1s
+
+#3 [api internal] load metadata for docker.io/library/python:3.12-slim
+#3 DONE 0.1s
+
+#4 [worker internal] load .dockerignore
+#4 transferring context: 414B 0.0s done
+#4 DONE 0.1s
+
+#5 [worker  1/11] FROM docker.io/library/python:3.12-slim@sha256:c3d81d25b3154142b0b42eb1e61300024426268edeb5b5a26dd7ddf64d9daf28
+#5 resolve docker.io/library/python:3.12-slim@sha256:c3d81d25b3154142b0b42eb1e61300024426268edeb5b5a26dd7ddf64d9daf28 0.1s done
+#5 DONE 0.1s
+
+#6 [worker internal] load build context
+#6 transferring context: 327.73kB 0.1s done
+#6 DONE 0.1s
+
+#6 [api internal] load build context
+#6 DONE 0.1s
+
+#7 [worker  2/11] RUN apt-get update && apt-get install -y --no-install-recommends postgresql-client ca-certificates     && rm -rf /var/lib/apt/lists/*
+#7 CACHED
+
+#8 [worker  3/11] WORKDIR /app/backend
+#8 CACHED
+
+#9 [worker  4/11] COPY backend/pyproject.toml backend/README.md ./
+#9 DONE 0.1s
+
+#9 [api  4/11] COPY backend/pyproject.toml backend/README.md ./
+#9 DONE 0.1s
+
+#10 [api  5/11] COPY backend/src ./src
+#10 DONE 0.2s
+
+#10 [api  5/11] COPY backend/src ./src
+#10 DONE 0.2s
+
+#11 [api  6/11] COPY backend/alembic ./alembic
+#11 DONE 0.1s
+
+#11 [worker  6/11] COPY backend/alembic ./alembic
+#11 DONE 0.1s
+
+#12 [api  7/11] COPY backend/alembic.ini ./alembic.ini
+#12 DONE 0.1s
+
+#12 [worker  7/11] COPY backend/alembic.ini ./alembic.ini
+#12 DONE 0.1s
+
+#13 [api  8/11] RUN pip install uv && uv pip install --system .
+#13 4.396 Collecting uv
+#13 4.501   Downloading uv-0.13.7-py3-none-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (11 kB)
+#13 4.526 Downloading uv-0.13.7-py3-none-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (17.2 MB)
+#13 5.870    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 17.2/17.2 MB 13.1 MB/s eta 0:00:00
+#13 5.904 Installing collected packages: uv
+#13 6.245 Successfully installed uv-0.13.7
+#13 6.246 WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager, possibly rendering your system unusable. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv. Use the --root-user-action option if you know what you are doing and want to suppress this warning.
+#13 6.376 
+#13 6.376 [notice] A new release of pip is available: 25.0.1 -> 26.3
+#13 6.376 [notice] To update, run: pip install --upgrade pip
+#13 6.654 warning: The `tool.uv.dev-dependencies` field (used in `pyproject.toml`) is deprecated and will be removed in a future release; use `dependency-groups.dev` instead
+#13 6.955 Using Python 3.12.13 environment at: /usr/local
+#13 8.761 Resolved 98 packages in 1.80s
+#13 8.850    Building forma @ file:///app/backend
+#13 8.862 Downloading pygments (1.2MiB)
+#13 8.894 Downloading uvloop (4.3MiB)
+#13 8.896 Downloading psycopg-binary (5.0MiB)
+#13 8.919 Downloading pydantic-core (2.1MiB)
+#13 8.933 Downloading polars-runtime-32 (51.4MiB)
+#13 8.935 Downloading sqlalchemy (4.5MiB)
+#13 8.937 Downloading cryptography (4.5MiB)
+#13 8.938 Downloading rapidfuzz (3.0MiB)
+#13 8.940 Downloading botocore (15.4MiB)
+#13 8.954 Downloading zstandard (5.3MiB)
+#13 8.956 Downloading duckdb (23.2MiB)
+#13 8.957 Downloading fastexcel (3.6MiB)
+#13 11.99  Downloaded pygments
+#13 13.28  Downloaded pydantic-core
+#13 14.54  Downloaded rapidfuzz
+#13 15.24  Downloaded fastexcel
+#13 15.45       Built forma @ file:///app/backend
+#13 15.92  Downloaded uvloop
+#13 16.00  Downloaded sqlalchemy
+#13 16.04  Downloaded cryptography
+#13 16.25  Downloaded psycopg-binary
+#13 16.42  Downloaded zstandard
+#13 19.28  Downloaded botocore
+#13 20.50  Downloaded duckdb
+#13 21.97  Downloaded polars-runtime-32
+#13 21.97 Prepared 98 packages in 13.21s
+#13 22.37 Installed 98 packages in 396ms
+#13 22.37  + aiosqlite==0.22.1
+#13 22.37  + alembic==1.20.1
+#13 22.37  + annotated-doc==0.0.5
+#13 22.37  + annotated-types==0.8.0
+#13 22.37  + anyio==4.16.0
+#13 22.37  + arq==0.28.0
+#13 22.37  + attrs==26.1.0
+#13 22.37  + boto3==1.43.123
+#13 22.37  + botocore==1.43.123
+#13 22.37  + certifi==2026.10.23
+#13 22.37  + cffi==2.1.1
+#13 22.37  + charset-normalizer==3.5.2
+#13 22.37  + click==8.5.0
+#13 22.37  + cryptography==50.0.2
+#13 22.37  + distro==1.9.0
+#13 22.37  + duckdb==2.0.0
+#13 22.37  + et-xmlfile==2.0.0
+#13 22.37  + fastapi==0.162.0
+#13 22.37  + fastexcel==0.21.0
+#13 22.37  + fastjsonschema==2.22.3
+#13 22.37  + forma==0.1.0 (from file:///app/backend)
+#13 22.37  + h11==0.16.0
+#13 22.37  + hiredis==3.5.0
+#13 22.37  + httpcore==1.0.9
+#13 22.37  + httpcore2==2.16.0
+#13 22.37  + httptools==0.9.0
+#13 22.37  + httpx==0.28.1
+#13 22.37  + httpx2==2.16.0
+#13 22.37  + idna==3.20
+#13 22.37  + jmespath==1.1.0
+#13 22.37  + jsonpatch==1.41
+#13 22.37  + jsonpointer==3.8
+#13 22.37  + jsonschema==4.26.0
+#13 22.37  + jsonschema-specifications==2025.9.1
+#13 22.37  + langchain-core==1.7.4
+#13 22.37  + langchain-protocol==0.0.20
+#13 22.37  + langgraph==1.2.19
+#13 22.37  + langgraph-checkpoint==4.3.1
+#13 22.37  + langgraph-checkpoint-postgres==3.2.0
+#13 22.37  + langgraph-checkpoint-sqlite==3.1.3
+#13 22.37  + langgraph-prebuilt==1.1.1
+#13 22.37  + langgraph-sdk==0.4.12
+#13 22.37  + langsmith==0.14.17
+#13 22.37  + mako==1.4.3
+#13 22.37  + markdown-it-py==4.2.0
+#13 22.37  + markupsafe==3.0.4
+#13 22.37  + mdurl==0.1.2
+#13 22.37  + openpyxl==3.1.5
+#13 22.37  + opentelemetry-api==1.45.2
+#13 22.37  + orjson==3.13.0
+#13 22.37  + ormsgpack==1.13.0
+#13 22.37  + packaging==26.3
+#13 22.37  + polars==2.1.0
+#13 22.37  + polars-runtime-32==2.1.0
+#13 22.37  + prometheus-client==0.26.0
+#13 22.37  + psutil==7.2.2
+#13 22.37  + psycopg==3.3.8
+#13 22.37  + psycopg-binary==3.3.8
+#13 22.37  + psycopg-pool==3.3.3
+#13 22.37  + pycparser==3.12
+#13 22.37  + pydantic==2.14.2
+#13 22.37  + pydantic-core==2.50.2
+#13 22.37  + pydantic-settings==2.16.2
+#13 22.37  + pygments==2.21.0
+#13 22.37  + pyjwt==2.15.1
+#13 22.37  + python-dateutil==2.9.0.post0
+#13 22.37  + python-dotenv==1.2.4
+#13 22.37  + python-multipart==0.0.33
+#13 22.37  + python-ulid==4.1.0
+#13 22.37  + pyyaml==6.0.3
+#13 22.37  + rapidfuzz==3.14.6
+#13 22.37  + redis==5.3.1
+#13 22.37  + referencing==0.37.0
+#13 22.37  + requests==2.34.2
+#13 22.37  + requests-toolbelt==1.0.0
+#13 22.37  + rich==15.0.0
+#13 22.37  + rpds-py==2026.9.1
+#13 22.37  + s3transfer==0.19.3
+#13 22.37  + shellingham==1.5.4
+#13 22.37  + six==1.17.0
+#13 22.37  + sniffio==1.3.1
+#13 22.37  + sqlalchemy==2.1.8
+#13 22.37  + sqlite-vec==0.1.9
+#13 22.37  + starlette==1.10.0
+#13 22.37  + structlog==26.1.0
+#13 22.37  + tenacity==9.2.1
+#13 22.37  + truststore==0.10.5
+#13 22.37  + typer==0.27.3
+#13 22.37  + typing-extensions==4.16.0
+#13 22.37  + typing-inspection==0.4.4
+#13 22.37  + urllib3==2.8.0
+#13 22.37  + uuid-utils==0.19.0
+#13 22.37  + uvicorn==0.54.0
+#13 22.37  + uvloop==0.23.0
+#13 22.37  + watchfiles==1.3.0
+#13 22.37  + websockets==17.4
+#13 22.37  + xxhash==4.0.2
+#13 22.37  + zstandard==0.25.0
+#13 DONE 23.4s
+
+#13 [api  8/11] RUN pip install uv && uv pip install --system .
+#13 DONE 23.4s
+
+#14 [worker  9/11] COPY target_schema /app/target_schema
+#14 DONE 0.2s
+
+#14 [api  9/11] COPY target_schema /app/target_schema
+#14 DONE 0.2s
+
+#15 [worker 10/11] COPY policies /app/policies
+#15 DONE 0.1s
+
+#15 [api 10/11] COPY policies /app/policies
+#15 DONE 0.1s
+
+#16 [worker 11/11] RUN useradd --create-home --uid 10001 forma && mkdir -p /data && chown -R forma:forma /data /app
+#16 DONE 1.1s
+
+#16 [api 11/11] RUN useradd --create-home --uid 10001 forma && mkdir -p /data && chown -R forma:forma /data /app
+#16 DONE 1.1s
+
+#17 [worker] exporting to image
+#17 exporting layers
+#17 ...
+
+#18 [api] exporting to image
+#18 ...
+
+#17 [worker] exporting to image
+#17 exporting layers 18.9s done
+#17 exporting manifest sha256:538b47bade9d54e8119e03219601c401f42cfe1a5bf57b2ee394b8a6cc9277ec 0.1s done
+#17 exporting config sha256:db256c05c0f44f03b5da1389698b35e838e8ce870d4d5e3eddf3b31bda3a7a61 0.1s done
+#17 exporting attestation manifest sha256:478f6d4a30434f42ecad111d7c273d8b94d1548721bf389fd88c4511f054fc08 0.1s done
+#17 exporting manifest list sha256:89fa6f67a3bca9bd50abd028c9a426615ee33cf9f21474576641c463b9099305
+#17 exporting manifest list sha256:89fa6f67a3bca9bd50abd028c9a426615ee33cf9f21474576641c463b9099305 0.1s done
+#17 naming to docker.io/library/forma-worker:latest 0.0s done
+#17 unpacking to docker.io/library/forma-worker:latest
+#17 unpacking to docker.io/library/forma-worker:latest 8.5s done
+#17 DONE 27.8s
+
+#18 [api] exporting to image
+#18 exporting layers 18.9s done
+#18 exporting manifest sha256:f37897ce0e91079e04214cf5aabcb358e4962f06d080e845f09f429e4e3ed3f0 0.1s done
+#18 exporting config sha256:07fa6aaf51134014e83deca2d1c52ede07ee27d2161c02778487e8782beac7ed 0.1s done
+#18 exporting attestation manifest sha256:947064c8aa7b3258cb449a297c1b51e3bfe581af14814ef260c42a892d51dea4 0.1s done
+#18 exporting manifest list sha256:453fabe941a66852f58af624b7b29d7db8ba688e992da812d77ea38f1379e155 0.1s done
+#18 naming to docker.io/library/forma-api:latest done
+#18 unpacking to docker.io/library/forma-api:latest 8.5s done
+#18 DONE 27.8s
+
+#19 [api] resolving provenance for metadata file
+#19 DONE 0.0s
+
+#20 [worker] resolving provenance for metadata file
+#20 DONE 0.0s
+ Image forma-worker Built 
+ Image forma-api Built 
