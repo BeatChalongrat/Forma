@@ -40,6 +40,8 @@ def record(session: Session, m: MappingVersion, actor: str) -> list[Correction]:
     r = session.get(ImportRound, m.round_id) if m.round_id else None
     out = []
     for decision in (m.policy or {}).get("confirmed_decisions", []):
+        if decision.get("knowledge_id") or decision.get("knowledge_mapping_id"):
+            continue  # Reuse retains the original dependency; it must not mint independent knowledge.
         # Always retain the audited answer; only approved interpretation rules may be recalled.
         row = Correction(
             customer_id=m.customer_id,
@@ -127,6 +129,7 @@ def recall(
 ) -> list[dict[str, Any]]:
     """Apply only an exact, still-valid expression rule. Conflicting answers cause abstention."""
     from forma.fingerprint.fingerprint import compare
+    from forma.services import format_context
 
     current = format_memory.files_fingerprint(r.files)
     if current is None:
@@ -155,6 +158,7 @@ def recall(
             or origin.approved_at is None
             or not verification_allows_recall(origin)
             or not format_memory.compatible(origin, schema)
+            or not format_context.compatible(session, origin, r.files)
         ):
             continue
         fingerprint = format_memory.mapping_fingerprint(origin)

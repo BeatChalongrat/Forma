@@ -15,7 +15,7 @@ from typing import Any
 from forma.core.hashing import stable_hash
 from forma.schema_registry import TargetSchema
 
-RULES_VERSION = "2026.11.04.1"
+RULES_VERSION = "2026.11.05.2"
 OUTCOMES = (
     "accept",
     "assign_customer",
@@ -107,7 +107,11 @@ THAI_QUESTIONS = {
 
 def _question(q: dict[str, Any]) -> dict[str, str]:
     if q.get("question"):
-        return _text(q["question"], q["question"])
+        return _text(q["question"], q.get("question_th") or q["question"])
+    if q.get("question_th"):
+        return _text(
+            f"Confirm the reading of {q['field'].get('description') or q['field']['name']}", q["question_th"]
+        )
     f = q["field"]
     known = THAI_QUESTIONS.get(f.get("semantic") or "")
     if known and q["kind"] not in ("confirm", "choice"):
@@ -540,6 +544,7 @@ def for_mapping(
                 "kind": vat_question["kind"],
                 "semantic": "price.vat_included",
                 "question": _question(vat_question),
+                "source_examples": vat_question.get("source_examples", []),
                 "why": _text(
                     f"Values moved by exactly 7% on {vat.get('pairs')} SKUs",
                     f"ค่าเปลี่ยนไป 7% พอดีบน {vat.get('pairs')} SKU",
@@ -571,9 +576,15 @@ def for_mapping(
                     "kind": q["kind"],
                     "semantic": q["field"].get("semantic"),
                     "question": _question(q),
-                    "why": _text(q["note"], q["note"])
-                    if q.get("question") and q.get("note")
-                    else _text("Below the confidence bar for its risk", "ความมั่นใจต่ำกว่าเกณฑ์ของระดับความเสี่ยงนี้"),
+                    "why": _text(
+                        q.get("note")
+                        or "The available evidence does not settle this interpretation. Check the source or ask the file owner.",
+                        q.get("reason_th")
+                        or q.get("note")
+                        or "หลักฐานยังไม่พอยืนยันความหมาย กรุณาตรวจต้นทางหรือถามเจ้าของไฟล์",
+                    ),
+                    "source_examples": q.get("source_examples", []),
+                    "original_question": q.get("question"),
                     "options": [True, False]
                     if q["kind"] == "boolean"
                     else ["confirm"]

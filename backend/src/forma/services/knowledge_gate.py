@@ -99,6 +99,16 @@ def allowed(
     if isinstance(row, MappingVersion):
         if row.status not in {"approved", "superseded"} or not row.approved_at:
             return False
+        if session.scalar(
+            select(Correction.id)
+            .where(
+                Correction.mapping_version_id == row.id,
+                Correction.kind.in_(("decision", "constant", "alias")),
+                Correction.status == "retired",
+            )
+            .limit(1)
+        ):
+            return False
     elif row.status != "confirmed":
         return False
     for dep in dependencies(row):

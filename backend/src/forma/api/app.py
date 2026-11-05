@@ -15,6 +15,7 @@ from starlette.concurrency import run_in_threadpool
 from forma import __version__
 from forma.api.batch_routes import router as batch_router
 from forma.api.config_routes import router as config_router
+from forma.api.knowledge_revision_routes import router as knowledge_revision_router
 from forma.api.knowledge_routes import router as knowledge_router
 from forma.api.routes import api
 from forma.api.workspace_routes import router as workspace_router
@@ -137,6 +138,7 @@ def create_app() -> FastAPI:
     app.include_router(api)
     app.include_router(config_router)
     app.include_router(knowledge_router)
+    app.include_router(knowledge_revision_router)
     app.include_router(batch_router)
     app.include_router(workspace_router)
     app.dependency_overrides[get_session] = request_session  # committed before the response (ADR-057)

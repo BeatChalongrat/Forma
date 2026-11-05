@@ -311,6 +311,11 @@ def propose_for_round(
     requirements_changed = bool(previous) and (r.notes or "") != (
         previous_round.notes or "" if previous_round else ""
     )
+    from forma.services import format_context
+
+    context_changes = format_context.changes(session, previous, r.files) if previous else []
+    if context_changes:
+        agent_log.append({"agent": "format_context", "result": "recheck", "changes": context_changes})
     if r.notes:
         import hashlib
 
@@ -324,7 +329,12 @@ def propose_for_round(
         )
 
     # 1) Mapping memory: identical structure → reuse the approved mapping verbatim
-    if previous is not None and drift in ("identical", "header_moved") and not requirements_changed:
+    if (
+        previous is not None
+        and drift in ("identical", "header_moved")
+        and not requirements_changed
+        and not context_changes
+    ):
         doc = format_memory.rebind_approved(previous, r.files)
         doc.meta.version = next_version
         doc.meta.confidence = 1.0
@@ -339,7 +349,12 @@ def propose_for_round(
         from forma.services import learning
 
         learned = learning.learned_for(
-            session, r.customer_id, schema, current_format=current_fp, requirements=r.notes or ""
+            session,
+            r.customer_id,
+            schema,
+            current_format=current_fp,
+            requirements=r.notes or "",
+            current_files=r.files,
         )
         # ... and what other customers' approved mappings say these headers mean (ADR-059)
         learned.absorb(
@@ -688,6 +703,8 @@ def propose_for_round(
         policy={
             **decision.to_dict(),
             "source": source_kind,
+            "format_context": format_context.observe(r.files),
+            "format_context_changes": context_changes,
             "target_schema_hash": stable_hash(schema.document),
             "reused_from": previous.id if source_kind == "memory" and previous else None,
             "file_fingerprints": file_fps,
@@ -1137,6 +1154,9 @@ def approve_mapping(
         raise Conflict(f"mapping is {m.status}; cannot approve")
     if m.status == "approved":
         return m  # An idempotent approval must not teach the same answer twice.
+    from forma.services.knowledge_revision import require_current_knowledge
+
+    require_current_knowledge(session, m)
     verified = (m.policy or {}).get("verification")
     if verified is not None and not (verified.get("complete") and verified.get("passed")):
         raise ValidationFailed(
@@ -1147,6 +1167,11 @@ def approve_mapping(
         q for q in (m.policy or {}).get("clarifications", []) if q.get("question") in (m.open_questions or [])
     ]
     unresolved.extend((m.policy or {}).get("review_decisions", []))
+    unresolved.extend(
+        q
+        for q in (m.policy or {}).get("knowledge_questions", [])
+        if q.get("question") in (m.open_questions or [])
+    )
     if unresolved:
         raise ValidationFailed(
             "Answer the unresolved business decisions before approving",
@@ -1233,6 +1258,8 @@ def save_mapping_edit(
     remaining_questions: list[Any] | None = None,
 ) -> MappingVersion:
     """A human edited the DSL in the Mapping Studio → new proposed version (never mutate in place)."""
+    from forma.services import format_context
+
     parent = get_mapping(session, mapping_id)
     schema = ctx.registry.get_ref(parent.target_schema)
     try:
@@ -1319,6 +1346,7 @@ def save_mapping_edit(
         policy={
             **decision.to_dict(),
             "source": "human_edit",
+            "format_context": format_context.observe(r.files) if r else {},
             "target_schema_hash": stable_hash(schema.document),
             "file_fingerprints": (parent.policy or {}).get("file_fingerprints", {}),
             "simulation": {**sim.summary(), "complete": True} if sim else None,
@@ -1330,6 +1358,13 @@ def save_mapping_edit(
                 for q in (parent.policy or {}).get("clarifications", [])
                 if q["question"] in (remaining_questions or [])
             ],
+            "knowledge_questions": [
+                q
+                for q in (parent.policy or {}).get("knowledge_questions", [])
+                if q.get("question") in (remaining_questions or [])
+            ],
+            "knowledge_recheck": (parent.policy or {}).get("knowledge_recheck"),
+            "knowledge_revision": (parent.policy or {}).get("knowledge_revision") or {},
             "sample": sim.records[:5] if sim else [],
             "sandbox": sandbox_report,
         },

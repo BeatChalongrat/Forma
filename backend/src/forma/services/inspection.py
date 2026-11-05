@@ -20,7 +20,7 @@ from forma.db.models import (
     MappingVersion,
     SourceFile,
 )
-from forma.services import decision_memory, format_memory
+from forma.services import decision_memory, format_context, format_memory
 from forma.services.rounds import audit
 
 
@@ -203,7 +203,7 @@ def knowledge_detail(session: Session, row: Correction, *, offset: int = 0) -> d
     fp = format_memory.mapping_fingerprint(origin) if origin else None
     conflicts = []
     # Conflict evidence uses the same exact layout and contract boundary as decision recall.
-    if row.kind == "decision" and origin and fp:
+    if row.kind == "decision" and row.status == "confirmed" and origin and fp:
         from forma.fingerprint.fingerprint import compare
 
         for other in session.scalars(
@@ -249,6 +249,7 @@ def knowledge_detail(session: Session, row: Correction, *, offset: int = 0) -> d
                 "target_schema": origin.target_schema if origin else None,
                 "requirements": r.notes if r else None,
                 "layout_hash": stable_hash(fp.to_dict()) if fp else None,
+                "interpretation_context": format_context.snapshot(session, origin) if origin else None,
                 "conflicts": conflicts,
                 "usage": events(session, entity_id=row.id, action="learning.use", offset=offset),
                 "legacy_use_count": row.uses or 0,
