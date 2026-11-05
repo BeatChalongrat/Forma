@@ -6,6 +6,7 @@ import { usePreferences } from '../lib/preferences'
 import { fmtDate } from '../lib/utils'
 import { RuleComparison, EventList } from './Inspection'
 import { Modal, Spinner } from './ui'
+import { KnowledgeRevision, KnowledgeImpacts, KnowledgeChanges } from './KnowledgeRevision'
 
 export function KnowledgeManager() {
   const { t } = usePreferences(), qc = useQueryClient()
@@ -15,7 +16,7 @@ export function KnowledgeManager() {
   const customers = useQuery({ queryKey: ['customers'], queryFn: api.customers })
   const me = useQuery({ queryKey: ['me'], queryFn: api.me })
   const q = useQuery({ queryKey: ['learning', customer, search, status, offset], queryFn: () => api.learning(customer, offset, search, status) })
-  const forget = useMutation({ mutationFn: api.forgetLearned, onSuccess: () => { setRetiring(''); void qc.invalidateQueries({ queryKey: ['learning'] }); void qc.invalidateQueries({ queryKey: ['knowledge'] }) } })
+  const forget = useMutation({ mutationFn: api.forgetLearned, onSuccess: () => { setRetiring(''); void qc.invalidateQueries({ queryKey: ['learning'] }); void qc.invalidateQueries({ queryKey: ['knowledge'] }); void qc.invalidateQueries({ queryKey: ['knowledge-impacts'] }) } })
   const promote = useMutation({ mutationFn: api.promoteAlias, onSuccess: () => void qc.invalidateQueries({ queryKey: ['learning'] }) })
   const id = params.get('knowledge') || ''
   const select = (value: string) => setParams(p => { const next = new URLSearchParams(p); if (value) next.set('knowledge', value); else next.delete('knowledge'); return next })
@@ -32,12 +33,13 @@ export function KnowledgeManager() {
     {!!q.data?.stats.series.length && <section className="card p-4"><h2 className="font-semibold">{t('Corrections by month', 'การแก้และการอนุมัติรายเดือน')}</h2><div className="overflow-auto mt-3"><table className="table"><thead><tr><th>{t('Month', 'เดือน')}</th><th>{t('Approved', 'อนุมัติ')}</th><th>{t('Accepted as proposed', 'รับตามที่เสนอ')}</th><th>{t('Corrections', 'การแก้')}</th><th>{t('Per approval', 'ต่อการอนุมัติ')}</th></tr></thead><tbody>{q.data.stats.series.map(x => <tr key={x.month}><td>{x.month}</td><td>{x.mappings_approved}</td><td>{x.accepted_as_proposed}</td><td>{x.corrections}</td><td>{x.corrections_per_approval ?? '—'}</td></tr>)}</tbody></table></div></section>}
 
     {!!q.data?.suggestions.length && me.data?.effective_roles.includes('admin') && <section className="card p-5 space-y-3"><h2 className="font-semibold">{t('Shared vocabulary suggestions', 'ชื่อคอลัมน์ที่เสนอให้ใช้ร่วมกัน')}</h2>{q.data.suggestions.map(x => <div key={x.header + x.target} className="flex flex-wrap gap-3 items-center"><span>{x.header} → {x.target} · {x.customers} {t('customers', 'ลูกค้า')}</span><button className="btn btn-sm" disabled={promote.isPending} onClick={() => promote.mutate({ header: x.header, target: x.target })}>{t('Use for everyone', 'ใช้กับทุกลูกค้า')}</button></div>)}{promote.isError && <p role="alert">{promote.error.message}</p>}</section>}
-    <Modal open={!!retiring} onClose={() => setRetiring('')} title={t('Retire this knowledge?', 'เลิกใช้ความรู้นี้?')}><div className="p-5 space-y-4"><p>{t('Future mapping runs will not reuse this rule. Past approvals and outputs remain in history. To replace it, open the original mapping, create a new version, correct it and approve after review.', 'รอบถัดไปจะไม่ใช้กฎนี้ซ้ำ ประวัติการอนุมัติและผลลัพธ์เดิมยังอยู่ หากต้องการกฎใหม่ ให้เปิดการจับคู่ต้นทาง สร้างเวอร์ชันใหม่ แก้ไขและตรวจอนุมัติ')}</p>{forget.isError && <p role="alert">{forget.error.message}</p>}<button className="btn btn-primary" disabled={forget.isPending} onClick={() => forget.mutate(retiring)}>{t('Retire', 'ยืนยันเลิกใช้')}</button></div></Modal>
+    <Modal open={!!retiring} onClose={() => setRetiring('')} title={t('Retire this knowledge?', 'เลิกใช้ความรู้นี้?')}><div className="p-5 space-y-4"><p>{t('Future runs will not reuse this rule. Existing results stay in history. Open its details to edit the answer or select affected files for review.', 'รอบถัดไปจะไม่ใช้กฎนี้ซ้ำ ผลลัพธ์เดิมยังอยู่ในประวัติ ถ้าต้องการเปลี่ยนคำตอบให้ใช้ปุ่มแก้คำตอบก่อนเลิกใช้ หรือเปิดรายละเอียดเพื่อเลือกไฟล์ที่ต้องส่งกลับมาตรวจ')}</p>{forget.isError && <p role="alert">{forget.error.message}</p>}<button className="btn btn-primary" disabled={forget.isPending} onClick={() => forget.mutate(retiring)}>{t('Retire', 'ยืนยันเลิกใช้')}</button></div></Modal>
   </div>
 }
 
 function KnowledgeDetails({ id, onSelect }: { id: string; onSelect: (id: string) => void }) {
   const { t } = usePreferences(), [offset, setOffset] = useState(0)
+  const me = useQuery({ queryKey: ['me'], queryFn: api.me })
   const q = useQuery({ queryKey: ['knowledge', id, offset], queryFn: () => api.knowledge(id, offset) })
   if (q.isPending) return <Spinner />
   if (q.isError) return <p role="alert">{q.error.message}</p>
@@ -59,6 +61,7 @@ function KnowledgeDetails({ id, onSelect }: { id: string; onSelect: (id: string)
       </>}
       <p className="text-xs text-muted">{t('Confirmed by', 'ผู้ยืนยัน')}: {d.actor} · {fmtDate(d.created_at || '')}</p>
     </section>
+    {d.kind === 'decision' && me.data?.effective_roles.includes('approver') && <KnowledgeRevision id={id} active={d.status === 'confirmed'} />}
     <section className="py-6 space-y-4">
       <h3 className="font-semibold">{t('When this knowledge applies', 'ใช้ความรู้นี้เมื่อไร')}</h3>
       <p className="text-sm leading-relaxed">{d.status === 'confirmed' && d.reusable ? t('Reusable only when the system checks that the scope and requirements match.', 'นำไปใช้ซ้ำได้เมื่อระบบตรวจว่าขอบเขตและเงื่อนไขตรงกันแล้ว') : t('Evidence for this delivery only; not reusable.', 'เป็นหลักฐานเฉพาะรอบนี้ ไม่นำไปใช้ซ้ำ')}</p>
@@ -67,16 +70,19 @@ function KnowledgeDetails({ id, onSelect }: { id: string; onSelect: (id: string)
         <div className="min-w-0"><dt className="text-xs text-muted mb-1">{t('File layout reference', 'รหัสรูปแบบไฟล์')}</dt><dd className="break-all font-mono text-xs">{d.layout_hash || t('Not recorded', 'ไม่มีบันทึก')}</dd></div>
         <div className="sm:col-span-2"><dt className="text-xs text-muted mb-2">{t('Requirements', 'เงื่อนไขที่บันทึกไว้')}</dt><dd className="whitespace-pre-wrap break-words leading-relaxed">{d.requirements || t('No requirements recorded.', 'ไม่มีเงื่อนไขที่บันทึกไว้')}</dd></div>
       </dl>
+      {!!Object.keys(d.interpretation_context?.columns || {}).length && <div className="overflow-auto"><h4 className="text-sm font-medium mb-2">{t('Observed interpretation conditions', 'เงื่อนไขความหมายที่พบในไฟล์')}</h4><table className="table text-sm"><thead><tr><th>{t('Column', 'คอลัมน์')}</th><th>{t('Condition', 'เงื่อนไข')}</th><th>{t('Observed', 'ค่าที่พบ')}</th></tr></thead><tbody>{Object.entries(d.interpretation_context?.columns || {}).flatMap(([column, conditions]) => Object.entries(conditions).map(([kind, values]) => <tr key={column + kind}><td>{column.replace(/^\d+:/, '')}</td><td>{({ country: t('Country', 'ประเทศ'), locale: t('Locale', 'ภาษาและภูมิภาค'), currency: t('Currency', 'สกุลเงิน'), unit: t('Unit codes', 'รหัสหน่วย'), date: t('Date convention', 'รูปแบบวันที่'), number: t('Number convention', 'รูปแบบตัวเลข') } as Record<string, string>)[kind] || kind}</td><td>{values.map(value => ({ day_first: t('Day first', 'วันก่อนเดือน'), month_first: t('Month first', 'เดือนก่อนวัน'), ambiguous_date: t('Day/month still ambiguous', 'วันกับเดือนยังคลุมเครือ'), thai_date: t('Possible Thai date', 'พบรูปแบบวันที่ไทย'), decimal_comma: t('Comma decimal', 'จุลภาคเป็นทศนิยม'), decimal_dot: t('Dot decimal', 'จุดเป็นทศนิยม') } as Record<string, string>)[value] || value).join(' · ')}</td></tr>))}</tbody></table><p className="text-xs text-muted mt-2">{t('Observations from file profiling; these are not proof of every row or of business meaning.', 'ข้อมูลจากการสำรวจไฟล์ ยังไม่ใช่ข้อยืนยันของทุกแถวหรือความหมายทางธุรกิจ')}</p></div>}
     </section>
     <section className="py-6 space-y-4">
       <h3 className="font-semibold">{t('Rule changes', 'กฎที่เปลี่ยนหลังยืนยันคำตอบ')}</h3>
       <RuleComparison before={d.before} after={fact?.after ?? d.after} />
       <div className="flex flex-wrap gap-3">{d.mapping_id && <Link className="btn btn-sm" to={`/review?mapping=${d.mapping_id}&section=history`}>{t('Original decision', 'การตัดสินใจต้นทาง')}</Link>}{d.mapping_id && d.round_id && <Link className="btn btn-sm" to={`/rounds/${d.round_id}/mapping/${d.mapping_id}`}>{t('Create a revised mapping', 'เปิดการจับคู่เพื่อสร้างเวอร์ชันแก้ไข')}</Link>}</div>
     </section>
+    {d.kind === 'decision' && <KnowledgeImpacts id={id} retired={d.status === 'retired'} canEdit={!!me.data?.effective_roles.includes('approver')} />}
     <section className="py-6 space-y-3">
       <h3 className="font-semibold">{t('Conflicting answers', 'คำตอบที่ขัดกัน')}</h3>
       {!d.conflicts.length ? <p className="text-sm text-muted">{t('No conflicting answers recorded in the same scope.', 'ไม่พบคำตอบที่ขัดกันในขอบเขตเดียวกัน')}</p> : d.conflicts.map(c => <button key={c.id} className="btn btn-sm mr-2" onClick={() => { setOffset(0); onSelect(c.id) }}>{display(c.answer)} →</button>)}
     </section>
+    {d.kind === 'decision' && <KnowledgeChanges id={id} />}
     <section className="pt-6 space-y-3">
       <h3 className="font-semibold">{t('Usage history', 'ประวัติการนำไปใช้')}</h3>
       {d.legacy_use_count > 0 && <p className="text-xs text-muted">{t('Earlier usage count (individual events may not be recorded)', 'จำนวนครั้งในอดีต (อาจไม่มีบันทึกรายเหตุการณ์)')}: {d.legacy_use_count}</p>}

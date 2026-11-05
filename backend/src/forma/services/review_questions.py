@@ -81,7 +81,15 @@ def _table_columns(
             if exact:
                 tables = exact
         if len(tables) == 1:
-            out[s.id] = list(tables[0].get("columns", []))
+            out[s.id] = [
+                {
+                    **c,
+                    "file": file.original_name,
+                    "sheet": tables[0].get("sheet"),
+                    "header_row": (tables[0].get("table") or {}).get("header_row"),
+                }
+                for c in tables[0].get("columns", [])
+            ]
     return out
 
 
@@ -334,6 +342,10 @@ def questions(ctx: ServiceContext, m: MappingVersion) -> dict[str, Any]:
             for q in items
         ):
             items.append(unit_question)
+    for pending in (m.policy or {}).get("knowledge_questions", []):
+        if pending.get("question") in (m.open_questions or []):
+            items = [q for q in items if q["id"] != pending["id"]]
+            items.append({**pending})
     # The model and deterministic checks can independently ask the same business question.
     # Merge by meaning, not wording, and retire every equivalent prompt with one answer.
     unique: list[dict[str, Any]] = []
@@ -359,7 +371,20 @@ def questions(ctx: ServiceContext, m: MappingVersion) -> dict[str, Any]:
         if mapped is None:
             continue
         examples = []
-        for ref in column_refs(mapped.expr, source_of.get(pointer, doc.record.root_source))[:3]:
+        references = column_refs(mapped.expr, source_of.get(pointer, doc.record.root_source))
+        context_only = not references
+        if not references and item["field"].get("semantic") in ("price.vat_included", "unit.pack_size"):
+            spec = specs[pointer]
+            related_spec = schema.semantic_field(
+                "price.amount" if spec.semantic == "price.vat_included" else "unit.sell",
+                in_collection=spec.in_collection,
+            )
+            related_mapping = field_by_target.get(related_spec.pointer) if related_spec else None
+            if related_mapping is not None and related_spec is not None:
+                references = column_refs(
+                    related_mapping.expr, source_of.get(related_spec.pointer, doc.record.root_source)
+                )
+        for ref in references[:3]:
             source, _, name = ref.partition(".")
             observed = next(
                 (
@@ -380,8 +405,11 @@ def questions(ctx: ServiceContext, m: MappingVersion) -> dict[str, Any]:
             examples.append(
                 {
                     "source": source,
+                    "file": observed.get("file"),
+                    "sheet": observed.get("sheet"),
                     "column": observed["name"],
                     "values": sample_values,
+                    "context_only": context_only,
                     "scope": "profile samples; not all rows",
                 }
             )
@@ -389,6 +417,9 @@ def questions(ctx: ServiceContext, m: MappingVersion) -> dict[str, Any]:
                 f"ตัวอย่างจากคอลัมน์ {observed['name']}: " + " · ".join(sample_values)
             )
         item["source_examples"] = examples
+        from forma.services.question_presentation import presentation
+
+        item.update(presentation(item))
     aliases = {p for q in items for p in q.get("related_questions", []) if p != q.get("question")}
     items.sort(
         key=lambda item: (
@@ -669,7 +700,7 @@ def apply_answers(
                 "scope": q.get("scope", "constant_for_this_file"),
                 "source_value": q.get("source_value"),
                 "answer": value,
-                "question": q.get("question"),
+                "question": q.get("question") or q.get("question_th"),
                 "before": before.expr.model_dump(mode="json") if before else None,
                 "after": after.expr.model_dump(mode="json") if after else None,
                 "actor": actor,

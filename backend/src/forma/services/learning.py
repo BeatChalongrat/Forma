@@ -22,7 +22,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from forma.core.errors import NotFound, ValidationFailed
-from forma.db.models import Correction, ImportRound, MappingVersion
+from forma.db.models import Correction, ImportRound, MappingVersion, SourceFile
 from forma.fingerprint.fingerprint import Fingerprint, compare, norm_header
 from forma.mapping_dsl.models import MappingDocument
 from forma.schema_registry import TargetSchema
@@ -282,6 +282,7 @@ def learned_for(
     *,
     current_format: Fingerprint | None = None,
     requirements: str | None = None,
+    current_files: list[SourceFile] | None = None,
 ) -> Learned:
     """This customer's confirmed aliases and constants plus the promoted (global) aliases."""
     out = Learned()
@@ -305,6 +306,10 @@ def learned_for(
             from forma.services.decision_memory import verification_allows_recall
 
             if origin is None or origin.approved_at is None or not verification_allows_recall(origin):
+                continue
+            from forma.services import format_context
+
+            if current_files is not None and not format_context.compatible(session, origin, current_files):
                 continue
             origin_round = session.get(ImportRound, origin.round_id) if origin and origin.round_id else None
             if requirements is not None and requirements != (

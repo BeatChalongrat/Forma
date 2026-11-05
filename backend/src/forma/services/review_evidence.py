@@ -262,6 +262,8 @@ def answer_impact(
     m: MappingVersion,
     document: dict[str, Any],
     answers: dict[str, Any],
+    *,
+    decisions: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Execute each version once, validate all records, then bound only the displayed diff."""
     if m.round_id is None:
@@ -275,7 +277,12 @@ def answer_impact(
     try:
         if old_result is None or new_result is None:
             raise ValidationFailed("Could not verify the complete delivery")
-        checked = _validate_answer_results(schema, old_result, new_result, [catalogue[k] for k in answers])
+        checked = _validate_answer_results(
+            schema,
+            old_result,
+            new_result,
+            decisions if decisions is not None else [catalogue[k] for k in answers],
+        )
     except ValidationFailed as exc:
         checked = {"complete": True, "passed": False, "error": str(exc)}
         after["ok"] = False
