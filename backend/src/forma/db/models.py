@@ -246,7 +246,7 @@ class DatasetVersion(Base):
     created_at: Mapped[dt.datetime] = mapped_column(UTCDateTime, default=utcnow)
 
 
-Index("ix_dataset_round_version", DatasetVersion.round_id, DatasetVersion.version)
+Index("ix_dataset_round_version", DatasetVersion.round_id, DatasetVersion.version, unique=True)
 
 
 class ChangeSet(Base):
@@ -272,6 +272,8 @@ class Override(Base):
     __tablename__ = "overrides"
     id: Mapped[str] = mapped_column(String(40), primary_key=True, default=lambda: new_id("ovr"))
     customer_id: Mapped[str] = mapped_column(String(40), index=True)
+    schema_ref: Mapped[str | None] = mapped_column(String(255))
+    schema_hash: Mapped[str | None] = mapped_column(String(64))
     target: Mapped[str] = mapped_column(String(255))
     where: Mapped[dict[str, Any]] = mapped_column(
         JSONType
@@ -378,6 +380,34 @@ class Correction(Base):
         Index("ix_corrections_kind_status", "kind", "status"),
         Index("ix_corrections_header_target", "header", "target"),
     )
+
+
+class KnowledgeLabel(Base):
+    """Explicit provenance and permission to recall; missing labels are unknown, never auto-approved."""
+
+    __tablename__ = "knowledge_labels"
+    subject: Mapped[str] = mapped_column(String(90), primary_key=True)
+    origin: Mapped[str] = mapped_column(String(24), default="unknown")
+    state: Mapped[str] = mapped_column(String(24), default="pending", index=True)
+    digest: Mapped[str | None] = mapped_column(String(64))
+    actor: Mapped[str] = mapped_column(String(128))
+    reason: Mapped[str] = mapped_column(Text)
+    release_id: Mapped[str | None] = mapped_column(String(64), index=True)
+    updated_at: Mapped[dt.datetime] = mapped_column(UTCDateTime, default=utcnow, onupdate=utcnow)
+
+
+class KnowledgeRelease(Base):
+    """Immutable import receipt. Revocation changes eligibility, never previously published output."""
+
+    __tablename__ = "knowledge_releases"
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    source_instance: Mapped[str] = mapped_column(String(64))
+    state: Mapped[str] = mapped_column(String(24), default="active")
+    manifest: Mapped[dict[str, Any]] = mapped_column(JSONType)
+    actor: Mapped[str] = mapped_column(String(128))
+    created_at: Mapped[dt.datetime] = mapped_column(UTCDateTime, default=utcnow)
+    revoked_by: Mapped[str | None] = mapped_column(String(128))
+    revoked_at: Mapped[dt.datetime | None] = mapped_column(UTCDateTime)
 
 
 class AppSetting(Base):

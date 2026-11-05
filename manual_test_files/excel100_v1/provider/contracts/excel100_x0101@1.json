@@ -1,0 +1,211 @@
+{
+  "mapping": {
+    "meta": {
+      "target_schema": "excel100_x0101@1",
+      "created_by": "ai",
+      "model": "fake-excel100",
+      "confidence": 1
+    },
+    "sources": [
+      {
+        "id": "master",
+        "role": "products",
+        "sheet": {
+          "name": "Item Master 1"
+        },
+        "table": {
+          "header_row": 0
+        }
+      },
+      {
+        "id": "prices",
+        "role": "pricing",
+        "sheet": {
+          "name": "Price List 1"
+        },
+        "table": {
+          "header_row": 0
+        }
+      },
+      {
+        "id": "stock",
+        "role": "inventory",
+        "sheet": {
+          "name": "Warehouse Balances 1"
+        },
+        "table": {
+          "header_row": 0
+        }
+      },
+      {
+        "id": "units",
+        "role": "other",
+        "sheet": {
+          "name": "Unit Dictionary 1"
+        },
+        "table": {
+          "header_row": 0
+        }
+      }
+    ],
+    "joins": [
+      {
+        "left": "master",
+        "right": "prices",
+        "on": [
+          {
+            "left": "Company",
+            "right": "Company"
+          },
+          {
+            "left": "Item",
+            "right": "Item"
+          }
+        ],
+        "cardinality": "1:1",
+        "on_unmatched": "review"
+      },
+      {
+        "left": "master",
+        "right": "units",
+        "on": [
+          {
+            "left": "Unit",
+            "right": "Unit"
+          }
+        ],
+        "cardinality": "N:1",
+        "on_unmatched": "review"
+      }
+    ],
+    "record": {
+      "root_source": "master",
+      "dedupe": {
+        "keys": [
+          "/sku"
+        ],
+        "keep": "error"
+      }
+    },
+    "fields": [
+      {
+        "target": "/sku",
+        "expr": {
+          "op": "col",
+          "source": "master",
+          "name": "Material Code"
+        },
+        "confidence": 1,
+        "evidence": [
+          "Scripted local model contract; verify against source workbook."
+        ]
+      },
+      {
+        "target": "/product_name",
+        "expr": {
+          "op": "col",
+          "source": "master",
+          "name": "Product Name"
+        },
+        "confidence": 1,
+        "evidence": [
+          "Scripted local model contract; verify against source workbook."
+        ]
+      },
+      {
+        "target": "/price",
+        "expr": {
+          "op": "parse_number_th",
+          "args": [
+            {
+              "op": "col",
+              "source": "prices",
+              "name": "Selling price"
+            }
+          ],
+          "params": {}
+        },
+        "confidence": 1,
+        "evidence": [
+          "Scripted local model contract; verify against source workbook."
+        ]
+      },
+      {
+        "target": "/currency",
+        "expr": {
+          "op": "col",
+          "source": "prices",
+          "name": "Currency"
+        },
+        "confidence": 1,
+        "evidence": [
+          "Scripted local model contract; verify against source workbook."
+        ]
+      },
+      {
+        "target": "/sell_unit",
+        "expr": {
+          "op": "col",
+          "source": "units",
+          "name": "Full unit"
+        },
+        "confidence": 1,
+        "evidence": [
+          "Scripted local model contract; verify against source workbook."
+        ]
+      }
+    ],
+    "collections": [
+      {
+        "target": "/inventory",
+        "source": "stock",
+        "link": [
+          {
+            "left": "Company",
+            "right": "Company"
+          },
+          {
+            "left": "Item",
+            "right": "Item"
+          }
+        ],
+        "fields": [
+          {
+            "target": "/inventory/*/warehouse_code",
+            "expr": {
+              "op": "col",
+              "source": "stock",
+              "name": "Warehouse"
+            },
+            "confidence": 1,
+            "evidence": [
+              "Scripted local model contract; verify against source workbook."
+            ]
+          },
+          {
+            "target": "/inventory/*/qty",
+            "expr": {
+              "op": "parse_number_th",
+              "args": [
+                {
+                  "op": "col",
+                  "source": "stock",
+                  "name": "Quantity"
+                }
+              ],
+              "params": {}
+            },
+            "confidence": 1,
+            "evidence": [
+              "Scripted local model contract; verify against source workbook."
+            ]
+          }
+        ]
+      }
+    ],
+    "attributes_passthrough": false,
+    "provenance": true
+  },
+  "clarifications": [],
+  "open_questions": []
+}

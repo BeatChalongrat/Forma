@@ -33,7 +33,7 @@ from forma.db.models import (
 )
 from forma.engine.transform import BoundSource, TransformEngine, TransformResult
 from forma.fingerprint.fingerprint import norm_header
-from forma.mapping_dsl.models import MappingDocument, SourceSpec
+from forma.mapping_dsl.models import ColExpr, ConstExpr, MappingDocument, SourceSpec
 from forma.mapping_dsl.validate import validate_mapping
 from forma.profiling.profile import WorkbookProfile
 from forma.schema_registry import TargetSchema
@@ -297,10 +297,12 @@ def propose_for_round(
     use_llm = (not ctx.llm.is_mock) if use_llm is None else use_llm
     agent_log: list[dict[str, Any]] = []
     agreement: dict[str, Any] | None = None
+    draft: HeuristicProposal | None = None
     confidence_basis: dict[str, Any] | None = None
     open_questions: list[str] = []
     llm_fallback = False
     learning_note: dict[str, Any] | None = None
+    example_dependencies: set[str] = set()
     prior_decisions: list[dict[str, Any]] = []
     file_fps = {f.id: f.fingerprint for f in r.files if f.fingerprint}
     # Requirements are round-scoped: an unchanged layout is not sufficient for reuse
@@ -345,7 +347,7 @@ def propose_for_round(
             {norm_header(c.name) for t in profile.tables for c in t.columns},
             int((ctx.policy.policy.get("learning") or {}).get("share_after_customers", 2)),
         )
-        draft: HeuristicProposal = propose_mapping(
+        draft = propose_mapping(
             profile, schema, customer_id=r.customer_id, learned=None if learned.empty else learned
         )
         from forma.services import decision_memory
@@ -368,6 +370,16 @@ def propose_for_round(
                 **learned.summary(),
                 "used": sorted(used),
                 "knowledge_ids": sorted({key for ptr in used for key in learned.ids.get(ptr, [])}),
+                "dependencies": sorted(
+                    learned.dependencies
+                    | {
+                        "correction:" + key
+                        for ptr, keys in learned.ids.items()
+                        if use_llm or ptr in used
+                        for key in keys
+                    }
+                    | {"correction:" + d["knowledge_id"] for d in prior_decisions if d.get("knowledge_id")}
+                ),
             }
             agent_log.append({"agent": "learning", **learning_note})
         doc = draft.mapping
@@ -376,6 +388,8 @@ def propose_for_round(
         if use_llm:
             from forma.services.mapping_lab import executor
 
+            examples = _examples(session, r.customer_id, profile, schema)
+            example_dependencies.update("mapping:" + e["mapping_id"] for e in examples)
             workbench = FileWorkbench(
                 schema,
                 profile,
@@ -410,11 +424,12 @@ def propose_for_round(
                             "provider": ctx.llm.provider.name,
                             "endpoint": getattr(ctx.llm.provider, "base_url", None),
                             "previous": previous.document if previous else None,
+                            "examples": examples,
                         },
                         learned=None if learned.empty else learned.for_prompt(),
                         instructions=r.notes,
                         previous=previous.document if previous else None,
-                        examples=_examples(session, r.customer_id, profile),
+                        examples=examples,
                     )
                     source_kind = "ai_adaptation" if previous else "ai"
                 elif previous is not None and drift not in (None, "unrelated_file"):
@@ -436,7 +451,6 @@ def propose_for_round(
                     sa = schema_agent(ctx.llm, profile, schema, instructions=r.notes)
                     _record_llm(session, r.id, sa)
                     agent_log.append(sa.to_dict())
-                    examples = _examples(session, r.customer_id, profile)
                     doc, res = mapping_agent(
                         ctx.llm,
                         profile,
@@ -525,6 +539,8 @@ def propose_for_round(
     )
     prev_sim = (previous.policy or {}).get("simulation") if previous else None
     if sim and not problems:
+        if not sim.errors and agreement and draft is not None:
+            _resolve_explicit_currency(agreement, draft.mapping, doc, schema, sim.records)
         # A fully populated row flag read through an explicitly matching boolean header supersedes
         # the heuristic's blanket VAT assumption. Confidence prose alone is never sufficient.
         from forma.ai.heuristics import VAT_ASSUMED_QUESTION_RE
@@ -684,6 +700,11 @@ def propose_for_round(
             "sandbox": sandbox_report,
             "field_review": review,
             "learning": learning_note,
+            "knowledge_dependencies": sorted(
+                set((learning_note or {}).get("dependencies", []))
+                | example_dependencies
+                | ({"mapping:" + previous.id} if previous else set())
+            ),
             "self_check": self_check,
             "workflow": next(
                 (e["data"]["workflow"] for e in agent_log if (e.get("data") or {}).get("workflow")), None
@@ -840,6 +861,55 @@ def _agreement(
                 or [json.dumps(y["expr"], ensure_ascii=False)[:80]],
             }
     return out
+
+
+def _resolve_explicit_currency(
+    agreement: dict[str, Any],
+    draft: MappingDocument,
+    doc: MappingDocument,
+    schema: TargetSchema,
+    records: list[dict[str, Any]],
+) -> None:
+    """A source currency column can corroborate a blanket currency for this delivery.
+
+    This is deliberately not a general 'same values means same meaning' rule:
+    price/cost, VAT and undefined unit codes still require their own evidence.
+    """
+    from forma.ai.plausibility import values_at
+
+    old_fields = {f.target: f for f in [*draft.fields, *(f for c in draft.collections for f in c.fields)]}
+    for field in [*doc.fields, *(f for c in doc.collections for f in c.fields)]:
+        if field.target not in agreement.get("disagree", {}):
+            continue
+        old = old_fields.get(field.target)
+        spec = schema.field(field.target)
+        if (
+            spec.semantic != "currency"
+            or old is None
+            or not isinstance(old.expr, ConstExpr)
+            or not isinstance(field.expr, ColExpr)
+        ):
+            continue
+        names = {norm_header(n) for n in (*spec.synonyms_en, *spec.synonyms_th, spec.name)}
+        value = old.expr.value
+        if (
+            norm_header(field.expr.name) not in names
+            or not isinstance(value, str)
+            or not re.fullmatch(r"[A-Z]{3}", value)
+        ):
+            continue
+        per_record = [list(values_at(record, field.target)) for record in records]
+        if not per_record or not all(values and all(v == value for v in values) for values in per_record):
+            continue
+        agreement.setdefault("resolved_by_evidence", {})[field.target] = {
+            **agreement["disagree"].pop(field.target),
+            "basis": "explicit currency column; all executed values match the matcher constant",
+            "records_checked": len(records),
+            "scope": "this_delivery",
+        }
+        field.evidence.append(
+            f"Verified explicit currency column across all {len(records)} records in this delivery"
+        )
 
 
 def _ground_confidence(
@@ -1007,7 +1077,9 @@ def _supersede_others(session: Session, customer_id: str, keep_id: str) -> None:
         m.status = "superseded"
 
 
-def _examples(session: Session, customer_id: str, profile: WorkbookProfile) -> list[dict[str, Any]]:
+def _examples(
+    session: Session, customer_id: str, profile: WorkbookProfile, schema: TargetSchema
+) -> list[dict[str, Any]]:
     """Few-shot: approved mappings from *other* customers whose headers overlap (loose fingerprint / header jaccard)."""
     mine = {norm_header(c.name) for t in profile.tables for c in t.columns}
     out: list[tuple[float, dict[str, Any]]] = []
@@ -1016,6 +1088,10 @@ def _examples(session: Session, customer_id: str, profile: WorkbookProfile) -> l
         .where(MappingVersion.status == "approved", MappingVersion.customer_id != customer_id)
         .limit(200)
     ):
+        from forma.services import format_memory, knowledge_gate
+
+        if not knowledge_gate.allowed(session, m) or not format_memory.compatible(m, schema):
+            continue
         fps = (m.policy or {}).get("file_fingerprints", {})
         theirs = {h for fp in fps.values() for t in fp.get("tables", []) for h in t.get("headers", [])}
         if not theirs:
@@ -1027,6 +1103,7 @@ def _examples(session: Session, customer_id: str, profile: WorkbookProfile) -> l
                     j,
                     {
                         "similarity": round(j, 2),
+                        "mapping_id": m.id,
                         "mapping": {
                             k: v for k, v in m.document.items() if k in ("fields", "collections", "joins")
                         },
@@ -1369,26 +1446,46 @@ def sandbox_details(
 def preview_mapping(
     ctx: ServiceContext, session: Session, round_id: str, document: dict[str, Any], *, limit: int = 200
 ) -> dict[str, Any]:
-    """Dry-run an (unsaved) mapping against the round's files — powers the live preview in the Studio."""
+    """Limit displayed records, never the source rows needed by joins or aggregates."""
+    preview, _ = preview_execution(ctx, session, round_id, document, limit=limit)
+    return preview
+
+
+def preview_execution(
+    ctx: ServiceContext, session: Session, round_id: str, document: dict[str, Any], *, limit: int = 200
+) -> tuple[dict[str, Any], TransformResult | None]:
+    """Return a bounded view plus the complete execution for request-local validation reuse."""
     r = get_round(session, round_id)
     schema = ctx.registry.get_ref(r.target_schema)
     try:
         doc = MappingDocument.model_validate(document)
     except Exception as e:
-        return {"ok": False, "errors": [str(e)[:1500]], "records": [], "findings": []}
+        return {"ok": False, "errors": [str(e)[:1500]], "records": [], "findings": []}, None
     rep = validate_mapping(doc, schema)
     if not rep.ok:
-        return {"ok": False, "validation": rep.to_dict(), "records": [], "findings": []}
-    sim, problems = simulate(ctx, doc, schema, r.files, limit=limit)
+        return {"ok": False, "validation": rep.to_dict(), "records": [], "findings": []}, None
+    sim, problems = simulate(ctx, doc, schema, r.files, limit=None)
     if sim is None:
-        return {"ok": False, "validation": rep.to_dict(), "errors": problems, "records": [], "findings": []}
+        return {
+            "ok": False,
+            "validation": rep.to_dict(),
+            "errors": problems,
+            "records": [],
+            "findings": [],
+        }, None
     return {
         "ok": not sim.errors and bool(sim.records),
         "validation": rep.to_dict(),
         "records": sim.records[:limit],
         "findings": [f.to_dict() for f in sim.findings],
         "stats": sim.stats,
-    }
+        "scope": {
+            "execution": "complete",
+            "records_total": len(sim.records),
+            "records_shown": len(sim.records[:limit]),
+            "display_limit": limit,
+        },
+    }, sim
 
 
 def source_preview(

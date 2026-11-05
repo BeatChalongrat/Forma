@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from forma.core import telemetry
 from forma.db.models import Customer, ImportRound, Job, LLMCall, ReviewTask
 from forma.jobs import runner
-from forma.services import retention
+from forma.services import health_alerts, retention
 from forma.services.context import ServiceContext
 
 
@@ -79,8 +79,11 @@ def ops_summary(session: Session, ctx: ServiceContext, ready: dict[str, Any]) ->
         breaker: dict[str, Any] | None = breaker_state()
     except Exception:  # pragma: no cover - breaker lands in a later step
         breaker = None
+    queue = runner.queue_stats()
+    housekeeping = retention.status(ctx, session)
     return {
-        "queue": runner.queue_stats(),
+        "alerts": health_alerts.collect(session, ctx, queue, housekeeping, ready),
+        "queue": queue,
         "ready": ready,
         "review": {
             "open": open_n,
@@ -90,7 +93,7 @@ def ops_summary(session: Session, ctx: ServiceContext, ready: dict[str, Any]) ->
         "llm_spend_by_day": llm_by_day,
         "slowest_rounds": slow[:15],
         "breaker": breaker,
-        "housekeeping": retention.status(ctx, session),
+        "housekeeping": housekeeping,
         "storage": ctx.storage.name,
         "database": get_engine().url.get_backend_name(),
         "auth": ctx.settings.auth,

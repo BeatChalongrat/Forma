@@ -242,9 +242,14 @@ def test_full_flow(client: TestClient, isolated_env: Path) -> None:
     assert prev["impact"]["rows_affected"] == 5 and prev["impact"]["cells_changed"] == 5
     assert set(prev["impact"]["fields"]) == {"/product_name", "/prices/0/amount"}
 
+    # A mixed batch must not silently remember only its set_cell and forget the scale operation.
+    assert (
+        c.post(f"/api/datasets/{dsid}/changes", json={"operations": ops, "kind": "persistent"}).status_code
+        == 422
+    )
     applied = c.post(
         f"/api/datasets/{dsid}/changes",
-        json={"operations": ops, "kind": "persistent", "actor": "qa", "note": "promo"},
+        json={"operations": ops, "kind": "one_time", "actor": "qa", "note": "promo"},
     )
     assert applied.status_code == 201
     v2 = applied.json()["dataset"]
@@ -252,7 +257,7 @@ def test_full_flow(client: TestClient, isolated_env: Path) -> None:
     assert (
         v2["version"] == 2
         and v2["parent_id"] == dsid
-        and cs["kind"] == "persistent"
+        and cs["kind"] == "one_time"
         and cs["impact"]["rows_affected"] == 5
     )
     v2_rows = {
@@ -266,7 +271,7 @@ def test_full_flow(client: TestClient, isolated_env: Path) -> None:
     assert c.get(f"/api/datasets/{dsid}").json()["status"] == "superseded"
     assert len(c.get(f"/api/datasets/{dsid}").json()["change_sets"]) == 1
     cust_view = c.get(f"/api/customers/{cust['id']}").json()
-    assert len(cust_view["overrides"]) == 1 and cust_view["overrides"][0]["target"] == "/product_name"
+    assert cust_view["overrides"] == []
     assert len(cust_view["rounds"]) == 1 and len(cust_view["mappings"]) == 2
 
     invalid = c.post(
@@ -385,6 +390,12 @@ def test_full_flow(client: TestClient, isolated_env: Path) -> None:
         == rnd["id"]
     )
     assert c.get("/api/jobs/job_nope").status_code == 404
+    remembered = c.post(
+        f"/api/datasets/{v3['id']}/changes", json={"operations": [ops[0]], "kind": "persistent"}
+    )
+    assert remembered.status_code == 201
+    cust_view = c.get(f"/api/customers/{cust['id']}").json()
+    assert len(cust_view["overrides"]) == 1
     assert c.delete(f"/api/customers/{cust['id']}/overrides/{cust_view['overrides'][0]['id']}").json() == {
         "ok": True
     }

@@ -37,6 +37,8 @@ def endpoint(provider: str, url: str | None) -> str:
 def discover(
     session: Session, base: Settings, provider: str, base_url: str | None, api_key: str | None
 ) -> dict[str, Any]:
+    if base.llm_mock_only:
+        raise ValidationFailed("Offline reproduction mode: provider model discovery is disabled")
     if provider not in ("openai", "anthropic", "openai_compatible"):
         raise ValidationFailed("Select a provider first")
     url = endpoint(provider, base_url)

@@ -86,6 +86,39 @@ def test_models_and_migrations_agree(isolated_env: Path) -> None:
     assert diff == [], diff
 
 
+def test_duplicate_dataset_history_blocks_upgrade_without_rewriting(isolated_env: Path) -> None:
+    from alembic import command
+    from sqlalchemy.orm import Session
+
+    from forma.db import migrate
+    from forma.db.models import DatasetVersion
+    from forma.db.session import get_engine
+
+    engine = get_engine()
+    config = migrate.alembic_config(engine.url.render_as_string(hide_password=False))
+    command.upgrade(config, "b5d7f9012345")
+    with Session(engine) as session:
+        session.add_all(
+            [
+                DatasetVersion(
+                    id=f"duplicate-{i}",
+                    round_id="round",
+                    customer_id="customer",
+                    mapping_version_id="mapping",
+                    version=2,
+                    records_key=f"datasets/{i}.jsonl",
+                )
+                for i in range(2)
+            ]
+        )
+        session.commit()
+    with pytest.raises(RuntimeError, match="conflicts require review"):
+        command.upgrade(config, "head")
+    with engine.connect() as connection:
+        assert connection.scalar(text("SELECT COUNT(*) FROM dataset_versions WHERE version = 2")) == 2
+    assert migrate.current_revision(engine) == "b5d7f9012345"
+
+
 def test_legacy_dev_db_gets_missing_columns(isolated_env: Path) -> None:
     """A dev DB created by plain create_all before Phase 7 lacks the new job columns; init_db adds them."""
     from forma.core.settings import get_settings

@@ -1,0 +1,122 @@
+{
+  "schema_version": 1,
+  "status": "candidate",
+  "inputs": {
+    "probe": false,
+    "data_path": "/var/lib/docker",
+    "cpus": 24.0,
+    "ram_gib": 64.0,
+    "disk_total_gib": 1000.0,
+    "disk_free_gib": 900.0,
+    "other_ram_gib": 0,
+    "other_cpus": 0,
+    "ram_per_job_gib": 1.5,
+    "max_jobs": 16,
+    "files": 300,
+    "average_file_mib": 5.0,
+    "retained_batches": 7,
+    "output_multiplier": 1,
+    "backup_copies": 15,
+    "database_gib": 5,
+    "out": "deploy\\server\\examples\\server-64g-16jobs"
+  },
+  "reserve": {
+    "ram_gib": 12.8,
+    "cpus": 3.0,
+    "disk_gib": 200.0
+  },
+  "allocatable": {
+    "ram_gib": 51.2,
+    "cpus": 21.0
+  },
+  "disk": {
+    "source_per_batch_gib": 1.46484375,
+    "live_data_gib": 25.5078125,
+    "persistent_growth_gib": 418.37890625,
+    "scratch_gib": 61.015625,
+    "images_logs_gib": 15.0,
+    "additional_required_gib": 494.39453125,
+    "fits": true,
+    "free_after_growth_gib": 405.60546875
+  },
+  "candidates": [
+    {
+      "jobs": 2,
+      "slots_per_worker": 2,
+      "worker_replicas": 1,
+      "sandboxes": 1,
+      "worker_ram_gib": 3.5,
+      "worker_cpus": 1.0,
+      "ram_limits_gib": 14.625,
+      "cpu_limits": 6.5,
+      "fits": true
+    },
+    {
+      "jobs": 4,
+      "slots_per_worker": 4,
+      "worker_replicas": 1,
+      "sandboxes": 1,
+      "worker_ram_gib": 6.5,
+      "worker_cpus": 2.0,
+      "ram_limits_gib": 17.625,
+      "cpu_limits": 7.5,
+      "fits": true
+    },
+    {
+      "jobs": 8,
+      "slots_per_worker": 4,
+      "worker_replicas": 2,
+      "sandboxes": 2,
+      "worker_ram_gib": 6.5,
+      "worker_cpus": 2.0,
+      "ram_limits_gib": 28.125,
+      "cpu_limits": 11.5,
+      "fits": true
+    },
+    {
+      "jobs": 16,
+      "slots_per_worker": 4,
+      "worker_replicas": 4,
+      "sandboxes": 4,
+      "worker_ram_gib": 6.5,
+      "worker_cpus": 2.0,
+      "ram_limits_gib": 49.125,
+      "cpu_limits": 19.5,
+      "fits": true
+    },
+    {
+      "jobs": 32,
+      "slots_per_worker": 4,
+      "worker_replicas": 8,
+      "sandboxes": 8,
+      "worker_ram_gib": 6.5,
+      "worker_cpus": 2.0,
+      "ram_limits_gib": 91.125,
+      "cpu_limits": 35.5,
+      "fits": false
+    }
+  ],
+  "selected": {
+    "jobs": 16,
+    "slots_per_worker": 4,
+    "worker_replicas": 4,
+    "sandboxes": 4,
+    "worker_ram_gib": 6.5,
+    "worker_cpus": 2.0,
+    "ram_limits_gib": 49.125,
+    "cpu_limits": 19.5,
+    "fits": true
+  },
+  "warnings": [
+    "Planning assumptions, not measured Excel RAM requirements or a readiness certificate.",
+    "All CPU/memory hard limits fit together; swap is not counted as capacity.",
+    "Includes local DB, Redis, MinIO, startup jobs and scheduled backups on ONE filesystem.",
+    "Disk growth is additional to current used space; use separate estimates for separate disks.",
+    "Retention/version cleanup is NOT enabled; storage grows until explicitly managed.",
+    "RAM per job is an assumption: joins, formulas and expanded XML can exceed it.",
+    "No runtime memory admission, autoscaling, HA or load balancer is installed by this tool.",
+    "Build images before load; builds/optional ops and telemetry profiles need extra budget.",
+    "Sandbox virtual-address limit stays 2560 MiB; container budget includes tmpfs overhead.",
+    "Settings in the database may override environment settings; verify effective runtime values."
+  ]
+}

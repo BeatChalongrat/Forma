@@ -1,0 +1,5807 @@
+{
+  "round": {
+    "id": "rnd_01M6KVNCXNCZKR5VYX5F507ABH",
+    "customer_id": "cus_01M6KVCR8M9QNQE9Y9V323R9B5",
+    "label": "Excel100 complex suite · X0204.xlsx",
+    "status": "review",
+    "target_schema": "excel100_x0204@1",
+    "notes": null,
+    "summary": {
+      "drift": null,
+      "profile": [
+        {
+          "name": "X0204.xlsx",
+          "drift": {
+            "similarity": 0.0,
+            "classification": "unknown",
+            "matches_other_customer": {
+              "customer_id": "cus_01M6KVCPZ6VFWW56H25ZZRTQD5",
+              "customer_code": "X0104",
+              "mapping_version_id": "map_01M6KVDFZ5WH5HHJREJ84JJ384"
+            }
+          },
+          "tables": 5,
+          "file_id": "fil_01M6KVNCY5A8DBT8Z6TEREN5ZZ",
+          "fingerprint": "7f07ad69cb717e08"
+        }
+      ],
+      "verdict": {
+        "word": "likely",
+        "stage": "mapping",
+        "digest": "cf7b511aff7f599c5189abdde3ce0a7f",
+        "outcome": "answer",
+        "subject": {
+          "id": "map_01M6KVNR0EJN5E9RDC2R041Z04",
+          "kind": "mapping",
+          "round_id": "rnd_01M6KVNCXNCZKR5VYX5F507ABH"
+        },
+        "evidence": [
+          {
+            "id": 1,
+            "kind": "other_customer",
+            "link": "/rounds/rnd_01M6KVNCXNCZKR5VYX5F507ABH",
+            "text": {
+              "en": "The layout matches X0104's approved format (100%)",
+              "th": "โครงสร้างไฟล์ตรงกับรูปแบบที่อนุมัติแล้วของ X0104 (100%)"
+            },
+            "numbers": {
+              "customer": "X0104",
+              "similarity": null
+            }
+          },
+          {
+            "id": 2,
+            "kind": "rows",
+            "link": "/rounds/rnd_01M6KVNCXNCZKR5VYX5F507ABH",
+            "text": {
+              "en": "36 records produced",
+              "th": "สร้างได้ 36 รายการ"
+            },
+            "numbers": {
+              "rows_out": 36
+            }
+          },
+          {
+            "id": 3,
+            "kind": "self_check",
+            "link": null,
+            "text": {
+              "en": "The AI ran its mapping on the first 36 rows (0 look(s) at the file, 0 fix round(s)): 0 problem(s) left",
+              "th": "AI ลองรัน mapping กับ 36 แถวแรก (ดูไฟล์ 0 ครั้ง แก้ 0 รอบ): เหลือปัญหา 0 ข้อ"
+            },
+            "numbers": {
+              "rows": 36,
+              "fix_rounds": 0,
+              "inspections": 0,
+              "problems_left": 0
+            }
+          },
+          {
+            "id": 4,
+            "kind": "questions",
+            "link": "/review?round=rnd_01M6KVNCXNCZKR5VYX5F507ABH",
+            "text": {
+              "en": "2 fields below the confidence bar",
+              "th": "2 ฟิลด์ยังไม่ถึงเกณฑ์ความมั่นใจ"
+            },
+            "numbers": {
+              "count": 2
+            }
+          }
+        ],
+        "narrative": null,
+        "conclusion": {
+          "en": "First file from X0204; its layout is the same as X0104's (the same ERP?) — confirm the sender, then 2 fields need a confirmation",
+          "th": "ไฟล์แรกของ X0204 โครงสร้างเหมือนของ X0104 (ERP เดียวกัน?) — ยืนยันผู้ส่ง แล้วมี 2 ฟิลด์ที่ต้องยืนยัน"
+        },
+        "confidence": 0.6,
+        "suppressed": {
+          "count": 0,
+          "groups": [
+            {
+              "text": {
+                "en": "3 notes from the mapper",
+                "th": "หมายเหตุจากตัวจับคู่ 3 ข้อ"
+              },
+              "reason": "open_questions",
+              "pointers": []
+            }
+          ]
+        },
+        "must_decide": [
+          {
+            "id": "/currency",
+            "why": {
+              "en": "Below the confidence bar for its risk",
+              "th": "ความมั่นใจต่ำกว่าเกณฑ์ของระดับความเสี่ยงนี้"
+            },
+            "kind": "choice",
+            "scope": null,
+            "default": null,
+            "options": [
+              "Currency",
+              "Company",
+              "Item",
+              "Unit"
+            ],
+            "question": {
+              "en": "Which column holds ISO currency from the applicable price row.?",
+              "th": "คอลัมน์ไหนคือสกุลเงิน?"
+            },
+            "semantic": "currency",
+            "allow_custom": false,
+            "evidence_ids": [
+              4
+            ],
+            "option_labels": null
+          },
+          {
+            "id": "/sell_unit",
+            "why": {
+              "en": "Below the confidence bar for its risk",
+              "th": "ความมั่นใจต่ำกว่าเกณฑ์ของระดับความเสี่ยงนี้"
+            },
+            "kind": "choice",
+            "scope": null,
+            "default": null,
+            "options": [
+              "Full unit",
+              "Unit",
+              "Company",
+              "Item"
+            ],
+            "question": {
+              "en": "Which column holds Full unit name; ask if the code has no definition.?",
+              "th": "คอลัมน์ไหนคือหน่วยขาย?"
+            },
+            "semantic": "unit.sell",
+            "allow_custom": false,
+            "evidence_ids": [
+              4
+            ],
+            "option_labels": null
+          }
+        ],
+        "rules_fired": [
+          "first_time_shared_layout"
+        ],
+        "round_status": "review",
+        "rules_version": "2026.11.04.1",
+        "mapping_status": "proposed",
+        "policy_decision": "review"
+      },
+      "batch_id": "bch_01M6KVCZXVH0JKV4MZQYDARVXY",
+      "decision": "review",
+      "simulation": {
+        "rows_in": 36,
+        "sources": {
+          "stock": 108,
+          "units": 2,
+          "master": 36,
+          "prices": 36
+        },
+        "findings": {
+          "info": 0,
+          "error": 0,
+          "warning": 0
+        },
+        "rows_out": 36,
+        "collections": {
+          "/inventory": 108
+        },
+        "duration_ms": 356.1,
+        "identity_keys": [
+          "/sku"
+        ],
+        "invalid_records": 0
+      },
+      "auto_publish": true,
+      "drift_report": null,
+      "batch_item_id": "bit_01M6KVD05AW41QVF6CECTFJPE9",
+      "format_memory": {
+        "status": "new",
+        "mapping_id": null,
+        "target_schema": "excel100_x0204@1",
+        "mapping_version": null
+      },
+      "skipped_files": 1,
+      "profiled_files": 0,
+      "mapping_version_id": "map_01M6KVNR0EJN5E9RDC2R041Z04",
+      "has_previous_approval": false,
+      "matches_other_customer": {
+        "customer_id": "cus_01M6KVCPZ6VFWW56H25ZZRTQD5",
+        "customer_code": "X0104",
+        "mapping_version_id": "map_01M6KVDFZ5WH5HHJREJ84JJ384"
+      }
+    },
+    "created_at": "2026-11-04T18:03:13.205309+00:00",
+    "updated_at": "2026-11-04T18:03:24.646779+00:00",
+    "successor_id": null,
+    "predecessor_id": null,
+    "files": [
+      {
+        "id": "fil_01M6KVNCY5A8DBT8Z6TEREN5ZZ",
+        "round_id": "rnd_01M6KVNCXNCZKR5VYX5F507ABH",
+        "name": "X0204.xlsx",
+        "size": 10739,
+        "kind": "excel",
+        "status": "profiled",
+        "sha256": "fb8fca011e210c78d4684d4aa4b00f547bf42c604118449aa9c9330439bf028e",
+        "duplicate_of": null,
+        "error": null,
+        "created_at": "2026-11-04T18:03:13.221114+00:00",
+        "fingerprint": "7f07ad69cb717e08",
+        "drift": {
+          "similarity": 0.0,
+          "classification": "unknown",
+          "matches_other_customer": {
+            "customer_id": "cus_01M6KVCPZ6VFWW56H25ZZRTQD5",
+            "customer_code": "X0104",
+            "mapping_version_id": "map_01M6KVDFZ5WH5HHJREJ84JJ384"
+          }
+        },
+        "tables": 5,
+        "sheets": [
+          "Delivery Notes 4",
+          "Warehouse Balances 4",
+          "Item Master 4",
+          "Unit Dictionary 4",
+          "Price List 4"
+        ]
+      }
+    ],
+    "customer": {
+      "id": "cus_01M6KVCR8M9QNQE9Y9V323R9B5",
+      "code": "X0204",
+      "name": "Excel100 X0204"
+    },
+    "successor": null,
+    "predecessor": null,
+    "mappings": [
+      {
+        "id": "map_01M6KVNR0EJN5E9RDC2R041Z04",
+        "customer_id": "cus_01M6KVCR8M9QNQE9Y9V323R9B5",
+        "round_id": "rnd_01M6KVNCXNCZKR5VYX5F507ABH",
+        "version": 1,
+        "status": "proposed",
+        "target_schema": "excel100_x0204@1",
+        "confidence": 1.0,
+        "created_by": "ai",
+        "model": "fake-excel100",
+        "policy": {
+          "checks": {
+            "drift": null,
+            "errors": 0,
+            "rows_out": 36,
+            "warnings": 0,
+            "agreement": {
+              "ops": 2,
+              "agree": 2,
+              "record": 2,
+              "dropped": 0,
+              "disagree": 2,
+              "model_only": 3
+            },
+            "llm_fallback": false,
+            "reused_approved": false,
+            "full_verification": true,
+            "mapping_confidence": 1.0,
+            "data_checks_trusted": false,
+            "low_confidence_high": [
+              "/sell_unit (0.70)"
+            ],
+            "unresolved_questions": 3,
+            "plausibility_warnings": 0,
+            "low_confidence_critical": [
+              "/currency (0.70)"
+            ]
+          },
+          "impact": {},
+          "source": "ai",
+          "reasons": [
+            "low confidence on critical fields: /currency (0.70)",
+            "low confidence on high-risk fields: /sell_unit (0.70)",
+            "structure is identical to customer X0104's approved format — confirm this file belongs here",
+            "first time this customer/format is seen",
+            "3 questions still need operator confirmation",
+            "the model selects rows differently from FORMA's matcher (records: dedupe; records: joins)"
+          ],
+          "sandbox": null,
+          "verdict": {
+            "word": "likely",
+            "stage": "mapping",
+            "digest": "cf7b511aff7f599c5189abdde3ce0a7f",
+            "outcome": "answer",
+            "subject": {
+              "id": "map_01M6KVNR0EJN5E9RDC2R041Z04",
+              "kind": "mapping",
+              "round_id": "rnd_01M6KVNCXNCZKR5VYX5F507ABH"
+            },
+            "evidence": [
+              {
+                "id": 1,
+                "kind": "other_customer",
+                "link": "/rounds/rnd_01M6KVNCXNCZKR5VYX5F507ABH",
+                "text": {
+                  "en": "The layout matches X0104's approved format (100%)",
+                  "th": "โครงสร้างไฟล์ตรงกับรูปแบบที่อนุมัติแล้วของ X0104 (100%)"
+                },
+                "numbers": {
+                  "customer": "X0104",
+                  "similarity": null
+                }
+              },
+              {
+                "id": 2,
+                "kind": "rows",
+                "link": "/rounds/rnd_01M6KVNCXNCZKR5VYX5F507ABH",
+                "text": {
+                  "en": "36 records produced",
+                  "th": "สร้างได้ 36 รายการ"
+                },
+                "numbers": {
+                  "rows_out": 36
+                }
+              },
+              {
+                "id": 3,
+                "kind": "self_check",
+                "link": null,
+                "text": {
+                  "en": "The AI ran its mapping on the first 36 rows (0 look(s) at the file, 0 fix round(s)): 0 problem(s) left",
+                  "th": "AI ลองรัน mapping กับ 36 แถวแรก (ดูไฟล์ 0 ครั้ง แก้ 0 รอบ): เหลือปัญหา 0 ข้อ"
+                },
+                "numbers": {
+                  "rows": 36,
+                  "fix_rounds": 0,
+                  "inspections": 0,
+                  "problems_left": 0
+                }
+              },
+              {
+                "id": 4,
+                "kind": "questions",
+                "link": "/review?round=rnd_01M6KVNCXNCZKR5VYX5F507ABH",
+                "text": {
+                  "en": "2 fields below the confidence bar",
+                  "th": "2 ฟิลด์ยังไม่ถึงเกณฑ์ความมั่นใจ"
+                },
+                "numbers": {
+                  "count": 2
+                }
+              }
+            ],
+            "narrative": null,
+            "conclusion": {
+              "en": "First file from X0204; its layout is the same as X0104's (the same ERP?) — confirm the sender, then 2 fields need a confirmation",
+              "th": "ไฟล์แรกของ X0204 โครงสร้างเหมือนของ X0104 (ERP เดียวกัน?) — ยืนยันผู้ส่ง แล้วมี 2 ฟิลด์ที่ต้องยืนยัน"
+            },
+            "confidence": 0.6,
+            "suppressed": {
+              "count": 0,
+              "groups": [
+                {
+                  "text": {
+                    "en": "3 notes from the mapper",
+                    "th": "หมายเหตุจากตัวจับคู่ 3 ข้อ"
+                  },
+                  "reason": "open_questions",
+                  "pointers": []
+                }
+              ]
+            },
+            "must_decide": [
+              {
+                "id": "/currency",
+                "why": {
+                  "en": "Below the confidence bar for its risk",
+                  "th": "ความมั่นใจต่ำกว่าเกณฑ์ของระดับความเสี่ยงนี้"
+                },
+                "kind": "choice",
+                "scope": null,
+                "default": null,
+                "options": [
+                  "Currency",
+                  "Company",
+                  "Item",
+                  "Unit"
+                ],
+                "question": {
+                  "en": "Which column holds ISO currency from the applicable price row.?",
+                  "th": "คอลัมน์ไหนคือสกุลเงิน?"
+                },
+                "semantic": "currency",
+                "allow_custom": false,
+                "evidence_ids": [
+                  4
+                ],
+                "option_labels": null
+              },
+              {
+                "id": "/sell_unit",
+                "why": {
+                  "en": "Below the confidence bar for its risk",
+                  "th": "ความมั่นใจต่ำกว่าเกณฑ์ของระดับความเสี่ยงนี้"
+                },
+                "kind": "choice",
+                "scope": null,
+                "default": null,
+                "options": [
+                  "Full unit",
+                  "Unit",
+                  "Company",
+                  "Item"
+                ],
+                "question": {
+                  "en": "Which column holds Full unit name; ask if the code has no definition.?",
+                  "th": "คอลัมน์ไหนคือหน่วยขาย?"
+                },
+                "semantic": "unit.sell",
+                "allow_custom": false,
+                "evidence_ids": [
+                  4
+                ],
+                "option_labels": null
+              }
+            ],
+            "rules_fired": [
+              "first_time_shared_layout"
+            ],
+            "round_status": "review",
+            "rules_version": "2026.11.04.1",
+            "mapping_status": "proposed",
+            "policy_decision": "review"
+          },
+          "decision": "review",
+          "learning": null,
+          "priority": 131,
+          "workflow": {
+            "roles": [
+              {
+                "data": {
+                  "analysis": {
+                    "facts": [],
+                    "hypotheses": [],
+                    "mapping_guidance": [],
+                    "missing_information": []
+                  }
+                },
+                "role": "analyst",
+                "outcome": "completed",
+                "elapsed_ms": 735
+              },
+              {
+                "data": {
+                  "review": {},
+                  "repairs": 0,
+                  "mapper_data": {
+                    "self_check": {
+                      "errors": 0,
+                      "history": [
+                        {
+                          "turn": "ground",
+                          "columns": 4
+                        },
+                        {
+                          "turn": "mapping",
+                          "complete": true,
+                          "coverage": {
+                            "fields": {
+                              "/sku": {
+                                "risk": "medium",
+                                "records": 36,
+                                "records_filled": 36
+                              },
+                              "/price": {
+                                "risk": "critical",
+                                "records": 36,
+                                "records_filled": 36
+                              },
+                              "/currency": {
+                                "risk": "critical",
+                                "records": 36,
+                                "records_filled": 36
+                              },
+                              "/sell_unit": {
+                                "risk": "high",
+                                "records": 36,
+                                "records_filled": 36
+                              },
+                              "/product_name": {
+                                "risk": "medium",
+                                "records": 36,
+                                "records_filled": 36
+                              },
+                              "/inventory/*/qty": {
+                                "risk": "high",
+                                "records": 36,
+                                "records_filled": 36
+                              },
+                              "/inventory/*/warehouse_code": {
+                                "risk": "high",
+                                "records": 36,
+                                "records_filled": 36
+                              }
+                            },
+                            "sources": {
+                              "stock": 108,
+                              "units": 2,
+                              "master": 36,
+                              "prices": 36
+                            },
+                            "collections": {
+                              "/inventory": 108
+                            },
+                            "invalid_records": 0
+                          },
+                          "problems": [],
+                          "rows_out": 36
+                        }
+                      ],
+                      "complete": true,
+                      "coverage": {
+                        "fields": {
+                          "/sku": {
+                            "risk": "medium",
+                            "records": 36,
+                            "records_filled": 36
+                          },
+                          "/price": {
+                            "risk": "critical",
+                            "records": 36,
+                            "records_filled": 36
+                          },
+                          "/currency": {
+                            "risk": "critical",
+                            "records": 36,
+                            "records_filled": 36
+                          },
+                          "/sell_unit": {
+                            "risk": "high",
+                            "records": 36,
+                            "records_filled": 36
+                          },
+                          "/product_name": {
+                            "risk": "medium",
+                            "records": 36,
+                            "records_filled": 36
+                          },
+                          "/inventory/*/qty": {
+                            "risk": "high",
+                            "records": 36,
+                            "records_filled": 36
+                          },
+                          "/inventory/*/warehouse_code": {
+                            "risk": "high",
+                            "records": 36,
+                            "records_filled": 36
+                          }
+                        },
+                        "sources": {
+                          "stock": 108,
+                          "units": 2,
+                          "master": 36,
+                          "prices": 36
+                        },
+                        "collections": {
+                          "/inventory": 108
+                        },
+                        "invalid_records": 0
+                      },
+                      "grounded": 4,
+                      "rows_out": 36,
+                      "fix_rounds": 0,
+                      "inspections": 0,
+                      "python_turns": 0,
+                      "rows_checked": 36,
+                      "problems_left": [],
+                      "candidate_turns": 0
+                    },
+                    "clarifications": [],
+                    "open_questions": []
+                  },
+                  "reviewer_turns": 0
+                },
+                "role": "mapper",
+                "outcome": "completed",
+                "elapsed_ms": 1001
+              },
+              {
+                "data": {
+                  "execution": {
+                    "errors": 0,
+                    "rows_in": 36,
+                    "complete": true,
+                    "coverage": {
+                      "fields": {
+                        "/sku": {
+                          "risk": "medium",
+                          "records": 36,
+                          "records_filled": 36
+                        },
+                        "/price": {
+                          "risk": "critical",
+                          "records": 36,
+                          "records_filled": 36
+                        },
+                        "/currency": {
+                          "risk": "critical",
+                          "records": 36,
+                          "records_filled": 36
+                        },
+                        "/sell_unit": {
+                          "risk": "high",
+                          "records": 36,
+                          "records_filled": 36
+                        },
+                        "/product_name": {
+                          "risk": "medium",
+                          "records": 36,
+                          "records_filled": 36
+                        },
+                        "/inventory/*/qty": {
+                          "risk": "high",
+                          "records": 36,
+                          "records_filled": 36
+                        },
+                        "/inventory/*/warehouse_code": {
+                          "risk": "high",
+                          "records": 36,
+                          "records_filled": 36
+                        }
+                      },
+                      "sources": {
+                        "stock": 108,
+                        "units": 2,
+                        "master": 36,
+                        "prices": 36
+                      },
+                      "collections": {
+                        "/inventory": 108
+                      },
+                      "invalid_records": 0
+                    },
+                    "problems": [],
+                    "rows_out": 36,
+                    "problem_count": 0,
+                    "sample_records": [
+                      {
+                        "sku": "SG-000005",
+                        "price": 73.75,
+                        "currency": "VND",
+                        "inventory": [
+                          {
+                            "qty": 175.0,
+                            "warehouse_code": "VN-03"
+                          },
+                          {
+                            "qty": 174.0,
+                            "warehouse_code": "VN-02"
+                          },
+                          {
+                            "qty": 173.0,
+                            "warehouse_code": "VN-01"
+                          }
+                        ],
+                        "sell_unit": "PIECE",
+                        "product_name": "Trà SG 023 / 4"
+                      },
+                      {
+                        "sku": "SG-000003",
+                        "price": 71.25,
+                        "currency": "VND",
+                        "inventory": [
+                          {
+                            "qty": 160.0,
+                            "warehouse_code": "VN-02"
+                          },
+                          {
+                            "qty": 159.0,
+                            "warehouse_code": "VN-01"
+                          },
+                          {
+                            "qty": 161.0,
+                            "warehouse_code": "VN-03"
+                          }
+                        ],
+                        "sell_unit": "PIECE",
+                        "product_name": "Trà SG 021 / 4"
+                      },
+                      {
+                        "sku": "VN-000004",
+                        "price": 50.0,
+                        "currency": "VND",
+                        "inventory": [
+                          {
+                            "qty": 41.0,
+                            "warehouse_code": "VN-02"
+                          },
+                          {
+                            "qty": 42.0,
+                            "warehouse_code": "VN-03"
+                          },
+                          {
+                            "qty": 40.0,
+                            "warehouse_code": "VN-01"
+                          }
+                        ],
+                        "sell_unit": "BOTTLE",
+                        "product_name": "Trà VN 004 / 4"
+                      }
+                    ]
+                  }
+                },
+                "role": "execute",
+                "outcome": "completed",
+                "elapsed_ms": 404
+              },
+              {
+                "data": {
+                  "review": {
+                    "checked": [
+                      "Scripted model only; real engine verification remains mandatory."
+                    ],
+                    "verdict": "pass",
+                    "concerns": [],
+                    "clarifications": []
+                  }
+                },
+                "role": "reviewer",
+                "outcome": "completed",
+                "elapsed_ms": 111
+              }
+            ],
+            "review": {
+              "checked": [
+                "Scripted model only; real engine verification remains mandatory."
+              ],
+              "verdict": "pass",
+              "concerns": [],
+              "clarifications": []
+            },
+            "status": "verified_proposal",
+            "repairs": 0,
+            "version": "2026.11.04.2",
+            "analysis": {
+              "facts": [],
+              "hypotheses": [],
+              "mapping_guidance": [],
+              "missing_information": []
+            },
+            "evidence": [],
+            "thread_id": "mapping-722855b01779d556",
+            "human_resume": "existing versioned question preview/apply service; no automatic approval",
+            "provider_attempts": 3,
+            "usage_unknown_attempts": 0
+          },
+          "agreement": {
+            "ops": [
+              "/product_name",
+              "/sku"
+            ],
+            "agree": [
+              "/product_name",
+              "/sku"
+            ],
+            "record": {
+              "joins": {
+                "model": [
+                  {
+                    "on": [
+                      {
+                        "left": "Company",
+                        "right": "Company"
+                      },
+                      {
+                        "left": "Item",
+                        "right": "Item"
+                      }
+                    ],
+                    "how": "left",
+                    "left": {
+                      "file": "fil_01M6KVNCY5A8DBT8Z6TEREN5ZZ",
+                      "sheet": "item master 4",
+                      "filter": null,
+                      "rename": {},
+                      "unpivot": null,
+                      "data_end": null,
+                      "fill_down": [],
+                      "data_start": null,
+                      "last_column": null,
+                      "first_column": 0
+                    },
+                    "right": {
+                      "file": "fil_01M6KVNCY5A8DBT8Z6TEREN5ZZ",
+                      "sheet": "price list 4",
+                      "filter": null,
+                      "rename": {},
+                      "unpivot": null,
+                      "data_end": null,
+                      "fill_down": [],
+                      "data_start": null,
+                      "last_column": null,
+                      "first_column": 0
+                    },
+                    "cardinality": "1:1",
+                    "on_unmatched": "review",
+                    "normalize_keys": [
+                      "trim",
+                      "upper"
+                    ]
+                  },
+                  {
+                    "on": [
+                      {
+                        "left": "Unit",
+                        "right": "Unit"
+                      }
+                    ],
+                    "how": "left",
+                    "left": {
+                      "file": "fil_01M6KVNCY5A8DBT8Z6TEREN5ZZ",
+                      "sheet": "item master 4",
+                      "filter": null,
+                      "rename": {},
+                      "unpivot": null,
+                      "data_end": null,
+                      "fill_down": [],
+                      "data_start": null,
+                      "last_column": null,
+                      "first_column": 0
+                    },
+                    "right": {
+                      "file": "fil_01M6KVNCY5A8DBT8Z6TEREN5ZZ",
+                      "sheet": "unit dictionary 4",
+                      "filter": null,
+                      "rename": {},
+                      "unpivot": null,
+                      "data_end": null,
+                      "fill_down": [],
+                      "data_start": null,
+                      "last_column": null,
+                      "first_column": 0
+                    },
+                    "cardinality": "N:1",
+                    "on_unmatched": "review",
+                    "normalize_keys": [
+                      "trim",
+                      "upper"
+                    ]
+                  }
+                ],
+                "matcher": []
+              },
+              "dedupe": {
+                "model": {
+                  "keep": "error",
+                  "keys": [
+                    "/sku"
+                  ]
+                },
+                "matcher": {
+                  "keep": "first",
+                  "keys": []
+                }
+              }
+            },
+            "dropped": [],
+            "disagree": {
+              "/currency": {
+                "model": [
+                  "prices.Currency"
+                ],
+                "matcher": [
+                  "{\"op\": \"const\", \"value\": \"THB\"}"
+                ]
+              },
+              "/sell_unit": {
+                "model": [
+                  "units.Full unit"
+                ],
+                "matcher": [
+                  "Item Master 4.Unit"
+                ]
+              }
+            },
+            "model_only": [
+              "/inventory/*/qty",
+              "/inventory/*/warehouse_code",
+              "/price"
+            ]
+          },
+          "risk_level": "high",
+          "risk_score": 0.825,
+          "self_check": {
+            "errors": 0,
+            "history": [
+              {
+                "turn": "ground",
+                "columns": 4
+              },
+              {
+                "turn": "mapping",
+                "complete": true,
+                "coverage": {
+                  "fields": {
+                    "/sku": {
+                      "risk": "medium",
+                      "records": 36,
+                      "records_filled": 36
+                    },
+                    "/price": {
+                      "risk": "critical",
+                      "records": 36,
+                      "records_filled": 36
+                    },
+                    "/currency": {
+                      "risk": "critical",
+                      "records": 36,
+                      "records_filled": 36
+                    },
+                    "/sell_unit": {
+                      "risk": "high",
+                      "records": 36,
+                      "records_filled": 36
+                    },
+                    "/product_name": {
+                      "risk": "medium",
+                      "records": 36,
+                      "records_filled": 36
+                    },
+                    "/inventory/*/qty": {
+                      "risk": "high",
+                      "records": 36,
+                      "records_filled": 36
+                    },
+                    "/inventory/*/warehouse_code": {
+                      "risk": "high",
+                      "records": 36,
+                      "records_filled": 36
+                    }
+                  },
+                  "sources": {
+                    "stock": 108,
+                    "units": 2,
+                    "master": 36,
+                    "prices": 36
+                  },
+                  "collections": {
+                    "/inventory": 108
+                  },
+                  "invalid_records": 0
+                },
+                "problems": [],
+                "rows_out": 36
+              }
+            ],
+            "complete": true,
+            "coverage": {
+              "fields": {
+                "/sku": {
+                  "risk": "medium",
+                  "records": 36,
+                  "records_filled": 36
+                },
+                "/price": {
+                  "risk": "critical",
+                  "records": 36,
+                  "records_filled": 36
+                },
+                "/currency": {
+                  "risk": "critical",
+                  "records": 36,
+                  "records_filled": 36
+                },
+                "/sell_unit": {
+                  "risk": "high",
+                  "records": 36,
+                  "records_filled": 36
+                },
+                "/product_name": {
+                  "risk": "medium",
+                  "records": 36,
+                  "records_filled": 36
+                },
+                "/inventory/*/qty": {
+                  "risk": "high",
+                  "records": 36,
+                  "records_filled": 36
+                },
+                "/inventory/*/warehouse_code": {
+                  "risk": "high",
+                  "records": 36,
+                  "records_filled": 36
+                }
+              },
+              "sources": {
+                "stock": 108,
+                "units": 2,
+                "master": 36,
+                "prices": 36
+              },
+              "collections": {
+                "/inventory": 108
+              },
+              "invalid_records": 0
+            },
+            "grounded": 4,
+            "rows_out": 36,
+            "fix_rounds": 0,
+            "inspections": 0,
+            "python_turns": 0,
+            "rows_checked": 36,
+            "problems_left": [],
+            "candidate_turns": 0
+          },
+          "simulation": {
+            "fill": {
+              "/sku": 1.0,
+              "/price": 1.0,
+              "/currency": 1.0,
+              "/sell_unit": 1.0,
+              "/product_name": 1.0,
+              "/inventory/*/qty": 1.0,
+              "/inventory/*/warehouse_code": 1.0
+            },
+            "rows_in": 36,
+            "sources": {
+              "stock": 108,
+              "units": 2,
+              "master": 36,
+              "prices": 36
+            },
+            "complete": true,
+            "findings": {
+              "info": 0,
+              "error": 0,
+              "warning": 0
+            },
+            "rows_out": 36,
+            "collections": {
+              "/inventory": 108
+            },
+            "duration_ms": 356.1,
+            "identity_keys": [
+              "/sku"
+            ],
+            "invalid_records": 0
+          },
+          "reused_from": null,
+          "field_review": null,
+          "risk_factors": [
+            "ambiguous critical field (price, discount, identity …)"
+          ],
+          "verification": {
+            "scope": "Execution and contract checks; business ambiguities require operator answers",
+            "passed": true,
+            "version": 1,
+            "complete": true,
+            "coverage": {
+              "fields": {
+                "/sku": {
+                  "risk": "medium",
+                  "records": 36,
+                  "records_filled": 36
+                },
+                "/price": {
+                  "risk": "critical",
+                  "records": 36,
+                  "records_filled": 36
+                },
+                "/currency": {
+                  "risk": "critical",
+                  "records": 36,
+                  "records_filled": 36
+                },
+                "/sell_unit": {
+                  "risk": "high",
+                  "records": 36,
+                  "records_filled": 36
+                },
+                "/product_name": {
+                  "risk": "medium",
+                  "records": 36,
+                  "records_filled": 36
+                },
+                "/inventory/*/qty": {
+                  "risk": "high",
+                  "records": 36,
+                  "records_filled": 36
+                },
+                "/inventory/*/warehouse_code": {
+                  "risk": "high",
+                  "records": 36,
+                  "records_filled": 36
+                }
+              },
+              "sources": {
+                "stock": 108,
+                "units": 2,
+                "master": 36,
+                "prices": 36
+              },
+              "collections": {
+                "/inventory": 108
+              },
+              "invalid_records": 0
+            },
+            "problems": [],
+            "rows_out": 36,
+            "warnings": [],
+            "rows_checked": 36,
+            "semantic_checks": {
+              "limitation": "Passing these checks does not prove column meaning. Missing business intent still requires an operator decision.",
+              "contract_rules": [],
+              "source_identity_warnings": []
+            }
+          },
+          "clarifications": [],
+          "confidence_basis": {
+            "capped": [
+              "/currency",
+              "/sell_unit"
+            ],
+            "raised": [],
+            "mapping_capped": false
+          },
+          "review_decisions": [],
+          "target_schema_hash": "8714d8c8f9087446",
+          "confirmed_decisions": []
+        },
+        "open_questions": [
+          "Sheet 'Delivery Notes 4' has a currency column 'Target currency' (Effective date, Price list, Stock basis), but records are labelled THB: confirm",
+          "Sheet 'Price List 4' has a currency column 'Currency' (VND), but records are labelled THB: confirm",
+          "Table 'Warehouse Balances 4' looks like inventory but no column links to root key 'Material Code'"
+        ],
+        "validation": {
+          "ok": true,
+          "issues": []
+        },
+        "parent_id": null,
+        "approved_by": null,
+        "approved_at": null,
+        "comment": null,
+        "created_at": "2026-11-04T18:03:24.595736+00:00",
+        "agent_log": [
+          {
+            "agent": "heuristic",
+            "unmatched": {
+              "inventory": [
+                "Company",
+                "Item",
+                "Warehouse",
+                "Lot",
+                "Quantity"
+              ],
+              "products_2": [
+                "Company",
+                "Item"
+              ],
+              "products_3": [
+                "Unit",
+                "Full unit"
+              ],
+              "products_4": [
+                "Company",
+                "Item",
+                "Selling price",
+                "Currency",
+                "Price list",
+                "Valid from",
+                "Valid to"
+              ]
+            },
+            "confidence": 0.5700000000000001,
+            "table_roles": {
+              "0": "other",
+              "1": "inventory",
+              "2": "products",
+              "3": "products",
+              "4": "products"
+            }
+          },
+          {
+            "data": {
+              "workflow": {
+                "roles": [
+                  {
+                    "data": {
+                      "analysis": {
+                        "facts": [],
+                        "hypotheses": [],
+                        "mapping_guidance": [],
+                        "missing_information": []
+                      }
+                    },
+                    "role": "analyst",
+                    "outcome": "completed",
+                    "elapsed_ms": 735
+                  },
+                  {
+                    "data": {
+                      "review": {},
+                      "repairs": 0,
+                      "mapper_data": {
+                        "self_check": {
+                          "errors": 0,
+                          "history": [
+                            {
+                              "turn": "ground",
+                              "columns": 4
+                            },
+                            {
+                              "turn": "mapping",
+                              "complete": true,
+                              "coverage": {
+                                "fields": {
+                                  "/sku": {
+                                    "risk": "medium",
+                                    "records": 36,
+                                    "records_filled": 36
+                                  },
+                                  "/price": {
+                                    "risk": "critical",
+                                    "records": 36,
+                                    "records_filled": 36
+                                  },
+                                  "/currency": {
+                                    "risk": "critical",
+                                    "records": 36,
+                                    "records_filled": 36
+                                  },
+                                  "/sell_unit": {
+                                    "risk": "high",
+                                    "records": 36,
+                                    "records_filled": 36
+                                  },
+                                  "/product_name": {
+                                    "risk": "medium",
+                                    "records": 36,
+                                    "records_filled": 36
+                                  },
+                                  "/inventory/*/qty": {
+                                    "risk": "high",
+                                    "records": 36,
+                                    "records_filled": 36
+                                  },
+                                  "/inventory/*/warehouse_code": {
+                                    "risk": "high",
+                                    "records": 36,
+                                    "records_filled": 36
+                                  }
+                                },
+                                "sources": {
+                                  "stock": 108,
+                                  "units": 2,
+                                  "master": 36,
+                                  "prices": 36
+                                },
+                                "collections": {
+                                  "/inventory": 108
+                                },
+                                "invalid_records": 0
+                              },
+                              "problems": [],
+                              "rows_out": 36
+                            }
+                          ],
+                          "complete": true,
+                          "coverage": {
+                            "fields": {
+                              "/sku": {
+                                "risk": "medium",
+                                "records": 36,
+                                "records_filled": 36
+                              },
+                              "/price": {
+                                "risk": "critical",
+                                "records": 36,
+                                "records_filled": 36
+                              },
+                              "/currency": {
+                                "risk": "critical",
+                                "records": 36,
+                                "records_filled": 36
+                              },
+                              "/sell_unit": {
+                                "risk": "high",
+                                "records": 36,
+                                "records_filled": 36
+                              },
+                              "/product_name": {
+                                "risk": "medium",
+                                "records": 36,
+                                "records_filled": 36
+                              },
+                              "/inventory/*/qty": {
+                                "risk": "high",
+                                "records": 36,
+                                "records_filled": 36
+                              },
+                              "/inventory/*/warehouse_code": {
+                                "risk": "high",
+                                "records": 36,
+                                "records_filled": 36
+                              }
+                            },
+                            "sources": {
+                              "stock": 108,
+                              "units": 2,
+                              "master": 36,
+                              "prices": 36
+                            },
+                            "collections": {
+                              "/inventory": 108
+                            },
+                            "invalid_records": 0
+                          },
+                          "grounded": 4,
+                          "rows_out": 36,
+                          "fix_rounds": 0,
+                          "inspections": 0,
+                          "python_turns": 0,
+                          "rows_checked": 36,
+                          "problems_left": [],
+                          "candidate_turns": 0
+                        },
+                        "clarifications": [],
+                        "open_questions": []
+                      },
+                      "reviewer_turns": 0
+                    },
+                    "role": "mapper",
+                    "outcome": "completed",
+                    "elapsed_ms": 1001
+                  },
+                  {
+                    "data": {
+                      "execution": {
+                        "errors": 0,
+                        "rows_in": 36,
+                        "complete": true,
+                        "coverage": {
+                          "fields": {
+                            "/sku": {
+                              "risk": "medium",
+                              "records": 36,
+                              "records_filled": 36
+                            },
+                            "/price": {
+                              "risk": "critical",
+                              "records": 36,
+                              "records_filled": 36
+                            },
+                            "/currency": {
+                              "risk": "critical",
+                              "records": 36,
+                              "records_filled": 36
+                            },
+                            "/sell_unit": {
+                              "risk": "high",
+                              "records": 36,
+                              "records_filled": 36
+                            },
+                            "/product_name": {
+                              "risk": "medium",
+                              "records": 36,
+                              "records_filled": 36
+                            },
+                            "/inventory/*/qty": {
+                              "risk": "high",
+                              "records": 36,
+                              "records_filled": 36
+                            },
+                            "/inventory/*/warehouse_code": {
+                              "risk": "high",
+                              "records": 36,
+                              "records_filled": 36
+                            }
+                          },
+                          "sources": {
+                            "stock": 108,
+                            "units": 2,
+                            "master": 36,
+                            "prices": 36
+                          },
+                          "collections": {
+                            "/inventory": 108
+                          },
+                          "invalid_records": 0
+                        },
+                        "problems": [],
+                        "rows_out": 36,
+                        "problem_count": 0,
+                        "sample_records": [
+                          {
+                            "sku": "SG-000005",
+                            "price": 73.75,
+                            "currency": "VND",
+                            "inventory": [
+                              {
+                                "qty": 175.0,
+                                "warehouse_code": "VN-03"
+                              },
+                              {
+                                "qty": 174.0,
+                                "warehouse_code": "VN-02"
+                              },
+                              {
+                                "qty": 173.0,
+                                "warehouse_code": "VN-01"
+                              }
+                            ],
+                            "sell_unit": "PIECE",
+                            "product_name": "Trà SG 023 / 4"
+                          },
+                          {
+                            "sku": "SG-000003",
+                            "price": 71.25,
+                            "currency": "VND",
+                            "inventory": [
+                              {
+                                "qty": 160.0,
+                                "warehouse_code": "VN-02"
+                              },
+                              {
+                                "qty": 159.0,
+                                "warehouse_code": "VN-01"
+                              },
+                              {
+                                "qty": 161.0,
+                                "warehouse_code": "VN-03"
+                              }
+                            ],
+                            "sell_unit": "PIECE",
+                            "product_name": "Trà SG 021 / 4"
+                          },
+                          {
+                            "sku": "VN-000004",
+                            "price": 50.0,
+                            "currency": "VND",
+                            "inventory": [
+                              {
+                                "qty": 41.0,
+                                "warehouse_code": "VN-02"
+                              },
+                              {
+                                "qty": 42.0,
+                                "warehouse_code": "VN-03"
+                              },
+                              {
+                                "qty": 40.0,
+                                "warehouse_code": "VN-01"
+                              }
+                            ],
+                            "sell_unit": "BOTTLE",
+                            "product_name": "Trà VN 004 / 4"
+                          }
+                        ]
+                      }
+                    },
+                    "role": "execute",
+                    "outcome": "completed",
+                    "elapsed_ms": 404
+                  },
+                  {
+                    "data": {
+                      "review": {
+                        "checked": [
+                          "Scripted model only; real engine verification remains mandatory."
+                        ],
+                        "verdict": "pass",
+                        "concerns": [],
+                        "clarifications": []
+                      }
+                    },
+                    "role": "reviewer",
+                    "outcome": "completed",
+                    "elapsed_ms": 111
+                  }
+                ],
+                "review": {
+                  "checked": [
+                    "Scripted model only; real engine verification remains mandatory."
+                  ],
+                  "verdict": "pass",
+                  "concerns": [],
+                  "clarifications": []
+                },
+                "status": "verified_proposal",
+                "repairs": 0,
+                "version": "2026.11.04.2",
+                "analysis": {
+                  "facts": [],
+                  "hypotheses": [],
+                  "mapping_guidance": [],
+                  "missing_information": []
+                },
+                "evidence": [],
+                "thread_id": "mapping-722855b01779d556",
+                "human_resume": "existing versioned question preview/apply service; no automatic approval",
+                "provider_attempts": 3,
+                "usage_unknown_attempts": 0
+              },
+              "self_check": {
+                "errors": 0,
+                "history": [
+                  {
+                    "turn": "ground",
+                    "columns": 4
+                  },
+                  {
+                    "turn": "mapping",
+                    "complete": true,
+                    "coverage": {
+                      "fields": {
+                        "/sku": {
+                          "risk": "medium",
+                          "records": 36,
+                          "records_filled": 36
+                        },
+                        "/price": {
+                          "risk": "critical",
+                          "records": 36,
+                          "records_filled": 36
+                        },
+                        "/currency": {
+                          "risk": "critical",
+                          "records": 36,
+                          "records_filled": 36
+                        },
+                        "/sell_unit": {
+                          "risk": "high",
+                          "records": 36,
+                          "records_filled": 36
+                        },
+                        "/product_name": {
+                          "risk": "medium",
+                          "records": 36,
+                          "records_filled": 36
+                        },
+                        "/inventory/*/qty": {
+                          "risk": "high",
+                          "records": 36,
+                          "records_filled": 36
+                        },
+                        "/inventory/*/warehouse_code": {
+                          "risk": "high",
+                          "records": 36,
+                          "records_filled": 36
+                        }
+                      },
+                      "sources": {
+                        "stock": 108,
+                        "units": 2,
+                        "master": 36,
+                        "prices": 36
+                      },
+                      "collections": {
+                        "/inventory": 108
+                      },
+                      "invalid_records": 0
+                    },
+                    "problems": [],
+                    "rows_out": 36
+                  }
+                ],
+                "complete": true,
+                "coverage": {
+                  "fields": {
+                    "/sku": {
+                      "risk": "medium",
+                      "records": 36,
+                      "records_filled": 36
+                    },
+                    "/price": {
+                      "risk": "critical",
+                      "records": 36,
+                      "records_filled": 36
+                    },
+                    "/currency": {
+                      "risk": "critical",
+                      "records": 36,
+                      "records_filled": 36
+                    },
+                    "/sell_unit": {
+                      "risk": "high",
+                      "records": 36,
+                      "records_filled": 36
+                    },
+                    "/product_name": {
+                      "risk": "medium",
+                      "records": 36,
+                      "records_filled": 36
+                    },
+                    "/inventory/*/qty": {
+                      "risk": "high",
+                      "records": 36,
+                      "records_filled": 36
+                    },
+                    "/inventory/*/warehouse_code": {
+                      "risk": "high",
+                      "records": 36,
+                      "records_filled": 36
+                    }
+                  },
+                  "sources": {
+                    "stock": 108,
+                    "units": 2,
+                    "master": 36,
+                    "prices": 36
+                  },
+                  "collections": {
+                    "/inventory": 108
+                  },
+                  "invalid_records": 0
+                },
+                "grounded": 4,
+                "rows_out": 36,
+                "fix_rounds": 0,
+                "inspections": 0,
+                "python_turns": 0,
+                "rows_checked": 36,
+                "problems_left": [],
+                "candidate_turns": 0
+              },
+              "clarifications": [],
+              "open_questions": []
+            },
+            "agent": "mapping_workflow",
+            "notes": [],
+            "usage": {
+              "calls": 3,
+              "model": "fake-excel100",
+              "cost_usd": 0.0,
+              "latency_ms": 936.6,
+              "input_tokens": 0,
+              "output_tokens": 0
+            },
+            "attempts": 3
+          },
+          {
+            "ops": 2,
+            "agent": "agreement",
+            "agree": 2,
+            "record": 2,
+            "dropped": 0,
+            "disagree": 2,
+            "model_only": 3
+          },
+          {
+            "agent": "question_reconciliation",
+            "basis": "complete execution, populated source-backed fields and unique identities",
+            "retired": [
+              "No SKU-like header found in root table; using 'Material Code' as identity — confirm"
+            ]
+          }
+        ],
+        "sample": [
+          {
+            "sku": "SG-000005",
+            "price": 73.75,
+            "currency": "VND",
+            "inventory": [
+              {
+                "qty": 175.0,
+                "warehouse_code": "VN-03"
+              },
+              {
+                "qty": 174.0,
+                "warehouse_code": "VN-02"
+              },
+              {
+                "qty": 173.0,
+                "warehouse_code": "VN-01"
+              }
+            ],
+            "sell_unit": "PIECE",
+            "source_meta": {
+              "file": "X0204.xlsx",
+              "lineage": {
+                "items": {
+                  "/inventory": [
+                    5,
+                    40,
+                    106
+                  ]
+                },
+                "joined": {
+                  "units": 0,
+                  "prices": 2
+                },
+                "source": "master",
+                "root_row": 0
+              }
+            },
+            "product_name": "Trà SG 023 / 4"
+          },
+          {
+            "sku": "SG-000003",
+            "price": 71.25,
+            "currency": "VND",
+            "inventory": [
+              {
+                "qty": 160.0,
+                "warehouse_code": "VN-02"
+              },
+              {
+                "qty": 159.0,
+                "warehouse_code": "VN-01"
+              },
+              {
+                "qty": 161.0,
+                "warehouse_code": "VN-03"
+              }
+            ],
+            "sell_unit": "PIECE",
+            "source_meta": {
+              "file": "X0204.xlsx",
+              "lineage": {
+                "items": {
+                  "/inventory": [
+                    17,
+                    23,
+                    58
+                  ]
+                },
+                "joined": {
+                  "units": 0,
+                  "prices": 22
+                },
+                "source": "master",
+                "root_row": 1
+              }
+            },
+            "product_name": "Trà SG 021 / 4"
+          },
+          {
+            "sku": "VN-000004",
+            "price": 50.0,
+            "currency": "VND",
+            "inventory": [
+              {
+                "qty": 41.0,
+                "warehouse_code": "VN-02"
+              },
+              {
+                "qty": 42.0,
+                "warehouse_code": "VN-03"
+              },
+              {
+                "qty": 40.0,
+                "warehouse_code": "VN-01"
+              }
+            ],
+            "sell_unit": "BOTTLE",
+            "source_meta": {
+              "file": "X0204.xlsx",
+              "lineage": {
+                "items": {
+                  "/inventory": [
+                    20,
+                    57,
+                    74
+                  ]
+                },
+                "joined": {
+                  "units": 1,
+                  "prices": 15
+                },
+                "source": "master",
+                "root_row": 2
+              }
+            },
+            "product_name": "Trà VN 004 / 4"
+          },
+          {
+            "sku": "SG-000009",
+            "price": 78.75,
+            "currency": "VND",
+            "inventory": [
+              {
+                "qty": 202.0,
+                "warehouse_code": "VN-02"
+              },
+              {
+                "qty": 201.0,
+                "warehouse_code": "VN-01"
+              },
+              {
+                "qty": 203.0,
+                "warehouse_code": "VN-03"
+              }
+            ],
+            "sell_unit": "PIECE",
+            "source_meta": {
+              "file": "X0204.xlsx",
+              "lineage": {
+                "items": {
+                  "/inventory": [
+                    51,
+                    61,
+                    92
+                  ]
+                },
+                "joined": {
+                  "units": 0,
+                  "prices": 21
+                },
+                "source": "master",
+                "root_row": 3
+              }
+            },
+            "product_name": "Trà SG 027 / 4"
+          },
+          {
+            "sku": "VN-000009",
+            "price": 56.25,
+            "currency": "VND",
+            "inventory": [
+              {
+                "qty": 76.0,
+                "warehouse_code": "VN-02"
+              },
+              {
+                "qty": 75.0,
+                "warehouse_code": "VN-01"
+              },
+              {
+                "qty": 77.0,
+                "warehouse_code": "VN-03"
+              }
+            ],
+            "sell_unit": "PIECE",
+            "source_meta": {
+              "file": "X0204.xlsx",
+              "lineage": {
+                "items": {
+                  "/inventory": [
+                    59,
+                    71,
+                    89
+                  ]
+                },
+                "joined": {
+                  "units": 0,
+                  "prices": 24
+                },
+                "source": "master",
+                "root_row": 4
+              }
+            },
+            "product_name": "Trà VN 009 / 4"
+          }
+        ]
+      }
+    ],
+    "datasets": [],
+    "review_tasks": [
+      {
+        "id": "rev_01M6KVNR33SYSX2S0V89KQ8GFM",
+        "round_id": "rnd_01M6KVNCXNCZKR5VYX5F507ABH",
+        "customer_id": "cus_01M6KVCR8M9QNQE9Y9V323R9B5",
+        "mapping_version_id": "map_01M6KVNR0EJN5E9RDC2R041Z04",
+        "dataset_version_id": null,
+        "kind": "mapping",
+        "priority": 131,
+        "status": "open",
+        "reasons": [
+          "low confidence on critical fields: /currency (0.70)",
+          "low confidence on high-risk fields: /sell_unit (0.70)",
+          "structure is identical to customer X0104's approved format — confirm this file belongs here",
+          "first time this customer/format is seen",
+          "3 questions still need operator confirmation",
+          "the model selects rows differently from FORMA's matcher (records: dedupe; records: joins)"
+        ],
+        "details": {
+          "impact": {},
+          "verdict": {
+            "word": "likely",
+            "stage": "mapping",
+            "digest": "cf7b511aff7f599c5189abdde3ce0a7f",
+            "outcome": "answer",
+            "conclusion": {
+              "en": "First file from X0204; its layout is the same as X0104's (the same ERP?) — confirm the sender, then 2 fields need a confirmation",
+              "th": "ไฟล์แรกของ X0204 โครงสร้างเหมือนของ X0104 (ERP เดียวกัน?) — ยืนยันผู้ส่ง แล้วมี 2 ฟิลด์ที่ต้องยืนยัน"
+            },
+            "confidence": 0.6,
+            "rules_fired": [
+              "first_time_shared_layout"
+            ]
+          },
+          "decision": "review",
+          "findings": [],
+          "risk_level": "high",
+          "risk_factors": [
+            "ambiguous critical field (price, discount, identity …)"
+          ],
+          "open_questions": [
+            "Sheet 'Delivery Notes 4' has a currency column 'Target currency' (Effective date, Price list, Stock basis), but records are labelled THB: confirm",
+            "Sheet 'Price List 4' has a currency column 'Currency' (VND), but records are labelled THB: confirm",
+            "Table 'Warehouse Balances 4' looks like inventory but no column links to root key 'Material Code'"
+          ]
+        },
+        "resolver": null,
+        "comment": null,
+        "created_at": "2026-11-04T18:03:24.643208+00:00",
+        "resolved_at": null,
+        "age_days": 0,
+        "waiting_until": null,
+        "waiting_note": null
+      }
+    ],
+    "jobs": [
+      {
+        "id": "job_01M6KVNCZ9V2GB9JSQK7SZRB31",
+        "kind": "process_batch_item",
+        "status": "done",
+        "progress": 100,
+        "message": null,
+        "error": null
+      }
+    ]
+  },
+  "mapping": {
+    "id": "map_01M6KVNR0EJN5E9RDC2R041Z04",
+    "customer_id": "cus_01M6KVCR8M9QNQE9Y9V323R9B5",
+    "round_id": "rnd_01M6KVNCXNCZKR5VYX5F507ABH",
+    "version": 1,
+    "status": "proposed",
+    "target_schema": "excel100_x0204@1",
+    "confidence": 1.0,
+    "created_by": "ai",
+    "model": "fake-excel100",
+    "policy": {
+      "checks": {
+        "drift": null,
+        "errors": 0,
+        "rows_out": 36,
+        "warnings": 0,
+        "agreement": {
+          "ops": 2,
+          "agree": 2,
+          "record": 2,
+          "dropped": 0,
+          "disagree": 2,
+          "model_only": 3
+        },
+        "llm_fallback": false,
+        "reused_approved": false,
+        "full_verification": true,
+        "mapping_confidence": 1.0,
+        "data_checks_trusted": false,
+        "low_confidence_high": [
+          "/sell_unit (0.70)"
+        ],
+        "unresolved_questions": 3,
+        "plausibility_warnings": 0,
+        "low_confidence_critical": [
+          "/currency (0.70)"
+        ]
+      },
+      "impact": {},
+      "source": "ai",
+      "reasons": [
+        "low confidence on critical fields: /currency (0.70)",
+        "low confidence on high-risk fields: /sell_unit (0.70)",
+        "structure is identical to customer X0104's approved format — confirm this file belongs here",
+        "first time this customer/format is seen",
+        "3 questions still need operator confirmation",
+        "the model selects rows differently from FORMA's matcher (records: dedupe; records: joins)"
+      ],
+      "sandbox": null,
+      "verdict": {
+        "word": "likely",
+        "stage": "mapping",
+        "digest": "cf7b511aff7f599c5189abdde3ce0a7f",
+        "outcome": "answer",
+        "subject": {
+          "id": "map_01M6KVNR0EJN5E9RDC2R041Z04",
+          "kind": "mapping",
+          "round_id": "rnd_01M6KVNCXNCZKR5VYX5F507ABH"
+        },
+        "evidence": [
+          {
+            "id": 1,
+            "kind": "other_customer",
+            "link": "/rounds/rnd_01M6KVNCXNCZKR5VYX5F507ABH",
+            "text": {
+              "en": "The layout matches X0104's approved format (100%)",
+              "th": "โครงสร้างไฟล์ตรงกับรูปแบบที่อนุมัติแล้วของ X0104 (100%)"
+            },
+            "numbers": {
+              "customer": "X0104",
+              "similarity": null
+            }
+          },
+          {
+            "id": 2,
+            "kind": "rows",
+            "link": "/rounds/rnd_01M6KVNCXNCZKR5VYX5F507ABH",
+            "text": {
+              "en": "36 records produced",
+              "th": "สร้างได้ 36 รายการ"
+            },
+            "numbers": {
+              "rows_out": 36
+            }
+          },
+          {
+            "id": 3,
+            "kind": "self_check",
+            "link": null,
+            "text": {
+              "en": "The AI ran its mapping on the first 36 rows (0 look(s) at the file, 0 fix round(s)): 0 problem(s) left",
+              "th": "AI ลองรัน mapping กับ 36 แถวแรก (ดูไฟล์ 0 ครั้ง แก้ 0 รอบ): เหลือปัญหา 0 ข้อ"
+            },
+            "numbers": {
+              "rows": 36,
+              "fix_rounds": 0,
+              "inspections": 0,
+              "problems_left": 0
+            }
+          },
+          {
+            "id": 4,
+            "kind": "questions",
+            "link": "/review?round=rnd_01M6KVNCXNCZKR5VYX5F507ABH",
+            "text": {
+              "en": "2 fields below the confidence bar",
+              "th": "2 ฟิลด์ยังไม่ถึงเกณฑ์ความมั่นใจ"
+            },
+            "numbers": {
+              "count": 2
+            }
+          }
+        ],
+        "narrative": null,
+        "conclusion": {
+          "en": "First file from X0204; its layout is the same as X0104's (the same ERP?) — confirm the sender, then 2 fields need a confirmation",
+          "th": "ไฟล์แรกของ X0204 โครงสร้างเหมือนของ X0104 (ERP เดียวกัน?) — ยืนยันผู้ส่ง แล้วมี 2 ฟิลด์ที่ต้องยืนยัน"
+        },
+        "confidence": 0.6,
+        "suppressed": {
+          "count": 0,
+          "groups": [
+            {
+              "text": {
+                "en": "3 notes from the mapper",
+                "th": "หมายเหตุจากตัวจับคู่ 3 ข้อ"
+              },
+              "reason": "open_questions",
+              "pointers": []
+            }
+          ]
+        },
+        "must_decide": [
+          {
+            "id": "/currency",
+            "why": {
+              "en": "Below the confidence bar for its risk",
+              "th": "ความมั่นใจต่ำกว่าเกณฑ์ของระดับความเสี่ยงนี้"
+            },
+            "kind": "choice",
+            "scope": null,
+            "default": null,
+            "options": [
+              "Currency",
+              "Company",
+              "Item",
+              "Unit"
+            ],
+            "question": {
+              "en": "Which column holds ISO currency from the applicable price row.?",
+              "th": "คอลัมน์ไหนคือสกุลเงิน?"
+            },
+            "semantic": "currency",
+            "allow_custom": false,
+            "evidence_ids": [
+              4
+            ],
+            "option_labels": null
+          },
+          {
+            "id": "/sell_unit",
+            "why": {
+              "en": "Below the confidence bar for its risk",
+              "th": "ความมั่นใจต่ำกว่าเกณฑ์ของระดับความเสี่ยงนี้"
+            },
+            "kind": "choice",
+            "scope": null,
+            "default": null,
+            "options": [
+              "Full unit",
+              "Unit",
+              "Company",
+              "Item"
+            ],
+            "question": {
+              "en": "Which column holds Full unit name; ask if the code has no definition.?",
+              "th": "คอลัมน์ไหนคือหน่วยขาย?"
+            },
+            "semantic": "unit.sell",
+            "allow_custom": false,
+            "evidence_ids": [
+              4
+            ],
+            "option_labels": null
+          }
+        ],
+        "rules_fired": [
+          "first_time_shared_layout"
+        ],
+        "round_status": "review",
+        "rules_version": "2026.11.04.1",
+        "mapping_status": "proposed",
+        "policy_decision": "review"
+      },
+      "decision": "review",
+      "learning": null,
+      "priority": 131,
+      "workflow": {
+        "roles": [
+          {
+            "data": {
+              "analysis": {
+                "facts": [],
+                "hypotheses": [],
+                "mapping_guidance": [],
+                "missing_information": []
+              }
+            },
+            "role": "analyst",
+            "outcome": "completed",
+            "elapsed_ms": 735
+          },
+          {
+            "data": {
+              "review": {},
+              "repairs": 0,
+              "mapper_data": {
+                "self_check": {
+                  "errors": 0,
+                  "history": [
+                    {
+                      "turn": "ground",
+                      "columns": 4
+                    },
+                    {
+                      "turn": "mapping",
+                      "complete": true,
+                      "coverage": {
+                        "fields": {
+                          "/sku": {
+                            "risk": "medium",
+                            "records": 36,
+                            "records_filled": 36
+                          },
+                          "/price": {
+                            "risk": "critical",
+                            "records": 36,
+                            "records_filled": 36
+                          },
+                          "/currency": {
+                            "risk": "critical",
+                            "records": 36,
+                            "records_filled": 36
+                          },
+                          "/sell_unit": {
+                            "risk": "high",
+                            "records": 36,
+                            "records_filled": 36
+                          },
+                          "/product_name": {
+                            "risk": "medium",
+                            "records": 36,
+                            "records_filled": 36
+                          },
+                          "/inventory/*/qty": {
+                            "risk": "high",
+                            "records": 36,
+                            "records_filled": 36
+                          },
+                          "/inventory/*/warehouse_code": {
+                            "risk": "high",
+                            "records": 36,
+                            "records_filled": 36
+                          }
+                        },
+                        "sources": {
+                          "stock": 108,
+                          "units": 2,
+                          "master": 36,
+                          "prices": 36
+                        },
+                        "collections": {
+                          "/inventory": 108
+                        },
+                        "invalid_records": 0
+                      },
+                      "problems": [],
+                      "rows_out": 36
+                    }
+                  ],
+                  "complete": true,
+                  "coverage": {
+                    "fields": {
+                      "/sku": {
+                        "risk": "medium",
+                        "records": 36,
+                        "records_filled": 36
+                      },
+                      "/price": {
+                        "risk": "critical",
+                        "records": 36,
+                        "records_filled": 36
+                      },
+                      "/currency": {
+                        "risk": "critical",
+                        "records": 36,
+                        "records_filled": 36
+                      },
+                      "/sell_unit": {
+                        "risk": "high",
+                        "records": 36,
+                        "records_filled": 36
+                      },
+                      "/product_name": {
+                        "risk": "medium",
+                        "records": 36,
+                        "records_filled": 36
+                      },
+                      "/inventory/*/qty": {
+                        "risk": "high",
+                        "records": 36,
+                        "records_filled": 36
+                      },
+                      "/inventory/*/warehouse_code": {
+                        "risk": "high",
+                        "records": 36,
+                        "records_filled": 36
+                      }
+                    },
+                    "sources": {
+                      "stock": 108,
+                      "units": 2,
+                      "master": 36,
+                      "prices": 36
+                    },
+                    "collections": {
+                      "/inventory": 108
+                    },
+                    "invalid_records": 0
+                  },
+                  "grounded": 4,
+                  "rows_out": 36,
+                  "fix_rounds": 0,
+                  "inspections": 0,
+                  "python_turns": 0,
+                  "rows_checked": 36,
+                  "problems_left": [],
+                  "candidate_turns": 0
+                },
+                "clarifications": [],
+                "open_questions": []
+              },
+              "reviewer_turns": 0
+            },
+            "role": "mapper",
+            "outcome": "completed",
+            "elapsed_ms": 1001
+          },
+          {
+            "data": {
+              "execution": {
+                "errors": 0,
+                "rows_in": 36,
+                "complete": true,
+                "coverage": {
+                  "fields": {
+                    "/sku": {
+                      "risk": "medium",
+                      "records": 36,
+                      "records_filled": 36
+                    },
+                    "/price": {
+                      "risk": "critical",
+                      "records": 36,
+                      "records_filled": 36
+                    },
+                    "/currency": {
+                      "risk": "critical",
+                      "records": 36,
+                      "records_filled": 36
+                    },
+                    "/sell_unit": {
+                      "risk": "high",
+                      "records": 36,
+                      "records_filled": 36
+                    },
+                    "/product_name": {
+                      "risk": "medium",
+                      "records": 36,
+                      "records_filled": 36
+                    },
+                    "/inventory/*/qty": {
+                      "risk": "high",
+                      "records": 36,
+                      "records_filled": 36
+                    },
+                    "/inventory/*/warehouse_code": {
+                      "risk": "high",
+                      "records": 36,
+                      "records_filled": 36
+                    }
+                  },
+                  "sources": {
+                    "stock": 108,
+                    "units": 2,
+                    "master": 36,
+                    "prices": 36
+                  },
+                  "collections": {
+                    "/inventory": 108
+                  },
+                  "invalid_records": 0
+                },
+                "problems": [],
+                "rows_out": 36,
+                "problem_count": 0,
+                "sample_records": [
+                  {
+                    "sku": "SG-000005",
+                    "price": 73.75,
+                    "currency": "VND",
+                    "inventory": [
+                      {
+                        "qty": 175.0,
+                        "warehouse_code": "VN-03"
+                      },
+                      {
+                        "qty": 174.0,
+                        "warehouse_code": "VN-02"
+                      },
+                      {
+                        "qty": 173.0,
+                        "warehouse_code": "VN-01"
+                      }
+                    ],
+                    "sell_unit": "PIECE",
+                    "product_name": "Trà SG 023 / 4"
+                  },
+                  {
+                    "sku": "SG-000003",
+                    "price": 71.25,
+                    "currency": "VND",
+                    "inventory": [
+                      {
+                        "qty": 160.0,
+                        "warehouse_code": "VN-02"
+                      },
+                      {
+                        "qty": 159.0,
+                        "warehouse_code": "VN-01"
+                      },
+                      {
+                        "qty": 161.0,
+                        "warehouse_code": "VN-03"
+                      }
+                    ],
+                    "sell_unit": "PIECE",
+                    "product_name": "Trà SG 021 / 4"
+                  },
+                  {
+                    "sku": "VN-000004",
+                    "price": 50.0,
+                    "currency": "VND",
+                    "inventory": [
+                      {
+                        "qty": 41.0,
+                        "warehouse_code": "VN-02"
+                      },
+                      {
+                        "qty": 42.0,
+                        "warehouse_code": "VN-03"
+                      },
+                      {
+                        "qty": 40.0,
+                        "warehouse_code": "VN-01"
+                      }
+                    ],
+                    "sell_unit": "BOTTLE",
+                    "product_name": "Trà VN 004 / 4"
+                  }
+                ]
+              }
+            },
+            "role": "execute",
+            "outcome": "completed",
+            "elapsed_ms": 404
+          },
+          {
+            "data": {
+              "review": {
+                "checked": [
+                  "Scripted model only; real engine verification remains mandatory."
+                ],
+                "verdict": "pass",
+                "concerns": [],
+                "clarifications": []
+              }
+            },
+            "role": "reviewer",
+            "outcome": "completed",
+            "elapsed_ms": 111
+          }
+        ],
+        "review": {
+          "checked": [
+            "Scripted model only; real engine verification remains mandatory."
+          ],
+          "verdict": "pass",
+          "concerns": [],
+          "clarifications": []
+        },
+        "status": "verified_proposal",
+        "repairs": 0,
+        "version": "2026.11.04.2",
+        "analysis": {
+          "facts": [],
+          "hypotheses": [],
+          "mapping_guidance": [],
+          "missing_information": []
+        },
+        "evidence": [],
+        "thread_id": "mapping-722855b01779d556",
+        "human_resume": "existing versioned question preview/apply service; no automatic approval",
+        "provider_attempts": 3,
+        "usage_unknown_attempts": 0
+      },
+      "agreement": {
+        "ops": [
+          "/product_name",
+          "/sku"
+        ],
+        "agree": [
+          "/product_name",
+          "/sku"
+        ],
+        "record": {
+          "joins": {
+            "model": [
+              {
+                "on": [
+                  {
+                    "left": "Company",
+                    "right": "Company"
+                  },
+                  {
+                    "left": "Item",
+                    "right": "Item"
+                  }
+                ],
+                "how": "left",
+                "left": {
+                  "file": "fil_01M6KVNCY5A8DBT8Z6TEREN5ZZ",
+                  "sheet": "item master 4",
+                  "filter": null,
+                  "rename": {},
+                  "unpivot": null,
+                  "data_end": null,
+                  "fill_down": [],
+                  "data_start": null,
+                  "last_column": null,
+                  "first_column": 0
+                },
+                "right": {
+                  "file": "fil_01M6KVNCY5A8DBT8Z6TEREN5ZZ",
+                  "sheet": "price list 4",
+                  "filter": null,
+                  "rename": {},
+                  "unpivot": null,
+                  "data_end": null,
+                  "fill_down": [],
+                  "data_start": null,
+                  "last_column": null,
+                  "first_column": 0
+                },
+                "cardinality": "1:1",
+                "on_unmatched": "review",
+                "normalize_keys": [
+                  "trim",
+                  "upper"
+                ]
+              },
+              {
+                "on": [
+                  {
+                    "left": "Unit",
+                    "right": "Unit"
+                  }
+                ],
+                "how": "left",
+                "left": {
+                  "file": "fil_01M6KVNCY5A8DBT8Z6TEREN5ZZ",
+                  "sheet": "item master 4",
+                  "filter": null,
+                  "rename": {},
+                  "unpivot": null,
+                  "data_end": null,
+                  "fill_down": [],
+                  "data_start": null,
+                  "last_column": null,
+                  "first_column": 0
+                },
+                "right": {
+                  "file": "fil_01M6KVNCY5A8DBT8Z6TEREN5ZZ",
+                  "sheet": "unit dictionary 4",
+                  "filter": null,
+                  "rename": {},
+                  "unpivot": null,
+                  "data_end": null,
+                  "fill_down": [],
+                  "data_start": null,
+                  "last_column": null,
+                  "first_column": 0
+                },
+                "cardinality": "N:1",
+                "on_unmatched": "review",
+                "normalize_keys": [
+                  "trim",
+                  "upper"
+                ]
+              }
+            ],
+            "matcher": []
+          },
+          "dedupe": {
+            "model": {
+              "keep": "error",
+              "keys": [
+                "/sku"
+              ]
+            },
+            "matcher": {
+              "keep": "first",
+              "keys": []
+            }
+          }
+        },
+        "dropped": [],
+        "disagree": {
+          "/currency": {
+            "model": [
+              "prices.Currency"
+            ],
+            "matcher": [
+              "{\"op\": \"const\", \"value\": \"THB\"}"
+            ]
+          },
+          "/sell_unit": {
+            "model": [
+              "units.Full unit"
+            ],
+            "matcher": [
+              "Item Master 4.Unit"
+            ]
+          }
+        },
+        "model_only": [
+          "/inventory/*/qty",
+          "/inventory/*/warehouse_code",
+          "/price"
+        ]
+      },
+      "risk_level": "high",
+      "risk_score": 0.825,
+      "self_check": {
+        "errors": 0,
+        "history": [
+          {
+            "turn": "ground",
+            "columns": 4
+          },
+          {
+            "turn": "mapping",
+            "complete": true,
+            "coverage": {
+              "fields": {
+                "/sku": {
+                  "risk": "medium",
+                  "records": 36,
+                  "records_filled": 36
+                },
+                "/price": {
+                  "risk": "critical",
+                  "records": 36,
+                  "records_filled": 36
+                },
+                "/currency": {
+                  "risk": "critical",
+                  "records": 36,
+                  "records_filled": 36
+                },
+                "/sell_unit": {
+                  "risk": "high",
+                  "records": 36,
+                  "records_filled": 36
+                },
+                "/product_name": {
+                  "risk": "medium",
+                  "records": 36,
+                  "records_filled": 36
+                },
+                "/inventory/*/qty": {
+                  "risk": "high",
+                  "records": 36,
+                  "records_filled": 36
+                },
+                "/inventory/*/warehouse_code": {
+                  "risk": "high",
+                  "records": 36,
+                  "records_filled": 36
+                }
+              },
+              "sources": {
+                "stock": 108,
+                "units": 2,
+                "master": 36,
+                "prices": 36
+              },
+              "collections": {
+                "/inventory": 108
+              },
+              "invalid_records": 0
+            },
+            "problems": [],
+            "rows_out": 36
+          }
+        ],
+        "complete": true,
+        "coverage": {
+          "fields": {
+            "/sku": {
+              "risk": "medium",
+              "records": 36,
+              "records_filled": 36
+            },
+            "/price": {
+              "risk": "critical",
+              "records": 36,
+              "records_filled": 36
+            },
+            "/currency": {
+              "risk": "critical",
+              "records": 36,
+              "records_filled": 36
+            },
+            "/sell_unit": {
+              "risk": "high",
+              "records": 36,
+              "records_filled": 36
+            },
+            "/product_name": {
+              "risk": "medium",
+              "records": 36,
+              "records_filled": 36
+            },
+            "/inventory/*/qty": {
+              "risk": "high",
+              "records": 36,
+              "records_filled": 36
+            },
+            "/inventory/*/warehouse_code": {
+              "risk": "high",
+              "records": 36,
+              "records_filled": 36
+            }
+          },
+          "sources": {
+            "stock": 108,
+            "units": 2,
+            "master": 36,
+            "prices": 36
+          },
+          "collections": {
+            "/inventory": 108
+          },
+          "invalid_records": 0
+        },
+        "grounded": 4,
+        "rows_out": 36,
+        "fix_rounds": 0,
+        "inspections": 0,
+        "python_turns": 0,
+        "rows_checked": 36,
+        "problems_left": [],
+        "candidate_turns": 0
+      },
+      "simulation": {
+        "fill": {
+          "/sku": 1.0,
+          "/price": 1.0,
+          "/currency": 1.0,
+          "/sell_unit": 1.0,
+          "/product_name": 1.0,
+          "/inventory/*/qty": 1.0,
+          "/inventory/*/warehouse_code": 1.0
+        },
+        "rows_in": 36,
+        "sources": {
+          "stock": 108,
+          "units": 2,
+          "master": 36,
+          "prices": 36
+        },
+        "complete": true,
+        "findings": {
+          "info": 0,
+          "error": 0,
+          "warning": 0
+        },
+        "rows_out": 36,
+        "collections": {
+          "/inventory": 108
+        },
+        "duration_ms": 356.1,
+        "identity_keys": [
+          "/sku"
+        ],
+        "invalid_records": 0
+      },
+      "reused_from": null,
+      "field_review": null,
+      "risk_factors": [
+        "ambiguous critical field (price, discount, identity …)"
+      ],
+      "verification": {
+        "scope": "Execution and contract checks; business ambiguities require operator answers",
+        "passed": true,
+        "version": 1,
+        "complete": true,
+        "coverage": {
+          "fields": {
+            "/sku": {
+              "risk": "medium",
+              "records": 36,
+              "records_filled": 36
+            },
+            "/price": {
+              "risk": "critical",
+              "records": 36,
+              "records_filled": 36
+            },
+            "/currency": {
+              "risk": "critical",
+              "records": 36,
+              "records_filled": 36
+            },
+            "/sell_unit": {
+              "risk": "high",
+              "records": 36,
+              "records_filled": 36
+            },
+            "/product_name": {
+              "risk": "medium",
+              "records": 36,
+              "records_filled": 36
+            },
+            "/inventory/*/qty": {
+              "risk": "high",
+              "records": 36,
+              "records_filled": 36
+            },
+            "/inventory/*/warehouse_code": {
+              "risk": "high",
+              "records": 36,
+              "records_filled": 36
+            }
+          },
+          "sources": {
+            "stock": 108,
+            "units": 2,
+            "master": 36,
+            "prices": 36
+          },
+          "collections": {
+            "/inventory": 108
+          },
+          "invalid_records": 0
+        },
+        "problems": [],
+        "rows_out": 36,
+        "warnings": [],
+        "rows_checked": 36,
+        "semantic_checks": {
+          "limitation": "Passing these checks does not prove column meaning. Missing business intent still requires an operator decision.",
+          "contract_rules": [],
+          "source_identity_warnings": []
+        }
+      },
+      "clarifications": [],
+      "confidence_basis": {
+        "capped": [
+          "/currency",
+          "/sell_unit"
+        ],
+        "raised": [],
+        "mapping_capped": false
+      },
+      "review_decisions": [],
+      "target_schema_hash": "8714d8c8f9087446",
+      "confirmed_decisions": []
+    },
+    "open_questions": [
+      "Sheet 'Delivery Notes 4' has a currency column 'Target currency' (Effective date, Price list, Stock basis), but records are labelled THB: confirm",
+      "Sheet 'Price List 4' has a currency column 'Currency' (VND), but records are labelled THB: confirm",
+      "Table 'Warehouse Balances 4' looks like inventory but no column links to root key 'Material Code'"
+    ],
+    "validation": {
+      "ok": true,
+      "issues": []
+    },
+    "parent_id": null,
+    "approved_by": null,
+    "approved_at": null,
+    "comment": null,
+    "created_at": "2026-11-04T18:03:24.595736+00:00",
+    "agent_log": [
+      {
+        "agent": "heuristic",
+        "unmatched": {
+          "inventory": [
+            "Company",
+            "Item",
+            "Warehouse",
+            "Lot",
+            "Quantity"
+          ],
+          "products_2": [
+            "Company",
+            "Item"
+          ],
+          "products_3": [
+            "Unit",
+            "Full unit"
+          ],
+          "products_4": [
+            "Company",
+            "Item",
+            "Selling price",
+            "Currency",
+            "Price list",
+            "Valid from",
+            "Valid to"
+          ]
+        },
+        "confidence": 0.5700000000000001,
+        "table_roles": {
+          "0": "other",
+          "1": "inventory",
+          "2": "products",
+          "3": "products",
+          "4": "products"
+        }
+      },
+      {
+        "data": {
+          "workflow": {
+            "roles": [
+              {
+                "data": {
+                  "analysis": {
+                    "facts": [],
+                    "hypotheses": [],
+                    "mapping_guidance": [],
+                    "missing_information": []
+                  }
+                },
+                "role": "analyst",
+                "outcome": "completed",
+                "elapsed_ms": 735
+              },
+              {
+                "data": {
+                  "review": {},
+                  "repairs": 0,
+                  "mapper_data": {
+                    "self_check": {
+                      "errors": 0,
+                      "history": [
+                        {
+                          "turn": "ground",
+                          "columns": 4
+                        },
+                        {
+                          "turn": "mapping",
+                          "complete": true,
+                          "coverage": {
+                            "fields": {
+                              "/sku": {
+                                "risk": "medium",
+                                "records": 36,
+                                "records_filled": 36
+                              },
+                              "/price": {
+                                "risk": "critical",
+                                "records": 36,
+                                "records_filled": 36
+                              },
+                              "/currency": {
+                                "risk": "critical",
+                                "records": 36,
+                                "records_filled": 36
+                              },
+                              "/sell_unit": {
+                                "risk": "high",
+                                "records": 36,
+                                "records_filled": 36
+                              },
+                              "/product_name": {
+                                "risk": "medium",
+                                "records": 36,
+                                "records_filled": 36
+                              },
+                              "/inventory/*/qty": {
+                                "risk": "high",
+                                "records": 36,
+                                "records_filled": 36
+                              },
+                              "/inventory/*/warehouse_code": {
+                                "risk": "high",
+                                "records": 36,
+                                "records_filled": 36
+                              }
+                            },
+                            "sources": {
+                              "stock": 108,
+                              "units": 2,
+                              "master": 36,
+                              "prices": 36
+                            },
+                            "collections": {
+                              "/inventory": 108
+                            },
+                            "invalid_records": 0
+                          },
+                          "problems": [],
+                          "rows_out": 36
+                        }
+                      ],
+                      "complete": true,
+                      "coverage": {
+                        "fields": {
+                          "/sku": {
+                            "risk": "medium",
+                            "records": 36,
+                            "records_filled": 36
+                          },
+                          "/price": {
+                            "risk": "critical",
+                            "records": 36,
+                            "records_filled": 36
+                          },
+                          "/currency": {
+                            "risk": "critical",
+                            "records": 36,
+                            "records_filled": 36
+                          },
+                          "/sell_unit": {
+                            "risk": "high",
+                            "records": 36,
+                            "records_filled": 36
+                          },
+                          "/product_name": {
+                            "risk": "medium",
+                            "records": 36,
+                            "records_filled": 36
+                          },
+                          "/inventory/*/qty": {
+                            "risk": "high",
+                            "records": 36,
+                            "records_filled": 36
+                          },
+                          "/inventory/*/warehouse_code": {
+                            "risk": "high",
+                            "records": 36,
+                            "records_filled": 36
+                          }
+                        },
+                        "sources": {
+                          "stock": 108,
+                          "units": 2,
+                          "master": 36,
+                          "prices": 36
+                        },
+                        "collections": {
+                          "/inventory": 108
+                        },
+                        "invalid_records": 0
+                      },
+                      "grounded": 4,
+                      "rows_out": 36,
+                      "fix_rounds": 0,
+                      "inspections": 0,
+                      "python_turns": 0,
+                      "rows_checked": 36,
+                      "problems_left": [],
+                      "candidate_turns": 0
+                    },
+                    "clarifications": [],
+                    "open_questions": []
+                  },
+                  "reviewer_turns": 0
+                },
+                "role": "mapper",
+                "outcome": "completed",
+                "elapsed_ms": 1001
+              },
+              {
+                "data": {
+                  "execution": {
+                    "errors": 0,
+                    "rows_in": 36,
+                    "complete": true,
+                    "coverage": {
+                      "fields": {
+                        "/sku": {
+                          "risk": "medium",
+                          "records": 36,
+                          "records_filled": 36
+                        },
+                        "/price": {
+                          "risk": "critical",
+                          "records": 36,
+                          "records_filled": 36
+                        },
+                        "/currency": {
+                          "risk": "critical",
+                          "records": 36,
+                          "records_filled": 36
+                        },
+                        "/sell_unit": {
+                          "risk": "high",
+                          "records": 36,
+                          "records_filled": 36
+                        },
+                        "/product_name": {
+                          "risk": "medium",
+                          "records": 36,
+                          "records_filled": 36
+                        },
+                        "/inventory/*/qty": {
+                          "risk": "high",
+                          "records": 36,
+                          "records_filled": 36
+                        },
+                        "/inventory/*/warehouse_code": {
+                          "risk": "high",
+                          "records": 36,
+                          "records_filled": 36
+                        }
+                      },
+                      "sources": {
+                        "stock": 108,
+                        "units": 2,
+                        "master": 36,
+                        "prices": 36
+                      },
+                      "collections": {
+                        "/inventory": 108
+                      },
+                      "invalid_records": 0
+                    },
+                    "problems": [],
+                    "rows_out": 36,
+                    "problem_count": 0,
+                    "sample_records": [
+                      {
+                        "sku": "SG-000005",
+                        "price": 73.75,
+                        "currency": "VND",
+                        "inventory": [
+                          {
+                            "qty": 175.0,
+                            "warehouse_code": "VN-03"
+                          },
+                          {
+                            "qty": 174.0,
+                            "warehouse_code": "VN-02"
+                          },
+                          {
+                            "qty": 173.0,
+                            "warehouse_code": "VN-01"
+                          }
+                        ],
+                        "sell_unit": "PIECE",
+                        "product_name": "Trà SG 023 / 4"
+                      },
+                      {
+                        "sku": "SG-000003",
+                        "price": 71.25,
+                        "currency": "VND",
+                        "inventory": [
+                          {
+                            "qty": 160.0,
+                            "warehouse_code": "VN-02"
+                          },
+                          {
+                            "qty": 159.0,
+                            "warehouse_code": "VN-01"
+                          },
+                          {
+                            "qty": 161.0,
+                            "warehouse_code": "VN-03"
+                          }
+                        ],
+                        "sell_unit": "PIECE",
+                        "product_name": "Trà SG 021 / 4"
+                      },
+                      {
+                        "sku": "VN-000004",
+                        "price": 50.0,
+                        "currency": "VND",
+                        "inventory": [
+                          {
+                            "qty": 41.0,
+                            "warehouse_code": "VN-02"
+                          },
+                          {
+                            "qty": 42.0,
+                            "warehouse_code": "VN-03"
+                          },
+                          {
+                            "qty": 40.0,
+                            "warehouse_code": "VN-01"
+                          }
+                        ],
+                        "sell_unit": "BOTTLE",
+                        "product_name": "Trà VN 004 / 4"
+                      }
+                    ]
+                  }
+                },
+                "role": "execute",
+                "outcome": "completed",
+                "elapsed_ms": 404
+              },
+              {
+                "data": {
+                  "review": {
+                    "checked": [
+                      "Scripted model only; real engine verification remains mandatory."
+                    ],
+                    "verdict": "pass",
+                    "concerns": [],
+                    "clarifications": []
+                  }
+                },
+                "role": "reviewer",
+                "outcome": "completed",
+                "elapsed_ms": 111
+              }
+            ],
+            "review": {
+              "checked": [
+                "Scripted model only; real engine verification remains mandatory."
+              ],
+              "verdict": "pass",
+              "concerns": [],
+              "clarifications": []
+            },
+            "status": "verified_proposal",
+            "repairs": 0,
+            "version": "2026.11.04.2",
+            "analysis": {
+              "facts": [],
+              "hypotheses": [],
+              "mapping_guidance": [],
+              "missing_information": []
+            },
+            "evidence": [],
+            "thread_id": "mapping-722855b01779d556",
+            "human_resume": "existing versioned question preview/apply service; no automatic approval",
+            "provider_attempts": 3,
+            "usage_unknown_attempts": 0
+          },
+          "self_check": {
+            "errors": 0,
+            "history": [
+              {
+                "turn": "ground",
+                "columns": 4
+              },
+              {
+                "turn": "mapping",
+                "complete": true,
+                "coverage": {
+                  "fields": {
+                    "/sku": {
+                      "risk": "medium",
+                      "records": 36,
+                      "records_filled": 36
+                    },
+                    "/price": {
+                      "risk": "critical",
+                      "records": 36,
+                      "records_filled": 36
+                    },
+                    "/currency": {
+                      "risk": "critical",
+                      "records": 36,
+                      "records_filled": 36
+                    },
+                    "/sell_unit": {
+                      "risk": "high",
+                      "records": 36,
+                      "records_filled": 36
+                    },
+                    "/product_name": {
+                      "risk": "medium",
+                      "records": 36,
+                      "records_filled": 36
+                    },
+                    "/inventory/*/qty": {
+                      "risk": "high",
+                      "records": 36,
+                      "records_filled": 36
+                    },
+                    "/inventory/*/warehouse_code": {
+                      "risk": "high",
+                      "records": 36,
+                      "records_filled": 36
+                    }
+                  },
+                  "sources": {
+                    "stock": 108,
+                    "units": 2,
+                    "master": 36,
+                    "prices": 36
+                  },
+                  "collections": {
+                    "/inventory": 108
+                  },
+                  "invalid_records": 0
+                },
+                "problems": [],
+                "rows_out": 36
+              }
+            ],
+            "complete": true,
+            "coverage": {
+              "fields": {
+                "/sku": {
+                  "risk": "medium",
+                  "records": 36,
+                  "records_filled": 36
+                },
+                "/price": {
+                  "risk": "critical",
+                  "records": 36,
+                  "records_filled": 36
+                },
+                "/currency": {
+                  "risk": "critical",
+                  "records": 36,
+                  "records_filled": 36
+                },
+                "/sell_unit": {
+                  "risk": "high",
+                  "records": 36,
+                  "records_filled": 36
+                },
+                "/product_name": {
+                  "risk": "medium",
+                  "records": 36,
+                  "records_filled": 36
+                },
+                "/inventory/*/qty": {
+                  "risk": "high",
+                  "records": 36,
+                  "records_filled": 36
+                },
+                "/inventory/*/warehouse_code": {
+                  "risk": "high",
+                  "records": 36,
+                  "records_filled": 36
+                }
+              },
+              "sources": {
+                "stock": 108,
+                "units": 2,
+                "master": 36,
+                "prices": 36
+              },
+              "collections": {
+                "/inventory": 108
+              },
+              "invalid_records": 0
+            },
+            "grounded": 4,
+            "rows_out": 36,
+            "fix_rounds": 0,
+            "inspections": 0,
+            "python_turns": 0,
+            "rows_checked": 36,
+            "problems_left": [],
+            "candidate_turns": 0
+          },
+          "clarifications": [],
+          "open_questions": []
+        },
+        "agent": "mapping_workflow",
+        "notes": [],
+        "usage": {
+          "calls": 3,
+          "model": "fake-excel100",
+          "cost_usd": 0.0,
+          "latency_ms": 936.6,
+          "input_tokens": 0,
+          "output_tokens": 0
+        },
+        "attempts": 3
+      },
+      {
+        "ops": 2,
+        "agent": "agreement",
+        "agree": 2,
+        "record": 2,
+        "dropped": 0,
+        "disagree": 2,
+        "model_only": 3
+      },
+      {
+        "agent": "question_reconciliation",
+        "basis": "complete execution, populated source-backed fields and unique identities",
+        "retired": [
+          "No SKU-like header found in root table; using 'Material Code' as identity — confirm"
+        ]
+      }
+    ],
+    "sample": [
+      {
+        "sku": "SG-000005",
+        "price": 73.75,
+        "currency": "VND",
+        "inventory": [
+          {
+            "qty": 175.0,
+            "warehouse_code": "VN-03"
+          },
+          {
+            "qty": 174.0,
+            "warehouse_code": "VN-02"
+          },
+          {
+            "qty": 173.0,
+            "warehouse_code": "VN-01"
+          }
+        ],
+        "sell_unit": "PIECE",
+        "source_meta": {
+          "file": "X0204.xlsx",
+          "lineage": {
+            "items": {
+              "/inventory": [
+                5,
+                40,
+                106
+              ]
+            },
+            "joined": {
+              "units": 0,
+              "prices": 2
+            },
+            "source": "master",
+            "root_row": 0
+          }
+        },
+        "product_name": "Trà SG 023 / 4"
+      },
+      {
+        "sku": "SG-000003",
+        "price": 71.25,
+        "currency": "VND",
+        "inventory": [
+          {
+            "qty": 160.0,
+            "warehouse_code": "VN-02"
+          },
+          {
+            "qty": 159.0,
+            "warehouse_code": "VN-01"
+          },
+          {
+            "qty": 161.0,
+            "warehouse_code": "VN-03"
+          }
+        ],
+        "sell_unit": "PIECE",
+        "source_meta": {
+          "file": "X0204.xlsx",
+          "lineage": {
+            "items": {
+              "/inventory": [
+                17,
+                23,
+                58
+              ]
+            },
+            "joined": {
+              "units": 0,
+              "prices": 22
+            },
+            "source": "master",
+            "root_row": 1
+          }
+        },
+        "product_name": "Trà SG 021 / 4"
+      },
+      {
+        "sku": "VN-000004",
+        "price": 50.0,
+        "currency": "VND",
+        "inventory": [
+          {
+            "qty": 41.0,
+            "warehouse_code": "VN-02"
+          },
+          {
+            "qty": 42.0,
+            "warehouse_code": "VN-03"
+          },
+          {
+            "qty": 40.0,
+            "warehouse_code": "VN-01"
+          }
+        ],
+        "sell_unit": "BOTTLE",
+        "source_meta": {
+          "file": "X0204.xlsx",
+          "lineage": {
+            "items": {
+              "/inventory": [
+                20,
+                57,
+                74
+              ]
+            },
+            "joined": {
+              "units": 1,
+              "prices": 15
+            },
+            "source": "master",
+            "root_row": 2
+          }
+        },
+        "product_name": "Trà VN 004 / 4"
+      },
+      {
+        "sku": "SG-000009",
+        "price": 78.75,
+        "currency": "VND",
+        "inventory": [
+          {
+            "qty": 202.0,
+            "warehouse_code": "VN-02"
+          },
+          {
+            "qty": 201.0,
+            "warehouse_code": "VN-01"
+          },
+          {
+            "qty": 203.0,
+            "warehouse_code": "VN-03"
+          }
+        ],
+        "sell_unit": "PIECE",
+        "source_meta": {
+          "file": "X0204.xlsx",
+          "lineage": {
+            "items": {
+              "/inventory": [
+                51,
+                61,
+                92
+              ]
+            },
+            "joined": {
+              "units": 0,
+              "prices": 21
+            },
+            "source": "master",
+            "root_row": 3
+          }
+        },
+        "product_name": "Trà SG 027 / 4"
+      },
+      {
+        "sku": "VN-000009",
+        "price": 56.25,
+        "currency": "VND",
+        "inventory": [
+          {
+            "qty": 76.0,
+            "warehouse_code": "VN-02"
+          },
+          {
+            "qty": 75.0,
+            "warehouse_code": "VN-01"
+          },
+          {
+            "qty": 77.0,
+            "warehouse_code": "VN-03"
+          }
+        ],
+        "sell_unit": "PIECE",
+        "source_meta": {
+          "file": "X0204.xlsx",
+          "lineage": {
+            "items": {
+              "/inventory": [
+                59,
+                71,
+                89
+              ]
+            },
+            "joined": {
+              "units": 0,
+              "prices": 24
+            },
+            "source": "master",
+            "root_row": 4
+          }
+        },
+        "product_name": "Trà VN 009 / 4"
+      }
+    ],
+    "document": {
+      "meta": {
+        "model": "fake-excel100",
+        "version": 1,
+        "evidence": [],
+        "confidence": 1.0,
+        "created_by": "ai",
+        "customer_id": "cus_01M6KVCR8M9QNQE9Y9V323R9B5",
+        "fingerprints": {
+          "stock": "7f07ad69cb717e08",
+          "units": "7f07ad69cb717e08",
+          "master": "7f07ad69cb717e08",
+          "prices": "7f07ad69cb717e08"
+        },
+        "target_schema": "excel100_x0204@1"
+      },
+      "joins": [
+        {
+          "on": [
+            {
+              "left": "Company",
+              "right": "Company"
+            },
+            {
+              "left": "Item",
+              "right": "Item"
+            }
+          ],
+          "how": "left",
+          "left": "master",
+          "right": "prices",
+          "cardinality": "1:1",
+          "on_unmatched": "review",
+          "normalize_keys": [
+            "trim",
+            "upper"
+          ]
+        },
+        {
+          "on": [
+            {
+              "left": "Unit",
+              "right": "Unit"
+            }
+          ],
+          "how": "left",
+          "left": "master",
+          "right": "units",
+          "cardinality": "N:1",
+          "on_unmatched": "review",
+          "normalize_keys": [
+            "trim",
+            "upper"
+          ]
+        }
+      ],
+      "fields": [
+        {
+          "expr": {
+            "op": "col",
+            "name": "Material Code",
+            "source": "master"
+          },
+          "target": "/sku",
+          "evidence": [
+            "Scripted local model contract; verify against source workbook."
+          ],
+          "confidence": 1.0
+        },
+        {
+          "expr": {
+            "op": "col",
+            "name": "Product Name",
+            "source": "master"
+          },
+          "target": "/product_name",
+          "evidence": [
+            "Scripted local model contract; verify against source workbook."
+          ],
+          "confidence": 1.0
+        },
+        {
+          "expr": {
+            "op": "parse_number_th",
+            "args": [
+              {
+                "op": "col",
+                "name": "Selling price",
+                "source": "prices"
+              }
+            ],
+            "params": {}
+          },
+          "target": "/price",
+          "evidence": [
+            "Scripted local model contract; verify against source workbook."
+          ],
+          "confidence": 1.0
+        },
+        {
+          "expr": {
+            "op": "col",
+            "name": "Currency",
+            "source": "prices"
+          },
+          "target": "/currency",
+          "evidence": [
+            "Scripted local model contract; verify against source workbook.",
+            "FORMA's matcher read {\"op\": \"const\", \"value\": \"THB\"} instead: confidence 1.00 → 0.70"
+          ],
+          "confidence": 0.7
+        },
+        {
+          "expr": {
+            "op": "col",
+            "name": "Full unit",
+            "source": "units"
+          },
+          "target": "/sell_unit",
+          "evidence": [
+            "Scripted local model contract; verify against source workbook.",
+            "FORMA's matcher read Item Master 4.Unit instead: confidence 1.00 → 0.70"
+          ],
+          "confidence": 0.7
+        }
+      ],
+      "record": {
+        "dedupe": {
+          "keep": "error",
+          "keys": [
+            "/sku"
+          ]
+        },
+        "filters": [],
+        "root_source": "master"
+      },
+      "quality": [],
+      "sources": [
+        {
+          "id": "master",
+          "csv": {
+            "encoding": "auto",
+            "delimiter": "auto",
+            "quote_char": "\""
+          },
+          "file": {
+            "sheet_names_any": []
+          },
+          "role": "products",
+          "sheet": {
+            "name": "Item Master 4"
+          },
+          "table": {
+            "fill_down": [],
+            "header_row": 0,
+            "header_rows": 1,
+            "drop_total_rows": true,
+            "drop_empty_columns": true,
+            "stop_at_blank_rows": 2,
+            "drop_repeated_headers": true
+          },
+          "rename": {}
+        },
+        {
+          "id": "prices",
+          "csv": {
+            "encoding": "auto",
+            "delimiter": "auto",
+            "quote_char": "\""
+          },
+          "file": {
+            "sheet_names_any": []
+          },
+          "role": "pricing",
+          "sheet": {
+            "name": "Price List 4"
+          },
+          "table": {
+            "fill_down": [],
+            "header_row": 0,
+            "header_rows": 1,
+            "drop_total_rows": true,
+            "drop_empty_columns": true,
+            "stop_at_blank_rows": 2,
+            "drop_repeated_headers": true
+          },
+          "rename": {}
+        },
+        {
+          "id": "stock",
+          "csv": {
+            "encoding": "auto",
+            "delimiter": "auto",
+            "quote_char": "\""
+          },
+          "file": {
+            "sheet_names_any": []
+          },
+          "role": "inventory",
+          "sheet": {
+            "name": "Warehouse Balances 4"
+          },
+          "table": {
+            "fill_down": [],
+            "header_row": 0,
+            "header_rows": 1,
+            "drop_total_rows": true,
+            "drop_empty_columns": true,
+            "stop_at_blank_rows": 2,
+            "drop_repeated_headers": true
+          },
+          "rename": {}
+        },
+        {
+          "id": "units",
+          "csv": {
+            "encoding": "auto",
+            "delimiter": "auto",
+            "quote_char": "\""
+          },
+          "file": {
+            "sheet_names_any": []
+          },
+          "role": "other",
+          "sheet": {
+            "name": "Unit Dictionary 4"
+          },
+          "table": {
+            "fill_down": [],
+            "header_row": 0,
+            "header_rows": 1,
+            "drop_total_rows": true,
+            "drop_empty_columns": true,
+            "stop_at_blank_rows": 2,
+            "drop_repeated_headers": true
+          },
+          "rename": {}
+        }
+      ],
+      "provenance": true,
+      "collections": [
+        {
+          "link": [
+            {
+              "left": "Company",
+              "right": "Company"
+            },
+            {
+              "left": "Item",
+              "right": "Item"
+            }
+          ],
+          "fields": [
+            {
+              "expr": {
+                "op": "col",
+                "name": "Warehouse",
+                "source": "stock"
+              },
+              "target": "/inventory/*/warehouse_code",
+              "evidence": [
+                "Scripted local model contract; verify against source workbook."
+              ],
+              "confidence": 1.0
+            },
+            {
+              "expr": {
+                "op": "parse_number_th",
+                "args": [
+                  {
+                    "op": "col",
+                    "name": "Quantity",
+                    "source": "stock"
+                  }
+                ],
+                "params": {}
+              },
+              "target": "/inventory/*/qty",
+              "evidence": [
+                "Scripted local model contract; verify against source workbook."
+              ],
+              "confidence": 1.0
+            }
+          ],
+          "source": "stock",
+          "target": "/inventory",
+          "dedupe_keys": [],
+          "normalize_keys": [
+            "trim",
+            "upper"
+          ]
+        }
+      ],
+      "attributes_passthrough": false
+    }
+  },
+  "questions": {
+    "mapping_id": "map_01M6KVNR0EJN5E9RDC2R041Z04",
+    "round_id": "rnd_01M6KVNCXNCZKR5VYX5F507ABH",
+    "status": "proposed",
+    "blocked": false,
+    "questions": [
+      {
+        "id": "/currency",
+        "field": {
+          "pointer": "/currency",
+          "name": "currency",
+          "json_type": [
+            "string"
+          ],
+          "semantic": "currency",
+          "risk": "critical",
+          "required": true,
+          "nullable": false,
+          "enum": null,
+          "format": null,
+          "synonyms_en": [],
+          "synonyms_th": [],
+          "description": "ISO currency from the applicable price row.",
+          "description_th": null,
+          "in_collection": null,
+          "is_collection": false,
+          "system": false,
+          "default": null,
+          "examples": []
+        },
+        "kind": "choice",
+        "options": [
+          "Currency",
+          "Company",
+          "Item",
+          "Unit"
+        ],
+        "current": {
+          "op": "col",
+          "name": "Currency",
+          "source": "prices"
+        },
+        "evidence": [
+          "Scripted local model contract; verify against source workbook.",
+          "FORMA's matcher read {\"op\": \"const\", \"value\": \"THB\"} instead: confidence 1.00 → 0.70",
+          "FORMA's matcher read {\"op\": \"const\", \"value\": \"THB\"} for this field",
+          "ตัวอย่างจากคอลัมน์ Currency: VND"
+        ],
+        "note": null,
+        "contested": true,
+        "source_examples": [
+          {
+            "source": "prices",
+            "column": "Currency",
+            "values": [
+              "VND"
+            ],
+            "scope": "profile samples; not all rows"
+          }
+        ]
+      },
+      {
+        "id": "/sell_unit",
+        "field": {
+          "pointer": "/sell_unit",
+          "name": "sell_unit",
+          "json_type": [
+            "string"
+          ],
+          "semantic": "unit.sell",
+          "risk": "high",
+          "required": true,
+          "nullable": false,
+          "enum": null,
+          "format": null,
+          "synonyms_en": [],
+          "synonyms_th": [],
+          "description": "Full unit name; ask if the code has no definition.",
+          "description_th": null,
+          "in_collection": null,
+          "is_collection": false,
+          "system": false,
+          "default": null,
+          "examples": []
+        },
+        "kind": "choice",
+        "options": [
+          "Full unit",
+          "Unit",
+          "Company",
+          "Item"
+        ],
+        "current": {
+          "op": "col",
+          "name": "Full unit",
+          "source": "units"
+        },
+        "evidence": [
+          "Scripted local model contract; verify against source workbook.",
+          "FORMA's matcher read Item Master 4.Unit instead: confidence 1.00 → 0.70",
+          "FORMA's matcher read Unit for this field",
+          "ตัวอย่างจากคอลัมน์ Full unit: PIECE · BOTTLE"
+        ],
+        "note": null,
+        "contested": true,
+        "source_examples": [
+          {
+            "source": "units",
+            "column": "Full unit",
+            "values": [
+              "PIECE",
+              "BOTTLE"
+            ],
+            "scope": "profile samples; not all rows"
+          }
+        ]
+      }
+    ],
+    "open_questions": [
+      "Sheet 'Delivery Notes 4' has a currency column 'Target currency' (Effective date, Price list, Stock basis), but records are labelled THB: confirm",
+      "Sheet 'Price List 4' has a currency column 'Currency' (VND), but records are labelled THB: confirm",
+      "Table 'Warehouse Balances 4' looks like inventory but no column links to root key 'Material Code'"
+    ],
+    "reasons": [
+      "low confidence on critical fields: /currency (0.70)",
+      "low confidence on high-risk fields: /sell_unit (0.70)",
+      "structure is identical to customer X0104's approved format — confirm this file belongs here",
+      "first time this customer/format is seen",
+      "3 questions still need operator confirmation",
+      "the model selects rows differently from FORMA's matcher (records: dedupe; records: joins)"
+    ],
+    "sample": [
+      {
+        "sku": "SG-000005",
+        "price": 73.75,
+        "currency": "VND",
+        "inventory": [
+          {
+            "qty": 175.0,
+            "warehouse_code": "VN-03"
+          },
+          {
+            "qty": 174.0,
+            "warehouse_code": "VN-02"
+          },
+          {
+            "qty": 173.0,
+            "warehouse_code": "VN-01"
+          }
+        ],
+        "sell_unit": "PIECE",
+        "source_meta": {
+          "file": "X0204.xlsx",
+          "lineage": {
+            "items": {
+              "/inventory": [
+                5,
+                40,
+                106
+              ]
+            },
+            "joined": {
+              "units": 0,
+              "prices": 2
+            },
+            "source": "master",
+            "root_row": 0
+          }
+        },
+        "product_name": "Trà SG 023 / 4"
+      },
+      {
+        "sku": "SG-000003",
+        "price": 71.25,
+        "currency": "VND",
+        "inventory": [
+          {
+            "qty": 160.0,
+            "warehouse_code": "VN-02"
+          },
+          {
+            "qty": 159.0,
+            "warehouse_code": "VN-01"
+          },
+          {
+            "qty": 161.0,
+            "warehouse_code": "VN-03"
+          }
+        ],
+        "sell_unit": "PIECE",
+        "source_meta": {
+          "file": "X0204.xlsx",
+          "lineage": {
+            "items": {
+              "/inventory": [
+                17,
+                23,
+                58
+              ]
+            },
+            "joined": {
+              "units": 0,
+              "prices": 22
+            },
+            "source": "master",
+            "root_row": 1
+          }
+        },
+        "product_name": "Trà SG 021 / 4"
+      },
+      {
+        "sku": "VN-000004",
+        "price": 50.0,
+        "currency": "VND",
+        "inventory": [
+          {
+            "qty": 41.0,
+            "warehouse_code": "VN-02"
+          },
+          {
+            "qty": 42.0,
+            "warehouse_code": "VN-03"
+          },
+          {
+            "qty": 40.0,
+            "warehouse_code": "VN-01"
+          }
+        ],
+        "sell_unit": "BOTTLE",
+        "source_meta": {
+          "file": "X0204.xlsx",
+          "lineage": {
+            "items": {
+              "/inventory": [
+                20,
+                57,
+                74
+              ]
+            },
+            "joined": {
+              "units": 1,
+              "prices": 15
+            },
+            "source": "master",
+            "root_row": 2
+          }
+        },
+        "product_name": "Trà VN 004 / 4"
+      }
+    ],
+    "context": {
+      "customer": {
+        "code": "X0204",
+        "name": "Excel100 X0204"
+      },
+      "round_label": "Excel100 complex suite · X0204.xlsx",
+      "files": [
+        {
+          "id": "fil_01M6KVNCY5A8DBT8Z6TEREN5ZZ",
+          "name": "X0204.xlsx"
+        }
+      ],
+      "mapping_version": 1
+    },
+    "changes": [],
+    "comparison_dataset_id": null,
+    "checks": {
+      "drift": null,
+      "errors": 0,
+      "rows_out": 36,
+      "warnings": 0,
+      "agreement": {
+        "ops": 2,
+        "agree": 2,
+        "record": 2,
+        "dropped": 0,
+        "disagree": 2,
+        "model_only": 3
+      },
+      "llm_fallback": false,
+      "reused_approved": false,
+      "full_verification": true,
+      "mapping_confidence": 1.0,
+      "data_checks_trusted": false,
+      "low_confidence_high": [
+        "/sell_unit (0.70)"
+      ],
+      "unresolved_questions": 3,
+      "plausibility_warnings": 0,
+      "low_confidence_critical": [
+        "/currency (0.70)"
+      ],
+      "verification": {
+        "scope": "Execution and contract checks; business ambiguities require operator answers",
+        "passed": true,
+        "version": 1,
+        "complete": true,
+        "coverage": {
+          "fields": {
+            "/sku": {
+              "risk": "medium",
+              "records": 36,
+              "records_filled": 36
+            },
+            "/price": {
+              "risk": "critical",
+              "records": 36,
+              "records_filled": 36
+            },
+            "/currency": {
+              "risk": "critical",
+              "records": 36,
+              "records_filled": 36
+            },
+            "/sell_unit": {
+              "risk": "high",
+              "records": 36,
+              "records_filled": 36
+            },
+            "/product_name": {
+              "risk": "medium",
+              "records": 36,
+              "records_filled": 36
+            },
+            "/inventory/*/qty": {
+              "risk": "high",
+              "records": 36,
+              "records_filled": 36
+            },
+            "/inventory/*/warehouse_code": {
+              "risk": "high",
+              "records": 36,
+              "records_filled": 36
+            }
+          },
+          "sources": {
+            "stock": 108,
+            "units": 2,
+            "master": 36,
+            "prices": 36
+          },
+          "collections": {
+            "/inventory": 108
+          },
+          "invalid_records": 0
+        },
+        "problems": [],
+        "rows_out": 36,
+        "warnings": [],
+        "rows_checked": 36,
+        "semantic_checks": {
+          "limitation": "Passing these checks does not prove column meaning. Missing business intent still requires an operator decision.",
+          "contract_rules": [],
+          "source_identity_warnings": []
+        }
+      }
+    },
+    "impact": {},
+    "fields": [
+      {
+        "pointer": "/sku",
+        "name": "sku",
+        "json_type": [
+          "string"
+        ],
+        "semantic": "identity.sku",
+        "risk": "medium",
+        "required": true,
+        "nullable": false,
+        "enum": null,
+        "format": null,
+        "synonyms_en": [],
+        "synonyms_th": [],
+        "description": "Preserve identity including leading zeroes.",
+        "description_th": null,
+        "in_collection": null,
+        "is_collection": false,
+        "system": false,
+        "default": null,
+        "examples": []
+      },
+      {
+        "pointer": "/price",
+        "name": "price",
+        "json_type": [
+          "number"
+        ],
+        "semantic": "price.amount",
+        "risk": "critical",
+        "required": true,
+        "nullable": false,
+        "enum": null,
+        "format": null,
+        "synonyms_en": [],
+        "synonyms_th": [],
+        "description": "Selling price for RETAIL in target currency valid 2026-11-05.",
+        "description_th": null,
+        "in_collection": null,
+        "is_collection": false,
+        "system": false,
+        "default": null,
+        "examples": []
+      },
+      {
+        "pointer": "/currency",
+        "name": "currency",
+        "json_type": [
+          "string"
+        ],
+        "semantic": "currency",
+        "risk": "critical",
+        "required": true,
+        "nullable": false,
+        "enum": null,
+        "format": null,
+        "synonyms_en": [],
+        "synonyms_th": [],
+        "description": "ISO currency from the applicable price row.",
+        "description_th": null,
+        "in_collection": null,
+        "is_collection": false,
+        "system": false,
+        "default": null,
+        "examples": []
+      },
+      {
+        "pointer": "/inventory/*/qty",
+        "name": "qty",
+        "json_type": [
+          "number"
+        ],
+        "semantic": "stock.qty",
+        "risk": "high",
+        "required": true,
+        "nullable": false,
+        "enum": null,
+        "format": null,
+        "synonyms_en": [],
+        "synonyms_th": [],
+        "description": "Individual pieces; sum lots within a warehouse.",
+        "description_th": null,
+        "in_collection": "/inventory",
+        "is_collection": false,
+        "system": false,
+        "default": null,
+        "examples": []
+      },
+      {
+        "pointer": "/inventory/*/warehouse_code",
+        "name": "warehouse_code",
+        "json_type": [
+          "string"
+        ],
+        "semantic": "stock.warehouse",
+        "risk": "high",
+        "required": true,
+        "nullable": false,
+        "enum": null,
+        "format": null,
+        "synonyms_en": [],
+        "synonyms_th": [],
+        "description": "Warehouse code.",
+        "description_th": null,
+        "in_collection": "/inventory",
+        "is_collection": false,
+        "system": false,
+        "default": null,
+        "examples": []
+      },
+      {
+        "pointer": "/sell_unit",
+        "name": "sell_unit",
+        "json_type": [
+          "string"
+        ],
+        "semantic": "unit.sell",
+        "risk": "high",
+        "required": true,
+        "nullable": false,
+        "enum": null,
+        "format": null,
+        "synonyms_en": [],
+        "synonyms_th": [],
+        "description": "Full unit name; ask if the code has no definition.",
+        "description_th": null,
+        "in_collection": null,
+        "is_collection": false,
+        "system": false,
+        "default": null,
+        "examples": []
+      },
+      {
+        "pointer": "/product_name",
+        "name": "product_name",
+        "json_type": [
+          "string"
+        ],
+        "semantic": "product.name",
+        "risk": "medium",
+        "required": true,
+        "nullable": false,
+        "enum": null,
+        "format": null,
+        "synonyms_en": [],
+        "synonyms_th": [],
+        "description": "Use the master product description.",
+        "description_th": null,
+        "in_collection": null,
+        "is_collection": false,
+        "system": false,
+        "default": null,
+        "examples": []
+      }
+    ]
+  },
+  "preview": {
+    "ok": true,
+    "validation": {
+      "ok": true,
+      "issues": []
+    },
+    "records": [
+      {
+        "sku": "SG-000005",
+        "product_name": "Trà SG 023 / 4",
+        "price": 73.75,
+        "currency": "VND",
+        "sell_unit": "PIECE",
+        "inventory": [
+          {
+            "warehouse_code": "VN-03",
+            "qty": 175.0
+          },
+          {
+            "warehouse_code": "VN-02",
+            "qty": 174.0
+          },
+          {
+            "warehouse_code": "VN-01",
+            "qty": 173.0
+          }
+        ],
+        "source_meta": {
+          "file": "X0204.xlsx",
+          "lineage": {
+            "root_row": 0,
+            "source": "master",
+            "items": {
+              "/inventory": [
+                5,
+                40,
+                106
+              ]
+            },
+            "joined": {
+              "prices": 2,
+              "units": 0
+            }
+          }
+        }
+      },
+      {
+        "sku": "SG-000003",
+        "product_name": "Trà SG 021 / 4",
+        "price": 71.25,
+        "currency": "VND",
+        "sell_unit": "PIECE",
+        "inventory": [
+          {
+            "warehouse_code": "VN-02",
+            "qty": 160.0
+          },
+          {
+            "warehouse_code": "VN-01",
+            "qty": 159.0
+          },
+          {
+            "warehouse_code": "VN-03",
+            "qty": 161.0
+          }
+        ],
+        "source_meta": {
+          "file": "X0204.xlsx",
+          "lineage": {
+            "root_row": 1,
+            "source": "master",
+            "items": {
+              "/inventory": [
+                17,
+                23,
+                58
+              ]
+            },
+            "joined": {
+              "prices": 22,
+              "units": 0
+            }
+          }
+        }
+      },
+      {
+        "sku": "VN-000004",
+        "product_name": "Trà VN 004 / 4",
+        "price": 50.0,
+        "currency": "VND",
+        "sell_unit": "BOTTLE",
+        "inventory": [
+          {
+            "warehouse_code": "VN-02",
+            "qty": 41.0
+          },
+          {
+            "warehouse_code": "VN-03",
+            "qty": 42.0
+          },
+          {
+            "warehouse_code": "VN-01",
+            "qty": 40.0
+          }
+        ],
+        "source_meta": {
+          "file": "X0204.xlsx",
+          "lineage": {
+            "root_row": 2,
+            "source": "master",
+            "items": {
+              "/inventory": [
+                20,
+                57,
+                74
+              ]
+            },
+            "joined": {
+              "prices": 15,
+              "units": 1
+            }
+          }
+        }
+      },
+      {
+        "sku": "SG-000009",
+        "product_name": "Trà SG 027 / 4",
+        "price": 78.75,
+        "currency": "VND",
+        "sell_unit": "PIECE",
+        "inventory": [
+          {
+            "warehouse_code": "VN-02",
+            "qty": 202.0
+          },
+          {
+            "warehouse_code": "VN-01",
+            "qty": 201.0
+          },
+          {
+            "warehouse_code": "VN-03",
+            "qty": 203.0
+          }
+        ],
+        "source_meta": {
+          "file": "X0204.xlsx",
+          "lineage": {
+            "root_row": 3,
+            "source": "master",
+            "items": {
+              "/inventory": [
+                51,
+                61,
+                92
+              ]
+            },
+            "joined": {
+              "prices": 21,
+              "units": 0
+            }
+          }
+        }
+      },
+      {
+        "sku": "VN-000009",
+        "product_name": "Trà VN 009 / 4",
+        "price": 56.25,
+        "currency": "VND",
+        "sell_unit": "PIECE",
+        "inventory": [
+          {
+            "warehouse_code": "VN-02",
+            "qty": 76.0
+          },
+          {
+            "warehouse_code": "VN-01",
+            "qty": 75.0
+          },
+          {
+            "warehouse_code": "VN-03",
+            "qty": 77.0
+          }
+        ],
+        "source_meta": {
+          "file": "X0204.xlsx",
+          "lineage": {
+            "root_row": 4,
+            "source": "master",
+            "items": {
+              "/inventory": [
+                59,
+                71,
+                89
+              ]
+            },
+            "joined": {
+              "prices": 24,
+              "units": 0
+            }
+          }
+        }
+      },
+      {
+        "sku": "SG-000012",
+        "product_name": "Trà SG 030 / 4",
+        "price": 82.5,
+        "currency": "VND",
+        "sell_unit": "BOTTLE",
+        "inventory": [
+          {
+            "warehouse_code": "VN-02",
+            "qty": 223.0
+          },
+          {
+            "warehouse_code": "VN-03",
+            "qty": 224.0
+          },
+          {
+            "warehouse_code": "VN-01",
+            "qty": 222.0
+          }
+        ],
+        "source_meta": {
+          "file": "X0204.xlsx",
+          "lineage": {
+            "root_row": 5,
+            "source": "master",
+            "items": {
+              "/inventory": [
+                13,
+                67,
+                68
+              ]
+            },
+            "joined": {
+              "prices": 4,
+              "units": 1
+            }
+          }
+        }
+      },
+      {
+        "sku": "VN-000017",
+        "product_name": "Trà VN 017 / 4",
+        "price": 66.25,
+        "currency": "VND",
+        "sell_unit": "PIECE",
+        "inventory": [
+          {
+            "warehouse_code": "VN-02",
+            "qty": 132.0
+          },
+          {
+            "warehouse_code": "VN-03",
+            "qty": 133.0
+          },
+          {
+            "warehouse_code": "VN-01",
+            "qty": 131.0
+          }
+        ],
+        "source_meta": {
+          "file": "X0204.xlsx",
+          "lineage": {
+            "root_row": 6,
+            "source": "master",
+            "items": {
+              "/inventory": [
+                52,
+                70,
+                79
+              ]
+            },
+            "joined": {
+              "prices": 3,
+              "units": 0
+            }
+          }
+        }
+      },
+      {
+        "sku": "SG-000015",
+        "product_name": "Trà SG 033 / 4",
+        "price": 86.25,
+        "currency": "VND",
+        "sell_unit": "PIECE",
+        "inventory": [
+          {
+            "warehouse_code": "VN-03",
+            "qty": 245.0
+          },
+          {
+            "warehouse_code": "VN-01",
+            "qty": 243.0
+          },
+          {
+            "warehouse_code": "VN-02",
+            "qty": 244.0
+          }
+        ],
+        "source_meta": {
+          "file": "X0204.xlsx",
+          "lineage": {
+            "root_row": 7,
+            "source": "master",
+            "items": {
+              "/inventory": [
+                84,
+                88,
+                94
+              ]
+            },
+            "joined": {
+              "prices": 7,
+              "units": 0
+            }
+          }
+        }
+      },
+      {
+        "sku": "VN-000008",
+        "product_name": "Trà VN 008 / 4",
+        "price": 55.0,
+        "currency": "VND",
+        "sell_unit": "BOTTLE",
+        "inventory": [
+          {
+            "warehouse_code": "VN-03",
+            "qty": 70.0
+          },
+          {
+            "warehouse_code": "VN-01",
+            "qty": 68.0
+          },
+          {
+            "warehouse_code": "VN-02",
+            "qty": 69.0
+          }
+        ],
+        "source_meta": {
+          "file": "X0204.xlsx",
+          "lineage": {
+            "root_row": 8,
+            "source": "master",
+            "items": {
+              "/inventory": [
+                35,
+                78,
+                97
+              ]
+            },
+            "joined": {
+              "prices": 25,
+              "units": 1
+            }
+          }
+        }
+      },
+      {
+        "sku": "VN-000003",
+        "product_name": "Trà VN 003 / 4",
+        "price": 48.75,
+        "currency": "VND",
+        "sell_unit": "PIECE",
+        "inventory": [
+          {
+            "warehouse_code": "VN-03",
+            "qty": 35.0
+          },
+          {
+            "warehouse_code": "VN-02",
+            "qty": 34.0
+          },
+          {
+            "warehouse_code": "VN-01",
+            "qty": 33.0
+          }
+        ],
+        "source_meta": {
+          "file": "X0204.xlsx",
+          "lineage": {
+            "root_row": 9,
+            "source": "master",
+            "items": {
+              "/inventory": [
+                6,
+                48,
+                77
+              ]
+            },
+            "joined": {
+              "prices": 28,
+              "units": 0
+            }
+          }
+        }
+      },
+      {
+        "sku": "SG-000017",
+        "product_name": "Trà SG 035 / 4",
+        "price": 88.75,
+        "currency": "VND",
+        "sell_unit": "PIECE",
+        "inventory": [
+          {
+            "warehouse_code": "VN-03",
+            "qty": 259.0
+          },
+          {
+            "warehouse_code": "VN-01",
+            "qty": 257.0
+          },
+          {
+            "warehouse_code": "VN-02",
+            "qty": 258.0
+          }
+        ],
+        "source_meta": {
+          "file": "X0204.xlsx",
+          "lineage": {
+            "root_row": 10,
+            "source": "master",
+            "items": {
+              "/inventory": [
+                39,
+                86,
+                99
+              ]
+            },
+            "joined": {
+              "prices": 1,
+              "units": 0
+            }
+          }
+        }
+      },
+      {
+        "sku": "VN-000018",
+        "product_name": "Trà VN 018 / 4",
+        "price": 67.5,
+        "currency": "VND",
+        "sell_unit": "BOTTLE",
+        "inventory": [
+          {
+            "warehouse_code": "VN-02",
+            "qty": 139.0
+          },
+          {
+            "warehouse_code": "VN-01",
+            "qty": 138.0
+          },
+          {
+            "warehouse_code": "VN-03",
+            "qty": 140.0
+          }
+        ],
+        "source_meta": {
+          "file": "X0204.xlsx",
+          "lineage": {
+            "root_row": 11,
+            "source": "master",
+            "items": {
+              "/inventory": [
+                45,
+                80,
+                105
+              ]
+            },
+            "joined": {
+              "prices": 34,
+              "units": 1
+            }
+          }
+        }
+      },
+      {
+        "sku": "SG-000002",
+        "product_name": "Trà SG 020 / 4",
+        "price": 70.0,
+        "currency": "VND",
+        "sell_unit": "BOTTLE",
+        "inventory": [
+          {
+            "warehouse_code": "VN-02",
+            "qty": 153.0
+          },
+          {
+            "warehouse_code": "VN-03",
+            "qty": 154.0
+          },
+          {
+            "warehouse_code": "VN-01",
+            "qty": 152.0
+          }
+        ],
+        "source_meta": {
+          "file": "X0204.xlsx",
+          "lineage": {
+            "root_row": 12,
+            "source": "master",
+            "items": {
+              "/inventory": [
+                56,
+                95,
+                100
+              ]
+            },
+            "joined": {
+              "prices": 5,
+              "units": 1
+            }
+          }
+        }
+      },
+      {
+        "sku": "SG-000001",
+        "product_name": "Trà SG 019 / 4",
+        "price": 68.75,
+        "currency": "VND",
+        "sell_unit": "PIECE",
+        "inventory": [
+          {
+            "warehouse_code": "VN-01",
+            "qty": 145.0
+          },
+          {
+            "warehouse_code": "VN-02",
+            "qty": 146.0
+          },
+          {
+            "warehouse_code": "VN-03",
+            "qty": 147.0
+          }
+        ],
+        "source_meta": {
+          "file": "X0204.xlsx",
+          "lineage": {
+            "root_row": 13,
+            "source": "master",
+            "items": {
+              "/inventory": [
+                12,
+                47,
+                76
+              ]
+            },
+            "joined": {
+              "prices": 30,
+              "units": 0
+            }
+          }
+        }
+      },
+      {
+        "sku": "SG-000014",
+        "product_name": "Trà SG 032 / 4",
+        "price": 85.0,
+        "currency": "VND",
+        "sell_unit": "BOTTLE",
+        "inventory": [
+          {
+            "warehouse_code": "VN-01",
+            "qty": 236.0
+          },
+          {
+            "warehouse_code": "VN-02",
+            "qty": 237.0
+          },
+          {
+            "warehouse_code": "VN-03",
+            "qty": 238.0
+          }
+        ],
+        "source_meta": {
+          "file": "X0204.xlsx",
+          "lineage": {
+            "root_row": 14,
+            "source": "master",
+            "items": {
+              "/inventory": [
+                15,
+                18,
+                54
+              ]
+            },
+            "joined": {
+              "prices": 26,
+              "units": 1
+            }
+          }
+        }
+      },
+      {
+        "sku": "VN-000005",
+        "product_name": "Trà VN 005 / 4",
+        "price": 51.25,
+        "currency": "VND",
+        "sell_unit": "PIECE",
+        "inventory": [
+          {
+            "warehouse_code": "VN-03",
+            "qty": 49.0
+          },
+          {
+            "warehouse_code": "VN-02",
+            "qty": 48.0
+          },
+          {
+            "warehouse_code": "VN-01",
+            "qty": 47.0
+          }
+        ],
+        "source_meta": {
+          "file": "X0204.xlsx",
+          "lineage": {
+            "root_row": 15,
+            "source": "master",
+            "items": {
+              "/inventory": [
+                25,
+                53,
+                69
+              ]
+            },
+            "joined": {
+              "prices": 29,
+              "units": 0
+            }
+          }
+        }
+      },
+      {
+        "sku": "SG-000011",
+        "product_name": "Trà SG 029 / 4",
+        "price": 81.25,
+        "currency": "VND",
+        "sell_unit": "PIECE",
+        "inventory": [
+          {
+            "warehouse_code": "VN-02",
+            "qty": 216.0
+          },
+          {
+            "warehouse_code": "VN-01",
+            "qty": 215.0
+          },
+          {
+            "warehouse_code": "VN-03",
+            "qty": 217.0
+          }
+        ],
+        "source_meta": {
+          "file": "X0204.xlsx",
+          "lineage": {
+            "root_row": 16,
+            "source": "master",
+            "items": {
+              "/inventory": [
+                30,
+                37,
+                66
+              ]
+            },
+            "joined": {
+              "prices": 31,
+              "units": 0
+            }
+          }
+        }
+      },
+      {
+        "sku": "VN-000012",
+        "product_name": "Trà VN 012 / 4",
+        "price": 60.0,
+        "currency": "VND",
+        "sell_unit": "BOTTLE",
+        "inventory": [
+          {
+            "warehouse_code": "VN-02",
+            "qty": 97.0
+          },
+          {
+            "warehouse_code": "VN-03",
+            "qty": 98.0
+          },
+          {
+            "warehouse_code": "VN-01",
+            "qty": 96.0
+          }
+        ],
+        "source_meta": {
+          "file": "X0204.xlsx",
+          "lineage": {
+            "root_row": 17,
+            "source": "master",
+            "items": {
+              "/inventory": [
+                4,
+                31,
+                43
+              ]
+            },
+            "joined": {
+              "prices": 33,
+              "units": 1
+            }
+          }
+        }
+      },
+      {
+        "sku": "SG-000013",
+        "product_name": "Trà SG 031 / 4",
+        "price": 83.75,
+        "currency": "VND",
+        "sell_unit": "PIECE",
+        "inventory": [
+          {
+            "warehouse_code": "VN-01",
+            "qty": 229.0
+          },
+          {
+            "warehouse_code": "VN-03",
+            "qty": 231.0
+          },
+          {
+            "warehouse_code": "VN-02",
+            "qty": 230.0
+          }
+        ],
+        "source_meta": {
+          "file": "X0204.xlsx",
+          "lineage": {
+            "root_row": 18,
+            "source": "master",
+            "items": {
+              "/inventory": [
+                36,
+                41,
+                102
+              ]
+            },
+            "joined": {
+              "prices": 0,
+              "units": 0
+            }
+          }
+        }
+      },
+      {
+        "sku": "SG-000006",
+        "product_name": "Trà SG 024 / 4",
+        "price": 75.0,
+        "currency": "VND",
+        "sell_unit": "BOTTLE",
+        "inventory": [
+          {
+            "warehouse_code": "VN-03",
+            "qty": 182.0
+          },
+          {
+            "warehouse_code": "VN-01",
+            "qty": 180.0
+          },
+          {
+            "warehouse_code": "VN-02",
+            "qty": 181.0
+          }
+        ],
+        "source_meta": {
+          "file": "X0204.xlsx",
+          "lineage": {
+            "root_row": 19,
+            "source": "master",
+            "items": {
+              "/inventory": [
+                14,
+                64,
+                82
+              ]
+            },
+            "joined": {
+              "prices": 13,
+              "units": 1
+            }
+          }
+        }
+      },
+      {
+        "sku": "VN-000011",
+        "product_name": "Trà VN 011 / 4",
+        "price": 58.75,
+        "currency": "VND",
+        "sell_unit": "PIECE",
+        "inventory": [
+          {
+            "warehouse_code": "VN-03",
+            "qty": 91.0
+          },
+          {
+            "warehouse_code": "VN-01",
+            "qty": 89.0
+          },
+          {
+            "warehouse_code": "VN-02",
+            "qty": 90.0
+          }
+        ],
+        "source_meta": {
+          "file": "X0204.xlsx",
+          "lineage": {
+            "root_row": 20,
+            "source": "master",
+            "items": {
+              "/inventory": [
+                33,
+                65,
+                101
+              ]
+            },
+            "joined": {
+              "prices": 10,
+              "units": 0
+            }
+          }
+        }
+      },
+      {
+        "sku": "VN-000001",
+        "product_name": "Trà VN 001 / 4",
+        "price": 46.25,
+        "currency": "VND",
+        "sell_unit": "PIECE",
+        "inventory": [
+          {
+            "warehouse_code": "VN-01",
+            "qty": 19.0
+          },
+          {
+            "warehouse_code": "VN-03",
+            "qty": 21.0
+          },
+          {
+            "warehouse_code": "VN-02",
+            "qty": 20.0
+          }
+        ],
+        "source_meta": {
+          "file": "X0204.xlsx",
+          "lineage": {
+            "root_row": 21,
+            "source": "master",
+            "items": {
+              "/inventory": [
+                16,
+                27,
+                38
+              ]
+            },
+            "joined": {
+              "prices": 32,
+              "units": 0
+            }
+          }
+        }
+      },
+      {
+        "sku": "VN-000010",
+        "product_name": "Trà VN 010 / 4",
+        "price": 57.5,
+        "currency": "VND",
+        "sell_unit": "BOTTLE",
+        "inventory": [
+          {
+            "warehouse_code": "VN-02",
+            "qty": 83.0
+          },
+          {
+            "warehouse_code": "VN-01",
+            "qty": 82.0
+          },
+          {
+            "warehouse_code": "VN-03",
+            "qty": 84.0
+          }
+        ],
+        "source_meta": {
+          "file": "X0204.xlsx",
+          "lineage": {
+            "root_row": 22,
+            "source": "master",
+            "items": {
+              "/inventory": [
+                28,
+                75,
+                93
+              ]
+            },
+            "joined": {
+              "prices": 19,
+              "units": 1
+            }
+          }
+        }
+      },
+      {
+        "sku": "SG-000018",
+        "product_name": "Trà SG 036 / 4",
+        "price": 90.0,
+        "currency": "VND",
+        "sell_unit": "BOTTLE",
+        "inventory": [
+          {
+            "warehouse_code": "VN-02",
+            "qty": 265.0
+          },
+          {
+            "warehouse_code": "VN-03",
+            "qty": 266.0
+          },
+          {
+            "warehouse_code": "VN-01",
+            "qty": 264.0
+          }
+        ],
+        "source_meta": {
+          "file": "X0204.xlsx",
+          "lineage": {
+            "root_row": 23,
+            "source": "master",
+            "items": {
+              "/inventory": [
+                0,
+                91,
+                96
+              ]
+            },
+            "joined": {
+              "prices": 6,
+              "units": 1
+            }
+          }
+        }
+      },
+      {
+        "sku": "SG-000016",
+        "product_name": "Trà SG 034 / 4",
+        "price": 87.5,
+        "currency": "VND",
+        "sell_unit": "BOTTLE",
+        "inventory": [
+          {
+            "warehouse_code": "VN-02",
+            "qty": 251.0
+          },
+          {
+            "warehouse_code": "VN-03",
+            "qty": 252.0
+          },
+          {
+            "warehouse_code": "VN-01",
+            "qty": 250.0
+          }
+        ],
+        "source_meta": {
+          "file": "X0204.xlsx",
+          "lineage": {
+            "root_row": 24,
+            "source": "master",
+            "items": {
+              "/inventory": [
+                22,
+                60,
+                107
+              ]
+            },
+            "joined": {
+              "prices": 16,
+              "units": 1
+            }
+          }
+        }
+      },
+      {
+        "sku": "VN-000002",
+        "product_name": "Trà VN 002 / 4",
+        "price": 47.5,
+        "currency": "VND",
+        "sell_unit": "BOTTLE",
+        "inventory": [
+          {
+            "warehouse_code": "VN-01",
+            "qty": 26.0
+          },
+          {
+            "warehouse_code": "VN-02",
+            "qty": 27.0
+          },
+          {
+            "warehouse_code": "VN-03",
+            "qty": 28.0
+          }
+        ],
+        "source_meta": {
+          "file": "X0204.xlsx",
+          "lineage": {
+            "root_row": 25,
+            "source": "master",
+            "items": {
+              "/inventory": [
+                7,
+                11,
+                26
+              ]
+            },
+            "joined": {
+              "prices": 18,
+              "units": 1
+            }
+          }
+        }
+      },
+      {
+        "sku": "SG-000004",
+        "product_name": "Trà SG 022 / 4",
+        "price": 72.5,
+        "currency": "VND",
+        "sell_unit": "BOTTLE",
+        "inventory": [
+          {
+            "warehouse_code": "VN-01",
+            "qty": 166.0
+          },
+          {
+            "warehouse_code": "VN-03",
+            "qty": 168.0
+          },
+          {
+            "warehouse_code": "VN-02",
+            "qty": 167.0
+          }
+        ],
+        "source_meta": {
+          "file": "X0204.xlsx",
+          "lineage": {
+            "root_row": 26,
+            "source": "master",
+            "items": {
+              "/inventory": [
+                2,
+                44,
+                49
+              ]
+            },
+            "joined": {
+              "prices": 27,
+              "units": 1
+            }
+          }
+        }
+      },
+      {
+        "sku": "VN-000015",
+        "product_name": "Trà VN 015 / 4",
+        "price": 63.75,
+        "currency": "VND",
+        "sell_unit": "PIECE",
+        "inventory": [
+          {
+            "warehouse_code": "VN-02",
+            "qty": 118.0
+          },
+          {
+            "warehouse_code": "VN-03",
+            "qty": 119.0
+          },
+          {
+            "warehouse_code": "VN-01",
+            "qty": 117.0
+          }
+        ],
+        "source_meta": {
+          "file": "X0204.xlsx",
+          "lineage": {
+            "root_row": 27,
+            "source": "master",
+            "items": {
+              "/inventory": [
+                32,
+                50,
+                90
+              ]
+            },
+            "joined": {
+              "prices": 20,
+              "units": 0
+            }
+          }
+        }
+      },
+      {
+        "sku": "VN-000016",
+        "product_name": "Trà VN 016 / 4",
+        "price": 65.0,
+        "currency": "VND",
+        "sell_unit": "BOTTLE",
+        "inventory": [
+          {
+            "warehouse_code": "VN-02",
+            "qty": 125.0
+          },
+          {
+            "warehouse_code": "VN-03",
+            "qty": 126.0
+          },
+          {
+            "warehouse_code": "VN-01",
+            "qty": 124.0
+          }
+        ],
+        "source_meta": {
+          "file": "X0204.xlsx",
+          "lineage": {
+            "root_row": 28,
+            "source": "master",
+            "items": {
+              "/inventory": [
+                10,
+                34,
+                81
+              ]
+            },
+            "joined": {
+              "prices": 23,
+              "units": 1
+            }
+          }
+        }
+      },
+      {
+        "sku": "VN-000014",
+        "product_name": "Trà VN 014 / 4",
+        "price": 62.5,
+        "currency": "VND",
+        "sell_unit": "BOTTLE",
+        "inventory": [
+          {
+            "warehouse_code": "VN-01",
+            "qty": 110.0
+          },
+          {
+            "warehouse_code": "VN-02",
+            "qty": 111.0
+          },
+          {
+            "warehouse_code": "VN-03",
+            "qty": 112.0
+          }
+        ],
+        "source_meta": {
+          "file": "X0204.xlsx",
+          "lineage": {
+            "root_row": 29,
+            "source": "master",
+            "items": {
+              "/inventory": [
+                62,
+                63,
+                103
+              ]
+            },
+            "joined": {
+              "prices": 11,
+              "units": 1
+            }
+          }
+        }
+      },
+      {
+        "sku": "SG-000007",
+        "product_name": "Trà SG 025 / 4",
+        "price": 76.25,
+        "currency": "VND",
+        "sell_unit": "PIECE",
+        "inventory": [
+          {
+            "warehouse_code": "VN-02",
+            "qty": 188.0
+          },
+          {
+            "warehouse_code": "VN-01",
+            "qty": 187.0
+          },
+          {
+            "warehouse_code": "VN-03",
+            "qty": 189.0
+          }
+        ],
+        "source_meta": {
+          "file": "X0204.xlsx",
+          "lineage": {
+            "root_row": 30,
+            "source": "master",
+            "items": {
+              "/inventory": [
+                8,
+                46,
+                55
+              ]
+            },
+            "joined": {
+              "prices": 9,
+              "units": 0
+            }
+          }
+        }
+      },
+      {
+        "sku": "VN-000007",
+        "product_name": "Trà VN 007 / 4",
+        "price": 53.75,
+        "currency": "VND",
+        "sell_unit": "PIECE",
+        "inventory": [
+          {
+            "warehouse_code": "VN-01",
+            "qty": 61.0
+          },
+          {
+            "warehouse_code": "VN-03",
+            "qty": 63.0
+          },
+          {
+            "warehouse_code": "VN-02",
+            "qty": 62.0
+          }
+        ],
+        "source_meta": {
+          "file": "X0204.xlsx",
+          "lineage": {
+            "root_row": 31,
+            "source": "master",
+            "items": {
+              "/inventory": [
+                9,
+                24,
+                85
+              ]
+            },
+            "joined": {
+              "prices": 8,
+              "units": 0
+            }
+          }
+        }
+      },
+      {
+        "sku": "VN-000006",
+        "product_name": "Trà VN 006 / 4",
+        "price": 52.5,
+        "currency": "VND",
+        "sell_unit": "BOTTLE",
+        "inventory": [
+          {
+            "warehouse_code": "VN-02",
+            "qty": 55.0
+          },
+          {
+            "warehouse_code": "VN-03",
+            "qty": 56.0
+          },
+          {
+            "warehouse_code": "VN-01",
+            "qty": 54.0
+          }
+        ],
+        "source_meta": {
+          "file": "X0204.xlsx",
+          "lineage": {
+            "root_row": 32,
+            "source": "master",
+            "items": {
+              "/inventory": [
+                1,
+                3,
+                72
+              ]
+            },
+            "joined": {
+              "prices": 14,
+              "units": 1
+            }
+          }
+        }
+      },
+      {
+        "sku": "VN-000013",
+        "product_name": "Trà VN 013 / 4",
+        "price": 61.25,
+        "currency": "VND",
+        "sell_unit": "PIECE",
+        "inventory": [
+          {
+            "warehouse_code": "VN-02",
+            "qty": 104.0
+          },
+          {
+            "warehouse_code": "VN-03",
+            "qty": 105.0
+          },
+          {
+            "warehouse_code": "VN-01",
+            "qty": 103.0
+          }
+        ],
+        "source_meta": {
+          "file": "X0204.xlsx",
+          "lineage": {
+            "root_row": 33,
+            "source": "master",
+            "items": {
+              "/inventory": [
+                21,
+                29,
+                87
+              ]
+            },
+            "joined": {
+              "prices": 12,
+              "units": 0
+            }
+          }
+        }
+      },
+      {
+        "sku": "SG-000008",
+        "product_name": "Trà SG 026 / 4",
+        "price": 77.5,
+        "currency": "VND",
+        "sell_unit": "BOTTLE",
+        "inventory": [
+          {
+            "warehouse_code": "VN-01",
+            "qty": 194.0
+          },
+          {
+            "warehouse_code": "VN-03",
+            "qty": 196.0
+          },
+          {
+            "warehouse_code": "VN-02",
+            "qty": 195.0
+          }
+        ],
+        "source_meta": {
+          "file": "X0204.xlsx",
+          "lineage": {
+            "root_row": 34,
+            "source": "master",
+            "items": {
+              "/inventory": [
+                42,
+                73,
+                104
+              ]
+            },
+            "joined": {
+              "prices": 35,
+              "units": 1
+            }
+          }
+        }
+      },
+      {
+        "sku": "SG-000010",
+        "product_name": "Trà SG 028 / 4",
+        "price": 80.0,
+        "currency": "VND",
+        "sell_unit": "BOTTLE",
+        "inventory": [
+          {
+            "warehouse_code": "VN-01",
+            "qty": 208.0
+          },
+          {
+            "warehouse_code": "VN-03",
+            "qty": 210.0
+          },
+          {
+            "warehouse_code": "VN-02",
+            "qty": 209.0
+          }
+        ],
+        "source_meta": {
+          "file": "X0204.xlsx",
+          "lineage": {
+            "root_row": 35,
+            "source": "master",
+            "items": {
+              "/inventory": [
+                19,
+                83,
+                98
+              ]
+            },
+            "joined": {
+              "prices": 17,
+              "units": 1
+            }
+          }
+        }
+      }
+    ],
+    "findings": [],
+    "stats": {
+      "rows_in": 36,
+      "rows_out": 36,
+      "sources": {
+        "master": 36,
+        "prices": 36,
+        "stock": 108,
+        "units": 2
+      },
+      "collections": {
+        "/inventory": 108
+      },
+      "duration_ms": 838.7,
+      "identity_keys": [
+        "/sku"
+      ],
+      "invalid_records": 0
+    },
+    "scope": {
+      "execution": "complete",
+      "records_total": 36,
+      "records_shown": 36,
+      "display_limit": 500
+    }
+  }
+}

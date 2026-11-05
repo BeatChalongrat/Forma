@@ -1,4 +1,5 @@
 import { KnowledgeManager, AuditBrowser } from '../components/KnowledgeManager'
+import { KnowledgeReleases } from '../components/KnowledgeReleases'
 import { Localized } from '../lib/locale'
 import { usePreferences } from '../lib/preferences'
 import { providerName } from '../lib/providerName'
@@ -11,7 +12,7 @@ import { PageHeader, Section, Badge, RiskDot, Json, KV, Modal, Spinner } from '.
 import { cn, fmtDate } from '../lib/utils'
 import { useToast } from '../lib/toast'
 
-const TABS = ['ai', 'formats', 'policy', 'learning', 'dsl', 'audit', 'system'] as const
+const TABS = ['ai', 'formats', 'policy', 'learning', 'releases', 'dsl', 'audit', 'system'] as const
 type Tab = (typeof TABS)[number]
 
 const SECTIONS: { id: Tab; label: string; hint: string; icon: LucideIcon }[] = [
@@ -19,6 +20,7 @@ const SECTIONS: { id: Tab; label: string; hint: string; icon: LucideIcon }[] = [
   { id: 'formats', label: 'Target formats', hint: 'อัป Target JSON และตั้งค่าเริ่มต้น', icon: FileJson },
   { id: 'policy', label: 'Approval policy', hint: 'เกณฑ์ approve อัตโนมัติ และเกณฑ์ความผิดปกติ', icon: Scale },
   { id: 'learning', label: 'What FORMA learned', hint: 'สิ่งที่ระบบเรียนจากการแก้ของคุณ และแนวโน้มการแก้ต่อรอบ', icon: Brain },
+  { id: 'releases', label: 'ย้ายความรู้', hint: 'ตรวจแหล่งที่มา เลือกส่งต่อ และถอนความรู้สำหรับระบบจริง', icon: Upload },
   { id: 'dsl', label: 'Mapping DSL', hint: 'รายการคำสั่งแปลงข้อมูลที่ใช้ได้', icon: CodeXml },
   { id: 'audit', label: 'Audit log', hint: 'ใครทำอะไร เมื่อไร', icon: ScrollText },
   { id: 'system', label: 'System', hint: 'การตั้งค่าเครื่อง server', icon: Monitor },
@@ -41,6 +43,7 @@ export function SettingsPage() {
         {tab === 'formats' && <FormatsTab />}
         {tab === 'policy' && <PolicyTab />}
         {tab === 'learning' && <KnowledgeManager />}
+        {tab === 'releases' && <KnowledgeReleases />}
         {tab === 'dsl' && <DslTab />}
         {tab === 'audit' && <AuditBrowser />}
         {tab === 'system' && <SystemTab />}

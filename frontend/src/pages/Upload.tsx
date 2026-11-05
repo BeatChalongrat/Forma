@@ -1,4 +1,5 @@
 import { WorkRoundProgress } from '../components/WorkRoundDashboard'
+import { UploadBackLink } from '../components/UploadBackLink'
 import { Localized } from '../lib/locale'
 import { dateInZone, usePreferences } from '../lib/preferences'
 import { Workflow } from '../components/Workflow'
@@ -6,7 +7,7 @@ import { VerdictLine } from '../components/VerdictCard'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { ArrowLeft, ArrowRight, CircleAlert, CircleCheck, Download, FileSpreadsheet, LoaderCircle, Upload, UserPlus, X } from 'lucide-react'
+import { ArrowRight, CircleAlert, CircleCheck, Download, FileSpreadsheet, LoaderCircle, Upload, UserPlus, X } from 'lucide-react'
 import { api, type BatchItem, type BatchItemState } from '../lib/api'
 import { cn, fmtBytes, fmtDate, fmtInt } from '../lib/utils'
 import { Badge, PageHeader, Section, Spinner, Modal } from '../components/ui'
@@ -15,16 +16,9 @@ import { RoundMenu } from '../components/RoundMenu'
 import { FileMenu } from '../components/FileMenu'
 import { refusedNames, splitReadable, UPLOAD_ACCEPT, UPLOAD_TYPES } from '../lib/uploads'
 
-function UploadBackLink({ fallback = '/imports' }: { fallback?: string }) {
-  const { t } = usePreferences()
-  const { state } = useLocation()
-  const origin = state as { uploadReturnTo?: unknown; uploadReturnState?: unknown } | null
-  const target = typeof origin?.uploadReturnTo === 'string' && /^\/(?:imports(?:\?|$)|uploads\/[^/?#]+(?:\?|$))/.test(origin.uploadReturnTo) ? origin.uploadReturnTo : fallback
-  return <Link to={target} state={origin?.uploadReturnState} className="btn btn-ghost btn-sm mb-5"><ArrowLeft size={15} />{target.startsWith('/uploads/') ? t('Back to this round', 'กลับรอบงานนี้') : t('Back to upload history', 'กลับประวัติไฟล์')}</Link>
-}
-
 /** Upload many files at once: each is matched to its customer by format and becomes one JSON (ADR-027). */
 export function BulkUpload() {
+  const location = useLocation()
   const receipt = useRef<{ files: File[]; options: string; key: string } | null>(null)
   const { t, prefs } = usePreferences()
   const [params] = useSearchParams()
@@ -157,7 +151,7 @@ export function BulkUpload() {
           </div>
           <div className="border-t border-line pt-4 text-[13px] leading-relaxed">
             <p className="text-ink-2 mb-2">{t('Products, prices and stock in separate files for the same customer? Process them together as one dataset instead.', 'ถ้าลูกค้ารายเดียวส่งไฟล์สินค้า ราคา และสต็อกแยกกัน และต้องใช้ข้อมูลร่วมกัน ให้เลือกประมวลผลเป็นชุดเดียว')}</p>
-            <Link to="/imports/new/single" className="btn btn-sm">{t('Combine files for one customer', 'รวมไฟล์ของลูกค้ารายเดียว')} <ArrowRight size={14} /></Link>
+            <Link to="/imports/new/single" state={{ uploadReturnTo: location.pathname + location.search, uploadReturnState: location.state }} className="btn btn-sm">{t('Combine files for one customer', 'รวมไฟล์ของลูกค้ารายเดียว')} <ArrowRight size={14} /></Link>
             <p className="text-muted text-xs mt-2">{t('A work round groups uploads for tracking; it does not merge their data.', 'รอบงานใช้จัดกลุ่มเพื่อติดตามงาน ไม่ได้รวมข้อมูลของไฟล์เข้าด้วยกัน')}</p>
           </div>
         </div>

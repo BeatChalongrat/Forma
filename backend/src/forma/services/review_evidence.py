@@ -9,9 +9,9 @@ from sqlalchemy.orm import Session
 
 from forma.core.errors import ValidationFailed
 from forma.db.models import ImportRound, MappingVersion
-from forma.engine.transform import ROW_COL, _get_pointer, _source_columns, load_source_frame
+from forma.engine.transform import ROW_COL, TransformResult, _get_pointer, _source_columns, load_source_frame
 from forma.mapping_dsl.models import MappingDocument
-from forma.schema_registry import PROVENANCE_KEY
+from forma.schema_registry import PROVENANCE_KEY, TargetSchema
 from forma.services import mapping, sandbox
 from forma.services.context import ServiceContext
 from forma.services.lineage import _expr_columns, _Sources
@@ -27,9 +27,6 @@ def validate_answer_effects(
     decisions: list[dict[str, Any]],
 ) -> dict[str, Any]:
     """Execute the complete delivery and reject new invalid records or unrelated changes."""
-    from forma.ai.plausibility import values_at
-    from forma.core.hashing import stable_hash
-
     r = session.get(ImportRound, m.round_id)
     if r is None:
         raise ValidationFailed("This mapping has no source delivery")
@@ -44,6 +41,19 @@ def validate_answer_effects(
         raise ValidationFailed(
             "Could not verify the complete delivery", details={"errors": old_errors + errors}
         )
+    return _validate_answer_results(schema, before, after, decisions)
+
+
+def _validate_answer_results(
+    schema: TargetSchema,
+    before: TransformResult,
+    after: TransformResult,
+    decisions: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """Check full results; preview and effect validation must use the same execution."""
+    from forma.ai.plausibility import values_at
+    from forma.core.hashing import stable_hash
+
     if after.stats.get("invalid_records", 0) > before.stats.get("invalid_records", 0):
         raise ValidationFailed(
             "These answers introduce invalid output records",
@@ -157,12 +167,13 @@ def evidence(ctx: ServiceContext, session: Session, m: MappingVersion, pointer: 
     if r is None:
         raise ValidationFailed("This mapping has no source delivery")
     doc.provenance = True  # preview only; never modify the stored document
-    sim, _problems = mapping.simulate(ctx, doc, schema, r.files, limit=SAMPLE_LIMIT)
+    sim, _problems = mapping.simulate(ctx, doc, schema, r.files, limit=None)
     result: dict[str, Any] = {
         "field": pointer,
         "examples": [],
         "sample_limit": SAMPLE_LIMIT,
         "sample_records": len(sim.records) if sim else 0,
+        "execution_scope": "complete_delivery",
         "constant": fm.expr.op == "const",
         "unavailable": sim is None or not sim.records,
         "context_only": False,
@@ -193,7 +204,7 @@ def evidence(ctx: ServiceContext, session: Session, m: MappingVersion, pointer: 
         if sid not in frames and sid in bindings:
             source = next(s for s in doc.sources if s.id == sid)
             frames[sid] = load_source_frame(
-                source, bindings[sid], limit=SAMPLE_LIMIT, expected_columns=_source_columns(doc, sid)
+                source, bindings[sid], limit=None, expected_columns=_source_columns(doc, sid)
             )
     for rec in sim.records:
         lin = (rec.get(PROVENANCE_KEY) or {}).get("lineage") or {}
@@ -252,22 +263,28 @@ def answer_impact(
     document: dict[str, Any],
     answers: dict[str, Any],
 ) -> dict[str, Any]:
-    """Compare both versions on the same bounded sample, joined by schema identity."""
+    """Execute each version once, validate all records, then bound only the displayed diff."""
     if m.round_id is None:
         raise ValidationFailed("This mapping has no source delivery")
-    before = mapping.preview_mapping(ctx, session, m.round_id, m.document, limit=SAMPLE_LIMIT)
-    after = mapping.preview_mapping(ctx, session, m.round_id, document, limit=SAMPLE_LIMIT)
+    before, old_result = mapping.preview_execution(ctx, session, m.round_id, m.document, limit=SAMPLE_LIMIT)
+    after, new_result = mapping.preview_execution(ctx, session, m.round_id, document, limit=SAMPLE_LIMIT)
     from forma.services.review_questions import questions
 
     catalogue = {q["id"]: q for q in questions(ctx, m)["questions"]}
+    schema = ctx.registry.get_ref(m.target_schema)
     try:
-        checked = validate_answer_effects(ctx, session, m, document, [catalogue[k] for k in answers])
+        if old_result is None or new_result is None:
+            raise ValidationFailed("Could not verify the complete delivery")
+        checked = _validate_answer_results(schema, old_result, new_result, [catalogue[k] for k in answers])
     except ValidationFailed as exc:
         checked = {"complete": True, "passed": False, "error": str(exc)}
         after["ok"] = False
         after["errors"] = [str(exc)]
     counts, detail = sandbox.compare_records(
-        ctx.registry.get_ref(m.target_schema), before.get("records", []), after.get("records", []), cap=50
+        schema,
+        old_result.records if old_result is not None else [],
+        new_result.records if new_result is not None else [],
+        cap=SAMPLE_LIMIT,
     )
     return {
         "preview": after,
@@ -277,8 +294,9 @@ def answer_impact(
             "counts": counts,
             "rows": detail["changed"],
             "sample_limit": SAMPLE_LIMIT,
-            "before_records": len(before.get("records", [])),
-            "after_records": len(after.get("records", [])),
+            "before_records": len(old_result.records) if old_result is not None else 0,
+            "after_records": len(new_result.records) if new_result is not None else 0,
+            "scope": "complete_delivery",
             "reliable": bool(before.get("ok") and after.get("ok")),
             "confirmed_fields": list(answers),
         },

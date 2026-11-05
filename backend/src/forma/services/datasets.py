@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import contextlib
 import copy
-import datetime as dt
 import re
 from collections.abc import Iterator
 from pathlib import Path
@@ -16,6 +15,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from forma.core.errors import Conflict, NotFound, ValidationFailed
+from forma.core.hashing import stable_hash
 from forma.core.ids import new_id
 from forma.db.models import ChangeSet, DatasetVersion, ExportArtifact, ImportRound, Override
 from forma.engine.ops import CompileContext, compile_expr
@@ -25,6 +25,7 @@ from forma.mapping_dsl.models import CallExpr, ColExpr, ConstExpr, MappingDocume
 from forma.schema_registry import INTERNAL_KEYS, PROVENANCE_KEY, TargetSchema
 from forma.services.context import ServiceContext
 from forma.services.mapping import bind_sources, get_mapping
+from forma.services.round_lifecycle import lock_round
 from forma.services.rounds import audit, get_round
 
 
@@ -77,6 +78,7 @@ def _new_version(
         for d in records:
             d.setdefault(PROVENANCE_KEY, {})["dataset_version_id"] = dv_id
     write_version_object(ctx, key, records)
+    session.info.setdefault("rollback_objects", []).append((ctx.storage, key))
     try:
         dv = DatasetVersion(id=dv_id, records_key=key, row_count=len(records), **fields)
         session.add(dv)
@@ -93,6 +95,24 @@ def get_dataset(session: Session, dataset_id: str) -> DatasetVersion:
     if d is None:
         raise NotFound(f"dataset version {dataset_id} not found")
     return d
+
+
+def _writable_dataset(session: Session, dataset_id: str) -> DatasetVersion:
+    dv = get_dataset(session, dataset_id)
+    lock_round(session, dv.round_id)
+    session.refresh(dv)
+    latest = session.scalar(
+        select(DatasetVersion)
+        .where(DatasetVersion.round_id == dv.round_id)
+        .order_by(DatasetVersion.version.desc())
+        .limit(1)
+    )
+    if latest and latest.id != dv.id:
+        raise Conflict(
+            "ข้อมูลมีเวอร์ชันใหม่แล้ว กรุณาเปิดข้อมูลล่าสุดก่อนบันทึก",
+            details={"latest_dataset_id": latest.id, "latest_version": latest.version},
+        )
+    return dv
 
 
 # --------------------------------------------------------------------------------------------
@@ -140,9 +160,6 @@ def transform_round(
     bindings, problems = bind_sources(doc, r.files, resolve=ctx.storage.local_path)
     if problems:
         raise ValidationFailed("cannot bind mapping sources to files", details={"problems": problems})
-    prev_version = session.scalar(
-        select(DatasetVersion).where(DatasetVersion.round_id == r.id).order_by(DatasetVersion.version.desc())
-    )
     engine = TransformEngine(schema, provenance_meta={"customer_id": r.customer_id, "import_round_id": r.id})
     res = engine.run(doc, bindings)
     records = res.records
@@ -157,6 +174,10 @@ def transform_round(
                 _with_schema_findings(findings, errors, schema), records, schema
             )
             stats["invalid_records"] = _invalid_count(errors)
+    r = lock_round(session, r.id)
+    prev_version = session.scalar(
+        select(DatasetVersion).where(DatasetVersion.round_id == r.id).order_by(DatasetVersion.version.desc())
+    )
     dv = _new_version(
         ctx,
         session,
@@ -524,7 +545,9 @@ def apply_changes(
     actor: str = "operator",
     note: str | None = None,
 ) -> tuple[DatasetVersion, ChangeSet]:
-    dv = get_dataset(session, dataset_id)
+    dv = _writable_dataset(session, dataset_id)
+    if kind == "persistent" and any(op.get("kind") not in ("set_cell", "set_field") for op in operations):
+        raise ValidationFailed("กฎสำหรับรอบถัดไปรองรับการกำหนดค่าเท่านั้น การแก้แบบนี้ให้บันทึกเฉพาะครั้งนี้")
     mv = get_mapping(session, dv.mapping_version_id)
     schema = ctx.registry.get_ref(mv.target_schema)
     records = records_of(ctx, dv)
@@ -569,8 +592,10 @@ def apply_changes(
                     session.add(
                         Override(
                             customer_id=dv.customer_id,
+                            schema_ref=schema.ref,
+                            schema_hash=stable_hash(schema.document),
                             target=op["target"],
-                            where={"identity": str(ident)},
+                            where={"identity": str(ident), "predicate": op.get("where")},
                             value=op.get("value"),
                             author=actor,
                             note=note,
@@ -580,6 +605,8 @@ def apply_changes(
                 session.add(
                     Override(
                         customer_id=dv.customer_id,
+                        schema_ref=schema.ref,
+                        schema_hash=stable_hash(schema.document),
                         target=op["target"],
                         where={"identity": op["identity"]} if "identity" in op else (op.get("where") or {}),
                         value=op.get("value"),
@@ -590,6 +617,7 @@ def apply_changes(
     r = session.get(ImportRound, dv.round_id)
     if r:
         errors = sum(1 for f in nv.findings if f["severity"] == "error")
+        r.status = "transformed"
         r.summary = {**(r.summary or {}), "dataset_version_id": nv.id, "rows": len(new), "errors": errors}
     audit(
         session,
@@ -608,25 +636,41 @@ def apply_persistent_overrides(
     session: Session, customer_id: str, schema: TargetSchema, records: list[dict[str, Any]]
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     rules = session.scalars(
-        select(Override).where(Override.customer_id == customer_id, Override.active.is_(True))
+        select(Override)
+        .where(Override.customer_id == customer_id, Override.active.is_(True))
+        .order_by(Override.created_at, Override.id)
     ).all()
     if not rules:
         return records, {"rules": 0}
     ops: list[dict[str, Any]] = []
+    skipped = 0
     for o in rules:
+        if o.schema_ref and (o.schema_ref != schema.ref or o.schema_hash != stable_hash(schema.document)):
+            skipped += 1
+            continue
         if "identity" in (o.where or {}):
             ops.append(
-                {"kind": "set_cell", "identity": o.where["identity"], "target": o.target, "value": o.value}
+                {
+                    "kind": "set_field",
+                    "identities": [str(o.where["identity"])],
+                    "where": o.where.get("predicate"),
+                    "target": o.target,
+                    "value": o.value,
+                }
             )
         else:
             ops.append({"kind": "set_field", "target": o.target, "value": o.value, "where": o.where or None})
     new, impact = apply_operations(records, ops, schema)
-    return new, {"rules": len(rules), **{k: v for k, v in impact.items() if k != "sample"}}
+    return new, {
+        "rules": len(ops),
+        "skipped_schema": skipped,
+        **{k: v for k, v in impact.items() if k != "sample"},
+    }
 
 
 def rollback(ctx: ServiceContext, session: Session, dataset_id: str, actor: str) -> DatasetVersion:
     """Rollback = new version whose content equals the parent (history is never rewritten)."""
-    dv = get_dataset(session, dataset_id)
+    dv = _writable_dataset(session, dataset_id)
     if not dv.parent_id:
         raise Conflict("this version has no parent to roll back to")
     parent = get_dataset(session, dv.parent_id)
@@ -635,7 +679,7 @@ def rollback(ctx: ServiceContext, session: Session, dataset_id: str, actor: str)
         ctx,
         session,
         records,
-        stamp_meta=False,
+        stamp_meta=True,
         round_id=dv.round_id,
         customer_id=dv.customer_id,
         mapping_version_id=parent.mapping_version_id,
@@ -647,6 +691,15 @@ def rollback(ctx: ServiceContext, session: Session, dataset_id: str, actor: str)
         created_by=actor,
         note=f"rollback to v{parent.version}",
     )
+    dv.status = "superseded" if dv.status == "draft" else dv.status
+    r = get_round(session, dv.round_id)
+    r.status = "transformed"
+    r.summary = {
+        **(r.summary or {}),
+        "dataset_version_id": nv.id,
+        "rows": nv.row_count,
+        "errors": sum(1 for f in nv.findings if f.get("severity") == "error"),
+    }
     audit(session, "dataset.rollback", "dataset", nv.id, actor=actor, to=parent.id)
     return nv
 
@@ -688,7 +741,7 @@ def approve_dataset(
     acknowledge_anomalies: bool = False,
     comment: str | None = None,
 ) -> DatasetVersion:
-    dv = get_dataset(session, dataset_id)
+    dv = _writable_dataset(session, dataset_id)
     _require_valid(dv, "approving")  # the contract is not negotiable: no acknowledgement overrides it
     acknowledged = None
     if ctx is not None and ctx.policy.policy["anomaly"]["block_approval_on_high"]:
@@ -840,20 +893,21 @@ def export_dataset(
 ) -> ExportArtifact:
     if fmt not in FORMATS:
         raise ValidationFailed(f"format must be one of {FORMATS}")
-    dv = get_dataset(session, dataset_id)
+    dv = _writable_dataset(session, dataset_id)
     # exporting publishes: only data a human approved may leave (approved_data → published)
     if dv.status not in ("approved", "published"):
         raise Conflict(f"dataset is {dv.status}; approve it before exporting", details={"status": dv.status})
     _require_valid(dv, "exporting")  # also for versions approved before the gate existed
     schema = ctx.registry.get_ref(get_mapping(session, dv.mapping_version_id).target_schema)
     src = ctx.records_path(dv)
-    stamp = dt.datetime.now(dt.UTC).strftime("%Y%m%dT%H%M%SZ")
-    name = f"{dv.round_id}_{dv.id}_{stamp}.{fmt}"
+    # Unique and short enough for Windows storage roots; round ID already lives in the manifest/DB.
+    name = f"{dv.id}_{new_id('exp')}.{fmt}"
     key = ctx.export_key(dv.customer_id, name)
     tmp = ctx.tmp_dir / name
     try:
         _, digest, _size = write_export(lambda: iter_records(src), fmt, schema, tmp)
         ctx.storage.put(key, tmp)  # atomic publish: the object appears only once fully written
+        session.info.setdefault("rollback_objects", []).append((ctx.storage, key))
     finally:
         tmp.unlink(missing_ok=True)
     art = ExportArtifact(

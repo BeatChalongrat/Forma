@@ -20,6 +20,22 @@ def _where(source: Any, files: list[Any] | None) -> dict[str, Any]:
         bound = _match_file(source, [f for f in files if getattr(f, "status", "profiled") == "profiled"])
     sheet = source.sheet
     table = source.table
+    # A column range covering the whole physical sheet is the same range as an
+    # omitted range. Only collapse it when metadata proves the width; retain
+    # genuinely partial ranges and all row/filter boundaries.
+    sheet_meta = None
+    if bound is not None and getattr(bound, "profile", None) and sheet is not None:
+        candidates = ((bound.profile or {}).get("meta") or {}).get("sheets", [])
+        hits = [
+            s
+            for s in candidates
+            if (sheet.name is not None and s.get("name", "").casefold() == sheet.name.casefold())
+            or (sheet.index is not None and s.get("index") == sheet.index)
+        ]
+        if len(hits) == 1:
+            sheet_meta = hits[0]
+    width = sheet_meta.get("n_cols") if sheet_meta else None
+    last_column = None if width and table.last_column == width else table.last_column
     return {
         "file": bound.id if bound is not None else (source.file.name_pattern or source.file.fingerprint),
         "sheet": (sheet.name.strip().casefold() if sheet and sheet.name else None)
@@ -27,8 +43,8 @@ def _where(source: Any, files: list[Any] | None) -> dict[str, Any]:
         or (sheet.index if sheet else None),
         "data_start": table.data_start,
         "data_end": table.data_end,
-        "first_column": table.first_column,
-        "last_column": table.last_column,
+        "first_column": table.first_column or 0,
+        "last_column": last_column,
         "unpivot": table.unpivot.model_dump(mode="json") if table.unpivot else None,
         "filter": table.filter.model_dump(mode="json", exclude_none=True) if table.filter else None,
         "fill_down": list(table.fill_down),

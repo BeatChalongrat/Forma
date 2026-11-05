@@ -37,6 +37,22 @@ const del = <T>(p: string) => request<T>(p, { method: 'DELETE' })
 const put = <T>(p: string, body: unknown) => request<T>(p, { method: 'PUT', body: JSON.stringify(body) })
 const patch = <T>(p: string, body: unknown) => request<T>(p, { method: 'PATCH', body: JSON.stringify(body) })
 
+export type TransferItem = { subject: string; customer: string; mapping_id: string; version: number; target_schema: string; mapping_status: string; origin: string; state: string; eligible: boolean; dependencies: string[]; corrections: { subject: string; target?: string; kind: string; eligible: boolean }[] }
+export type TransferPlan = { digest: string; plan_digest: string; status: string; already_imported: boolean; errors: string[]; items: { kind: string; name: string; action: string; bytes?: number; reviewed_by?: string }[] }
+export const knowledgeTransfer = {
+  list: (offset: number) => get<{ items: TransferItem[]; next_offset: number | null; instance: string; policy: string }>(`/api/knowledge-transfer?offset=${offset}`),
+  classify: (body: { subject: string; origin: string; state: string; reason: string; include_answers: boolean }) => post('/api/knowledge-transfer/classify', body),
+  releases: () => get<{ items: { id: string; state: string; actor: string; created_at: string; source_instance: string }[] }>('/api/knowledge-transfer/releases'),
+  revoke: (id: string, reason: string) => post<{ review_mapping_ids: string[] }>(`/api/knowledge-transfer/releases/${encodeURIComponent(id)}/revoke`, { reason }),
+  preview: (file: File) => { const body = new FormData(); body.append('file', file); return request<TransferPlan>('/api/knowledge-transfer/preview', { method: 'POST', body }) },
+  apply: (file: File, digest: string) => { const body = new FormData(); body.append('file', file); body.append('plan_digest', digest); return request<{ id: string }>('/api/knowledge-transfer/import', { method: 'POST', body }) },
+  export: async (subjects: string[]) => {
+    const response = await fetch('/api/knowledge-transfer/export', { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() }, body: JSON.stringify({ subjects }) })
+    if (!response.ok) { const body = await response.json(); throw new Error(body.message || 'Export failed') }
+    return response.blob()
+  },
+}
+
 export type ChatStreamEvent = { type: 'started'; request_id: string } | { type: 'phase'; phase: 'research' | 'coding' | 'writing' } | { type: 'delta'; text: string } | { type: 'reset' } | { type: 'done'; turn: ChatTurn } | { type: 'error'; message: string }
 async function chatFile(id: string): Promise<Blob> {
   const res = await fetch(`/api/assistant/attachments/${encodeURIComponent(id)}`, { headers: authHeaders() })
@@ -218,6 +234,7 @@ export type QueueStats = { by_status: Record<string, number>; queued: number; ru
 export type Ready = { status: 'ok' | 'degraded'; checks: Record<string, { ok: boolean; detail?: string }> }
 export type Me = { subject: string; name: string; roles: string[]; effective_roles: string[]; customers: string[] | null; mode: string }
 export type OpsSummary = {
+  alerts?: { code: string; severity: 'critical' | 'warning'; message: string; action: string; value: number; href: string }[]
   queue: QueueStats; ready: Ready; review: { open: number; oldest_age_s: number | null }
   failed_jobs: (Job & { customer_code?: string | null })[]
   llm_spend_by_day: { day: string; calls: number; tokens: number; cost_usd: number }[]
@@ -264,6 +281,7 @@ export type Operation = { kind: 'set_cell' | 'set_field' | 'scale_field' | 'dele
 export type Impact = { rows_affected: number; cells_changed: number; rows_deleted: number; fields: string[]; sample: { row: number; identity: string; target: string | null; before: unknown; after: unknown }[] }
 export type RowsPage = { total: number; offset: number; limit: number; identity_keys: string[]; rows: Record<string, unknown>[]; columns: FieldSpec[]; findings: Finding[] }
 export type Dashboard = {
+  attention?: { total: number; unit: 'import_rounds'; items: ImportRound[] }
   customers: number; rounds_by_status: Record<string, number>; open_reviews: number; approved_mappings: number; auto_approved_mappings: number; mapping_versions: number; reused_mappings: number
   review?: { open: number; stale: number; waiting: number; oldest_days: number | null; stale_after_days: number }
   published_rows: number; failed_jobs: number; llm: { calls: number; cost_usd: number; tokens: number; provider: string; model: string }; recent_rounds: ImportRound[]; automation_rate: number | null; learning?: { aliases: number; constants: number; uses: number; corrections_per_approval: number | null }
@@ -294,13 +312,13 @@ export type MemoryItem = { id: string; topic: string; content: string; origin: '
 export type MemoryChange = { action: 'save' | 'change' | 'forget'; id: string; topic: string; sensitive?: boolean }
 export type HistoryFilters = { status?: string; customer_id?: string; search?: string; start?: string; end?: string; timezone?: string; offset?: number; limit?: number }
 export type ReviewQuestions = { mapping_id: string; round_id: string; status: string; blocked: boolean; questions: { id: string; field: FieldSpec; kind: 'boolean' | 'number' | 'confirm' | 'choice' | 'text' | 'enum'; question?: string; scope?: string; option_labels?: Record<string, string>; allow_custom?: boolean; options?: string[]; current: Expr; evidence: string[]; note?: string; contested?: boolean }[]; open_questions: string[]; reasons: string[]; sample: Record<string, unknown>[]; context: { customer: { code: string; name: string } | null; round_label: string | null; files: { id: string; name: string }[]; mapping_version: number }; changes: (FieldChange & { field: FieldSpec })[]; comparison_dataset_id: string | null; checks: Record<string, unknown>; impact: PolicyDecision['impact'] | null; fields: FieldSpec[] }
-export type ReviewEvidence = { field: string; sample_limit: number; sample_records: number; constant: boolean; context_only: boolean; unavailable: boolean; examples: { identity: string; item: number | null; value: unknown; source_complete: boolean; cells: { file: string | null; sheet: string | null; row: number | null; column: string | null; header: string; raw: unknown; verified: boolean | null }[] }[] }
+export type ReviewEvidence = { execution_scope?: string; field: string; sample_limit: number; sample_records: number; constant: boolean; context_only: boolean; unavailable: boolean; examples: { identity: string; item: number | null; value: unknown; source_complete: boolean; cells: { file: string | null; sheet: string | null; row: number | null; column: string | null; header: string; raw: unknown; verified: boolean | null }[] }[] }
 export type EffectCheck = { complete: boolean; passed: boolean; records_checked?: number; remaining_errors?: number; error?: string; checked_at?: string; before_mapping_id?: string; mapping_id?: string; actor?: string }
 export type AuditEvent = { id: string; actor: string; action: string; entity: string; entity_id: string; details: Record<string, unknown>; at: string }
 export type EventPage = { items: AuditEvent[]; total: number; offset: number; limit: number; next_offset: number | null }
 export type MappingTrace = { mapping_id: string; round_id: string | null; version: number; parent_id: string | null; status: string; created_at: string; target_schema: string; approved_by: string | null; approved_at: string | null; comment: string | null; decisions: { target: string; question?: string; answer: unknown; before?: unknown; after?: unknown; actor: string; answered_at?: string; remember?: boolean; scope?: string; origin_round?: string }[]; acknowledged: { question: string; actor: string }[]; effect_check: EffectCheck | null; checks: Record<string, unknown>; knowledge: { id: string; target?: string; method?: string }[]; logs: { items: Record<string, unknown>[]; total: number; offset: number; next_offset: number | null } }
 export type KnowledgeDetail = { id: string; kind: string; status: string; target: string | null; actor: string; created_at: string; before: unknown; after: unknown; reusable: boolean; mapping_id: string | null; round_id: string | null; target_schema: string | null; requirements: string | null; layout_hash: string | null; conflicts: { id: string; answer: unknown; round_id: string | null }[]; usage: EventPage; legacy_use_count: number }
-export type AnswerPreview = { digest: string; remaining_questions: string[]; before: Record<string, unknown>[]; comparison: { validation?: EffectCheck; counts: { changed_records: number; lost: number; gained: number }; rows: SandboxItem[]; sample_limit: number; before_records: number; after_records: number; reliable: boolean; confirmed_fields: string[] }; preview: { ok: boolean; records: Record<string, unknown>[]; findings: Finding[]; validation?: { ok: boolean }; stats?: Record<string, unknown>; errors?: string[] } }
+export type AnswerPreview = { digest: string; remaining_questions: string[]; before: Record<string, unknown>[]; comparison: { scope?: string; validation?: EffectCheck; counts: { changed_records: number; lost: number; gained: number }; rows: SandboxItem[]; sample_limit: number; before_records: number; after_records: number; reliable: boolean; confirmed_fields: string[] }; preview: { ok: boolean; records: Record<string, unknown>[]; findings: Finding[]; validation?: { ok: boolean }; stats?: Record<string, unknown>; errors?: string[] } }
 export type AssistantAction = { id: string; label: string; detail: string; url: string; kind?: 'act'; act?: { type: 'verdict.accept'; round_id: string; digest: string; decisions?: Record<string, boolean | number | string | null>; preview?: Bilingual[] } }
 export type Clarification = { question: string; reason: string; options: string[] }
 export type AssistantReport = {

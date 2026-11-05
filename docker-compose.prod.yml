@@ -5,7 +5,7 @@
 # Auth: set FORMA_AUTH=oidc (+ issuer, client id) in .env.production — the api refuses FORMA_AUTH=dev in
 # prod; FORMA_AUTH_ALLOW_DEV_IN_PROD=true is for a local smoke test of this stack only (ADR-013).
 x-forma-env: &forma-env
-  env_file: .env.production
+  env_file: ${FORMA_ENV_FILE:-.env.production}
   environment:
     FORMA_ENV: prod
     FORMA_DATA_DIR: /data                       # container contract: overrides the dev-relative defaults
@@ -117,7 +117,7 @@ services:
     <<: *forma-env
     command: ["forma", "worker"]
     healthcheck:
-      test: ["CMD", "python", "-c", "import sys; from forma.jobs.runner import get_backend; sys.exit(1 if get_backend().stats().get('error') else 0)"]
+      test: ["CMD", "python", "-c", "import os; import redis; r=redis.Redis.from_url(os.environ['FORMA_REDIS_URL'], socket_timeout=2, socket_connect_timeout=2); assert r.get('arq:queue:health-check'), 'worker heartbeat missing'"]
       interval: 30s
       timeout: 10s
       start_period: 20s

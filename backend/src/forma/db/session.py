@@ -6,10 +6,39 @@ from functools import lru_cache
 from typing import Any
 
 from fastapi import Request
-from sqlalchemy import Engine, create_engine, event
+from sqlalchemy import Engine, create_engine, event, select
 from sqlalchemy.orm import ORMExecuteState, Session, SessionTransaction, sessionmaker
 
 from forma.core.settings import get_settings
+
+
+@event.listens_for(Session, "after_rollback")
+def _discard_uncommitted_objects(session: Session) -> None:
+    from forma.core.logging import get_logger
+    from forma.db.models import DatasetVersion, ExportArtifact
+
+    for storage, key in session.info.pop("rollback_objects", []):
+        try:
+            # A lost COMMIT acknowledgement is ambiguous: the server may already have committed.
+            # Only remove an object after a fresh connection proves there is no durable reference.
+            bind = session.get_bind()
+            engine = bind if isinstance(bind, Engine) else bind.engine
+            with engine.connect() as connection:
+                referenced = connection.scalar(
+                    select(DatasetVersion.id).where(DatasetVersion.records_key == key).limit(1)
+                ) or connection.scalar(
+                    select(ExportArtifact.id).where(ExportArtifact.storage_key == key).limit(1)
+                )
+            if referenced:
+                continue
+            storage.delete(key)
+        except Exception:
+            get_logger(__name__).exception("transaction.object_cleanup_failed", key=key)
+
+
+@event.listens_for(Session, "after_commit")
+def _keep_committed_objects(session: Session) -> None:
+    session.info.pop("rollback_objects", None)
 
 
 @event.listens_for(Session, "before_flush")
@@ -103,14 +132,14 @@ def get_session() -> Iterator[Session]:
 def request_session(request: Request) -> Iterator[Session]:
     """The API's session: registered on the request so the http middleware commits it before the response
     is sent. FastAPI runs a yield-dependency's exit code after the response, and a client that reads what it
-    just created could get 404 in that gap (measured: 3 of 25). The exit code below is then a no-op commit."""
+    just created could get 404 in that gap. Only the middleware commits: cleanup must never retry a failed
+    commit after a response has already been selected."""
     s = _factory()()
     sessions: list[Session] = getattr(request.state, "db_sessions", None) or []
     sessions.append(s)
     request.state.db_sessions = sessions
     try:
         yield s
-        s.commit()
     except Exception:
         s.rollback()
         raise
@@ -120,11 +149,14 @@ def request_session(request: Request) -> Iterator[Session]:
 
 def commit_request_sessions(request: Request, *, ok: bool) -> None:
     """Called by the middleware once the handler has produced its response."""
-    for s in getattr(request.state, "db_sessions", None) or []:
-        try:
+    sessions = getattr(request.state, "db_sessions", None) or []
+    try:
+        for s in sessions:
             if ok:
                 s.commit()
             else:
                 s.rollback()
-        except Exception:  # the dependency's own exit code reports the real error
+    except Exception:
+        for s in sessions:
             s.rollback()
+        raise

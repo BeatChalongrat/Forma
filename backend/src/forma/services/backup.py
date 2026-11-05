@@ -26,7 +26,7 @@ import tarfile
 import tempfile
 import time
 from collections.abc import Iterator
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 from forma.core.logging import get_logger
@@ -146,7 +146,19 @@ def restore_database(dump: Path) -> None:
     with tempfile.TemporaryDirectory(prefix="forma-restore-") as tmp:
         script = Path(tmp) / "db.sql"
         _drop_newer_settings(dump, script)
-        subprocess.run(["psql", "--quiet", "--set", "ON_ERROR_STOP=1", pg_url, "-f", str(script)], check=True)
+        subprocess.run(
+            [
+                "psql",
+                "--quiet",
+                "--single-transaction",
+                "--set",
+                "ON_ERROR_STOP=1",
+                pg_url,
+                "-f",
+                str(script),
+            ],
+            check=True,
+        )
 
 
 def create_backup(
@@ -200,6 +212,7 @@ def _write_backup(
         "schema_revision": migrate.current_revision(get_engine()),
         "storage": ctx.storage.name,
         "database": db_file.name,
+        "database_integrity": {"size": db_file.stat().st_size, "sha256": _file_digest(db_file)},
         "objects_included": include_objects,
         "object_count": len(objects),
         "object_bytes": total,
@@ -229,24 +242,93 @@ def _write_backup(
     }
 
 
+def _file_digest(path: Path) -> str:
+    with _fs(path).open("rb") as file:
+        return _sha256_stream(file)
+
+
+def _safe_member(root: Path, name: str) -> Path:
+    if not isinstance(name, str) or not name or "\\" in name or ":" in name:
+        raise ValueError("Invalid backup path")
+    parts = PurePosixPath(name)
+    if parts.is_absolute() or ".." in parts.parts:
+        raise ValueError("Invalid backup path")
+    path = root / name
+    if not path.resolve().is_relative_to(root.resolve()):
+        raise ValueError("Backup path leaves the backup directory")
+    return _fs(path)
+
+
+def _verify_bytes(file: Any, expected: dict[str, Any], label: str) -> None:
+    digest, size = hashlib.sha256(), 0
+    for chunk in iter(lambda: file.read(1024 * 1024), b""):
+        digest.update(chunk)
+        size += len(chunk)
+    if size != expected.get("size") or digest.hexdigest() != expected.get("sha256"):
+        raise ValueError(f"Backup integrity check failed: {label}")
+
+
 def restore_backup(ctx: ServiceContext, src: Path, *, verify: bool = True) -> dict[str, Any]:
     if src.is_file() and src.name.endswith(".tar.gz"):
-        # a short temp dir keeps nested keys under Windows' MAX_PATH during extraction
-        extract = Path(tempfile.mkdtemp(prefix="forma-restore-"))
-        with tarfile.open(src, "r:gz") as tar:
-            tar.extractall(extract, filter="data")
-        inner = [p for p in extract.iterdir() if p.is_dir()]
-        src = inner[0] if len(inner) == 1 else extract
+        with tempfile.TemporaryDirectory(prefix="forma-restore-") as folder:
+            extract = Path(folder)
+            with tarfile.open(src, "r:gz") as tar:
+                for member in tar.getmembers():
+                    _safe_member(extract, member.name)
+                    if not (member.isfile() or member.isdir()):
+                        raise ValueError("Backup archive may contain only regular files and directories")
+                tar.extractall(extract, filter="data")
+            inner = [p for p in extract.iterdir() if p.is_dir()]
+            return _restore_directory(ctx, inner[0] if len(inner) == 1 else extract, verify=verify)
+    return _restore_directory(ctx, src, verify=verify)
+
+
+def _restore_directory(ctx: ServiceContext, src: Path, *, verify: bool) -> dict[str, Any]:
+    from sqlalchemy import inspect
+
+    from forma.db.session import get_engine
+
+    if set(inspect(get_engine()).get_table_names()) - {"alembic_version"}:
+        raise RuntimeError("refusing to restore into a non-empty database (see RUNBOOK: restore)")
     manifest = json.loads((src / "manifest.json").read_text(encoding="utf-8"))
-    restore_database(src / manifest["database"])
-    restored = 0
-    missing: list[str] = []
-    for obj in manifest["objects"]:
-        local = _fs(src / "objects" / obj["key"])
+    dump = _safe_member(src, manifest["database"])
+    if not dump.is_file():
+        raise ValueError("Backup database dump is missing")
+    objects = manifest["objects"]
+    if len({obj["key"] for obj in objects}) != len(objects):
+        raise ValueError("Duplicate object keys in backup manifest")
+    if verify:
+        if not manifest.get("database_integrity"):
+            raise ValueError("Backup has no database checksum; create a verified backup before restoring")
+        with dump.open("rb") as file:
+            _verify_bytes(file, manifest["database_integrity"], "database")
+    # Validate every source before changing the target, including externally replicated objects.
+    sources = []
+    for obj in objects:
+        local = _safe_member(src / "objects", obj["key"])
         if local.is_file():
-            ctx.storage.put(obj["key"], local)
-            restored += 1
-        elif verify and not ctx.storage.exists(obj["key"]):
-            missing.append(obj["key"])
-    log.info("backup restored", objects=restored, missing=len(missing))
-    return {"database": manifest["database"], "objects_restored": restored, "missing_objects": missing}
+            if verify:
+                with local.open("rb") as file:
+                    _verify_bytes(file, obj, obj["key"])
+            sources.append((obj, local))
+        elif not manifest.get("objects_included") and ctx.storage.exists(obj["key"]):
+            if verify:
+                with ctx.storage.open(obj["key"]) as file:
+                    _verify_bytes(file, obj, obj["key"])
+        else:
+            raise ValueError(f"Backup object is missing: {obj['key']}")
+    restored = 0
+    for obj, local in sources:
+        # A restore target must not silently replace unrelated existing objects.
+        if ctx.storage.exists(obj["key"]):
+            with ctx.storage.open(obj["key"]) as file:
+                _verify_bytes(file, obj, obj["key"])
+        ctx.storage.put(obj["key"], local)
+        if verify:
+            with ctx.storage.open(obj["key"]) as file:
+                _verify_bytes(file, obj, obj["key"])
+        restored += 1
+    # Publish DB references only after every object has passed verification.
+    restore_database(dump)
+    log.info("backup restored", objects=restored, missing=0)
+    return {"database": manifest["database"], "objects_restored": restored, "missing_objects": []}

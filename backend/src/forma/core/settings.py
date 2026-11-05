@@ -43,6 +43,13 @@ class Settings(BaseSettings):
 
     # LLM (provider-agnostic). provider: mock | openai | anthropic | openai_compatible
     llm_provider: str = Field(default="mock", description="mock | openai | openai_compatible | anthropic.")
+    llm_mock_only: bool = Field(
+        default=False,
+        description=(
+            "Local reproduction safety lock: force offline mock, "
+            "ignore saved AI routes and deny provider HTTP."
+        ),
+    )
     llm_model: str = Field(default="gpt-4.1-mini", description="Model name sent to the provider.")
     llm_api_key: str | None = Field(default=None, description="Provider API key (secret).")
     llm_base_url: str | None = Field(default=None, description="Gateway base URL for openai_compatible.")
@@ -90,6 +97,13 @@ class Settings(BaseSettings):
     )
     mapping_lab_turns: int = Field(
         default=3, ge=0, le=6, description="Maximum isolated Python experiments per mapping proposal."
+    )
+    knowledge_policy: str = Field(
+        default="legacy",
+        pattern="^(legacy|strict)$",
+        description=(
+            "strict recalls only reviewed real-data knowledge; legacy preserves unclassified dev data."
+        ),
     )
 
     # Engine

@@ -16,15 +16,13 @@ import { Foresight } from '../components/Foresight'
 export function Overview() {
   const { t } = usePreferences()
   const dashboard = useQuery({ queryKey: ['dashboard'], queryFn: api.dashboard, refetchInterval: 10000 })
-  const roundsQuery = useQuery({ queryKey: ['rounds', ''], queryFn: () => api.rounds(), refetchInterval: 10000 })
   const uploadsQuery = useQuery({ queryKey: ['uploads'], queryFn: () => api.uploads(), refetchInterval: 10000 })
   const d = dashboard.data
   const unknown = (uploadsQuery.data ?? []).filter((u) => u.counts.needs_customer || u.stuck)
-  const priority = ['blocked', 'failed', 'rejected', 'review', 'transformed', 'approved', 'auto_approved', 'approved_data']
-  const waiting = (roundsQuery.data ?? []).filter((r) => priority.includes(r.status)).sort((a, b) => priority.indexOf(a.status) - priority.indexOf(b.status))
+  const waiting = d?.attention?.items ?? []
   const target = (r: ImportRound) => ['review', 'rejected', 'blocked'].includes(r.status) ? `/review?round=${r.id}` : r.status === 'transformed' && r.summary.dataset_version_id ? `/datasets/${r.summary.dataset_version_id}?tab=diff` : `/rounds/${r.id}`
-  const loading = roundsQuery.isPending || uploadsQuery.isPending
-  const error = roundsQuery.isError || uploadsQuery.isError || dashboard.isError
+  const loading = dashboard.isPending || uploadsQuery.isPending
+  const error = uploadsQuery.isError || dashboard.isError
   return <>
     <PageHeader title={t("Your workspace", "งานของคุณ")} subtitle={t("Track your work, answer questions and download the results. Add files from Upload history.", "ติดตามงาน ตอบคำถาม และดาวน์โหลดผลลัพธ์ เพิ่มไฟล์ได้ที่ประวัติไฟล์")} />
     <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3 mb-6">
@@ -34,7 +32,7 @@ export function Overview() {
       <Stat label={t('Learned from you', 'เรียนจากคุณ')} value={d?.learning ? fmtInt(d.learning.aliases + d.learning.constants) : '–'} hint={d?.learning ? t(`${fmtInt(d.learning.uses)} uses · corrections per approval ${d.learning.corrections_per_approval ?? '–'}`, `ใช้แล้ว ${fmtInt(d.learning.uses)} ครั้ง · การแก้ต่อการอนุมัติ ${d.learning.corrections_per_approval ?? '–'}`) : ''} />
       <Stat label={t('Estimated AI cost', 'ค่า AI โดยประมาณ')} value={d ? `$${d.llm.cost_usd.toFixed(2)}` : '–'} hint={d ? `${fmtInt(d.llm.calls)} ${t('usage records · not provider billing', 'รายการที่บันทึก · ไม่ใช่ยอดเรียกเก็บ')}` : ''} />
     </div>
-    {error && <div role="alert" className="card p-4 mb-5 text-bad">Some tasks could not be loaded. <button className="btn btn-sm ml-2" onClick={() => { void roundsQuery.refetch(); void uploadsQuery.refetch(); void dashboard.refetch() }}>Try again</button></div>}
+    {error && <div role="alert" className="card p-4 mb-5 text-bad">Some tasks could not be loaded. <button className="btn btn-sm ml-2" onClick={() => { void uploadsQuery.refetch(); void dashboard.refetch() }}>Try again</button></div>}
     <Workflow />
     <WorkRoundDashboard />
     <Foresight />
@@ -57,7 +55,7 @@ export function Overview() {
         </Link>
       })}
       {!loading && !error && !waiting.length && !unknown.length && <div className="p-6 flex items-center gap-3 text-ink-2"><CircleCheck size={20} className="text-ok" /><div className="min-w-0"><div className="font-medium"><Localized>Nothing needs your attention</Localized></div><div className="text-[13px] text-muted"><Localized>You can upload another batch or open a recent file below.</Localized></div></div></div>}
-      {waiting.length > 6 && <Link to="/imports?view=files" className="block px-5 py-3 text-signal text-[13px] hover:underline">View all {waiting.length} tasks →</Link>}
+      {!!d?.attention?.total && <Link to="/imports?view=files&status=attention" className="block px-5 py-3 text-signal text-[13px] hover:underline">{t(`View all ${fmtInt(d.attention.total)} imports needing attention`, `ดูชุดนำเข้าที่รอจัดการทั้งหมด ${fmtInt(d.attention.total)} ชุด`)} →</Link>}
     </Section>
     <Section title={t("Recent files", "ไฟล์ล่าสุด")} actions={<Link to="/imports?view=files" className="btn btn-ghost btn-sm">{t("Upload history", "ประวัติไฟล์")} <ArrowRight size={14} /></Link>}>
       {d?.recent_rounds?.length ? <table className="table"><thead><tr><th><Localized>Customer / delivery</Localized></th><th><Localized>Next action</Localized></th><th className="text-right"><Localized>Records</Localized></th><th><Localized>Updated</Localized></th><th aria-label={t('Open', 'เปิด')}></th></tr></thead><tbody>

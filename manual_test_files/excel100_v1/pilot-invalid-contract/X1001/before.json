@@ -1,0 +1,1876 @@
+{
+  "round": {
+    "id": "rnd_01M6KSJQZ69T9XEE62DJ4Q2J7T",
+    "customer_id": "cus_01M6KSJ73AZFSHWZ5R46V46MDQ",
+    "label": "Excel100 complex suite · X1001.xlsx",
+    "status": "blocked",
+    "target_schema": "excel100_x1001@1",
+    "notes": null,
+    "summary": {
+      "drift": null,
+      "profile": [
+        {
+          "name": "X1001.xlsx",
+          "drift": null,
+          "tables": 6,
+          "file_id": "fil_01M6KSJQZJK9PS5T4XQW2NE7TH",
+          "fingerprint": "aa7b715f1f6c8ca9"
+        }
+      ],
+      "verdict": {
+        "word": "likely",
+        "stage": "mapping",
+        "digest": "b63ba2c073f69e170d9e696ba1bb9b63",
+        "outcome": "fix_mapping",
+        "subject": {
+          "id": "map_01M6KSJV50S1JMK68G291JNJAZ",
+          "kind": "mapping",
+          "round_id": "rnd_01M6KSJQZ69T9XEE62DJ4Q2J7T"
+        },
+        "evidence": [
+          {
+            "id": 1,
+            "kind": "errors",
+            "link": "/rounds/rnd_01M6KSJQZ69T9XEE62DJ4Q2J7T/mapping/map_01M6KSJV50S1JMK68G291JNJAZ?tab=findings",
+            "text": {
+              "en": "1 engine or validation errors",
+              "th": "ข้อผิดพลาดของ engine/การตรวจ 1 จุด"
+            },
+            "numbers": {
+              "errors": 1
+            }
+          },
+          {
+            "id": 2,
+            "kind": "ai",
+            "link": null,
+            "text": {
+              "en": "AI was unavailable; the deterministic draft is in use",
+              "th": "AI ใช้งานไม่ได้ ใช้ร่างจากกฎแทน"
+            },
+            "numbers": {}
+          },
+          {
+            "id": 3,
+            "kind": "self_check",
+            "link": null,
+            "text": {
+              "en": "The AI ran its mapping on the first 0 rows (0 look(s) at the file, 0 fix round(s)): 2 problem(s) left",
+              "th": "AI ลองรัน mapping กับ 0 แถวแรก (ดูไฟล์ 0 ครั้ง แก้ 0 รอบ): เหลือปัญหา 2 ข้อ"
+            },
+            "numbers": {
+              "rows": 0,
+              "fix_rounds": 0,
+              "inspections": 0,
+              "problems_left": 2
+            }
+          },
+          {
+            "id": 4,
+            "kind": "questions",
+            "link": "/review?round=rnd_01M6KSJQZ69T9XEE62DJ4Q2J7T",
+            "text": {
+              "en": "3 fields below the confidence bar",
+              "th": "3 ฟิลด์ยังไม่ถึงเกณฑ์ความมั่นใจ"
+            },
+            "numbers": {
+              "count": 3
+            }
+          }
+        ],
+        "narrative": null,
+        "conclusion": {
+          "en": "The policy blocks this mapping: transformation produced zero records",
+          "th": "กฎระงับการจับคู่นี้: transformation produced zero records"
+        },
+        "confidence": 0.7,
+        "suppressed": {
+          "count": 0,
+          "groups": [
+            {
+              "text": {
+                "en": "4 notes from the mapper",
+                "th": "หมายเหตุจากตัวจับคู่ 4 ข้อ"
+              },
+              "reason": "open_questions",
+              "pointers": []
+            }
+          ]
+        },
+        "must_decide": [
+          {
+            "id": "/sell_unit:value:9ed0965ce03b",
+            "why": {
+              "en": "An unknown source unit needs an explicit definition",
+              "th": "An unknown source unit needs an explicit definition"
+            },
+            "kind": "text",
+            "scope": "source_value",
+            "default": null,
+            "options": [],
+            "question": {
+              "en": "หน่วย BT หมายถึงอะไร?",
+              "th": "หน่วย BT หมายถึงอะไร?"
+            },
+            "semantic": "unit.sell",
+            "allow_custom": true,
+            "evidence_ids": [
+              4
+            ],
+            "option_labels": null
+          },
+          {
+            "id": "/sell_unit",
+            "why": {
+              "en": "Below the confidence bar for its risk",
+              "th": "ความมั่นใจต่ำกว่าเกณฑ์ของระดับความเสี่ยงนี้"
+            },
+            "kind": "choice",
+            "scope": null,
+            "default": null,
+            "options": [
+              "Unit",
+              "Company"
+            ],
+            "question": {
+              "en": "Which column holds Full unit name; ask if the code has no definition.?",
+              "th": "คอลัมน์ไหนคือหน่วยขาย?"
+            },
+            "semantic": "unit.sell",
+            "allow_custom": false,
+            "evidence_ids": [
+              4
+            ],
+            "option_labels": null
+          },
+          {
+            "id": "/currency",
+            "why": {
+              "en": "Below the confidence bar for its risk",
+              "th": "ความมั่นใจต่ำกว่าเกณฑ์ของระดับความเสี่ยงนี้"
+            },
+            "kind": "confirm",
+            "scope": null,
+            "default": null,
+            "options": [
+              "confirm"
+            ],
+            "question": {
+              "en": "Is ISO currency from the applicable price row. read correctly?",
+              "th": "สกุลเงิน อ่านถูกต้องไหม?"
+            },
+            "semantic": "currency",
+            "allow_custom": false,
+            "evidence_ids": [
+              4
+            ],
+            "option_labels": null
+          }
+        ],
+        "rules_fired": [
+          "blocked"
+        ],
+        "round_status": "blocked",
+        "rules_version": "2026.11.04.1",
+        "mapping_status": "proposed",
+        "policy_decision": "block"
+      },
+      "batch_id": "bch_01M6KSJ756XVX42960RKH98YFM",
+      "decision": "block",
+      "simulation": null,
+      "auto_publish": true,
+      "drift_report": null,
+      "batch_item_id": "bit_01M6KSJ79HY8K74BBY5MHFGD6R",
+      "format_memory": {
+        "status": "new",
+        "mapping_id": null,
+        "target_schema": "excel100_x1001@1",
+        "mapping_version": null
+      },
+      "skipped_files": 1,
+      "profiled_files": 0,
+      "mapping_version_id": "map_01M6KSJV50S1JMK68G291JNJAZ",
+      "has_previous_approval": false,
+      "matches_other_customer": null
+    },
+    "created_at": "2026-11-04T17:26:49.062433+00:00",
+    "updated_at": "2026-11-04T17:26:52.366202+00:00",
+    "successor_id": null,
+    "predecessor_id": null,
+    "files": [
+      {
+        "id": "fil_01M6KSJQZJK9PS5T4XQW2NE7TH",
+        "round_id": "rnd_01M6KSJQZ69T9XEE62DJ4Q2J7T",
+        "name": "X1001.xlsx",
+        "size": 8514,
+        "kind": "excel",
+        "status": "profiled",
+        "sha256": "bb771742eeac9bc3cef4702a3ca03795fdf37b8024880313ee02ff6c9be4441c",
+        "duplicate_of": null,
+        "error": null,
+        "created_at": "2026-11-04T17:26:49.074286+00:00",
+        "fingerprint": "aa7b715f1f6c8ca9",
+        "drift": null,
+        "tables": 6,
+        "sheets": [
+          "Item Master 1",
+          "Price List 1",
+          "Warehouse Balances 1",
+          "Unit Dictionary 1",
+          "Delivery Notes 1",
+          "Calculation Inputs 1"
+        ]
+      }
+    ],
+    "customer": {
+      "id": "cus_01M6KSJ73AZFSHWZ5R46V46MDQ",
+      "code": "X1001",
+      "name": "Excel100 X1001"
+    },
+    "successor": null,
+    "predecessor": null,
+    "mappings": [
+      {
+        "id": "map_01M6KSJV50S1JMK68G291JNJAZ",
+        "customer_id": "cus_01M6KSJ73AZFSHWZ5R46V46MDQ",
+        "round_id": "rnd_01M6KSJQZ69T9XEE62DJ4Q2J7T",
+        "version": 1,
+        "status": "proposed",
+        "target_schema": "excel100_x1001@1",
+        "confidence": 0.655,
+        "created_by": "system",
+        "model": null,
+        "policy": {
+          "checks": {
+            "drift": null,
+            "errors": 1,
+            "rows_out": 0,
+            "warnings": 0,
+            "llm_fallback": true,
+            "reused_approved": false,
+            "full_verification": false,
+            "unresolved_questions": 4,
+            "plausibility_warnings": 0
+          },
+          "impact": {},
+          "source": "heuristic",
+          "reasons": [
+            "transformation produced zero records",
+            "4 questions still need operator confirmation",
+            "verification: missing_required: required target /price is not mapped",
+            "verification: No transformation result was verified"
+          ],
+          "sandbox": null,
+          "verdict": {
+            "word": "likely",
+            "stage": "mapping",
+            "digest": "b63ba2c073f69e170d9e696ba1bb9b63",
+            "outcome": "fix_mapping",
+            "subject": {
+              "id": "map_01M6KSJV50S1JMK68G291JNJAZ",
+              "kind": "mapping",
+              "round_id": "rnd_01M6KSJQZ69T9XEE62DJ4Q2J7T"
+            },
+            "evidence": [
+              {
+                "id": 1,
+                "kind": "errors",
+                "link": "/rounds/rnd_01M6KSJQZ69T9XEE62DJ4Q2J7T/mapping/map_01M6KSJV50S1JMK68G291JNJAZ?tab=findings",
+                "text": {
+                  "en": "1 engine or validation errors",
+                  "th": "ข้อผิดพลาดของ engine/การตรวจ 1 จุด"
+                },
+                "numbers": {
+                  "errors": 1
+                }
+              },
+              {
+                "id": 2,
+                "kind": "ai",
+                "link": null,
+                "text": {
+                  "en": "AI was unavailable; the deterministic draft is in use",
+                  "th": "AI ใช้งานไม่ได้ ใช้ร่างจากกฎแทน"
+                },
+                "numbers": {}
+              },
+              {
+                "id": 3,
+                "kind": "self_check",
+                "link": null,
+                "text": {
+                  "en": "The AI ran its mapping on the first 0 rows (0 look(s) at the file, 0 fix round(s)): 2 problem(s) left",
+                  "th": "AI ลองรัน mapping กับ 0 แถวแรก (ดูไฟล์ 0 ครั้ง แก้ 0 รอบ): เหลือปัญหา 2 ข้อ"
+                },
+                "numbers": {
+                  "rows": 0,
+                  "fix_rounds": 0,
+                  "inspections": 0,
+                  "problems_left": 2
+                }
+              },
+              {
+                "id": 4,
+                "kind": "questions",
+                "link": "/review?round=rnd_01M6KSJQZ69T9XEE62DJ4Q2J7T",
+                "text": {
+                  "en": "3 fields below the confidence bar",
+                  "th": "3 ฟิลด์ยังไม่ถึงเกณฑ์ความมั่นใจ"
+                },
+                "numbers": {
+                  "count": 3
+                }
+              }
+            ],
+            "narrative": null,
+            "conclusion": {
+              "en": "The policy blocks this mapping: transformation produced zero records",
+              "th": "กฎระงับการจับคู่นี้: transformation produced zero records"
+            },
+            "confidence": 0.7,
+            "suppressed": {
+              "count": 0,
+              "groups": [
+                {
+                  "text": {
+                    "en": "4 notes from the mapper",
+                    "th": "หมายเหตุจากตัวจับคู่ 4 ข้อ"
+                  },
+                  "reason": "open_questions",
+                  "pointers": []
+                }
+              ]
+            },
+            "must_decide": [
+              {
+                "id": "/sell_unit:value:9ed0965ce03b",
+                "why": {
+                  "en": "An unknown source unit needs an explicit definition",
+                  "th": "An unknown source unit needs an explicit definition"
+                },
+                "kind": "text",
+                "scope": "source_value",
+                "default": null,
+                "options": [],
+                "question": {
+                  "en": "หน่วย BT หมายถึงอะไร?",
+                  "th": "หน่วย BT หมายถึงอะไร?"
+                },
+                "semantic": "unit.sell",
+                "allow_custom": true,
+                "evidence_ids": [
+                  4
+                ],
+                "option_labels": null
+              },
+              {
+                "id": "/sell_unit",
+                "why": {
+                  "en": "Below the confidence bar for its risk",
+                  "th": "ความมั่นใจต่ำกว่าเกณฑ์ของระดับความเสี่ยงนี้"
+                },
+                "kind": "choice",
+                "scope": null,
+                "default": null,
+                "options": [
+                  "Unit",
+                  "Company"
+                ],
+                "question": {
+                  "en": "Which column holds Full unit name; ask if the code has no definition.?",
+                  "th": "คอลัมน์ไหนคือหน่วยขาย?"
+                },
+                "semantic": "unit.sell",
+                "allow_custom": false,
+                "evidence_ids": [
+                  4
+                ],
+                "option_labels": null
+              },
+              {
+                "id": "/currency",
+                "why": {
+                  "en": "Below the confidence bar for its risk",
+                  "th": "ความมั่นใจต่ำกว่าเกณฑ์ของระดับความเสี่ยงนี้"
+                },
+                "kind": "confirm",
+                "scope": null,
+                "default": null,
+                "options": [
+                  "confirm"
+                ],
+                "question": {
+                  "en": "Is ISO currency from the applicable price row. read correctly?",
+                  "th": "สกุลเงิน อ่านถูกต้องไหม?"
+                },
+                "semantic": "currency",
+                "allow_custom": false,
+                "evidence_ids": [
+                  4
+                ],
+                "option_labels": null
+              }
+            ],
+            "rules_fired": [
+              "blocked"
+            ],
+            "round_status": "blocked",
+            "rules_version": "2026.11.04.1",
+            "mapping_status": "proposed",
+            "policy_decision": "block"
+          },
+          "decision": "block",
+          "learning": null,
+          "priority": 50,
+          "workflow": {
+            "roles": [
+              {
+                "data": {
+                  "analysis": {
+                    "facts": [],
+                    "hypotheses": [],
+                    "mapping_guidance": [],
+                    "missing_information": []
+                  }
+                },
+                "role": "analyst",
+                "outcome": "completed",
+                "elapsed_ms": 690
+              },
+              {
+                "data": {
+                  "phase": "failed",
+                  "failure": "llm_failed: structured output failed validation: guard: /mapping/collections/0/fields/0/target: pointer '/warehouse_code' is not in the target schema; guard: /mapping/collections/0/fields/1/target: pointer '/qty' is not in the target schema"
+                },
+                "role": "mapper",
+                "outcome": "failed",
+                "elapsed_ms": 486
+              }
+            ],
+            "review": {},
+            "status": "failed",
+            "repairs": 0,
+            "version": "2026.11.04.2",
+            "analysis": {
+              "facts": [],
+              "hypotheses": [],
+              "mapping_guidance": [],
+              "missing_information": []
+            },
+            "evidence": [],
+            "thread_id": "mapping-4b10f9230208cabb",
+            "human_resume": "existing versioned question preview/apply service; no automatic approval",
+            "provider_attempts": 4,
+            "usage_unknown_attempts": 0
+          },
+          "agreement": null,
+          "risk_level": "high",
+          "risk_score": 1.0,
+          "self_check": {
+            "problems_left": [
+              "workflow: llm_failed: structured output failed validation: guard: /mapping/collections/0/fields/0/target: pointer '/warehouse_code' is not in the target schema; guard: /mapping/collections/0/fields/1/target: pointer '/qty' is not in the target schema",
+              "Full execution must pass before approval"
+            ]
+          },
+          "simulation": null,
+          "reused_from": null,
+          "field_review": null,
+          "risk_factors": [
+            "blocked by policy",
+            "validation or engine errors"
+          ],
+          "verification": {
+            "passed": false,
+            "version": 1,
+            "complete": false,
+            "problems": [
+              "missing_required: required target /price is not mapped",
+              "No transformation result was verified"
+            ],
+            "warnings": []
+          },
+          "clarifications": [],
+          "confidence_basis": null,
+          "review_decisions": [
+            {
+              "id": "/sell_unit:value:9ed0965ce03b",
+              "why": "An unknown source unit needs an explicit definition",
+              "kind": "text",
+              "note": "เปลี่ยนเฉพาะรหัสนี้ โดยเก็บหน่วยอื่นตามเดิม",
+              "field": {
+                "enum": null,
+                "name": "sell_unit",
+                "risk": "high",
+                "format": null,
+                "system": false,
+                "default": null,
+                "pointer": "/sell_unit",
+                "examples": [],
+                "nullable": false,
+                "required": true,
+                "semantic": "unit.sell",
+                "json_type": [
+                  "string"
+                ],
+                "description": "Full unit name; ask if the code has no definition.",
+                "synonyms_en": [],
+                "synonyms_th": [],
+                "in_collection": null,
+                "is_collection": false,
+                "description_th": null
+              },
+              "scope": "source_value",
+              "action": "value_map",
+              "target": "/sell_unit",
+              "current": {
+                "op": "unit_normalize",
+                "args": [
+                  {
+                    "op": "col",
+                    "name": "Unit",
+                    "source": null
+                  }
+                ],
+                "params": {}
+              },
+              "options": [],
+              "evidence": [
+                "header 'Unit' ≈ synonym 'sell unit' (0.85)"
+              ],
+              "question": "หน่วย BT หมายถึงอะไร?",
+              "contested": true,
+              "allow_custom": true,
+              "source_value": "BT"
+            }
+          ],
+          "target_schema_hash": "7b89c4462eda3032",
+          "confirmed_decisions": []
+        },
+        "open_questions": [
+          "No SKU-like header found in root table; using 'Material Code' as identity — confirm",
+          "Sheet 'Delivery Notes 1' has a currency column 'Target currency' (Effective date, Price list, Stock basis), but records are labelled THB: confirm",
+          "Inventory table 'Warehouse Balances 1' has no recognisable quantity column",
+          "หน่วย BT หมายถึงอะไร?"
+        ],
+        "validation": {
+          "ok": false,
+          "issues": [
+            {
+              "code": "missing_required",
+              "path": "/fields",
+              "level": "error",
+              "message": "required target /price is not mapped"
+            },
+            {
+              "code": "critical_unmapped",
+              "path": "/fields",
+              "level": "warning",
+              "message": "critical field /price is not mapped"
+            },
+            {
+              "code": "critical_constant",
+              "path": "/fields/3",
+              "level": "warning",
+              "message": "critical field /currency is a constant 'THB'"
+            }
+          ]
+        },
+        "parent_id": null,
+        "approved_by": null,
+        "approved_at": null,
+        "comment": null,
+        "created_at": "2026-11-04T17:26:52.337881+00:00",
+        "agent_log": [
+          {
+            "agent": "heuristic",
+            "unmatched": {
+              "inventory": [
+                "Company",
+                "Item",
+                "Warehouse",
+                "Lot",
+                "Quantity"
+              ],
+              "products_0": [
+                "Company",
+                "Item"
+              ],
+              "products_1": [
+                "Company",
+                "Item",
+                "Currency",
+                "Price list",
+                "Valid from",
+                "Valid to"
+              ],
+              "products_3": [
+                "Unit",
+                "Full unit"
+              ],
+              "products_5": [
+                "Company",
+                "Item",
+                "Base price",
+                "Multiplier"
+              ]
+            },
+            "confidence": 0.655,
+            "table_roles": {
+              "0": "products",
+              "1": "products",
+              "2": "inventory",
+              "3": "products",
+              "4": "other",
+              "5": "products"
+            }
+          },
+          {
+            "data": {
+              "workflow": {
+                "roles": [
+                  {
+                    "data": {
+                      "analysis": {
+                        "facts": [],
+                        "hypotheses": [],
+                        "mapping_guidance": [],
+                        "missing_information": []
+                      }
+                    },
+                    "role": "analyst",
+                    "outcome": "completed",
+                    "elapsed_ms": 690
+                  },
+                  {
+                    "data": {
+                      "phase": "failed",
+                      "failure": "llm_failed: structured output failed validation: guard: /mapping/collections/0/fields/0/target: pointer '/warehouse_code' is not in the target schema; guard: /mapping/collections/0/fields/1/target: pointer '/qty' is not in the target schema"
+                    },
+                    "role": "mapper",
+                    "outcome": "failed",
+                    "elapsed_ms": 486
+                  }
+                ],
+                "review": {},
+                "status": "failed",
+                "repairs": 0,
+                "version": "2026.11.04.2",
+                "analysis": {
+                  "facts": [],
+                  "hypotheses": [],
+                  "mapping_guidance": [],
+                  "missing_information": []
+                },
+                "evidence": [],
+                "thread_id": "mapping-4b10f9230208cabb",
+                "human_resume": "existing versioned question preview/apply service; no automatic approval",
+                "provider_attempts": 4,
+                "usage_unknown_attempts": 0
+              },
+              "self_check": {
+                "problems_left": [
+                  "workflow: llm_failed: structured output failed validation: guard: /mapping/collections/0/fields/0/target: pointer '/warehouse_code' is not in the target schema; guard: /mapping/collections/0/fields/1/target: pointer '/qty' is not in the target schema",
+                  "Full execution must pass before approval"
+                ]
+              },
+              "clarifications": []
+            },
+            "agent": "mapping_workflow",
+            "notes": [
+              "llm_failed: llm_failed: structured output failed validation: guard: /mapping/collections/0/fields/0/target: pointer '/warehouse_code' is not in the target schema; guard: /mapping/collections/0/fields/1/target: pointer '/qty' is not in the target schema"
+            ],
+            "usage": {
+              "calls": 4,
+              "model": "fake-excel100",
+              "cost_usd": 0.0,
+              "latency_ms": 896.1,
+              "input_tokens": 0,
+              "output_tokens": 0
+            },
+            "attempts": 4
+          }
+        ],
+        "sample": []
+      }
+    ],
+    "datasets": [],
+    "review_tasks": [
+      {
+        "id": "rev_01M6KSJV6B1CHW9RN50B5GANEV",
+        "round_id": "rnd_01M6KSJQZ69T9XEE62DJ4Q2J7T",
+        "customer_id": "cus_01M6KSJ73AZFSHWZ5R46V46MDQ",
+        "mapping_version_id": "map_01M6KSJV50S1JMK68G291JNJAZ",
+        "dataset_version_id": null,
+        "kind": "blocked",
+        "priority": 50,
+        "status": "open",
+        "reasons": [
+          "transformation produced zero records",
+          "4 questions still need operator confirmation",
+          "verification: missing_required: required target /price is not mapped",
+          "verification: No transformation result was verified"
+        ],
+        "details": {
+          "impact": {},
+          "verdict": {
+            "word": "likely",
+            "stage": "mapping",
+            "digest": "b63ba2c073f69e170d9e696ba1bb9b63",
+            "outcome": "fix_mapping",
+            "conclusion": {
+              "en": "The policy blocks this mapping: transformation produced zero records",
+              "th": "กฎระงับการจับคู่นี้: transformation produced zero records"
+            },
+            "confidence": 0.7,
+            "rules_fired": [
+              "blocked"
+            ]
+          },
+          "decision": "block",
+          "findings": [
+            {
+              "kind": "binding",
+              "message": "missing_required: required target /price is not mapped",
+              "severity": "error"
+            }
+          ],
+          "risk_level": "high",
+          "risk_factors": [
+            "blocked by policy",
+            "validation or engine errors"
+          ],
+          "open_questions": [
+            "No SKU-like header found in root table; using 'Material Code' as identity — confirm",
+            "Sheet 'Delivery Notes 1' has a currency column 'Target currency' (Effective date, Price list, Stock basis), but records are labelled THB: confirm",
+            "Inventory table 'Warehouse Balances 1' has no recognisable quantity column",
+            "หน่วย BT หมายถึงอะไร?"
+          ]
+        },
+        "resolver": null,
+        "comment": null,
+        "created_at": "2026-11-04T17:26:52.363623+00:00",
+        "resolved_at": null,
+        "age_days": 0,
+        "waiting_until": null,
+        "waiting_note": null
+      }
+    ],
+    "jobs": [
+      {
+        "id": "job_01M6KSJ7A4YWZJB8GD1M1XC2NC",
+        "kind": "process_batch_item",
+        "status": "done",
+        "progress": 100,
+        "message": null,
+        "error": null
+      }
+    ]
+  },
+  "mapping": {
+    "id": "map_01M6KSJV50S1JMK68G291JNJAZ",
+    "customer_id": "cus_01M6KSJ73AZFSHWZ5R46V46MDQ",
+    "round_id": "rnd_01M6KSJQZ69T9XEE62DJ4Q2J7T",
+    "version": 1,
+    "status": "proposed",
+    "target_schema": "excel100_x1001@1",
+    "confidence": 0.655,
+    "created_by": "system",
+    "model": null,
+    "policy": {
+      "checks": {
+        "drift": null,
+        "errors": 1,
+        "rows_out": 0,
+        "warnings": 0,
+        "llm_fallback": true,
+        "reused_approved": false,
+        "full_verification": false,
+        "unresolved_questions": 4,
+        "plausibility_warnings": 0
+      },
+      "impact": {},
+      "source": "heuristic",
+      "reasons": [
+        "transformation produced zero records",
+        "4 questions still need operator confirmation",
+        "verification: missing_required: required target /price is not mapped",
+        "verification: No transformation result was verified"
+      ],
+      "sandbox": null,
+      "verdict": {
+        "word": "likely",
+        "stage": "mapping",
+        "digest": "b63ba2c073f69e170d9e696ba1bb9b63",
+        "outcome": "fix_mapping",
+        "subject": {
+          "id": "map_01M6KSJV50S1JMK68G291JNJAZ",
+          "kind": "mapping",
+          "round_id": "rnd_01M6KSJQZ69T9XEE62DJ4Q2J7T"
+        },
+        "evidence": [
+          {
+            "id": 1,
+            "kind": "errors",
+            "link": "/rounds/rnd_01M6KSJQZ69T9XEE62DJ4Q2J7T/mapping/map_01M6KSJV50S1JMK68G291JNJAZ?tab=findings",
+            "text": {
+              "en": "1 engine or validation errors",
+              "th": "ข้อผิดพลาดของ engine/การตรวจ 1 จุด"
+            },
+            "numbers": {
+              "errors": 1
+            }
+          },
+          {
+            "id": 2,
+            "kind": "ai",
+            "link": null,
+            "text": {
+              "en": "AI was unavailable; the deterministic draft is in use",
+              "th": "AI ใช้งานไม่ได้ ใช้ร่างจากกฎแทน"
+            },
+            "numbers": {}
+          },
+          {
+            "id": 3,
+            "kind": "self_check",
+            "link": null,
+            "text": {
+              "en": "The AI ran its mapping on the first 0 rows (0 look(s) at the file, 0 fix round(s)): 2 problem(s) left",
+              "th": "AI ลองรัน mapping กับ 0 แถวแรก (ดูไฟล์ 0 ครั้ง แก้ 0 รอบ): เหลือปัญหา 2 ข้อ"
+            },
+            "numbers": {
+              "rows": 0,
+              "fix_rounds": 0,
+              "inspections": 0,
+              "problems_left": 2
+            }
+          },
+          {
+            "id": 4,
+            "kind": "questions",
+            "link": "/review?round=rnd_01M6KSJQZ69T9XEE62DJ4Q2J7T",
+            "text": {
+              "en": "3 fields below the confidence bar",
+              "th": "3 ฟิลด์ยังไม่ถึงเกณฑ์ความมั่นใจ"
+            },
+            "numbers": {
+              "count": 3
+            }
+          }
+        ],
+        "narrative": null,
+        "conclusion": {
+          "en": "The policy blocks this mapping: transformation produced zero records",
+          "th": "กฎระงับการจับคู่นี้: transformation produced zero records"
+        },
+        "confidence": 0.7,
+        "suppressed": {
+          "count": 0,
+          "groups": [
+            {
+              "text": {
+                "en": "4 notes from the mapper",
+                "th": "หมายเหตุจากตัวจับคู่ 4 ข้อ"
+              },
+              "reason": "open_questions",
+              "pointers": []
+            }
+          ]
+        },
+        "must_decide": [
+          {
+            "id": "/sell_unit:value:9ed0965ce03b",
+            "why": {
+              "en": "An unknown source unit needs an explicit definition",
+              "th": "An unknown source unit needs an explicit definition"
+            },
+            "kind": "text",
+            "scope": "source_value",
+            "default": null,
+            "options": [],
+            "question": {
+              "en": "หน่วย BT หมายถึงอะไร?",
+              "th": "หน่วย BT หมายถึงอะไร?"
+            },
+            "semantic": "unit.sell",
+            "allow_custom": true,
+            "evidence_ids": [
+              4
+            ],
+            "option_labels": null
+          },
+          {
+            "id": "/sell_unit",
+            "why": {
+              "en": "Below the confidence bar for its risk",
+              "th": "ความมั่นใจต่ำกว่าเกณฑ์ของระดับความเสี่ยงนี้"
+            },
+            "kind": "choice",
+            "scope": null,
+            "default": null,
+            "options": [
+              "Unit",
+              "Company"
+            ],
+            "question": {
+              "en": "Which column holds Full unit name; ask if the code has no definition.?",
+              "th": "คอลัมน์ไหนคือหน่วยขาย?"
+            },
+            "semantic": "unit.sell",
+            "allow_custom": false,
+            "evidence_ids": [
+              4
+            ],
+            "option_labels": null
+          },
+          {
+            "id": "/currency",
+            "why": {
+              "en": "Below the confidence bar for its risk",
+              "th": "ความมั่นใจต่ำกว่าเกณฑ์ของระดับความเสี่ยงนี้"
+            },
+            "kind": "confirm",
+            "scope": null,
+            "default": null,
+            "options": [
+              "confirm"
+            ],
+            "question": {
+              "en": "Is ISO currency from the applicable price row. read correctly?",
+              "th": "สกุลเงิน อ่านถูกต้องไหม?"
+            },
+            "semantic": "currency",
+            "allow_custom": false,
+            "evidence_ids": [
+              4
+            ],
+            "option_labels": null
+          }
+        ],
+        "rules_fired": [
+          "blocked"
+        ],
+        "round_status": "blocked",
+        "rules_version": "2026.11.04.1",
+        "mapping_status": "proposed",
+        "policy_decision": "block"
+      },
+      "decision": "block",
+      "learning": null,
+      "priority": 50,
+      "workflow": {
+        "roles": [
+          {
+            "data": {
+              "analysis": {
+                "facts": [],
+                "hypotheses": [],
+                "mapping_guidance": [],
+                "missing_information": []
+              }
+            },
+            "role": "analyst",
+            "outcome": "completed",
+            "elapsed_ms": 690
+          },
+          {
+            "data": {
+              "phase": "failed",
+              "failure": "llm_failed: structured output failed validation: guard: /mapping/collections/0/fields/0/target: pointer '/warehouse_code' is not in the target schema; guard: /mapping/collections/0/fields/1/target: pointer '/qty' is not in the target schema"
+            },
+            "role": "mapper",
+            "outcome": "failed",
+            "elapsed_ms": 486
+          }
+        ],
+        "review": {},
+        "status": "failed",
+        "repairs": 0,
+        "version": "2026.11.04.2",
+        "analysis": {
+          "facts": [],
+          "hypotheses": [],
+          "mapping_guidance": [],
+          "missing_information": []
+        },
+        "evidence": [],
+        "thread_id": "mapping-4b10f9230208cabb",
+        "human_resume": "existing versioned question preview/apply service; no automatic approval",
+        "provider_attempts": 4,
+        "usage_unknown_attempts": 0
+      },
+      "agreement": null,
+      "risk_level": "high",
+      "risk_score": 1.0,
+      "self_check": {
+        "problems_left": [
+          "workflow: llm_failed: structured output failed validation: guard: /mapping/collections/0/fields/0/target: pointer '/warehouse_code' is not in the target schema; guard: /mapping/collections/0/fields/1/target: pointer '/qty' is not in the target schema",
+          "Full execution must pass before approval"
+        ]
+      },
+      "simulation": null,
+      "reused_from": null,
+      "field_review": null,
+      "risk_factors": [
+        "blocked by policy",
+        "validation or engine errors"
+      ],
+      "verification": {
+        "passed": false,
+        "version": 1,
+        "complete": false,
+        "problems": [
+          "missing_required: required target /price is not mapped",
+          "No transformation result was verified"
+        ],
+        "warnings": []
+      },
+      "clarifications": [],
+      "confidence_basis": null,
+      "review_decisions": [
+        {
+          "id": "/sell_unit:value:9ed0965ce03b",
+          "why": "An unknown source unit needs an explicit definition",
+          "kind": "text",
+          "note": "เปลี่ยนเฉพาะรหัสนี้ โดยเก็บหน่วยอื่นตามเดิม",
+          "field": {
+            "enum": null,
+            "name": "sell_unit",
+            "risk": "high",
+            "format": null,
+            "system": false,
+            "default": null,
+            "pointer": "/sell_unit",
+            "examples": [],
+            "nullable": false,
+            "required": true,
+            "semantic": "unit.sell",
+            "json_type": [
+              "string"
+            ],
+            "description": "Full unit name; ask if the code has no definition.",
+            "synonyms_en": [],
+            "synonyms_th": [],
+            "in_collection": null,
+            "is_collection": false,
+            "description_th": null
+          },
+          "scope": "source_value",
+          "action": "value_map",
+          "target": "/sell_unit",
+          "current": {
+            "op": "unit_normalize",
+            "args": [
+              {
+                "op": "col",
+                "name": "Unit",
+                "source": null
+              }
+            ],
+            "params": {}
+          },
+          "options": [],
+          "evidence": [
+            "header 'Unit' ≈ synonym 'sell unit' (0.85)"
+          ],
+          "question": "หน่วย BT หมายถึงอะไร?",
+          "contested": true,
+          "allow_custom": true,
+          "source_value": "BT"
+        }
+      ],
+      "target_schema_hash": "7b89c4462eda3032",
+      "confirmed_decisions": []
+    },
+    "open_questions": [
+      "No SKU-like header found in root table; using 'Material Code' as identity — confirm",
+      "Sheet 'Delivery Notes 1' has a currency column 'Target currency' (Effective date, Price list, Stock basis), but records are labelled THB: confirm",
+      "Inventory table 'Warehouse Balances 1' has no recognisable quantity column",
+      "หน่วย BT หมายถึงอะไร?"
+    ],
+    "validation": {
+      "ok": false,
+      "issues": [
+        {
+          "code": "missing_required",
+          "path": "/fields",
+          "level": "error",
+          "message": "required target /price is not mapped"
+        },
+        {
+          "code": "critical_unmapped",
+          "path": "/fields",
+          "level": "warning",
+          "message": "critical field /price is not mapped"
+        },
+        {
+          "code": "critical_constant",
+          "path": "/fields/3",
+          "level": "warning",
+          "message": "critical field /currency is a constant 'THB'"
+        }
+      ]
+    },
+    "parent_id": null,
+    "approved_by": null,
+    "approved_at": null,
+    "comment": null,
+    "created_at": "2026-11-04T17:26:52.337881+00:00",
+    "agent_log": [
+      {
+        "agent": "heuristic",
+        "unmatched": {
+          "inventory": [
+            "Company",
+            "Item",
+            "Warehouse",
+            "Lot",
+            "Quantity"
+          ],
+          "products_0": [
+            "Company",
+            "Item"
+          ],
+          "products_1": [
+            "Company",
+            "Item",
+            "Currency",
+            "Price list",
+            "Valid from",
+            "Valid to"
+          ],
+          "products_3": [
+            "Unit",
+            "Full unit"
+          ],
+          "products_5": [
+            "Company",
+            "Item",
+            "Base price",
+            "Multiplier"
+          ]
+        },
+        "confidence": 0.655,
+        "table_roles": {
+          "0": "products",
+          "1": "products",
+          "2": "inventory",
+          "3": "products",
+          "4": "other",
+          "5": "products"
+        }
+      },
+      {
+        "data": {
+          "workflow": {
+            "roles": [
+              {
+                "data": {
+                  "analysis": {
+                    "facts": [],
+                    "hypotheses": [],
+                    "mapping_guidance": [],
+                    "missing_information": []
+                  }
+                },
+                "role": "analyst",
+                "outcome": "completed",
+                "elapsed_ms": 690
+              },
+              {
+                "data": {
+                  "phase": "failed",
+                  "failure": "llm_failed: structured output failed validation: guard: /mapping/collections/0/fields/0/target: pointer '/warehouse_code' is not in the target schema; guard: /mapping/collections/0/fields/1/target: pointer '/qty' is not in the target schema"
+                },
+                "role": "mapper",
+                "outcome": "failed",
+                "elapsed_ms": 486
+              }
+            ],
+            "review": {},
+            "status": "failed",
+            "repairs": 0,
+            "version": "2026.11.04.2",
+            "analysis": {
+              "facts": [],
+              "hypotheses": [],
+              "mapping_guidance": [],
+              "missing_information": []
+            },
+            "evidence": [],
+            "thread_id": "mapping-4b10f9230208cabb",
+            "human_resume": "existing versioned question preview/apply service; no automatic approval",
+            "provider_attempts": 4,
+            "usage_unknown_attempts": 0
+          },
+          "self_check": {
+            "problems_left": [
+              "workflow: llm_failed: structured output failed validation: guard: /mapping/collections/0/fields/0/target: pointer '/warehouse_code' is not in the target schema; guard: /mapping/collections/0/fields/1/target: pointer '/qty' is not in the target schema",
+              "Full execution must pass before approval"
+            ]
+          },
+          "clarifications": []
+        },
+        "agent": "mapping_workflow",
+        "notes": [
+          "llm_failed: llm_failed: structured output failed validation: guard: /mapping/collections/0/fields/0/target: pointer '/warehouse_code' is not in the target schema; guard: /mapping/collections/0/fields/1/target: pointer '/qty' is not in the target schema"
+        ],
+        "usage": {
+          "calls": 4,
+          "model": "fake-excel100",
+          "cost_usd": 0.0,
+          "latency_ms": 896.1,
+          "input_tokens": 0,
+          "output_tokens": 0
+        },
+        "attempts": 4
+      }
+    ],
+    "sample": [],
+    "document": {
+      "meta": {
+        "version": 1,
+        "evidence": [
+          "root table: sheet 'Item Master 1' (12 rows) classified as products"
+        ],
+        "confidence": 0.655,
+        "created_by": "system",
+        "customer_id": "cus_01M6KSJ73AZFSHWZ5R46V46MDQ",
+        "fingerprints": {
+          "inventory": "aa7b715f1f6c8ca9",
+          "products_0": "aa7b715f1f6c8ca9",
+          "products_1": "aa7b715f1f6c8ca9",
+          "products_3": "aa7b715f1f6c8ca9",
+          "products_5": "aa7b715f1f6c8ca9"
+        },
+        "target_schema": "excel100_x1001@1"
+      },
+      "joins": [],
+      "fields": [
+        {
+          "expr": {
+            "op": "normalize_whitespace",
+            "args": [
+              {
+                "op": "col",
+                "name": "Product Name"
+              }
+            ],
+            "params": {}
+          },
+          "target": "/product_name",
+          "evidence": [
+            "header 'Product Name' == synonym 'product name'"
+          ],
+          "confidence": 1.0
+        },
+        {
+          "expr": {
+            "op": "unit_normalize",
+            "args": [
+              {
+                "op": "col",
+                "name": "Unit"
+              }
+            ],
+            "params": {}
+          },
+          "target": "/sell_unit",
+          "evidence": [
+            "header 'Unit' ≈ synonym 'sell unit' (0.85)"
+          ],
+          "confidence": 0.91
+        },
+        {
+          "expr": {
+            "op": "normalize_whitespace",
+            "args": [
+              {
+                "op": "col",
+                "name": "Material Code"
+              }
+            ],
+            "params": {}
+          },
+          "target": "/sku",
+          "evidence": [
+            "fallback: key candidate 'Material Code'"
+          ],
+          "confidence": 0.4
+        },
+        {
+          "expr": {
+            "op": "const",
+            "value": "THB"
+          },
+          "target": "/currency",
+          "evidence": [
+            "default currency THB"
+          ],
+          "confidence": 0.9
+        }
+      ],
+      "record": {
+        "dedupe": {
+          "keep": "first",
+          "keys": []
+        },
+        "filters": [],
+        "root_source": "products_0"
+      },
+      "quality": [
+        {
+          "rule": "unique",
+          "params": {},
+          "target": "/sku",
+          "severity": "warning"
+        }
+      ],
+      "sources": [
+        {
+          "id": "products_0",
+          "csv": {
+            "encoding": "auto",
+            "delimiter": "auto",
+            "quote_char": "\""
+          },
+          "file": {
+            "name_pattern": "(?i)^X",
+            "sheet_names_any": [
+              "Item Master 1"
+            ]
+          },
+          "role": "products",
+          "sheet": {
+            "name": "Item Master 1"
+          },
+          "table": {
+            "fill_down": [],
+            "header_row": 0,
+            "header_rows": 1,
+            "last_column": 5,
+            "first_column": 0,
+            "drop_total_rows": true,
+            "drop_empty_columns": true,
+            "stop_at_blank_rows": 2,
+            "drop_repeated_headers": true
+          },
+          "rename": {}
+        },
+        {
+          "id": "products_1",
+          "csv": {
+            "encoding": "auto",
+            "delimiter": "auto",
+            "quote_char": "\""
+          },
+          "file": {
+            "name_pattern": "(?i)^X",
+            "sheet_names_any": [
+              "Price List 1"
+            ]
+          },
+          "role": "products",
+          "sheet": {
+            "name": "Price List 1"
+          },
+          "table": {
+            "fill_down": [],
+            "header_row": 0,
+            "header_rows": 1,
+            "last_column": 7,
+            "first_column": 0,
+            "drop_total_rows": true,
+            "drop_empty_columns": true,
+            "stop_at_blank_rows": 2,
+            "drop_repeated_headers": true
+          },
+          "rename": {}
+        },
+        {
+          "id": "inventory",
+          "csv": {
+            "encoding": "auto",
+            "delimiter": "auto",
+            "quote_char": "\""
+          },
+          "file": {
+            "name_pattern": "(?i)^X",
+            "sheet_names_any": [
+              "Warehouse Balances 1"
+            ]
+          },
+          "role": "inventory",
+          "sheet": {
+            "name": "Warehouse Balances 1"
+          },
+          "table": {
+            "fill_down": [],
+            "header_row": 0,
+            "header_rows": 1,
+            "last_column": 5,
+            "first_column": 0,
+            "drop_total_rows": true,
+            "drop_empty_columns": true,
+            "stop_at_blank_rows": 2,
+            "drop_repeated_headers": true
+          },
+          "rename": {}
+        },
+        {
+          "id": "products_3",
+          "csv": {
+            "encoding": "auto",
+            "delimiter": "auto",
+            "quote_char": "\""
+          },
+          "file": {
+            "name_pattern": "(?i)^X",
+            "sheet_names_any": [
+              "Unit Dictionary 1"
+            ]
+          },
+          "role": "products",
+          "sheet": {
+            "name": "Unit Dictionary 1"
+          },
+          "table": {
+            "fill_down": [],
+            "header_row": 0,
+            "header_rows": 1,
+            "last_column": 2,
+            "first_column": 0,
+            "drop_total_rows": true,
+            "drop_empty_columns": true,
+            "stop_at_blank_rows": 2,
+            "drop_repeated_headers": true
+          },
+          "rename": {}
+        },
+        {
+          "id": "products_5",
+          "csv": {
+            "encoding": "auto",
+            "delimiter": "auto",
+            "quote_char": "\""
+          },
+          "file": {
+            "name_pattern": "(?i)^X",
+            "sheet_names_any": [
+              "Calculation Inputs 1"
+            ]
+          },
+          "role": "products",
+          "sheet": {
+            "name": "Calculation Inputs 1"
+          },
+          "table": {
+            "fill_down": [],
+            "header_row": 0,
+            "header_rows": 1,
+            "last_column": 4,
+            "first_column": 0,
+            "drop_total_rows": true,
+            "drop_empty_columns": true,
+            "stop_at_blank_rows": 2,
+            "drop_repeated_headers": true
+          },
+          "rename": {}
+        }
+      ],
+      "provenance": true,
+      "collections": [],
+      "attributes_passthrough": true
+    }
+  },
+  "questions": {
+    "mapping_id": "map_01M6KSJV50S1JMK68G291JNJAZ",
+    "round_id": "rnd_01M6KSJQZ69T9XEE62DJ4Q2J7T",
+    "status": "proposed",
+    "blocked": true,
+    "questions": [
+      {
+        "id": "/sell_unit:value:9ed0965ce03b",
+        "why": "An unknown source unit needs an explicit definition",
+        "kind": "text",
+        "note": "An unknown source unit needs an explicit definition",
+        "field": {
+          "pointer": "/sell_unit",
+          "name": "sell_unit",
+          "json_type": [
+            "string"
+          ],
+          "semantic": "unit.sell",
+          "risk": "high",
+          "required": true,
+          "nullable": false,
+          "enum": null,
+          "format": null,
+          "synonyms_en": [],
+          "synonyms_th": [],
+          "description": "Full unit name; ask if the code has no definition.",
+          "description_th": null,
+          "in_collection": null,
+          "is_collection": false,
+          "system": false,
+          "default": null,
+          "examples": []
+        },
+        "scope": "source_value",
+        "action": "value_map",
+        "target": "/sell_unit",
+        "current": {},
+        "options": [],
+        "evidence": [
+          "An unknown source unit needs an explicit definition",
+          "ตัวอย่างจากคอลัมน์ Unit: EA · BT"
+        ],
+        "question": "หน่วย BT หมายถึงอะไร?",
+        "contested": true,
+        "allow_custom": true,
+        "source_value": "BT",
+        "related_questions": [],
+        "source_examples": [
+          {
+            "source": "products_0",
+            "column": "Unit",
+            "values": [
+              "EA",
+              "BT"
+            ],
+            "scope": "profile samples; not all rows"
+          }
+        ]
+      },
+      {
+        "id": "/sell_unit",
+        "field": {
+          "pointer": "/sell_unit",
+          "name": "sell_unit",
+          "json_type": [
+            "string"
+          ],
+          "semantic": "unit.sell",
+          "risk": "high",
+          "required": true,
+          "nullable": false,
+          "enum": null,
+          "format": null,
+          "synonyms_en": [],
+          "synonyms_th": [],
+          "description": "Full unit name; ask if the code has no definition.",
+          "description_th": null,
+          "in_collection": null,
+          "is_collection": false,
+          "system": false,
+          "default": null,
+          "examples": []
+        },
+        "kind": "choice",
+        "options": [
+          "Unit",
+          "Company"
+        ],
+        "current": {
+          "op": "unit_normalize",
+          "args": [
+            {
+              "op": "col",
+              "name": "Unit"
+            }
+          ],
+          "params": {}
+        },
+        "evidence": [
+          "header 'Unit' ≈ synonym 'sell unit' (0.85)",
+          "ตัวอย่างจากคอลัมน์ Unit: EA · BT"
+        ],
+        "note": null,
+        "contested": false,
+        "source_examples": [
+          {
+            "source": "products_0",
+            "column": "Unit",
+            "values": [
+              "EA",
+              "BT"
+            ],
+            "scope": "profile samples; not all rows"
+          }
+        ]
+      },
+      {
+        "id": "/currency",
+        "field": {
+          "pointer": "/currency",
+          "name": "currency",
+          "json_type": [
+            "string"
+          ],
+          "semantic": "currency",
+          "risk": "critical",
+          "required": true,
+          "nullable": false,
+          "enum": null,
+          "format": null,
+          "synonyms_en": [],
+          "synonyms_th": [],
+          "description": "ISO currency from the applicable price row.",
+          "description_th": null,
+          "in_collection": null,
+          "is_collection": false,
+          "system": false,
+          "default": null,
+          "examples": []
+        },
+        "kind": "confirm",
+        "options": [],
+        "current": {
+          "op": "const",
+          "value": "THB"
+        },
+        "evidence": [
+          "default currency THB"
+        ],
+        "note": null,
+        "contested": false,
+        "source_examples": []
+      }
+    ],
+    "open_questions": [
+      "No SKU-like header found in root table; using 'Material Code' as identity — confirm",
+      "Sheet 'Delivery Notes 1' has a currency column 'Target currency' (Effective date, Price list, Stock basis), but records are labelled THB: confirm",
+      "Inventory table 'Warehouse Balances 1' has no recognisable quantity column",
+      "หน่วย BT หมายถึงอะไร?"
+    ],
+    "reasons": [
+      "transformation produced zero records",
+      "4 questions still need operator confirmation",
+      "verification: missing_required: required target /price is not mapped",
+      "verification: No transformation result was verified"
+    ],
+    "sample": [],
+    "context": {
+      "customer": {
+        "code": "X1001",
+        "name": "Excel100 X1001"
+      },
+      "round_label": "Excel100 complex suite · X1001.xlsx",
+      "files": [
+        {
+          "id": "fil_01M6KSJQZJK9PS5T4XQW2NE7TH",
+          "name": "X1001.xlsx"
+        }
+      ],
+      "mapping_version": 1
+    },
+    "changes": [],
+    "comparison_dataset_id": null,
+    "checks": {
+      "drift": null,
+      "errors": 1,
+      "rows_out": 0,
+      "warnings": 0,
+      "llm_fallback": true,
+      "reused_approved": false,
+      "full_verification": false,
+      "unresolved_questions": 4,
+      "plausibility_warnings": 0,
+      "verification": {
+        "passed": false,
+        "version": 1,
+        "complete": false,
+        "problems": [
+          "missing_required: required target /price is not mapped",
+          "No transformation result was verified"
+        ],
+        "warnings": []
+      }
+    },
+    "impact": {},
+    "fields": [
+      {
+        "pointer": "/sku",
+        "name": "sku",
+        "json_type": [
+          "string"
+        ],
+        "semantic": "identity.sku",
+        "risk": "medium",
+        "required": true,
+        "nullable": false,
+        "enum": null,
+        "format": null,
+        "synonyms_en": [],
+        "synonyms_th": [],
+        "description": "Preserve identity including leading zeroes.",
+        "description_th": null,
+        "in_collection": null,
+        "is_collection": false,
+        "system": false,
+        "default": null,
+        "examples": []
+      },
+      {
+        "pointer": "/price",
+        "name": "price",
+        "json_type": [
+          "number"
+        ],
+        "semantic": "price.amount",
+        "risk": "critical",
+        "required": true,
+        "nullable": false,
+        "enum": null,
+        "format": null,
+        "synonyms_en": [],
+        "synonyms_th": [],
+        "description": "Selling price for RETAIL in target currency valid 2026-11-05.",
+        "description_th": null,
+        "in_collection": null,
+        "is_collection": false,
+        "system": false,
+        "default": null,
+        "examples": []
+      },
+      {
+        "pointer": "/currency",
+        "name": "currency",
+        "json_type": [
+          "string"
+        ],
+        "semantic": "currency",
+        "risk": "critical",
+        "required": true,
+        "nullable": false,
+        "enum": null,
+        "format": null,
+        "synonyms_en": [],
+        "synonyms_th": [],
+        "description": "ISO currency from the applicable price row.",
+        "description_th": null,
+        "in_collection": null,
+        "is_collection": false,
+        "system": false,
+        "default": null,
+        "examples": []
+      },
+      {
+        "pointer": "/inventory/*/qty",
+        "name": "qty",
+        "json_type": [
+          "number"
+        ],
+        "semantic": "stock.qty",
+        "risk": "high",
+        "required": true,
+        "nullable": false,
+        "enum": null,
+        "format": null,
+        "synonyms_en": [],
+        "synonyms_th": [],
+        "description": "Individual pieces; sum lots within a warehouse.",
+        "description_th": null,
+        "in_collection": "/inventory",
+        "is_collection": false,
+        "system": false,
+        "default": null,
+        "examples": []
+      },
+      {
+        "pointer": "/inventory/*/warehouse_code",
+        "name": "warehouse_code",
+        "json_type": [
+          "string"
+        ],
+        "semantic": "stock.warehouse",
+        "risk": "high",
+        "required": true,
+        "nullable": false,
+        "enum": null,
+        "format": null,
+        "synonyms_en": [],
+        "synonyms_th": [],
+        "description": "Warehouse code.",
+        "description_th": null,
+        "in_collection": "/inventory",
+        "is_collection": false,
+        "system": false,
+        "default": null,
+        "examples": []
+      },
+      {
+        "pointer": "/sell_unit",
+        "name": "sell_unit",
+        "json_type": [
+          "string"
+        ],
+        "semantic": "unit.sell",
+        "risk": "high",
+        "required": true,
+        "nullable": false,
+        "enum": null,
+        "format": null,
+        "synonyms_en": [],
+        "synonyms_th": [],
+        "description": "Full unit name; ask if the code has no definition.",
+        "description_th": null,
+        "in_collection": null,
+        "is_collection": false,
+        "system": false,
+        "default": null,
+        "examples": []
+      },
+      {
+        "pointer": "/product_name",
+        "name": "product_name",
+        "json_type": [
+          "string"
+        ],
+        "semantic": "product.name",
+        "risk": "medium",
+        "required": true,
+        "nullable": false,
+        "enum": null,
+        "format": null,
+        "synonyms_en": [],
+        "synonyms_th": [],
+        "description": "Use the master product description.",
+        "description_th": null,
+        "in_collection": null,
+        "is_collection": false,
+        "system": false,
+        "default": null,
+        "examples": []
+      }
+    ]
+  },
+  "preview": {
+    "ok": false,
+    "validation": {
+      "ok": false,
+      "issues": [
+        {
+          "level": "error",
+          "code": "missing_required",
+          "message": "required target /price is not mapped",
+          "path": "/fields"
+        },
+        {
+          "level": "warning",
+          "code": "critical_unmapped",
+          "message": "critical field /price is not mapped",
+          "path": "/fields"
+        },
+        {
+          "level": "warning",
+          "code": "critical_constant",
+          "message": "critical field /currency is a constant 'THB'",
+          "path": "/fields/3"
+        }
+      ]
+    },
+    "records": [],
+    "findings": []
+  }
+}

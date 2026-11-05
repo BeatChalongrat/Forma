@@ -1,0 +1,1073 @@
+[
+  {
+    "file": "backend/src/forma/api/batch_routes.py",
+    "line": 70,
+    "name": "create_batch",
+    "decorators": "router.post('/batches', status_code=201)",
+    "parameters": "files: list[UploadFile]=File(...), label: str | None=Form(None, max_length=255), work_date: date | None=Form(None), expected_files: int | None=Form(None, ge=1, le=1000000), auto_publish: bool=Form(True), use_llm: bool | None=Form(None), upload_key: str | None=Form(None, min_length=1, max_length=100), sync: bool=Query(False), session: Session=Depends(get_session), ctx: ServiceContext=Depends(ctx_dep), p: Principal=Depends(require_role('importer'))"
+  },
+  {
+    "file": "backend/src/forma/api/batch_routes.py",
+    "line": 157,
+    "name": "append_files",
+    "decorators": "router.post('/batches/{batch_id}/files')",
+    "parameters": "batch_id: str, files: list[UploadFile]=File(...), use_llm: bool | None=Form(None), sync: bool=Query(False), session: Session=Depends(get_session), ctx: ServiceContext=Depends(ctx_dep), p: Principal=Depends(require_role('importer'))"
+  },
+  {
+    "file": "backend/src/forma/api/batch_routes.py",
+    "line": 190,
+    "name": "list_batches",
+    "decorators": "router.get('/batches')",
+    "parameters": "limit: int=Query(20, ge=1, le=200), offset: int=Query(0, ge=0), search: str=Query('', max_length=200), start: date | None=None, end: date | None=None, session: Session=Depends(get_session), p: Principal=Depends(current_principal)"
+  },
+  {
+    "file": "backend/src/forma/api/batch_routes.py",
+    "line": 203,
+    "name": "get_batch",
+    "decorators": "router.get('/batches/{batch_id}')",
+    "parameters": "batch_id: str, session: Session=Depends(get_session), p: Principal=Depends(current_principal)"
+  },
+  {
+    "file": "backend/src/forma/api/batch_routes.py",
+    "line": 211,
+    "name": "get_batch_summary",
+    "decorators": "router.get('/batches/{batch_id}/summary')",
+    "parameters": "batch_id: str, session: Session=Depends(get_session), p: Principal=Depends(current_principal)"
+  },
+  {
+    "file": "backend/src/forma/api/batch_routes.py",
+    "line": 219,
+    "name": "edit_label",
+    "decorators": "router.patch('/batches/{batch_id}')",
+    "parameters": "batch_id: str, body: BatchLabelIn, session: Session=Depends(get_session), p: Principal=Depends(require_role('importer'))"
+  },
+  {
+    "file": "backend/src/forma/api/batch_routes.py",
+    "line": 251,
+    "name": "assign",
+    "decorators": "router.post('/batches/{batch_id}/assign')",
+    "parameters": "batch_id: str, body: BatchAssignIn, session: Session=Depends(get_session), ctx: ServiceContext=Depends(ctx_dep), p: Principal=Depends(require_role('importer'))"
+  },
+  {
+    "file": "backend/src/forma/api/batch_routes.py",
+    "line": 284,
+    "name": "resume",
+    "decorators": "router.post('/batches/{batch_id}/resume')",
+    "parameters": "batch_id: str, sync: bool=Query(False), session: Session=Depends(get_session), p: Principal=Depends(require_role('importer'))"
+  },
+  {
+    "file": "backend/src/forma/api/batch_routes.py",
+    "line": 303,
+    "name": "download",
+    "decorators": "router.get('/batches/{batch_id}/download')",
+    "parameters": "batch_id: str, session: Session=Depends(get_session), ctx: ServiceContext=Depends(ctx_dep), p: Principal=Depends(current_principal)"
+  },
+  {
+    "file": "backend/src/forma/api/config_routes.py",
+    "line": 52,
+    "name": "get_ai",
+    "decorators": "router.get('/settings/ai')",
+    "parameters": "session: Session=Depends(get_session), ctx: ServiceContext=Depends(ctx_dep), p: Principal=Depends(require_role('admin'))"
+  },
+  {
+    "file": "backend/src/forma/api/config_routes.py",
+    "line": 61,
+    "name": "put_ai",
+    "decorators": "router.put('/settings/ai')",
+    "parameters": "body: AISettingsIn, session: Session=Depends(get_session), ctx: ServiceContext=Depends(ctx_dep), p: Principal=Depends(require_role('admin'))"
+  },
+  {
+    "file": "backend/src/forma/api/config_routes.py",
+    "line": 75,
+    "name": "connect_ai",
+    "decorators": "router.post('/settings/ai/connect')",
+    "parameters": "body: ConnectAIIn, session: Session=Depends(get_session), ctx: ServiceContext=Depends(ctx_dep), p: Principal=Depends(require_role('admin')), _rl: Principal=Depends(llm_rate_limited)"
+  },
+  {
+    "file": "backend/src/forma/api/config_routes.py",
+    "line": 93,
+    "name": "discover_models",
+    "decorators": "router.post('/settings/ai/models')",
+    "parameters": "body: DiscoverModelsIn, session: Session=Depends(get_session), ctx: ServiceContext=Depends(ctx_dep), p: Principal=Depends(require_role('admin')), _rl: Principal=Depends(llm_rate_limited)"
+  },
+  {
+    "file": "backend/src/forma/api/config_routes.py",
+    "line": 106,
+    "name": "test_ai",
+    "decorators": "router.post('/settings/ai/test')",
+    "parameters": "session: Session=Depends(get_session), ctx: ServiceContext=Depends(ctx_dep), p: Principal=Depends(require_role('admin')), _rl: Principal=Depends(llm_rate_limited)"
+  },
+  {
+    "file": "backend/src/forma/api/config_routes.py",
+    "line": 133,
+    "name": "test_vision",
+    "decorators": "router.post('/settings/ai/vision-test')",
+    "parameters": "session: Session=Depends(get_session), ctx: ServiceContext=Depends(ctx_dep), p: Principal=Depends(require_role('admin')), _rl: Principal=Depends(llm_rate_limited)"
+  },
+  {
+    "file": "backend/src/forma/api/config_routes.py",
+    "line": 147,
+    "name": "add_backup",
+    "decorators": "router.post('/settings/ai/backups')",
+    "parameters": "body: BackupKeyIn, session: Session=Depends(get_session), ctx: ServiceContext=Depends(ctx_dep), p: Principal=Depends(require_role('admin')), _rl: Principal=Depends(llm_rate_limited)"
+  },
+  {
+    "file": "backend/src/forma/api/config_routes.py",
+    "line": 171,
+    "name": "update_backup",
+    "decorators": "router.patch('/settings/ai/backups/{backup_id}')",
+    "parameters": "backup_id: str, body: BackupKeyPatchIn, session: Session=Depends(get_session), ctx: ServiceContext=Depends(ctx_dep), p: Principal=Depends(require_role('admin'))"
+  },
+  {
+    "file": "backend/src/forma/api/config_routes.py",
+    "line": 185,
+    "name": "remove_backup",
+    "decorators": "router.delete('/settings/ai/backups/{backup_id}')",
+    "parameters": "backup_id: str, session: Session=Depends(get_session), ctx: ServiceContext=Depends(ctx_dep), p: Principal=Depends(require_role('admin'))"
+  },
+  {
+    "file": "backend/src/forma/api/config_routes.py",
+    "line": 198,
+    "name": "order_backups",
+    "decorators": "router.put('/settings/ai/backups/order')",
+    "parameters": "body: BackupOrderIn, session: Session=Depends(get_session), ctx: ServiceContext=Depends(ctx_dep), p: Principal=Depends(require_role('admin'))"
+  },
+  {
+    "file": "backend/src/forma/api/config_routes.py",
+    "line": 214,
+    "name": "get_policy",
+    "decorators": "router.get('/settings/policy')",
+    "parameters": "session: Session=Depends(get_session), ctx: ServiceContext=Depends(ctx_dep), p: Principal=Depends(require_role('admin'))"
+  },
+  {
+    "file": "backend/src/forma/api/config_routes.py",
+    "line": 223,
+    "name": "put_policy",
+    "decorators": "router.put('/settings/policy')",
+    "parameters": "body: PolicyIn, session: Session=Depends(get_session), ctx: ServiceContext=Depends(ctx_dep), p: Principal=Depends(require_role('admin'))"
+  },
+  {
+    "file": "backend/src/forma/api/config_routes.py",
+    "line": 236,
+    "name": "reset_policy",
+    "decorators": "router.delete('/settings/policy')",
+    "parameters": "session: Session=Depends(get_session), ctx: ServiceContext=Depends(ctx_dep), p: Principal=Depends(require_role('admin'))"
+  },
+  {
+    "file": "backend/src/forma/api/config_routes.py",
+    "line": 252,
+    "name": "semantics",
+    "decorators": "router.get('/settings/semantics')",
+    "parameters": "p: Principal=Depends(current_principal)"
+  },
+  {
+    "file": "backend/src/forma/api/config_routes.py",
+    "line": 258,
+    "name": "preview_schema",
+    "decorators": "router.post('/schemas/preview')",
+    "parameters": "body: SchemaIn, ctx: ServiceContext=Depends(ctx_dep), p: Principal=Depends(require_role('approver'))"
+  },
+  {
+    "file": "backend/src/forma/api/config_routes.py",
+    "line": 280,
+    "name": "put_default_format",
+    "decorators": "router.put('/settings/default-format')",
+    "parameters": "body: DefaultFormatIn, session: Session=Depends(get_session), ctx: ServiceContext=Depends(ctx_dep), p: Principal=Depends(require_role('admin'))"
+  },
+  {
+    "file": "backend/src/forma/api/knowledge_routes.py",
+    "line": 61,
+    "name": "inventory",
+    "decorators": "router.get('')",
+    "parameters": "offset: int=0, session: Session=Depends(get_session), p: Principal=Depends(admin)"
+  },
+  {
+    "file": "backend/src/forma/api/knowledge_routes.py",
+    "line": 68,
+    "name": "classify",
+    "decorators": "router.post('/classify')",
+    "parameters": "body: Classification, session: Session=Depends(get_session), p: Principal=Depends(admin)"
+  },
+  {
+    "file": "backend/src/forma/api/knowledge_routes.py",
+    "line": 85,
+    "name": "export",
+    "decorators": "router.post('/export', dependencies=[Depends(package_slot)])",
+    "parameters": "body: Selection, session: Session=Depends(get_session), ctx: ServiceContext=Depends(ctx_dep), p: Principal=Depends(admin)"
+  },
+  {
+    "file": "backend/src/forma/api/knowledge_routes.py",
+    "line": 107,
+    "name": "preview",
+    "decorators": "router.post('/preview', dependencies=[Depends(package_slot)])",
+    "parameters": "file: UploadFile=File(...), session: Session=Depends(get_session), ctx: ServiceContext=Depends(ctx_dep), p: Principal=Depends(admin)"
+  },
+  {
+    "file": "backend/src/forma/api/knowledge_routes.py",
+    "line": 117,
+    "name": "import_release",
+    "decorators": "router.post('/import', dependencies=[Depends(package_slot)])",
+    "parameters": "file: UploadFile=File(...), plan_digest: str=Form(...), session: Session=Depends(get_session), ctx: ServiceContext=Depends(ctx_dep), p: Principal=Depends(admin)"
+  },
+  {
+    "file": "backend/src/forma/api/knowledge_routes.py",
+    "line": 131,
+    "name": "releases",
+    "decorators": "router.get('/releases')",
+    "parameters": "session: Session=Depends(get_session), p: Principal=Depends(admin)"
+  },
+  {
+    "file": "backend/src/forma/api/knowledge_routes.py",
+    "line": 150,
+    "name": "revoke",
+    "decorators": "router.post('/releases/{release_id}/revoke')",
+    "parameters": "release_id: str, body: Withdrawal, session: Session=Depends(get_session), ctx: ServiceContext=Depends(ctx_dep), p: Principal=Depends(admin)"
+  },
+  {
+    "file": "backend/src/forma/api/knowledge_routes.py",
+    "line": 164,
+    "name": "refresh",
+    "decorators": "router.post('/refresh')",
+    "parameters": "session: Session=Depends(get_session), ctx: ServiceContext=Depends(ctx_dep), p: Principal=Depends(admin)"
+  },
+  {
+    "file": "backend/src/forma/api/routes.py",
+    "line": 110,
+    "name": "me",
+    "decorators": "api.get('/me')",
+    "parameters": "p: Principal=Depends(authenticated_principal)"
+  },
+  {
+    "file": "backend/src/forma/api/routes.py",
+    "line": 115,
+    "name": "auth_config",
+    "decorators": "api.get('/auth/config')",
+    "parameters": "ctx: ServiceContext=Depends(ctx_dep)"
+  },
+  {
+    "file": "backend/src/forma/api/routes.py",
+    "line": 135,
+    "name": "list_customers",
+    "decorators": "api.get('/customers')",
+    "parameters": "session: Session=Depends(get_session), p: Principal=Depends(current_principal)"
+  },
+  {
+    "file": "backend/src/forma/api/routes.py",
+    "line": 171,
+    "name": "create_customer",
+    "decorators": "api.post('/customers', status_code=201)",
+    "parameters": "body: CustomerIn, session: Session=Depends(get_session), p: Principal=Depends(require_role('admin'))"
+  },
+  {
+    "file": "backend/src/forma/api/routes.py",
+    "line": 178,
+    "name": "update_customer",
+    "decorators": "api.patch('/customers/{customer_id}')",
+    "parameters": "customer_id: str, body: CustomerPatch, session: Session=Depends(get_session), ctx: ServiceContext=Depends(ctx_dep), p: Principal=Depends(require_role('admin'))"
+  },
+  {
+    "file": "backend/src/forma/api/routes.py",
+    "line": 193,
+    "name": "get_customer",
+    "decorators": "api.get('/customers/{customer_id}')",
+    "parameters": "customer_id: str, session: Session=Depends(get_session), p: Principal=Depends(current_principal)"
+  },
+  {
+    "file": "backend/src/forma/api/routes.py",
+    "line": 229,
+    "name": "delete_override",
+    "decorators": "api.delete('/customers/{customer_id}/overrides/{override_id}')",
+    "parameters": "customer_id: str, override_id: str, session: Session=Depends(get_session), p: Principal=Depends(require_role('approver'))"
+  },
+  {
+    "file": "backend/src/forma/api/routes.py",
+    "line": 247,
+    "name": "list_rounds",
+    "decorators": "api.get('/rounds')",
+    "parameters": "status: str | None=None, customer_id: str | None=None, limit: int=Query(100, le=500), offset: int=Query(0, ge=0), session: Session=Depends(get_session), p: Principal=Depends(current_principal)"
+  },
+  {
+    "file": "backend/src/forma/api/routes.py",
+    "line": 271,
+    "name": "create_round",
+    "decorators": "api.post('/rounds', status_code=201)",
+    "parameters": "body: RoundIn, session: Session=Depends(get_session), ctx: ServiceContext=Depends(ctx_dep), p: Principal=Depends(require_role('importer'))"
+  },
+  {
+    "file": "backend/src/forma/api/routes.py",
+    "line": 286,
+    "name": "get_round",
+    "decorators": "api.get('/rounds/{round_id}')",
+    "parameters": "round_id: str, session: Session=Depends(get_session), p: Principal=Depends(current_principal)"
+  },
+  {
+    "file": "backend/src/forma/api/routes.py",
+    "line": 352,
+    "name": "upload_files",
+    "decorators": "api.post('/rounds/{round_id}/files', status_code=201)",
+    "parameters": "round_id: str, files: list[UploadFile]=File(...), session: Session=Depends(get_session), ctx: ServiceContext=Depends(ctx_dep), p: Principal=Depends(require_role('importer'))"
+  },
+  {
+    "file": "backend/src/forma/api/routes.py",
+    "line": 368,
+    "name": "get_file",
+    "decorators": "api.get('/rounds/{round_id}/files/{file_id}')",
+    "parameters": "round_id: str, file_id: str, session: Session=Depends(get_session), p: Principal=Depends(current_principal)"
+  },
+  {
+    "file": "backend/src/forma/api/routes.py",
+    "line": 382,
+    "name": "file_grid",
+    "decorators": "api.get('/rounds/{round_id}/files/{file_id}/grid')",
+    "parameters": "round_id: str, file_id: str, sheet: int=0, rows: int=Query(60, le=500), session: Session=Depends(get_session), ctx: ServiceContext=Depends(ctx_dep), p: Principal=Depends(current_principal)"
+  },
+  {
+    "file": "backend/src/forma/api/routes.py",
+    "line": 403,
+    "name": "profile_round",
+    "decorators": "api.post('/rounds/{round_id}/profile')",
+    "parameters": "round_id: str, sync: bool=False, session: Session=Depends(get_session), p: Principal=Depends(require_role('importer'))"
+  },
+  {
+    "file": "backend/src/forma/api/routes.py",
+    "line": 419,
+    "name": "propose",
+    "decorators": "api.post('/rounds/{round_id}/propose')",
+    "parameters": "round_id: str, body: ProposeIn | None=None, session: Session=Depends(get_session), p: Principal=Depends(require_role('importer'))"
+  },
+  {
+    "file": "backend/src/forma/api/routes.py",
+    "line": 442,
+    "name": "cancel_round",
+    "decorators": "api.post('/rounds/{round_id}/cancel')",
+    "parameters": "round_id: str, body: CloseIn, session: Session=Depends(get_session), p: Principal=Depends(require_role('importer'))"
+  },
+  {
+    "file": "backend/src/forma/api/routes.py",
+    "line": 457,
+    "name": "reopen_round",
+    "decorators": "api.post('/rounds/{round_id}/reopen')",
+    "parameters": "round_id: str, session: Session=Depends(get_session), p: Principal=Depends(require_role('importer'))"
+  },
+  {
+    "file": "backend/src/forma/api/routes.py",
+    "line": 467,
+    "name": "move_round",
+    "decorators": "api.post('/rounds/{round_id}/move', status_code=201)",
+    "parameters": "round_id: str, body: MoveIn, sync: bool=Query(False), session: Session=Depends(get_session), p: Principal=Depends(require_role('importer'))"
+  },
+  {
+    "file": "backend/src/forma/api/routes.py",
+    "line": 494,
+    "name": "replace_round",
+    "decorators": "api.post('/rounds/{round_id}/replace', status_code=201)",
+    "parameters": "round_id: str, files: list[UploadFile]=File(...), reason: str=Form(..., min_length=1, max_length=500), label: str | None=Form(None, max_length=255), sync: bool=Query(False), session: Session=Depends(get_session), ctx: ServiceContext=Depends(ctx_dep), p: Principal=Depends(require_role('importer'))"
+  },
+  {
+    "file": "backend/src/forma/api/routes.py",
+    "line": 552,
+    "name": "replace_file",
+    "decorators": "api.post('/rounds/{round_id}/files/{file_id}/replace', status_code=201)",
+    "parameters": "round_id: str, file_id: str, file: UploadFile=File(...), reason: str=Form(..., min_length=1, max_length=500), sync: bool=Query(False), session: Session=Depends(get_session), ctx: ServiceContext=Depends(ctx_dep), p: Principal=Depends(require_role('importer'))"
+  },
+  {
+    "file": "backend/src/forma/api/routes.py",
+    "line": 571,
+    "name": "move_file",
+    "decorators": "api.post('/rounds/{round_id}/files/{file_id}/move', status_code=201)",
+    "parameters": "round_id: str, file_id: str, body: MoveIn, sync: bool=Query(False), session: Session=Depends(get_session), ctx: ServiceContext=Depends(ctx_dep), p: Principal=Depends(require_role('importer'))"
+  },
+  {
+    "file": "backend/src/forma/api/routes.py",
+    "line": 589,
+    "name": "cancel_file",
+    "decorators": "api.post('/rounds/{round_id}/files/{file_id}/cancel')",
+    "parameters": "round_id: str, file_id: str, body: CloseIn, sync: bool=Query(False), session: Session=Depends(get_session), ctx: ServiceContext=Depends(ctx_dep), p: Principal=Depends(require_role('importer'))"
+  },
+  {
+    "file": "backend/src/forma/api/routes.py",
+    "line": 604,
+    "name": "run_pipeline",
+    "decorators": "api.post('/rounds/{round_id}/run')",
+    "parameters": "round_id: str, body: ProposeIn | None=None, session: Session=Depends(get_session), p: Principal=Depends(require_role('importer'))"
+  },
+  {
+    "file": "backend/src/forma/api/routes.py",
+    "line": 628,
+    "name": "transform",
+    "decorators": "api.post('/rounds/{round_id}/transform')",
+    "parameters": "round_id: str, mapping_version_id: str | None=None, actor: str='operator', sync: bool=False, session: Session=Depends(get_session), p: Principal=Depends(require_role('importer'))"
+  },
+  {
+    "file": "backend/src/forma/api/routes.py",
+    "line": 650,
+    "name": "batch_run",
+    "decorators": "api.post('/rounds/batch-run')",
+    "parameters": "body: BatchRunIn, session: Session=Depends(get_session), p: Principal=Depends(require_role('importer'))"
+  },
+  {
+    "file": "backend/src/forma/api/routes.py",
+    "line": 681,
+    "name": "get_mapping",
+    "decorators": "api.get('/mappings/{mapping_id}')",
+    "parameters": "mapping_id: str, session: Session=Depends(get_session), p: Principal=Depends(current_principal)"
+  },
+  {
+    "file": "backend/src/forma/api/routes.py",
+    "line": 688,
+    "name": "approve_mapping",
+    "decorators": "api.post('/mappings/{mapping_id}/approve')",
+    "parameters": "mapping_id: str, body: Decision, session: Session=Depends(get_session), p: Principal=Depends(require_role('reviewer'))"
+  },
+  {
+    "file": "backend/src/forma/api/routes.py",
+    "line": 715,
+    "name": "reject_mapping",
+    "decorators": "api.post('/mappings/{mapping_id}/reject')",
+    "parameters": "mapping_id: str, body: Decision, session: Session=Depends(get_session), p: Principal=Depends(require_role('reviewer'))"
+  },
+  {
+    "file": "backend/src/forma/api/routes.py",
+    "line": 726,
+    "name": "edit_mapping",
+    "decorators": "api.post('/mappings/{mapping_id}/edit', status_code=201)",
+    "parameters": "mapping_id: str, body: MappingEditIn, session: Session=Depends(get_session), ctx: ServiceContext=Depends(ctx_dep), p: Principal=Depends(require_role('reviewer'))"
+  },
+  {
+    "file": "backend/src/forma/api/routes.py",
+    "line": 738,
+    "name": "mapping_preview",
+    "decorators": "api.post('/rounds/{round_id}/mapping-preview')",
+    "parameters": "round_id: str, body: MappingPreviewIn, session: Session=Depends(get_session), ctx: ServiceContext=Depends(ctx_dep), p: Principal=Depends(current_principal)"
+  },
+  {
+    "file": "backend/src/forma/api/routes.py",
+    "line": 750,
+    "name": "round_relationships",
+    "decorators": "api.post('/rounds/{round_id}/relationships')",
+    "parameters": "round_id: str, body: RelationshipsIn, session: Session=Depends(get_session), ctx: ServiceContext=Depends(ctx_dep), p: Principal=Depends(current_principal)"
+  },
+  {
+    "file": "backend/src/forma/api/routes.py",
+    "line": 771,
+    "name": "mapping_field_review",
+    "decorators": "api.get('/mappings/{mapping_id}/field-review')",
+    "parameters": "mapping_id: str, session: Session=Depends(get_session), ctx: ServiceContext=Depends(ctx_dep), p: Principal=Depends(current_principal)"
+  },
+  {
+    "file": "backend/src/forma/api/routes.py",
+    "line": 783,
+    "name": "compare_mapping",
+    "decorators": "api.post('/mappings/{mapping_id}/compare')",
+    "parameters": "mapping_id: str, body: CompareIn, session: Session=Depends(get_session), ctx: ServiceContext=Depends(ctx_dep), p: Principal=Depends(current_principal)"
+  },
+  {
+    "file": "backend/src/forma/api/routes.py",
+    "line": 796,
+    "name": "mapping_sandbox",
+    "decorators": "api.get('/mappings/{mapping_id}/sandbox')",
+    "parameters": "mapping_id: str, list: str='price_changes', offset: int=Query(0, ge=0), limit: int=Query(100, ge=1, le=1000), session: Session=Depends(get_session), ctx: ServiceContext=Depends(ctx_dep), p: Principal=Depends(current_principal)"
+  },
+  {
+    "file": "backend/src/forma/api/routes.py",
+    "line": 811,
+    "name": "source_preview",
+    "decorators": "api.post('/rounds/{round_id}/source-preview')",
+    "parameters": "round_id: str, body: SourcePreviewIn, session: Session=Depends(get_session), ctx: ServiceContext=Depends(ctx_dep), p: Principal=Depends(current_principal)"
+  },
+  {
+    "file": "backend/src/forma/api/routes.py",
+    "line": 823,
+    "name": "dsl_reference",
+    "decorators": "api.get('/dsl')",
+    "parameters": "p: Principal=Depends(current_principal)"
+  },
+  {
+    "file": "backend/src/forma/api/routes.py",
+    "line": 839,
+    "name": "wait_for_customer",
+    "decorators": "api.post('/review/{task_id}/wait')",
+    "parameters": "task_id: str, body: WaitIn, session: Session=Depends(get_session), p: Principal=Depends(require_role('reviewer'))"
+  },
+  {
+    "file": "backend/src/forma/api/routes.py",
+    "line": 850,
+    "name": "resume_review",
+    "decorators": "api.post('/review/{task_id}/resume')",
+    "parameters": "task_id: str, session: Session=Depends(get_session), p: Principal=Depends(require_role('reviewer'))"
+  },
+  {
+    "file": "backend/src/forma/api/routes.py",
+    "line": 857,
+    "name": "confirm_audit",
+    "decorators": "api.post('/review/{task_id}/confirm')",
+    "parameters": "task_id: str, body: ConfirmIn, session: Session=Depends(get_session), p: Principal=Depends(require_role('reviewer'))"
+  },
+  {
+    "file": "backend/src/forma/api/routes.py",
+    "line": 868,
+    "name": "question_groups",
+    "decorators": "api.get('/review/question-groups')",
+    "parameters": "session: Session=Depends(get_session), p: Principal=Depends(current_principal), ctx: ServiceContext=Depends(ctx_dep)"
+  },
+  {
+    "file": "backend/src/forma/api/routes.py",
+    "line": 880,
+    "name": "answer_question_group",
+    "decorators": "api.post('/review/question-groups/answer')",
+    "parameters": "body: GroupAnswerIn, session: Session=Depends(get_session), p: Principal=Depends(require_role('reviewer')), ctx: ServiceContext=Depends(ctx_dep)"
+  },
+  {
+    "file": "backend/src/forma/api/routes.py",
+    "line": 893,
+    "name": "review_queue",
+    "decorators": "api.get('/review')",
+    "parameters": "status: str='open', round_id: str | None=None, limit: int=Query(200, le=1000), offset: int=Query(0, ge=0), session: Session=Depends(get_session), p: Principal=Depends(current_principal)"
+  },
+  {
+    "file": "backend/src/forma/api/routes.py",
+    "line": 957,
+    "name": "get_dataset",
+    "decorators": "api.get('/datasets/{dataset_id}')",
+    "parameters": "dataset_id: str, session: Session=Depends(get_session), p: Principal=Depends(current_principal)"
+  },
+  {
+    "file": "backend/src/forma/api/routes.py",
+    "line": 982,
+    "name": "dataset_rows",
+    "decorators": "api.get('/datasets/{dataset_id}/rows')",
+    "parameters": "dataset_id: str, offset: int=0, limit: int=Query(100, le=1000), q: str | None=None, sort: str | None=None, desc: bool=False, session: Session=Depends(get_session), ctx: ServiceContext=Depends(ctx_dep), p: Principal=Depends(current_principal)"
+  },
+  {
+    "file": "backend/src/forma/api/routes.py",
+    "line": 1018,
+    "name": "preview_changes",
+    "decorators": "api.post('/datasets/{dataset_id}/preview-changes')",
+    "parameters": "dataset_id: str, body: ChangesIn, session: Session=Depends(get_session), ctx: ServiceContext=Depends(ctx_dep), p: Principal=Depends(require_role('reviewer'))"
+  },
+  {
+    "file": "backend/src/forma/api/routes.py",
+    "line": 1030,
+    "name": "apply_changes",
+    "decorators": "api.post('/datasets/{dataset_id}/changes', status_code=201)",
+    "parameters": "dataset_id: str, body: ChangesIn, session: Session=Depends(get_session), ctx: ServiceContext=Depends(ctx_dep), p: Principal=Depends(require_role('reviewer'))"
+  },
+  {
+    "file": "backend/src/forma/api/routes.py",
+    "line": 1047,
+    "name": "rollback",
+    "decorators": "api.post('/datasets/{dataset_id}/rollback', status_code=201)",
+    "parameters": "dataset_id: str, body: Decision, session: Session=Depends(get_session), ctx: ServiceContext=Depends(ctx_dep), p: Principal=Depends(require_role('reviewer'))"
+  },
+  {
+    "file": "backend/src/forma/api/routes.py",
+    "line": 1059,
+    "name": "approve_dataset",
+    "decorators": "api.post('/datasets/{dataset_id}/approve')",
+    "parameters": "dataset_id: str, body: Decision, session: Session=Depends(get_session), ctx: ServiceContext=Depends(ctx_dep), p: Principal=Depends(require_role('reviewer'))"
+  },
+  {
+    "file": "backend/src/forma/api/routes.py",
+    "line": 1082,
+    "name": "changes_report",
+    "decorators": "api.get('/datasets/{dataset_id}/changes-report')",
+    "parameters": "dataset_id: str, session: Session=Depends(get_session), ctx: ServiceContext=Depends(ctx_dep), p: Principal=Depends(current_principal)"
+  },
+  {
+    "file": "backend/src/forma/api/routes.py",
+    "line": 1093,
+    "name": "lineage",
+    "decorators": "api.get('/datasets/{dataset_id}/lineage/{identity}')",
+    "parameters": "dataset_id: str, identity: str, session: Session=Depends(get_session), ctx: ServiceContext=Depends(ctx_dep), p: Principal=Depends(current_principal)"
+  },
+  {
+    "file": "backend/src/forma/api/routes.py",
+    "line": 1105,
+    "name": "trace",
+    "decorators": "api.get('/datasets/{dataset_id}/trace/{identity}')",
+    "parameters": "dataset_id: str, identity: str, pointer: str | None=None, session: Session=Depends(get_session), ctx: ServiceContext=Depends(ctx_dep), p: Principal=Depends(current_principal)"
+  },
+  {
+    "file": "backend/src/forma/api/routes.py",
+    "line": 1119,
+    "name": "export_dataset",
+    "decorators": "api.post('/datasets/{dataset_id}/export', status_code=201)",
+    "parameters": "dataset_id: str, fmt: str='json', actor: str='operator', session: Session=Depends(get_session), ctx: ServiceContext=Depends(ctx_dep), p: Principal=Depends(require_role('approver'))"
+  },
+  {
+    "file": "backend/src/forma/api/routes.py",
+    "line": 1132,
+    "name": "download_export",
+    "decorators": "api.get('/exports/{export_id}/download')",
+    "parameters": "export_id: str, session: Session=Depends(get_session), ctx: ServiceContext=Depends(ctx_dep), p: Principal=Depends(current_principal)"
+  },
+  {
+    "file": "backend/src/forma/api/routes.py",
+    "line": 1159,
+    "name": "diagnose",
+    "decorators": "api.post('/mappings/{mapping_id}/diagnose')",
+    "parameters": "mapping_id: str, session: Session=Depends(get_session), ctx: ServiceContext=Depends(ctx_dep), p: Principal=Depends(require_role('reviewer')), _rl: Principal=Depends(llm_rate_limited)"
+  },
+  {
+    "file": "backend/src/forma/api/routes.py",
+    "line": 1242,
+    "name": "copilot",
+    "decorators": "api.post('/datasets/{dataset_id}/copilot')",
+    "parameters": "dataset_id: str, body: CopilotIn, session: Session=Depends(get_session), ctx: ServiceContext=Depends(ctx_dep), p: Principal=Depends(require_role('reviewer')), _rl: Principal=Depends(llm_rate_limited)"
+  },
+  {
+    "file": "backend/src/forma/api/routes.py",
+    "line": 1276,
+    "name": "ask",
+    "decorators": "api.post('/datasets/{dataset_id}/ask')",
+    "parameters": "dataset_id: str, body: AskIn, session: Session=Depends(get_session), ctx: ServiceContext=Depends(ctx_dep), p: Principal=Depends(current_principal)"
+  },
+  {
+    "file": "backend/src/forma/api/routes.py",
+    "line": 1324,
+    "name": "list_schemas",
+    "decorators": "api.get('/schemas')",
+    "parameters": "session: Session=Depends(get_session), ctx: ServiceContext=Depends(ctx_dep), p: Principal=Depends(current_principal)"
+  },
+  {
+    "file": "backend/src/forma/api/routes.py",
+    "line": 1344,
+    "name": "get_schema",
+    "decorators": "api.get('/schemas/{ref}')",
+    "parameters": "ref: str, ctx: ServiceContext=Depends(ctx_dep), p: Principal=Depends(current_principal)"
+  },
+  {
+    "file": "backend/src/forma/api/routes.py",
+    "line": 1356,
+    "name": "register_schema",
+    "decorators": "api.post('/schemas', status_code=201)",
+    "parameters": "body: SchemaIn, session: Session=Depends(get_session), ctx: ServiceContext=Depends(ctx_dep), p: Principal=Depends(require_role('approver'))"
+  },
+  {
+    "file": "backend/src/forma/api/routes.py",
+    "line": 1372,
+    "name": "diff_schema",
+    "decorators": "api.get('/schemas/{a}/diff/{b}')",
+    "parameters": "a: str, b: str, ctx: ServiceContext=Depends(ctx_dep), p: Principal=Depends(current_principal)"
+  },
+  {
+    "file": "backend/src/forma/api/routes.py",
+    "line": 1379,
+    "name": "get_policy",
+    "decorators": "api.get('/policy')",
+    "parameters": "ctx: ServiceContext=Depends(ctx_dep), p: Principal=Depends(require_role('admin'))"
+  },
+  {
+    "file": "backend/src/forma/api/routes.py",
+    "line": 1400,
+    "name": "dashboard",
+    "decorators": "api.get('/dashboard')",
+    "parameters": "session: Session=Depends(get_session), ctx: ServiceContext=Depends(ctx_dep), p: Principal=Depends(current_principal)"
+  },
+  {
+    "file": "backend/src/forma/api/routes.py",
+    "line": 1488,
+    "name": "list_jobs",
+    "decorators": "api.get('/jobs')",
+    "parameters": "status: str | None=None, kind: str | None=None, limit: int=Query(100, le=1000), offset: int=Query(0, ge=0), p: Principal=Depends(current_principal)"
+  },
+  {
+    "file": "backend/src/forma/api/routes.py",
+    "line": 1499,
+    "name": "job_stats",
+    "decorators": "api.get('/jobs/stats')",
+    "parameters": "p: Principal=Depends(current_principal)"
+  },
+  {
+    "file": "backend/src/forma/api/routes.py",
+    "line": 1505,
+    "name": "get_batch",
+    "decorators": "api.get('/jobs/batch/{batch_id}')",
+    "parameters": "batch_id: str, p: Principal=Depends(current_principal)"
+  },
+  {
+    "file": "backend/src/forma/api/routes.py",
+    "line": 1513,
+    "name": "get_job",
+    "decorators": "api.get('/jobs/{job_id}')",
+    "parameters": "job_id: str, p: Principal=Depends(current_principal)"
+  },
+  {
+    "file": "backend/src/forma/api/routes.py",
+    "line": 1521,
+    "name": "retry_job",
+    "decorators": "api.post('/jobs/{job_id}/retry')",
+    "parameters": "job_id: str, p: Principal=Depends(require_role('admin'))"
+  },
+  {
+    "file": "backend/src/forma/api/routes.py",
+    "line": 1530,
+    "name": "cancel_job",
+    "decorators": "api.post('/jobs/{job_id}/cancel')",
+    "parameters": "job_id: str, p: Principal=Depends(require_role('admin'))"
+  },
+  {
+    "file": "backend/src/forma/api/routes.py",
+    "line": 1539,
+    "name": "ops_summary",
+    "decorators": "api.get('/ops')",
+    "parameters": "session: Session=Depends(get_session), ctx: ServiceContext=Depends(ctx_dep), p: Principal=Depends(require_role('admin'))"
+  },
+  {
+    "file": "backend/src/forma/api/routes.py",
+    "line": 1553,
+    "name": "audit_log",
+    "decorators": "api.get('/audit')",
+    "parameters": "limit: int=Query(100, le=1000), offset: int=Query(0, ge=0), entity_id: str | None=None, session: Session=Depends(get_session), p: Principal=Depends(require_role('admin'))"
+  },
+  {
+    "file": "backend/src/forma/api/workspace_routes.py",
+    "line": 51,
+    "name": "round_history",
+    "decorators": "router.get('/rounds/{round_id}/history')",
+    "parameters": "round_id: str, offset: int=Query(0, ge=0), action: str=Query('', max_length=200), session: Session=Depends(get_session), p: Principal=Depends(require_role('importer'))"
+  },
+  {
+    "file": "backend/src/forma/api/workspace_routes.py",
+    "line": 65,
+    "name": "mapping_trace",
+    "decorators": "router.get('/mappings/{mapping_id}/trace')",
+    "parameters": "mapping_id: str, offset: int=Query(0, ge=0), session: Session=Depends(get_session), p: Principal=Depends(require_role('importer'))"
+  },
+  {
+    "file": "backend/src/forma/api/workspace_routes.py",
+    "line": 77,
+    "name": "knowledge_detail",
+    "decorators": "router.get('/learning/{correction_id}')",
+    "parameters": "correction_id: str, offset: int=Query(0, ge=0), session: Session=Depends(get_session), p: Principal=Depends(require_role('importer'))"
+  },
+  {
+    "file": "backend/src/forma/api/workspace_routes.py",
+    "line": 94,
+    "name": "audit_events",
+    "decorators": "router.get('/audit/events')",
+    "parameters": "offset: int=Query(0, ge=0), entity_id: str=Query('', max_length=100), actor: str=Query('', max_length=200), action: str=Query('', max_length=200), start: date | None=None, end: date | None=None, session: Session=Depends(get_session), p: Principal=Depends(require_role('admin'))"
+  },
+  {
+    "file": "backend/src/forma/api/workspace_routes.py",
+    "line": 115,
+    "name": "preferences",
+    "decorators": "router.get('/me/preferences')",
+    "parameters": "session: Session=Depends(get_session), p: Principal=Depends(require_role('importer'))"
+  },
+  {
+    "file": "backend/src/forma/api/workspace_routes.py",
+    "line": 122,
+    "name": "save_preferences",
+    "decorators": "router.put('/me/preferences')",
+    "parameters": "body: workspace.Preferences, session: Session=Depends(get_session), p: Principal=Depends(require_role('importer'))"
+  },
+  {
+    "file": "backend/src/forma/api/workspace_routes.py",
+    "line": 131,
+    "name": "history",
+    "decorators": "router.get('/history')",
+    "parameters": "status: str='', customer_id: str='', search: str=Query('', max_length=200), start: date | None=None, end: date | None=None, timezone: str='Asia/Bangkok', offset: int=Query(0, ge=0), limit: int=Query(50, ge=1, le=100), session: Session=Depends(get_session), p: Principal=Depends(require_role('importer'))"
+  },
+  {
+    "file": "backend/src/forma/api/workspace_routes.py",
+    "line": 158,
+    "name": "questions",
+    "decorators": "router.get('/mappings/{mapping_id}/questions')",
+    "parameters": "mapping_id: str, session: Session=Depends(get_session), ctx: ServiceContext=Depends(ctx_dep), p: Principal=Depends(require_role('importer'))"
+  },
+  {
+    "file": "backend/src/forma/api/workspace_routes.py",
+    "line": 169,
+    "name": "question_evidence",
+    "decorators": "router.get('/mappings/{mapping_id}/questions/evidence')",
+    "parameters": "mapping_id: str, field: str=Query(min_length=1, max_length=500), session: Session=Depends(get_session), ctx: ServiceContext=Depends(ctx_dep), p: Principal=Depends(require_role('importer'))"
+  },
+  {
+    "file": "backend/src/forma/api/workspace_routes.py",
+    "line": 180,
+    "name": "round_verdict",
+    "decorators": "router.get('/rounds/{round_id}/verdict')",
+    "parameters": "round_id: str, session: Session=Depends(get_session), ctx: ServiceContext=Depends(ctx_dep), p: Principal=Depends(require_role('importer'))"
+  },
+  {
+    "file": "backend/src/forma/api/workspace_routes.py",
+    "line": 199,
+    "name": "accept_verdict",
+    "decorators": "router.post('/rounds/{round_id}/verdict/accept')",
+    "parameters": "round_id: str, body: VerdictAcceptIn, session: Session=Depends(get_session), ctx: ServiceContext=Depends(ctx_dep), p: Principal=Depends(require_role('reviewer'))"
+  },
+  {
+    "file": "backend/src/forma/api/workspace_routes.py",
+    "line": 223,
+    "name": "learning_view",
+    "decorators": "router.get('/learning')",
+    "parameters": "customer_id: str='', search: str=Query('', max_length=200), status: Literal['confirmed', 'retired', 'all']='confirmed', offset: int=Query(0, ge=0), session: Session=Depends(get_session), ctx: ServiceContext=Depends(ctx_dep), p: Principal=Depends(require_role('importer'))"
+  },
+  {
+    "file": "backend/src/forma/api/workspace_routes.py",
+    "line": 250,
+    "name": "foresight_view",
+    "decorators": "router.get('/foresight')",
+    "parameters": "session: Session=Depends(get_session), p: Principal=Depends(require_role('importer'))"
+  },
+  {
+    "file": "backend/src/forma/api/workspace_routes.py",
+    "line": 258,
+    "name": "calibration_view",
+    "decorators": "router.get('/calibration')",
+    "parameters": "session: Session=Depends(get_session), ctx: ServiceContext=Depends(ctx_dep), p: Principal=Depends(require_role('admin'))"
+  },
+  {
+    "file": "backend/src/forma/api/workspace_routes.py",
+    "line": 276,
+    "name": "apply_proposal",
+    "decorators": "router.post('/calibration/apply')",
+    "parameters": "body: ApplyProposalIn, session: Session=Depends(get_session), ctx: ServiceContext=Depends(ctx_dep), p: Principal=Depends(require_role('admin'))"
+  },
+  {
+    "file": "backend/src/forma/api/workspace_routes.py",
+    "line": 296,
+    "name": "promote_alias",
+    "decorators": "router.post('/learning/promote', status_code=201)",
+    "parameters": "body: PromoteIn, session: Session=Depends(get_session), ctx: ServiceContext=Depends(ctx_dep), p: Principal=Depends(require_role('admin'))"
+  },
+  {
+    "file": "backend/src/forma/api/workspace_routes.py",
+    "line": 312,
+    "name": "forget_learned",
+    "decorators": "router.delete('/learning/{correction_id}', status_code=204)",
+    "parameters": "correction_id: str, session: Session=Depends(get_session), p: Principal=Depends(require_role('approver'))"
+  },
+  {
+    "file": "backend/src/forma/api/workspace_routes.py",
+    "line": 335,
+    "name": "preview_answers",
+    "decorators": "router.post('/mappings/{mapping_id}/answers/preview')",
+    "parameters": "mapping_id: str, body: AnswersIn, session: Session=Depends(get_session), ctx: ServiceContext=Depends(ctx_dep), p: Principal=Depends(require_role('reviewer'))"
+  },
+  {
+    "file": "backend/src/forma/api/workspace_routes.py",
+    "line": 356,
+    "name": "apply_answers",
+    "decorators": "router.post('/mappings/{mapping_id}/answers/apply', status_code=201)",
+    "parameters": "mapping_id: str, body: AnswersIn, session: Session=Depends(get_session), ctx: ServiceContext=Depends(ctx_dep), p: Principal=Depends(require_role('reviewer'))"
+  },
+  {
+    "file": "backend/src/forma/api/workspace_routes.py",
+    "line": 402,
+    "name": "assistant_status",
+    "decorators": "router.get('/assistant/status')",
+    "parameters": "session: Session=Depends(get_session), ctx: ServiceContext=Depends(ctx_dep), p: Principal=Depends(require_role('importer'))"
+  },
+  {
+    "file": "backend/src/forma/api/workspace_routes.py",
+    "line": 416,
+    "name": "ask",
+    "decorators": "router.post('/assistant/ask')",
+    "parameters": "body: AssistantIn, session: Session=Depends(get_session), ctx: ServiceContext=Depends(ctx_dep), p: Principal=Depends(require_role('importer')), _limit: Principal=Depends(llm_rate_limited)"
+  },
+  {
+    "file": "backend/src/forma/api/workspace_routes.py",
+    "line": 491,
+    "name": "list_conversations",
+    "decorators": "router.get('/assistant/conversations')",
+    "parameters": "search: str=Query('', max_length=200), offset: int=Query(0, ge=0), archived: bool=False, session: Session=Depends(get_session), p: Principal=Depends(require_role('importer'))"
+  },
+  {
+    "file": "backend/src/forma/api/workspace_routes.py",
+    "line": 502,
+    "name": "create_conversation",
+    "decorators": "router.post('/assistant/conversations', status_code=201)",
+    "parameters": "body: ConversationIn, session: Session=Depends(get_session), ctx: ServiceContext=Depends(ctx_dep), p: Principal=Depends(require_role('importer'))"
+  },
+  {
+    "file": "backend/src/forma/api/workspace_routes.py",
+    "line": 525,
+    "name": "import_conversation",
+    "decorators": "router.post('/assistant/conversations/import', status_code=201)",
+    "parameters": "body: LegacyConversation, session: Session=Depends(get_session), p: Principal=Depends(require_role('importer'))"
+  },
+  {
+    "file": "backend/src/forma/api/workspace_routes.py",
+    "line": 538,
+    "name": "conversation_detail",
+    "decorators": "router.get('/assistant/conversations/{chat_id}')",
+    "parameters": "chat_id: str, before: int | None=Query(None, ge=1), session: Session=Depends(get_session), p: Principal=Depends(require_role('importer'))"
+  },
+  {
+    "file": "backend/src/forma/api/workspace_routes.py",
+    "line": 548,
+    "name": "edit_conversation",
+    "decorators": "router.patch('/assistant/conversations/{chat_id}')",
+    "parameters": "chat_id: str, body: ConversationEdit, session: Session=Depends(get_session), p: Principal=Depends(require_role('importer'))"
+  },
+  {
+    "file": "backend/src/forma/api/workspace_routes.py",
+    "line": 576,
+    "name": "delete_conversation",
+    "decorators": "router.delete('/assistant/conversations/{chat_id}', status_code=204)",
+    "parameters": "chat_id: str, session: Session=Depends(get_session), ctx: ServiceContext=Depends(ctx_dep), p: Principal=Depends(require_role('importer'))"
+  },
+  {
+    "file": "backend/src/forma/api/workspace_routes.py",
+    "line": 589,
+    "name": "attach_file",
+    "decorators": "router.post('/assistant/conversations/{chat_id}/attachments')",
+    "parameters": "chat_id: str, file: UploadFile=File(...), ctx: ServiceContext=Depends(ctx_dep), p: Principal=Depends(require_role('importer'))"
+  },
+  {
+    "file": "backend/src/forma/api/workspace_routes.py",
+    "line": 607,
+    "name": "get_attachment",
+    "decorators": "router.get('/assistant/attachments/{file_id}')",
+    "parameters": "file_id: str, session: Session=Depends(get_session), ctx: ServiceContext=Depends(ctx_dep), p: Principal=Depends(require_role('importer'))"
+  },
+  {
+    "file": "backend/src/forma/api/workspace_routes.py",
+    "line": 631,
+    "name": "list_artifacts",
+    "decorators": "router.get('/assistant/artifacts')",
+    "parameters": "session: Session=Depends(get_session), p: Principal=Depends(require_role('importer'))"
+  },
+  {
+    "file": "backend/src/forma/api/workspace_routes.py",
+    "line": 642,
+    "name": "list_memory",
+    "decorators": "router.get('/assistant/memory')",
+    "parameters": "session: Session=Depends(get_session), p: Principal=Depends(require_role('importer'))"
+  },
+  {
+    "file": "backend/src/forma/api/workspace_routes.py",
+    "line": 649,
+    "name": "add_memory",
+    "decorators": "router.post('/assistant/memory', status_code=201)",
+    "parameters": "body: MemoryIn, session: Session=Depends(get_session), p: Principal=Depends(require_role('importer'))"
+  },
+  {
+    "file": "backend/src/forma/api/workspace_routes.py",
+    "line": 658,
+    "name": "edit_memory",
+    "decorators": "router.patch('/assistant/memory/{memory_id}')",
+    "parameters": "memory_id: str, body: MemoryEdit, session: Session=Depends(get_session), p: Principal=Depends(require_role('importer'))"
+  },
+  {
+    "file": "backend/src/forma/api/workspace_routes.py",
+    "line": 668,
+    "name": "delete_memory",
+    "decorators": "router.delete('/assistant/memory/{memory_id}', status_code=204)",
+    "parameters": "memory_id: str, session: Session=Depends(get_session), p: Principal=Depends(require_role('importer'))"
+  },
+  {
+    "file": "backend/src/forma/api/workspace_routes.py",
+    "line": 678,
+    "name": "reset_memory",
+    "decorators": "router.delete('/assistant/memory')",
+    "parameters": "session: Session=Depends(get_session), p: Principal=Depends(require_role('importer'))"
+  },
+  {
+    "file": "backend/src/forma/api/workspace_routes.py",
+    "line": 691,
+    "name": "get_artifact",
+    "decorators": "router.get('/assistant/artifacts/{artifact_id}')",
+    "parameters": "artifact_id: str, session: Session=Depends(get_session), p: Principal=Depends(require_role('importer'))"
+  },
+  {
+    "file": "backend/src/forma/api/workspace_routes.py",
+    "line": 700,
+    "name": "restore_artifact_version",
+    "decorators": "router.post('/assistant/artifacts/{artifact_id}/versions/{number}/restore')",
+    "parameters": "artifact_id: str, number: int, session: Session=Depends(get_session), ctx: ServiceContext=Depends(ctx_dep), p: Principal=Depends(require_role('importer'))"
+  },
+  {
+    "file": "backend/src/forma/api/workspace_routes.py",
+    "line": 711,
+    "name": "send_message",
+    "decorators": "router.post('/assistant/conversations/{chat_id}/messages')",
+    "parameters": "chat_id: str, body: TurnIn, session: Session=Depends(get_session), ctx: ServiceContext=Depends(ctx_dep), p: Principal=Depends(require_role('importer')), _limit: Principal=Depends(llm_rate_limited)"
+  },
+  {
+    "file": "backend/src/forma/api/workspace_routes.py",
+    "line": 740,
+    "name": "stop_message",
+    "decorators": "router.post('/assistant/conversations/{chat_id}/stop')",
+    "parameters": "chat_id: str, body: StopIn, session: Session=Depends(get_session), p: Principal=Depends(require_role('importer'))"
+  },
+  {
+    "file": "backend/src/forma/api/workspace_routes.py",
+    "line": 750,
+    "name": "stream_message",
+    "decorators": "router.post('/assistant/conversations/{chat_id}/messages/stream')",
+    "parameters": "chat_id: str, body: TurnIn, ctx: ServiceContext=Depends(ctx_dep), p: Principal=Depends(require_role('importer')), _limit: Principal=Depends(llm_rate_limited)"
+  },
+  {
+    "file": "backend/src/forma/api/workspace_routes.py",
+    "line": 831,
+    "name": "mcp_listen",
+    "decorators": "router.get('/mcp')",
+    "parameters": "request: Request, ctx: ServiceContext=Depends(ctx_dep), p: Principal=Depends(require_role('importer'))"
+  },
+  {
+    "file": "backend/src/forma/api/workspace_routes.py",
+    "line": 839,
+    "name": "mcp",
+    "decorators": "router.post('/mcp')",
+    "parameters": "request: Request, session: Session=Depends(get_session), ctx: ServiceContext=Depends(ctx_dep), p: Principal=Depends(require_role('importer')), _limit: Principal=Depends(llm_rate_limited)"
+  },
+  {
+    "file": "manual_test_files/excel100_v1/provider/fake_provider.py",
+    "line": 19,
+    "name": "status",
+    "decorators": "app.get('/stats')",
+    "parameters": ""
+  },
+  {
+    "file": "manual_test_files/excel100_v1/provider/fake_provider.py",
+    "line": 22,
+    "name": "complete",
+    "decorators": "app.post('/v1/chat/completions')",
+    "parameters": "request: Request"
+  },
+  {
+    "file": "manual_test_files/parallel300_v1/fake_provider.py",
+    "line": 17,
+    "name": "status",
+    "decorators": "app.get('/stats')",
+    "parameters": ""
+  },
+  {
+    "file": "manual_test_files/parallel300_v1/fake_provider.py",
+    "line": 22,
+    "name": "control",
+    "decorators": "app.post('/control')",
+    "parameters": "request: Request"
+  },
+  {
+    "file": "manual_test_files/parallel300_v1/fake_provider.py",
+    "line": 28,
+    "name": "complete",
+    "decorators": "app.post('/v1/chat/completions')",
+    "parameters": "request: Request"
+  },
+  {
+    "file": "manual_test_files/stability_v1/fake_provider.py",
+    "line": 17,
+    "name": "status",
+    "decorators": "app.get('/stats')",
+    "parameters": ""
+  },
+  {
+    "file": "manual_test_files/stability_v1/fake_provider.py",
+    "line": 22,
+    "name": "control",
+    "decorators": "app.post('/control')",
+    "parameters": "request: Request"
+  },
+  {
+    "file": "manual_test_files/stability_v1/fake_provider.py",
+    "line": 28,
+    "name": "complete",
+    "decorators": "app.post('/v1/chat/completions')",
+    "parameters": "request: Request"
+  }
+]

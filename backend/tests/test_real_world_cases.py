@@ -61,7 +61,10 @@ def _approve_and_transform(c: TestClient, r: dict[str, Any], *, publish: bool = 
         assert res.status_code == 200, res.text
     job = c.post(f"/api/rounds/{r['id']}/transform", params={"sync": "true"}).json()
     assert c.get(f"/api/jobs/{job['job_id']}").json()["status"] == "done"
-    ds = c.get(f"/api/rounds/{r['id']}").json()["datasets"][-1]["id"]
+    # The round API returns newest first. A reused mapping may have already
+    # produced a version before this explicit transform, so never approve [-1].
+    datasets = c.get(f"/api/rounds/{r['id']}").json()["datasets"]
+    ds = max(datasets, key=lambda item: item["version"])["id"]
     if publish:
         approved = c.post(f"/api/datasets/{ds}/approve", json={"acknowledge_anomalies": True})
         assert approved.status_code == 200, approved.text

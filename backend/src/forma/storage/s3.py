@@ -8,6 +8,7 @@ version / export), so the cache never needs invalidation.
 from __future__ import annotations
 
 import contextlib
+import uuid
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any, BinaryIO
@@ -130,13 +131,20 @@ class S3Storage:
         if dest.is_file():
             return dest
         dest.parent.mkdir(parents=True, exist_ok=True)
-        tmp = dest.with_name(dest.name + ".part")
+        # Concurrent requests may fetch the same cold key; each owns its temporary file.
+        tmp = dest.with_name(uuid.uuid4().hex + ".part")
         try:
             self.client.download_file(self.bucket, self._k(key), str(tmp))
-            tmp.replace(dest)
-        except BaseException:
+            try:
+                tmp.replace(dest)
+            except PermissionError:
+                # Windows can deny simultaneous replacements of the same target.
+                # Keys are immutable and published atomically, so reuse a winner's
+                # completed file; a genuine permissions failure must still surface.
+                if not dest.is_file():
+                    raise
+        finally:
             tmp.unlink(missing_ok=True)
-            raise
         return dest
 
     def healthy(self) -> bool:

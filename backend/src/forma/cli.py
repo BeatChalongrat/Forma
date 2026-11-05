@@ -7,11 +7,15 @@ from pathlib import Path
 
 import typer
 
+from forma.knowledge_cli import app as knowledge_app
+
 app = typer.Typer(no_args_is_help=True, help="FORMA — AI-native data transformation platform")
 schema_app = typer.Typer(help="Target schema registry")
 app.add_typer(schema_app, name="schema")
 db_app = typer.Typer(help="Database migrations (Alembic)")
 app.add_typer(db_app, name="db")
+
+app.add_typer(knowledge_app, name="knowledge")
 
 
 @db_app.command("upgrade")
