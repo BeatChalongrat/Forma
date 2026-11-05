@@ -20,6 +20,7 @@ from forma.db.models import (
     ExportArtifact,
     ImportRound,
     Job,
+    KnowledgeLabel,
     LLMCall,
     ReviewTask,
     SourceFile,
@@ -126,10 +127,37 @@ def _aware(d: dt.datetime | None) -> dt.datetime | None:
     return d if d.tzinfo else d.replace(tzinfo=dt.UTC)
 
 
+def knowledge_rounds(session: Session) -> set[str]:
+    """Keep evidence until an explicit withdrawal, including transitive mapping/answer dependencies."""
+    from forma.core.errors import NotFound
+    from forma.db.models import Correction
+    from forma.services import knowledge_gate as gate
+
+    pending = list(session.scalars(select(KnowledgeLabel.subject).where(KnowledgeLabel.state == "allowed")))
+    visited: set[str] = set()
+    rounds: set[str] = set()
+    while pending:
+        key = pending.pop()
+        if key in visited:
+            continue
+        visited.add(key)
+        try:
+            row = gate.lookup(session, key)
+        except NotFound:
+            continue
+        if row.round_id:
+            rounds.add(row.round_id)
+        pending.extend(gate.dependencies(row))
+        if isinstance(row, Correction) and row.mapping_version_id:
+            pending.append("mapping:" + row.mapping_version_id)
+    return rounds
+
+
 def plan(ctx: ServiceContext, session: Session, *, now: dt.datetime | None = None) -> dict[str, Any]:
     """Compute what retention would delete. Pure read; returns a serialisable plan."""
     pol = load_policy(ctx.settings.resolve(ctx.settings.policies_dir))
     now = now or dt.datetime.now(dt.UTC)
+    protected = knowledge_rounds(session)
     out: dict[str, Any] = {
         "at": now.isoformat(),
         "policy": pol,
@@ -141,6 +169,7 @@ def plan(ctx: ServiceContext, session: Session, *, now: dt.datetime | None = Non
         "llm_calls": [],
         "review_tasks": [],
         "cache": [],
+        "protected_knowledge_rounds": sorted(protected),
     }
     # A file still waiting for a customer keeps its object, even when a closed round has the same bytes.
     unassigned = list(session.scalars(select(BatchItem).where(BatchItem.round_id.is_(None))))
@@ -153,7 +182,7 @@ def plan(ctx: ServiceContext, session: Session, *, now: dt.datetime | None = Non
         closed = {
             r.id
             for r in session.scalars(select(ImportRound).where(ImportRound.status.in_(CLOSED_ROUND_STATUSES)))
-            if (_aware(r.updated_at) or now) < cutoff
+            if r.id not in protected and (_aware(r.updated_at) or now) < cutoff
         }
         open_rounds = {r.id for r in session.scalars(select(ImportRound)) if r.id not in closed}
         files = list(session.scalars(select(SourceFile).where(SourceFile.storage_key != "")))
@@ -194,6 +223,8 @@ def plan(ctx: ServiceContext, session: Session, *, now: dt.datetime | None = Non
         for dv in session.scalars(select(DatasetVersion).order_by(DatasetVersion.version.desc())):
             per_round.setdefault(dv.round_id, []).append(dv)
         for rid, versions in per_round.items():
+            if rid in protected:
+                continue
             keep = {v.id for v in versions[:keep_k]}
             keep |= {v.id for v in versions if v.status in ("approved", "published")}
             keep |= {v.parent_id for v in versions if v.id in keep and v.parent_id}
@@ -207,8 +238,15 @@ def plan(ctx: ServiceContext, session: Session, *, now: dt.datetime | None = Non
     days = int((pol.get("exports") or {}).get("keep_days", 0) or 0)
     if days > 0:
         cutoff = now - dt.timedelta(days=days)
+        protected_datasets = set(
+            session.scalars(select(DatasetVersion.id).where(DatasetVersion.round_id.in_(protected)))
+        )
         for e in session.scalars(select(ExportArtifact)):
-            if (_aware(e.created_at) or now) < cutoff and e.storage_key:
+            if (
+                e.dataset_version_id not in protected_datasets
+                and (_aware(e.created_at) or now) < cutoff
+                and e.storage_key
+            ):
                 out["exports"].append({"id": e.id, "key": e.storage_key})
 
     # ---- jobs / llm calls -----------------------------------------------------------------------
@@ -218,13 +256,15 @@ def plan(ctx: ServiceContext, session: Session, *, now: dt.datetime | None = Non
         out["jobs"] = [
             j.id
             for j in session.scalars(select(Job).where(Job.status.in_(["done", "failed"])))
-            if (_aware(j.finished_at) or _aware(j.created_at) or now) < cutoff
+            if j.round_id not in protected and (_aware(j.finished_at) or _aware(j.created_at) or now) < cutoff
         ]
     days = int((pol.get("llm_calls") or {}).get("keep_days", 0) or 0)
     if days > 0:
         cutoff = now - dt.timedelta(days=days)
         out["llm_calls"] = [
-            c.id for c in session.scalars(select(LLMCall)) if (_aware(c.created_at) or now) < cutoff
+            c.id
+            for c in session.scalars(select(LLMCall))
+            if c.round_id not in protected and (_aware(c.created_at) or now) < cutoff
         ]
 
     # ---- resolved review questions ------------------------------------------------------------
@@ -237,7 +277,8 @@ def plan(ctx: ServiceContext, session: Session, *, now: dt.datetime | None = Non
             for t in session.scalars(
                 select(ReviewTask).where(ReviewTask.status.in_(("approved", "rejected", "dismissed")))
             )
-            if t.round_id not in cancelled and (_aware(t.resolved_at or t.created_at) or now) < cutoff
+            if t.round_id not in cancelled | protected
+            and (_aware(t.resolved_at or t.created_at) or now) < cutoff
         ]
 
     # ---- S3 cache ---------------------------------------------------------------------------------
@@ -247,7 +288,9 @@ def plan(ctx: ServiceContext, session: Session, *, now: dt.datetime | None = Non
         cutoff_ts = (now - dt.timedelta(days=days)).timestamp()
         out["cache"] = [str(p) for p in cache_dir.rglob("*") if p.is_file() and p.stat().st_atime < cutoff_ts]
 
-    out["summary"] = {k: len(v) for k, v in out.items() if isinstance(v, list)}
+    out["summary"] = {
+        k: len(v) for k, v in out.items() if isinstance(v, list) and k != "protected_knowledge_rounds"
+    }
     return out
 
 
@@ -255,6 +298,23 @@ def apply(
     ctx: ServiceContext, session: Session, plan_: dict[str, Any], *, actor: str = "retention"
 ) -> dict[str, Any]:
     """Execute a plan: delete storage objects first, then rows/markers; every deletion is audited."""
+    from sqlalchemy import text, update
+
+    # Serialize against knowledge approval/import/revoke and re-check old previews before deleting.
+    if session.get_bind().dialect.name == "postgresql":
+        session.execute(text("SELECT pg_advisory_xact_lock(74603821)"))
+    else:
+        session.execute(update(KnowledgeLabel).values(state=KnowledgeLabel.state))
+    fresh = plan(ctx, session)
+
+    def identity(item: Any) -> str:
+        return str(item.get("key", item.get("id"))) if isinstance(item, dict) else str(item)
+
+    plan_ = {
+        key: [item for item in fresh.get(key, []) if identity(item) in {identity(old) for old in values}]
+        for key, values in plan_.items()
+        if isinstance(values, list)
+    }
     done: dict[str, Any] = {
         "source_files": 0,
         "batch_items": 0,

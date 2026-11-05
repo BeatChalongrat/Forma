@@ -1,0 +1,5177 @@
+{
+  "round": {
+    "id": "rnd_01M6KT35Y4K01DSQRCPWBVXNHA",
+    "customer_id": "cus_01M6KSRRAENBFNTDM1MVXVZ9Q7",
+    "label": "Excel100 complex suite · X0207.xlsx",
+    "status": "review",
+    "target_schema": "excel100_x0207@1",
+    "notes": null,
+    "summary": {
+      "drift": null,
+      "profile": [
+        {
+          "name": "X0207.xlsx",
+          "drift": {
+            "similarity": 0.0,
+            "classification": "unknown",
+            "matches_other_customer": {
+              "customer_id": "cus_01M6KSRQ3VPDM60XCCD6SKMH06",
+              "customer_code": "X0107",
+              "mapping_version_id": "map_01M6KSSRGSJ4DBAVJZ67P2EMEN"
+            }
+          },
+          "tables": 5,
+          "file_id": "fil_01M6KT35Y9T3EFP5B7BP34WWYV",
+          "fingerprint": "ca3d15aa0ec5df3b"
+        }
+      ],
+      "verdict": {
+        "word": "likely",
+        "stage": "mapping",
+        "digest": "816116a48cec758fb921a6f883b1bb52",
+        "outcome": "answer",
+        "subject": {
+          "id": "map_01M6KT3SXR1VC4GR2REERDZT63",
+          "kind": "mapping",
+          "round_id": "rnd_01M6KT35Y4K01DSQRCPWBVXNHA"
+        },
+        "evidence": [
+          {
+            "id": 1,
+            "kind": "other_customer",
+            "link": "/rounds/rnd_01M6KT35Y4K01DSQRCPWBVXNHA",
+            "text": {
+              "en": "The layout matches X0107's approved format (100%)",
+              "th": "โครงสร้างไฟล์ตรงกับรูปแบบที่อนุมัติแล้วของ X0107 (100%)"
+            },
+            "numbers": {
+              "customer": "X0107",
+              "similarity": null
+            }
+          },
+          {
+            "id": 2,
+            "kind": "rows",
+            "link": "/rounds/rnd_01M6KT35Y4K01DSQRCPWBVXNHA",
+            "text": {
+              "en": "18 records produced",
+              "th": "สร้างได้ 18 รายการ"
+            },
+            "numbers": {
+              "rows_out": 18
+            }
+          },
+          {
+            "id": 3,
+            "kind": "self_check",
+            "link": null,
+            "text": {
+              "en": "The AI ran its mapping on the first 18 rows (0 look(s) at the file, 0 fix round(s)): 0 problem(s) left",
+              "th": "AI ลองรัน mapping กับ 18 แถวแรก (ดูไฟล์ 0 ครั้ง แก้ 0 รอบ): เหลือปัญหา 0 ข้อ"
+            },
+            "numbers": {
+              "rows": 18,
+              "fix_rounds": 0,
+              "inspections": 0,
+              "problems_left": 0
+            }
+          },
+          {
+            "id": 4,
+            "kind": "questions",
+            "link": "/review?round=rnd_01M6KT35Y4K01DSQRCPWBVXNHA",
+            "text": {
+              "en": "2 fields below the confidence bar",
+              "th": "2 ฟิลด์ยังไม่ถึงเกณฑ์ความมั่นใจ"
+            },
+            "numbers": {
+              "count": 2
+            }
+          }
+        ],
+        "narrative": null,
+        "conclusion": {
+          "en": "First file from X0207; its layout is the same as X0107's (the same ERP?) — confirm the sender, then 2 fields need a confirmation",
+          "th": "ไฟล์แรกของ X0207 โครงสร้างเหมือนของ X0107 (ERP เดียวกัน?) — ยืนยันผู้ส่ง แล้วมี 2 ฟิลด์ที่ต้องยืนยัน"
+        },
+        "confidence": 0.6,
+        "suppressed": {
+          "count": 0,
+          "groups": [
+            {
+              "text": {
+                "en": "3 notes from the mapper",
+                "th": "หมายเหตุจากตัวจับคู่ 3 ข้อ"
+              },
+              "reason": "open_questions",
+              "pointers": []
+            }
+          ]
+        },
+        "must_decide": [
+          {
+            "id": "/currency",
+            "why": {
+              "en": "Below the confidence bar for its risk",
+              "th": "ความมั่นใจต่ำกว่าเกณฑ์ของระดับความเสี่ยงนี้"
+            },
+            "kind": "choice",
+            "scope": null,
+            "default": null,
+            "options": [
+              "Currency",
+              "Company",
+              "Item",
+              "Unit"
+            ],
+            "question": {
+              "en": "Which column holds ISO currency from the applicable price row.?",
+              "th": "คอลัมน์ไหนคือสกุลเงิน?"
+            },
+            "semantic": "currency",
+            "allow_custom": false,
+            "evidence_ids": [
+              4
+            ],
+            "option_labels": null
+          },
+          {
+            "id": "/sell_unit",
+            "why": {
+              "en": "Below the confidence bar for its risk",
+              "th": "ความมั่นใจต่ำกว่าเกณฑ์ของระดับความเสี่ยงนี้"
+            },
+            "kind": "choice",
+            "scope": null,
+            "default": null,
+            "options": [
+              "Full unit",
+              "Unit",
+              "Company",
+              "Item"
+            ],
+            "question": {
+              "en": "Which column holds Full unit name; ask if the code has no definition.?",
+              "th": "คอลัมน์ไหนคือหน่วยขาย?"
+            },
+            "semantic": "unit.sell",
+            "allow_custom": false,
+            "evidence_ids": [
+              4
+            ],
+            "option_labels": null
+          }
+        ],
+        "rules_fired": [
+          "first_time_shared_layout"
+        ],
+        "round_status": "review",
+        "rules_version": "2026.11.04.1",
+        "mapping_status": "proposed",
+        "policy_decision": "review"
+      },
+      "batch_id": "bch_01M6KSJ756XVX42960RKH98YFM",
+      "decision": "review",
+      "simulation": {
+        "rows_in": 18,
+        "sources": {
+          "stock": 54,
+          "units": 2,
+          "master": 18,
+          "prices": 18
+        },
+        "findings": {
+          "info": 0,
+          "error": 0,
+          "warning": 0
+        },
+        "rows_out": 18,
+        "collections": {
+          "/inventory": 54
+        },
+        "duration_ms": 405.2,
+        "identity_keys": [
+          "/sku"
+        ],
+        "invalid_records": 0
+      },
+      "auto_publish": true,
+      "drift_report": null,
+      "batch_item_id": "bit_01M6KSS14CF1Z4PV3KMC4904WB",
+      "format_memory": {
+        "status": "new",
+        "mapping_id": null,
+        "target_schema": "excel100_x0207@1",
+        "mapping_version": null
+      },
+      "skipped_files": 1,
+      "profiled_files": 0,
+      "mapping_version_id": "map_01M6KT3SXR1VC4GR2REERDZT63",
+      "has_previous_approval": false,
+      "matches_other_customer": {
+        "customer_id": "cus_01M6KSRQ3VPDM60XCCD6SKMH06",
+        "customer_code": "X0107",
+        "mapping_version_id": "map_01M6KSSRGSJ4DBAVJZ67P2EMEN"
+      }
+    },
+    "created_at": "2026-11-04T17:35:47.652609+00:00",
+    "updated_at": "2026-11-04T17:36:08.231129+00:00",
+    "successor_id": null,
+    "predecessor_id": null,
+    "files": [
+      {
+        "id": "fil_01M6KT35Y9T3EFP5B7BP34WWYV",
+        "round_id": "rnd_01M6KT35Y4K01DSQRCPWBVXNHA",
+        "name": "X0207.xlsx",
+        "size": 8359,
+        "kind": "excel",
+        "status": "profiled",
+        "sha256": "1b41ffeb804de97ebb10d4aa2c296728f108847b1856383751adf5ba6faaf1ce",
+        "duplicate_of": null,
+        "error": null,
+        "created_at": "2026-11-04T17:35:47.658040+00:00",
+        "fingerprint": "ca3d15aa0ec5df3b",
+        "drift": {
+          "similarity": 0.0,
+          "classification": "unknown",
+          "matches_other_customer": {
+            "customer_id": "cus_01M6KSRQ3VPDM60XCCD6SKMH06",
+            "customer_code": "X0107",
+            "mapping_version_id": "map_01M6KSSRGSJ4DBAVJZ67P2EMEN"
+          }
+        },
+        "tables": 5,
+        "sheets": [
+          "Item Master 7",
+          "Price List 7",
+          "Warehouse Balances 7",
+          "Unit Dictionary 7",
+          "Delivery Notes 7"
+        ]
+      }
+    ],
+    "customer": {
+      "id": "cus_01M6KSRRAENBFNTDM1MVXVZ9Q7",
+      "code": "X0207",
+      "name": "Excel100 X0207"
+    },
+    "successor": null,
+    "predecessor": null,
+    "mappings": [
+      {
+        "id": "map_01M6KT3SXR1VC4GR2REERDZT63",
+        "customer_id": "cus_01M6KSRRAENBFNTDM1MVXVZ9Q7",
+        "round_id": "rnd_01M6KT35Y4K01DSQRCPWBVXNHA",
+        "version": 1,
+        "status": "proposed",
+        "target_schema": "excel100_x0207@1",
+        "confidence": 1.0,
+        "created_by": "ai",
+        "model": "fake-excel100",
+        "policy": {
+          "checks": {
+            "drift": null,
+            "errors": 0,
+            "rows_out": 18,
+            "warnings": 0,
+            "agreement": {
+              "ops": 0,
+              "agree": 0,
+              "record": 3,
+              "dropped": 0,
+              "disagree": 4,
+              "model_only": 3
+            },
+            "llm_fallback": false,
+            "reused_approved": false,
+            "full_verification": true,
+            "mapping_confidence": 1.0,
+            "data_checks_trusted": false,
+            "low_confidence_high": [
+              "/sell_unit (0.70)"
+            ],
+            "unresolved_questions": 3,
+            "plausibility_warnings": 0,
+            "low_confidence_critical": [
+              "/currency (0.70)"
+            ]
+          },
+          "impact": {},
+          "source": "ai",
+          "reasons": [
+            "low confidence on critical fields: /currency (0.70)",
+            "low confidence on high-risk fields: /sell_unit (0.70)",
+            "structure is identical to customer X0107's approved format — confirm this file belongs here",
+            "first time this customer/format is seen",
+            "3 questions still need operator confirmation",
+            "the model selects rows differently from FORMA's matcher (records: dedupe; records: joins; records: root)"
+          ],
+          "sandbox": null,
+          "verdict": {
+            "word": "likely",
+            "stage": "mapping",
+            "digest": "816116a48cec758fb921a6f883b1bb52",
+            "outcome": "answer",
+            "subject": {
+              "id": "map_01M6KT3SXR1VC4GR2REERDZT63",
+              "kind": "mapping",
+              "round_id": "rnd_01M6KT35Y4K01DSQRCPWBVXNHA"
+            },
+            "evidence": [
+              {
+                "id": 1,
+                "kind": "other_customer",
+                "link": "/rounds/rnd_01M6KT35Y4K01DSQRCPWBVXNHA",
+                "text": {
+                  "en": "The layout matches X0107's approved format (100%)",
+                  "th": "โครงสร้างไฟล์ตรงกับรูปแบบที่อนุมัติแล้วของ X0107 (100%)"
+                },
+                "numbers": {
+                  "customer": "X0107",
+                  "similarity": null
+                }
+              },
+              {
+                "id": 2,
+                "kind": "rows",
+                "link": "/rounds/rnd_01M6KT35Y4K01DSQRCPWBVXNHA",
+                "text": {
+                  "en": "18 records produced",
+                  "th": "สร้างได้ 18 รายการ"
+                },
+                "numbers": {
+                  "rows_out": 18
+                }
+              },
+              {
+                "id": 3,
+                "kind": "self_check",
+                "link": null,
+                "text": {
+                  "en": "The AI ran its mapping on the first 18 rows (0 look(s) at the file, 0 fix round(s)): 0 problem(s) left",
+                  "th": "AI ลองรัน mapping กับ 18 แถวแรก (ดูไฟล์ 0 ครั้ง แก้ 0 รอบ): เหลือปัญหา 0 ข้อ"
+                },
+                "numbers": {
+                  "rows": 18,
+                  "fix_rounds": 0,
+                  "inspections": 0,
+                  "problems_left": 0
+                }
+              },
+              {
+                "id": 4,
+                "kind": "questions",
+                "link": "/review?round=rnd_01M6KT35Y4K01DSQRCPWBVXNHA",
+                "text": {
+                  "en": "2 fields below the confidence bar",
+                  "th": "2 ฟิลด์ยังไม่ถึงเกณฑ์ความมั่นใจ"
+                },
+                "numbers": {
+                  "count": 2
+                }
+              }
+            ],
+            "narrative": null,
+            "conclusion": {
+              "en": "First file from X0207; its layout is the same as X0107's (the same ERP?) — confirm the sender, then 2 fields need a confirmation",
+              "th": "ไฟล์แรกของ X0207 โครงสร้างเหมือนของ X0107 (ERP เดียวกัน?) — ยืนยันผู้ส่ง แล้วมี 2 ฟิลด์ที่ต้องยืนยัน"
+            },
+            "confidence": 0.6,
+            "suppressed": {
+              "count": 0,
+              "groups": [
+                {
+                  "text": {
+                    "en": "3 notes from the mapper",
+                    "th": "หมายเหตุจากตัวจับคู่ 3 ข้อ"
+                  },
+                  "reason": "open_questions",
+                  "pointers": []
+                }
+              ]
+            },
+            "must_decide": [
+              {
+                "id": "/currency",
+                "why": {
+                  "en": "Below the confidence bar for its risk",
+                  "th": "ความมั่นใจต่ำกว่าเกณฑ์ของระดับความเสี่ยงนี้"
+                },
+                "kind": "choice",
+                "scope": null,
+                "default": null,
+                "options": [
+                  "Currency",
+                  "Company",
+                  "Item",
+                  "Unit"
+                ],
+                "question": {
+                  "en": "Which column holds ISO currency from the applicable price row.?",
+                  "th": "คอลัมน์ไหนคือสกุลเงิน?"
+                },
+                "semantic": "currency",
+                "allow_custom": false,
+                "evidence_ids": [
+                  4
+                ],
+                "option_labels": null
+              },
+              {
+                "id": "/sell_unit",
+                "why": {
+                  "en": "Below the confidence bar for its risk",
+                  "th": "ความมั่นใจต่ำกว่าเกณฑ์ของระดับความเสี่ยงนี้"
+                },
+                "kind": "choice",
+                "scope": null,
+                "default": null,
+                "options": [
+                  "Full unit",
+                  "Unit",
+                  "Company",
+                  "Item"
+                ],
+                "question": {
+                  "en": "Which column holds Full unit name; ask if the code has no definition.?",
+                  "th": "คอลัมน์ไหนคือหน่วยขาย?"
+                },
+                "semantic": "unit.sell",
+                "allow_custom": false,
+                "evidence_ids": [
+                  4
+                ],
+                "option_labels": null
+              }
+            ],
+            "rules_fired": [
+              "first_time_shared_layout"
+            ],
+            "round_status": "review",
+            "rules_version": "2026.11.04.1",
+            "mapping_status": "proposed",
+            "policy_decision": "review"
+          },
+          "decision": "review",
+          "learning": null,
+          "priority": 131,
+          "workflow": {
+            "roles": [
+              {
+                "data": {
+                  "analysis": {
+                    "facts": [],
+                    "hypotheses": [],
+                    "mapping_guidance": [],
+                    "missing_information": []
+                  }
+                },
+                "role": "analyst",
+                "outcome": "completed",
+                "elapsed_ms": 805
+              },
+              {
+                "data": {
+                  "review": {},
+                  "repairs": 0,
+                  "mapper_data": {
+                    "self_check": {
+                      "errors": 0,
+                      "history": [
+                        {
+                          "turn": "ground",
+                          "columns": 4
+                        },
+                        {
+                          "turn": "mapping",
+                          "complete": true,
+                          "coverage": {
+                            "fields": {
+                              "/sku": {
+                                "risk": "medium",
+                                "records": 18,
+                                "records_filled": 18
+                              },
+                              "/price": {
+                                "risk": "critical",
+                                "records": 18,
+                                "records_filled": 18
+                              },
+                              "/currency": {
+                                "risk": "critical",
+                                "records": 18,
+                                "records_filled": 18
+                              },
+                              "/sell_unit": {
+                                "risk": "high",
+                                "records": 18,
+                                "records_filled": 18
+                              },
+                              "/product_name": {
+                                "risk": "medium",
+                                "records": 18,
+                                "records_filled": 18
+                              },
+                              "/inventory/*/qty": {
+                                "risk": "high",
+                                "records": 18,
+                                "records_filled": 18
+                              },
+                              "/inventory/*/warehouse_code": {
+                                "risk": "high",
+                                "records": 18,
+                                "records_filled": 18
+                              }
+                            },
+                            "sources": {
+                              "stock": 54,
+                              "units": 2,
+                              "master": 18,
+                              "prices": 18
+                            },
+                            "collections": {
+                              "/inventory": 54
+                            },
+                            "invalid_records": 0
+                          },
+                          "problems": [],
+                          "rows_out": 18
+                        }
+                      ],
+                      "complete": true,
+                      "coverage": {
+                        "fields": {
+                          "/sku": {
+                            "risk": "medium",
+                            "records": 18,
+                            "records_filled": 18
+                          },
+                          "/price": {
+                            "risk": "critical",
+                            "records": 18,
+                            "records_filled": 18
+                          },
+                          "/currency": {
+                            "risk": "critical",
+                            "records": 18,
+                            "records_filled": 18
+                          },
+                          "/sell_unit": {
+                            "risk": "high",
+                            "records": 18,
+                            "records_filled": 18
+                          },
+                          "/product_name": {
+                            "risk": "medium",
+                            "records": 18,
+                            "records_filled": 18
+                          },
+                          "/inventory/*/qty": {
+                            "risk": "high",
+                            "records": 18,
+                            "records_filled": 18
+                          },
+                          "/inventory/*/warehouse_code": {
+                            "risk": "high",
+                            "records": 18,
+                            "records_filled": 18
+                          }
+                        },
+                        "sources": {
+                          "stock": 54,
+                          "units": 2,
+                          "master": 18,
+                          "prices": 18
+                        },
+                        "collections": {
+                          "/inventory": 54
+                        },
+                        "invalid_records": 0
+                      },
+                      "grounded": 4,
+                      "rows_out": 18,
+                      "fix_rounds": 0,
+                      "inspections": 0,
+                      "python_turns": 0,
+                      "rows_checked": 18,
+                      "problems_left": [],
+                      "candidate_turns": 0
+                    },
+                    "clarifications": [],
+                    "open_questions": []
+                  },
+                  "reviewer_turns": 0
+                },
+                "role": "mapper",
+                "outcome": "completed",
+                "elapsed_ms": 940
+              },
+              {
+                "data": {
+                  "execution": {
+                    "errors": 0,
+                    "rows_in": 18,
+                    "complete": true,
+                    "coverage": {
+                      "fields": {
+                        "/sku": {
+                          "risk": "medium",
+                          "records": 18,
+                          "records_filled": 18
+                        },
+                        "/price": {
+                          "risk": "critical",
+                          "records": 18,
+                          "records_filled": 18
+                        },
+                        "/currency": {
+                          "risk": "critical",
+                          "records": 18,
+                          "records_filled": 18
+                        },
+                        "/sell_unit": {
+                          "risk": "high",
+                          "records": 18,
+                          "records_filled": 18
+                        },
+                        "/product_name": {
+                          "risk": "medium",
+                          "records": 18,
+                          "records_filled": 18
+                        },
+                        "/inventory/*/qty": {
+                          "risk": "high",
+                          "records": 18,
+                          "records_filled": 18
+                        },
+                        "/inventory/*/warehouse_code": {
+                          "risk": "high",
+                          "records": 18,
+                          "records_filled": 18
+                        }
+                      },
+                      "sources": {
+                        "stock": 54,
+                        "units": 2,
+                        "master": 18,
+                        "prices": 18
+                      },
+                      "collections": {
+                        "/inventory": 54
+                      },
+                      "invalid_records": 0
+                    },
+                    "problems": [],
+                    "rows_out": 18,
+                    "problem_count": 0,
+                    "sample_records": [
+                      {
+                        "sku": "SG-000009",
+                        "price": 73.5,
+                        "currency": "MYR",
+                        "inventory": [
+                          {
+                            "qty": 147.0,
+                            "warehouse_code": "MY-01"
+                          },
+                          {
+                            "qty": 149.0,
+                            "warehouse_code": "MY-03"
+                          },
+                          {
+                            "qty": 148.0,
+                            "warehouse_code": "MY-02"
+                          }
+                        ],
+                        "sell_unit": "BOTTLE",
+                        "product_name": "Kopi SG 018 / 7"
+                      },
+                      {
+                        "sku": "SG-000006",
+                        "price": 69.75,
+                        "currency": "MYR",
+                        "inventory": [
+                          {
+                            "qty": 126.0,
+                            "warehouse_code": "MY-01"
+                          },
+                          {
+                            "qty": 128.0,
+                            "warehouse_code": "MY-03"
+                          },
+                          {
+                            "qty": 127.0,
+                            "warehouse_code": "MY-02"
+                          }
+                        ],
+                        "sell_unit": "PIECE",
+                        "product_name": "Kopi SG 015 / 7"
+                      },
+                      {
+                        "sku": "MY-000004",
+                        "price": 56.0,
+                        "currency": "MYR",
+                        "inventory": [
+                          {
+                            "qty": 51.0,
+                            "warehouse_code": "MY-03"
+                          },
+                          {
+                            "qty": 49.0,
+                            "warehouse_code": "MY-01"
+                          },
+                          {
+                            "qty": 50.0,
+                            "warehouse_code": "MY-02"
+                          }
+                        ],
+                        "sell_unit": "BOTTLE",
+                        "product_name": "Kopi MY 004 / 7"
+                      }
+                    ]
+                  }
+                },
+                "role": "execute",
+                "outcome": "completed",
+                "elapsed_ms": 353
+              },
+              {
+                "data": {
+                  "review": {
+                    "checked": [
+                      "Scripted model only; real engine verification remains mandatory."
+                    ],
+                    "verdict": "pass",
+                    "concerns": [],
+                    "clarifications": []
+                  }
+                },
+                "role": "reviewer",
+                "outcome": "completed",
+                "elapsed_ms": 104
+              }
+            ],
+            "review": {
+              "checked": [
+                "Scripted model only; real engine verification remains mandatory."
+              ],
+              "verdict": "pass",
+              "concerns": [],
+              "clarifications": []
+            },
+            "status": "verified_proposal",
+            "repairs": 0,
+            "version": "2026.11.04.2",
+            "analysis": {
+              "facts": [],
+              "hypotheses": [],
+              "mapping_guidance": [],
+              "missing_information": []
+            },
+            "evidence": [],
+            "thread_id": "mapping-8fc7bfc604b28385",
+            "human_resume": "existing versioned question preview/apply service; no automatic approval",
+            "provider_attempts": 3,
+            "usage_unknown_attempts": 0
+          },
+          "agreement": {
+            "ops": [],
+            "agree": [],
+            "record": {
+              "root": {
+                "model": {
+                  "file": "fil_01M6KT35Y9T3EFP5B7BP34WWYV",
+                  "sheet": "item master 7",
+                  "filter": null,
+                  "rename": {},
+                  "unpivot": null,
+                  "data_end": null,
+                  "fill_down": [],
+                  "data_start": null,
+                  "last_column": null,
+                  "first_column": null
+                },
+                "matcher": {
+                  "file": "fil_01M6KT35Y9T3EFP5B7BP34WWYV",
+                  "sheet": "item master 7",
+                  "filter": null,
+                  "rename": {},
+                  "unpivot": null,
+                  "data_end": null,
+                  "fill_down": [],
+                  "data_start": null,
+                  "last_column": 5,
+                  "first_column": 0
+                }
+              },
+              "joins": {
+                "model": [
+                  {
+                    "on": [
+                      {
+                        "left": "Company",
+                        "right": "Company"
+                      },
+                      {
+                        "left": "Item",
+                        "right": "Item"
+                      }
+                    ],
+                    "how": "left",
+                    "left": {
+                      "file": "fil_01M6KT35Y9T3EFP5B7BP34WWYV",
+                      "sheet": "item master 7",
+                      "filter": null,
+                      "rename": {},
+                      "unpivot": null,
+                      "data_end": null,
+                      "fill_down": [],
+                      "data_start": null,
+                      "last_column": null,
+                      "first_column": null
+                    },
+                    "right": {
+                      "file": "fil_01M6KT35Y9T3EFP5B7BP34WWYV",
+                      "sheet": "price list 7",
+                      "filter": null,
+                      "rename": {},
+                      "unpivot": null,
+                      "data_end": null,
+                      "fill_down": [],
+                      "data_start": null,
+                      "last_column": null,
+                      "first_column": null
+                    },
+                    "cardinality": "1:1",
+                    "on_unmatched": "review",
+                    "normalize_keys": [
+                      "trim",
+                      "upper"
+                    ]
+                  },
+                  {
+                    "on": [
+                      {
+                        "left": "Unit",
+                        "right": "Unit"
+                      }
+                    ],
+                    "how": "left",
+                    "left": {
+                      "file": "fil_01M6KT35Y9T3EFP5B7BP34WWYV",
+                      "sheet": "item master 7",
+                      "filter": null,
+                      "rename": {},
+                      "unpivot": null,
+                      "data_end": null,
+                      "fill_down": [],
+                      "data_start": null,
+                      "last_column": null,
+                      "first_column": null
+                    },
+                    "right": {
+                      "file": "fil_01M6KT35Y9T3EFP5B7BP34WWYV",
+                      "sheet": "unit dictionary 7",
+                      "filter": null,
+                      "rename": {},
+                      "unpivot": null,
+                      "data_end": null,
+                      "fill_down": [],
+                      "data_start": null,
+                      "last_column": null,
+                      "first_column": null
+                    },
+                    "cardinality": "N:1",
+                    "on_unmatched": "review",
+                    "normalize_keys": [
+                      "trim",
+                      "upper"
+                    ]
+                  }
+                ],
+                "matcher": []
+              },
+              "dedupe": {
+                "model": {
+                  "keep": "error",
+                  "keys": [
+                    "/sku"
+                  ]
+                },
+                "matcher": {
+                  "keep": "first",
+                  "keys": []
+                }
+              }
+            },
+            "dropped": [],
+            "disagree": {
+              "/sku": {
+                "model": [
+                  "master.Material Code"
+                ],
+                "matcher": [
+                  "Item Master 7.Material Code"
+                ]
+              },
+              "/currency": {
+                "model": [
+                  "prices.Currency"
+                ],
+                "matcher": [
+                  "{\"op\": \"const\", \"value\": \"THB\"}"
+                ]
+              },
+              "/sell_unit": {
+                "model": [
+                  "units.Full unit"
+                ],
+                "matcher": [
+                  "Item Master 7.Unit"
+                ]
+              },
+              "/product_name": {
+                "model": [
+                  "master.Product Name"
+                ],
+                "matcher": [
+                  "Item Master 7.Product Name"
+                ]
+              }
+            },
+            "model_only": [
+              "/inventory/*/qty",
+              "/inventory/*/warehouse_code",
+              "/price"
+            ]
+          },
+          "risk_level": "high",
+          "risk_score": 1.0,
+          "self_check": {
+            "errors": 0,
+            "history": [
+              {
+                "turn": "ground",
+                "columns": 4
+              },
+              {
+                "turn": "mapping",
+                "complete": true,
+                "coverage": {
+                  "fields": {
+                    "/sku": {
+                      "risk": "medium",
+                      "records": 18,
+                      "records_filled": 18
+                    },
+                    "/price": {
+                      "risk": "critical",
+                      "records": 18,
+                      "records_filled": 18
+                    },
+                    "/currency": {
+                      "risk": "critical",
+                      "records": 18,
+                      "records_filled": 18
+                    },
+                    "/sell_unit": {
+                      "risk": "high",
+                      "records": 18,
+                      "records_filled": 18
+                    },
+                    "/product_name": {
+                      "risk": "medium",
+                      "records": 18,
+                      "records_filled": 18
+                    },
+                    "/inventory/*/qty": {
+                      "risk": "high",
+                      "records": 18,
+                      "records_filled": 18
+                    },
+                    "/inventory/*/warehouse_code": {
+                      "risk": "high",
+                      "records": 18,
+                      "records_filled": 18
+                    }
+                  },
+                  "sources": {
+                    "stock": 54,
+                    "units": 2,
+                    "master": 18,
+                    "prices": 18
+                  },
+                  "collections": {
+                    "/inventory": 54
+                  },
+                  "invalid_records": 0
+                },
+                "problems": [],
+                "rows_out": 18
+              }
+            ],
+            "complete": true,
+            "coverage": {
+              "fields": {
+                "/sku": {
+                  "risk": "medium",
+                  "records": 18,
+                  "records_filled": 18
+                },
+                "/price": {
+                  "risk": "critical",
+                  "records": 18,
+                  "records_filled": 18
+                },
+                "/currency": {
+                  "risk": "critical",
+                  "records": 18,
+                  "records_filled": 18
+                },
+                "/sell_unit": {
+                  "risk": "high",
+                  "records": 18,
+                  "records_filled": 18
+                },
+                "/product_name": {
+                  "risk": "medium",
+                  "records": 18,
+                  "records_filled": 18
+                },
+                "/inventory/*/qty": {
+                  "risk": "high",
+                  "records": 18,
+                  "records_filled": 18
+                },
+                "/inventory/*/warehouse_code": {
+                  "risk": "high",
+                  "records": 18,
+                  "records_filled": 18
+                }
+              },
+              "sources": {
+                "stock": 54,
+                "units": 2,
+                "master": 18,
+                "prices": 18
+              },
+              "collections": {
+                "/inventory": 54
+              },
+              "invalid_records": 0
+            },
+            "grounded": 4,
+            "rows_out": 18,
+            "fix_rounds": 0,
+            "inspections": 0,
+            "python_turns": 0,
+            "rows_checked": 18,
+            "problems_left": [],
+            "candidate_turns": 0
+          },
+          "simulation": {
+            "fill": {
+              "/sku": 1.0,
+              "/price": 1.0,
+              "/currency": 1.0,
+              "/sell_unit": 1.0,
+              "/product_name": 1.0,
+              "/inventory/*/qty": 1.0,
+              "/inventory/*/warehouse_code": 1.0
+            },
+            "rows_in": 18,
+            "sources": {
+              "stock": 54,
+              "units": 2,
+              "master": 18,
+              "prices": 18
+            },
+            "complete": true,
+            "findings": {
+              "info": 0,
+              "error": 0,
+              "warning": 0
+            },
+            "rows_out": 18,
+            "collections": {
+              "/inventory": 54
+            },
+            "duration_ms": 405.2,
+            "identity_keys": [
+              "/sku"
+            ],
+            "invalid_records": 0
+          },
+          "reused_from": null,
+          "field_review": null,
+          "risk_factors": [
+            "ambiguous critical field (price, discount, identity …)"
+          ],
+          "verification": {
+            "scope": "Execution and contract checks; business ambiguities require operator answers",
+            "passed": true,
+            "version": 1,
+            "complete": true,
+            "coverage": {
+              "fields": {
+                "/sku": {
+                  "risk": "medium",
+                  "records": 18,
+                  "records_filled": 18
+                },
+                "/price": {
+                  "risk": "critical",
+                  "records": 18,
+                  "records_filled": 18
+                },
+                "/currency": {
+                  "risk": "critical",
+                  "records": 18,
+                  "records_filled": 18
+                },
+                "/sell_unit": {
+                  "risk": "high",
+                  "records": 18,
+                  "records_filled": 18
+                },
+                "/product_name": {
+                  "risk": "medium",
+                  "records": 18,
+                  "records_filled": 18
+                },
+                "/inventory/*/qty": {
+                  "risk": "high",
+                  "records": 18,
+                  "records_filled": 18
+                },
+                "/inventory/*/warehouse_code": {
+                  "risk": "high",
+                  "records": 18,
+                  "records_filled": 18
+                }
+              },
+              "sources": {
+                "stock": 54,
+                "units": 2,
+                "master": 18,
+                "prices": 18
+              },
+              "collections": {
+                "/inventory": 54
+              },
+              "invalid_records": 0
+            },
+            "problems": [],
+            "rows_out": 18,
+            "warnings": [],
+            "rows_checked": 18,
+            "semantic_checks": {
+              "limitation": "Passing these checks does not prove column meaning. Missing business intent still requires an operator decision.",
+              "contract_rules": [],
+              "source_identity_warnings": []
+            }
+          },
+          "clarifications": [],
+          "confidence_basis": {
+            "capped": [
+              "/sku",
+              "/product_name",
+              "/currency",
+              "/sell_unit"
+            ],
+            "raised": [],
+            "mapping_capped": false
+          },
+          "review_decisions": [],
+          "target_schema_hash": "7ba0bb6f0232b42f",
+          "confirmed_decisions": []
+        },
+        "open_questions": [
+          "Sheet 'Price List 7' has a currency column 'Currency' (MYR), but records are labelled THB: confirm",
+          "Sheet 'Delivery Notes 7' has a currency column 'Target currency' (Effective date, Price list, Stock basis), but records are labelled THB: confirm",
+          "Table 'Warehouse Balances 7' looks like inventory but no column links to root key 'Material Code'"
+        ],
+        "validation": {
+          "ok": true,
+          "issues": []
+        },
+        "parent_id": null,
+        "approved_by": null,
+        "approved_at": null,
+        "comment": null,
+        "created_at": "2026-11-04T17:36:08.164377+00:00",
+        "agent_log": [
+          {
+            "agent": "heuristic",
+            "unmatched": {
+              "inventory": [
+                "Company",
+                "Item",
+                "Warehouse",
+                "Lot",
+                "Quantity"
+              ],
+              "products_0": [
+                "Company",
+                "Item"
+              ],
+              "products_1": [
+                "Company",
+                "Item",
+                "Selling price",
+                "Currency",
+                "Price list",
+                "Valid from",
+                "Valid to"
+              ],
+              "products_3": [
+                "Unit",
+                "Full unit"
+              ]
+            },
+            "confidence": 0.5700000000000001,
+            "table_roles": {
+              "0": "products",
+              "1": "products",
+              "2": "inventory",
+              "3": "products",
+              "4": "other"
+            }
+          },
+          {
+            "data": {
+              "workflow": {
+                "roles": [
+                  {
+                    "data": {
+                      "analysis": {
+                        "facts": [],
+                        "hypotheses": [],
+                        "mapping_guidance": [],
+                        "missing_information": []
+                      }
+                    },
+                    "role": "analyst",
+                    "outcome": "completed",
+                    "elapsed_ms": 805
+                  },
+                  {
+                    "data": {
+                      "review": {},
+                      "repairs": 0,
+                      "mapper_data": {
+                        "self_check": {
+                          "errors": 0,
+                          "history": [
+                            {
+                              "turn": "ground",
+                              "columns": 4
+                            },
+                            {
+                              "turn": "mapping",
+                              "complete": true,
+                              "coverage": {
+                                "fields": {
+                                  "/sku": {
+                                    "risk": "medium",
+                                    "records": 18,
+                                    "records_filled": 18
+                                  },
+                                  "/price": {
+                                    "risk": "critical",
+                                    "records": 18,
+                                    "records_filled": 18
+                                  },
+                                  "/currency": {
+                                    "risk": "critical",
+                                    "records": 18,
+                                    "records_filled": 18
+                                  },
+                                  "/sell_unit": {
+                                    "risk": "high",
+                                    "records": 18,
+                                    "records_filled": 18
+                                  },
+                                  "/product_name": {
+                                    "risk": "medium",
+                                    "records": 18,
+                                    "records_filled": 18
+                                  },
+                                  "/inventory/*/qty": {
+                                    "risk": "high",
+                                    "records": 18,
+                                    "records_filled": 18
+                                  },
+                                  "/inventory/*/warehouse_code": {
+                                    "risk": "high",
+                                    "records": 18,
+                                    "records_filled": 18
+                                  }
+                                },
+                                "sources": {
+                                  "stock": 54,
+                                  "units": 2,
+                                  "master": 18,
+                                  "prices": 18
+                                },
+                                "collections": {
+                                  "/inventory": 54
+                                },
+                                "invalid_records": 0
+                              },
+                              "problems": [],
+                              "rows_out": 18
+                            }
+                          ],
+                          "complete": true,
+                          "coverage": {
+                            "fields": {
+                              "/sku": {
+                                "risk": "medium",
+                                "records": 18,
+                                "records_filled": 18
+                              },
+                              "/price": {
+                                "risk": "critical",
+                                "records": 18,
+                                "records_filled": 18
+                              },
+                              "/currency": {
+                                "risk": "critical",
+                                "records": 18,
+                                "records_filled": 18
+                              },
+                              "/sell_unit": {
+                                "risk": "high",
+                                "records": 18,
+                                "records_filled": 18
+                              },
+                              "/product_name": {
+                                "risk": "medium",
+                                "records": 18,
+                                "records_filled": 18
+                              },
+                              "/inventory/*/qty": {
+                                "risk": "high",
+                                "records": 18,
+                                "records_filled": 18
+                              },
+                              "/inventory/*/warehouse_code": {
+                                "risk": "high",
+                                "records": 18,
+                                "records_filled": 18
+                              }
+                            },
+                            "sources": {
+                              "stock": 54,
+                              "units": 2,
+                              "master": 18,
+                              "prices": 18
+                            },
+                            "collections": {
+                              "/inventory": 54
+                            },
+                            "invalid_records": 0
+                          },
+                          "grounded": 4,
+                          "rows_out": 18,
+                          "fix_rounds": 0,
+                          "inspections": 0,
+                          "python_turns": 0,
+                          "rows_checked": 18,
+                          "problems_left": [],
+                          "candidate_turns": 0
+                        },
+                        "clarifications": [],
+                        "open_questions": []
+                      },
+                      "reviewer_turns": 0
+                    },
+                    "role": "mapper",
+                    "outcome": "completed",
+                    "elapsed_ms": 940
+                  },
+                  {
+                    "data": {
+                      "execution": {
+                        "errors": 0,
+                        "rows_in": 18,
+                        "complete": true,
+                        "coverage": {
+                          "fields": {
+                            "/sku": {
+                              "risk": "medium",
+                              "records": 18,
+                              "records_filled": 18
+                            },
+                            "/price": {
+                              "risk": "critical",
+                              "records": 18,
+                              "records_filled": 18
+                            },
+                            "/currency": {
+                              "risk": "critical",
+                              "records": 18,
+                              "records_filled": 18
+                            },
+                            "/sell_unit": {
+                              "risk": "high",
+                              "records": 18,
+                              "records_filled": 18
+                            },
+                            "/product_name": {
+                              "risk": "medium",
+                              "records": 18,
+                              "records_filled": 18
+                            },
+                            "/inventory/*/qty": {
+                              "risk": "high",
+                              "records": 18,
+                              "records_filled": 18
+                            },
+                            "/inventory/*/warehouse_code": {
+                              "risk": "high",
+                              "records": 18,
+                              "records_filled": 18
+                            }
+                          },
+                          "sources": {
+                            "stock": 54,
+                            "units": 2,
+                            "master": 18,
+                            "prices": 18
+                          },
+                          "collections": {
+                            "/inventory": 54
+                          },
+                          "invalid_records": 0
+                        },
+                        "problems": [],
+                        "rows_out": 18,
+                        "problem_count": 0,
+                        "sample_records": [
+                          {
+                            "sku": "SG-000009",
+                            "price": 73.5,
+                            "currency": "MYR",
+                            "inventory": [
+                              {
+                                "qty": 147.0,
+                                "warehouse_code": "MY-01"
+                              },
+                              {
+                                "qty": 149.0,
+                                "warehouse_code": "MY-03"
+                              },
+                              {
+                                "qty": 148.0,
+                                "warehouse_code": "MY-02"
+                              }
+                            ],
+                            "sell_unit": "BOTTLE",
+                            "product_name": "Kopi SG 018 / 7"
+                          },
+                          {
+                            "sku": "SG-000006",
+                            "price": 69.75,
+                            "currency": "MYR",
+                            "inventory": [
+                              {
+                                "qty": 126.0,
+                                "warehouse_code": "MY-01"
+                              },
+                              {
+                                "qty": 128.0,
+                                "warehouse_code": "MY-03"
+                              },
+                              {
+                                "qty": 127.0,
+                                "warehouse_code": "MY-02"
+                              }
+                            ],
+                            "sell_unit": "PIECE",
+                            "product_name": "Kopi SG 015 / 7"
+                          },
+                          {
+                            "sku": "MY-000004",
+                            "price": 56.0,
+                            "currency": "MYR",
+                            "inventory": [
+                              {
+                                "qty": 51.0,
+                                "warehouse_code": "MY-03"
+                              },
+                              {
+                                "qty": 49.0,
+                                "warehouse_code": "MY-01"
+                              },
+                              {
+                                "qty": 50.0,
+                                "warehouse_code": "MY-02"
+                              }
+                            ],
+                            "sell_unit": "BOTTLE",
+                            "product_name": "Kopi MY 004 / 7"
+                          }
+                        ]
+                      }
+                    },
+                    "role": "execute",
+                    "outcome": "completed",
+                    "elapsed_ms": 353
+                  },
+                  {
+                    "data": {
+                      "review": {
+                        "checked": [
+                          "Scripted model only; real engine verification remains mandatory."
+                        ],
+                        "verdict": "pass",
+                        "concerns": [],
+                        "clarifications": []
+                      }
+                    },
+                    "role": "reviewer",
+                    "outcome": "completed",
+                    "elapsed_ms": 104
+                  }
+                ],
+                "review": {
+                  "checked": [
+                    "Scripted model only; real engine verification remains mandatory."
+                  ],
+                  "verdict": "pass",
+                  "concerns": [],
+                  "clarifications": []
+                },
+                "status": "verified_proposal",
+                "repairs": 0,
+                "version": "2026.11.04.2",
+                "analysis": {
+                  "facts": [],
+                  "hypotheses": [],
+                  "mapping_guidance": [],
+                  "missing_information": []
+                },
+                "evidence": [],
+                "thread_id": "mapping-8fc7bfc604b28385",
+                "human_resume": "existing versioned question preview/apply service; no automatic approval",
+                "provider_attempts": 3,
+                "usage_unknown_attempts": 0
+              },
+              "self_check": {
+                "errors": 0,
+                "history": [
+                  {
+                    "turn": "ground",
+                    "columns": 4
+                  },
+                  {
+                    "turn": "mapping",
+                    "complete": true,
+                    "coverage": {
+                      "fields": {
+                        "/sku": {
+                          "risk": "medium",
+                          "records": 18,
+                          "records_filled": 18
+                        },
+                        "/price": {
+                          "risk": "critical",
+                          "records": 18,
+                          "records_filled": 18
+                        },
+                        "/currency": {
+                          "risk": "critical",
+                          "records": 18,
+                          "records_filled": 18
+                        },
+                        "/sell_unit": {
+                          "risk": "high",
+                          "records": 18,
+                          "records_filled": 18
+                        },
+                        "/product_name": {
+                          "risk": "medium",
+                          "records": 18,
+                          "records_filled": 18
+                        },
+                        "/inventory/*/qty": {
+                          "risk": "high",
+                          "records": 18,
+                          "records_filled": 18
+                        },
+                        "/inventory/*/warehouse_code": {
+                          "risk": "high",
+                          "records": 18,
+                          "records_filled": 18
+                        }
+                      },
+                      "sources": {
+                        "stock": 54,
+                        "units": 2,
+                        "master": 18,
+                        "prices": 18
+                      },
+                      "collections": {
+                        "/inventory": 54
+                      },
+                      "invalid_records": 0
+                    },
+                    "problems": [],
+                    "rows_out": 18
+                  }
+                ],
+                "complete": true,
+                "coverage": {
+                  "fields": {
+                    "/sku": {
+                      "risk": "medium",
+                      "records": 18,
+                      "records_filled": 18
+                    },
+                    "/price": {
+                      "risk": "critical",
+                      "records": 18,
+                      "records_filled": 18
+                    },
+                    "/currency": {
+                      "risk": "critical",
+                      "records": 18,
+                      "records_filled": 18
+                    },
+                    "/sell_unit": {
+                      "risk": "high",
+                      "records": 18,
+                      "records_filled": 18
+                    },
+                    "/product_name": {
+                      "risk": "medium",
+                      "records": 18,
+                      "records_filled": 18
+                    },
+                    "/inventory/*/qty": {
+                      "risk": "high",
+                      "records": 18,
+                      "records_filled": 18
+                    },
+                    "/inventory/*/warehouse_code": {
+                      "risk": "high",
+                      "records": 18,
+                      "records_filled": 18
+                    }
+                  },
+                  "sources": {
+                    "stock": 54,
+                    "units": 2,
+                    "master": 18,
+                    "prices": 18
+                  },
+                  "collections": {
+                    "/inventory": 54
+                  },
+                  "invalid_records": 0
+                },
+                "grounded": 4,
+                "rows_out": 18,
+                "fix_rounds": 0,
+                "inspections": 0,
+                "python_turns": 0,
+                "rows_checked": 18,
+                "problems_left": [],
+                "candidate_turns": 0
+              },
+              "clarifications": [],
+              "open_questions": []
+            },
+            "agent": "mapping_workflow",
+            "notes": [],
+            "usage": {
+              "calls": 3,
+              "model": "fake-excel100",
+              "cost_usd": 0.0,
+              "latency_ms": 949.2,
+              "input_tokens": 0,
+              "output_tokens": 0
+            },
+            "attempts": 3
+          },
+          {
+            "ops": 0,
+            "agent": "agreement",
+            "agree": 0,
+            "record": 3,
+            "dropped": 0,
+            "disagree": 4,
+            "model_only": 3
+          },
+          {
+            "agent": "question_reconciliation",
+            "basis": "complete execution, populated source-backed fields and unique identities",
+            "retired": [
+              "No SKU-like header found in root table; using 'Material Code' as identity — confirm"
+            ]
+          }
+        ],
+        "sample": [
+          {
+            "sku": "SG-000009",
+            "price": 73.5,
+            "currency": "MYR",
+            "inventory": [
+              {
+                "qty": 147.0,
+                "warehouse_code": "MY-01"
+              },
+              {
+                "qty": 149.0,
+                "warehouse_code": "MY-03"
+              },
+              {
+                "qty": 148.0,
+                "warehouse_code": "MY-02"
+              }
+            ],
+            "sell_unit": "BOTTLE",
+            "source_meta": {
+              "file": "X0207.xlsx",
+              "lineage": {
+                "items": {
+                  "/inventory": [
+                    5,
+                    10,
+                    29
+                  ]
+                },
+                "joined": {
+                  "units": 1,
+                  "prices": 6
+                },
+                "source": "master",
+                "root_row": 0
+              }
+            },
+            "product_name": "Kopi SG 018 / 7"
+          },
+          {
+            "sku": "SG-000006",
+            "price": 69.75,
+            "currency": "MYR",
+            "inventory": [
+              {
+                "qty": 126.0,
+                "warehouse_code": "MY-01"
+              },
+              {
+                "qty": 128.0,
+                "warehouse_code": "MY-03"
+              },
+              {
+                "qty": 127.0,
+                "warehouse_code": "MY-02"
+              }
+            ],
+            "sell_unit": "PIECE",
+            "source_meta": {
+              "file": "X0207.xlsx",
+              "lineage": {
+                "items": {
+                  "/inventory": [
+                    11,
+                    31,
+                    48
+                  ]
+                },
+                "joined": {
+                  "units": 0,
+                  "prices": 7
+                },
+                "source": "master",
+                "root_row": 1
+              }
+            },
+            "product_name": "Kopi SG 015 / 7"
+          },
+          {
+            "sku": "MY-000004",
+            "price": 56.0,
+            "currency": "MYR",
+            "inventory": [
+              {
+                "qty": 51.0,
+                "warehouse_code": "MY-03"
+              },
+              {
+                "qty": 49.0,
+                "warehouse_code": "MY-01"
+              },
+              {
+                "qty": 50.0,
+                "warehouse_code": "MY-02"
+              }
+            ],
+            "sell_unit": "BOTTLE",
+            "source_meta": {
+              "file": "X0207.xlsx",
+              "lineage": {
+                "items": {
+                  "/inventory": [
+                    1,
+                    2,
+                    22
+                  ]
+                },
+                "joined": {
+                  "units": 1,
+                  "prices": 5
+                },
+                "source": "master",
+                "root_row": 2
+              }
+            },
+            "product_name": "Kopi MY 004 / 7"
+          },
+          {
+            "sku": "SG-000001",
+            "price": 63.5,
+            "currency": "MYR",
+            "inventory": [
+              {
+                "qty": 92.0,
+                "warehouse_code": "MY-02"
+              },
+              {
+                "qty": 93.0,
+                "warehouse_code": "MY-03"
+              },
+              {
+                "qty": 91.0,
+                "warehouse_code": "MY-01"
+              }
+            ],
+            "sell_unit": "BOTTLE",
+            "source_meta": {
+              "file": "X0207.xlsx",
+              "lineage": {
+                "items": {
+                  "/inventory": [
+                    28,
+                    30,
+                    53
+                  ]
+                },
+                "joined": {
+                  "units": 1,
+                  "prices": 1
+                },
+                "source": "master",
+                "root_row": 3
+              }
+            },
+            "product_name": "Kopi SG 010 / 7"
+          },
+          {
+            "sku": "MY-000003",
+            "price": 54.75,
+            "currency": "MYR",
+            "inventory": [
+              {
+                "qty": 42.0,
+                "warehouse_code": "MY-01"
+              },
+              {
+                "qty": 43.0,
+                "warehouse_code": "MY-02"
+              },
+              {
+                "qty": 44.0,
+                "warehouse_code": "MY-03"
+              }
+            ],
+            "sell_unit": "PIECE",
+            "source_meta": {
+              "file": "X0207.xlsx",
+              "lineage": {
+                "items": {
+                  "/inventory": [
+                    4,
+                    36,
+                    43
+                  ]
+                },
+                "joined": {
+                  "units": 0,
+                  "prices": 15
+                },
+                "source": "master",
+                "root_row": 4
+              }
+            },
+            "product_name": "Kopi MY 003 / 7"
+          }
+        ]
+      }
+    ],
+    "datasets": [],
+    "review_tasks": [
+      {
+        "id": "rev_01M6KT3T1225X564VMPBT2NN9Q",
+        "round_id": "rnd_01M6KT35Y4K01DSQRCPWBVXNHA",
+        "customer_id": "cus_01M6KSRRAENBFNTDM1MVXVZ9Q7",
+        "mapping_version_id": "map_01M6KT3SXR1VC4GR2REERDZT63",
+        "dataset_version_id": null,
+        "kind": "mapping",
+        "priority": 131,
+        "status": "open",
+        "reasons": [
+          "low confidence on critical fields: /currency (0.70)",
+          "low confidence on high-risk fields: /sell_unit (0.70)",
+          "structure is identical to customer X0107's approved format — confirm this file belongs here",
+          "first time this customer/format is seen",
+          "3 questions still need operator confirmation",
+          "the model selects rows differently from FORMA's matcher (records: dedupe; records: joins; records: root)"
+        ],
+        "details": {
+          "impact": {},
+          "verdict": {
+            "word": "likely",
+            "stage": "mapping",
+            "digest": "816116a48cec758fb921a6f883b1bb52",
+            "outcome": "answer",
+            "conclusion": {
+              "en": "First file from X0207; its layout is the same as X0107's (the same ERP?) — confirm the sender, then 2 fields need a confirmation",
+              "th": "ไฟล์แรกของ X0207 โครงสร้างเหมือนของ X0107 (ERP เดียวกัน?) — ยืนยันผู้ส่ง แล้วมี 2 ฟิลด์ที่ต้องยืนยัน"
+            },
+            "confidence": 0.6,
+            "rules_fired": [
+              "first_time_shared_layout"
+            ]
+          },
+          "decision": "review",
+          "findings": [],
+          "risk_level": "high",
+          "risk_factors": [
+            "ambiguous critical field (price, discount, identity …)"
+          ],
+          "open_questions": [
+            "Sheet 'Price List 7' has a currency column 'Currency' (MYR), but records are labelled THB: confirm",
+            "Sheet 'Delivery Notes 7' has a currency column 'Target currency' (Effective date, Price list, Stock basis), but records are labelled THB: confirm",
+            "Table 'Warehouse Balances 7' looks like inventory but no column links to root key 'Material Code'"
+          ]
+        },
+        "resolver": null,
+        "comment": null,
+        "created_at": "2026-11-04T17:36:08.226677+00:00",
+        "resolved_at": null,
+        "age_days": 0,
+        "waiting_until": null,
+        "waiting_note": null
+      }
+    ],
+    "jobs": [
+      {
+        "id": "job_01M6KT35YQNCJ5W0QJSGKY89ED",
+        "kind": "process_batch_item",
+        "status": "done",
+        "progress": 100,
+        "message": null,
+        "error": null
+      }
+    ]
+  },
+  "mapping": {
+    "id": "map_01M6KT3SXR1VC4GR2REERDZT63",
+    "customer_id": "cus_01M6KSRRAENBFNTDM1MVXVZ9Q7",
+    "round_id": "rnd_01M6KT35Y4K01DSQRCPWBVXNHA",
+    "version": 1,
+    "status": "proposed",
+    "target_schema": "excel100_x0207@1",
+    "confidence": 1.0,
+    "created_by": "ai",
+    "model": "fake-excel100",
+    "policy": {
+      "checks": {
+        "drift": null,
+        "errors": 0,
+        "rows_out": 18,
+        "warnings": 0,
+        "agreement": {
+          "ops": 0,
+          "agree": 0,
+          "record": 3,
+          "dropped": 0,
+          "disagree": 4,
+          "model_only": 3
+        },
+        "llm_fallback": false,
+        "reused_approved": false,
+        "full_verification": true,
+        "mapping_confidence": 1.0,
+        "data_checks_trusted": false,
+        "low_confidence_high": [
+          "/sell_unit (0.70)"
+        ],
+        "unresolved_questions": 3,
+        "plausibility_warnings": 0,
+        "low_confidence_critical": [
+          "/currency (0.70)"
+        ]
+      },
+      "impact": {},
+      "source": "ai",
+      "reasons": [
+        "low confidence on critical fields: /currency (0.70)",
+        "low confidence on high-risk fields: /sell_unit (0.70)",
+        "structure is identical to customer X0107's approved format — confirm this file belongs here",
+        "first time this customer/format is seen",
+        "3 questions still need operator confirmation",
+        "the model selects rows differently from FORMA's matcher (records: dedupe; records: joins; records: root)"
+      ],
+      "sandbox": null,
+      "verdict": {
+        "word": "likely",
+        "stage": "mapping",
+        "digest": "816116a48cec758fb921a6f883b1bb52",
+        "outcome": "answer",
+        "subject": {
+          "id": "map_01M6KT3SXR1VC4GR2REERDZT63",
+          "kind": "mapping",
+          "round_id": "rnd_01M6KT35Y4K01DSQRCPWBVXNHA"
+        },
+        "evidence": [
+          {
+            "id": 1,
+            "kind": "other_customer",
+            "link": "/rounds/rnd_01M6KT35Y4K01DSQRCPWBVXNHA",
+            "text": {
+              "en": "The layout matches X0107's approved format (100%)",
+              "th": "โครงสร้างไฟล์ตรงกับรูปแบบที่อนุมัติแล้วของ X0107 (100%)"
+            },
+            "numbers": {
+              "customer": "X0107",
+              "similarity": null
+            }
+          },
+          {
+            "id": 2,
+            "kind": "rows",
+            "link": "/rounds/rnd_01M6KT35Y4K01DSQRCPWBVXNHA",
+            "text": {
+              "en": "18 records produced",
+              "th": "สร้างได้ 18 รายการ"
+            },
+            "numbers": {
+              "rows_out": 18
+            }
+          },
+          {
+            "id": 3,
+            "kind": "self_check",
+            "link": null,
+            "text": {
+              "en": "The AI ran its mapping on the first 18 rows (0 look(s) at the file, 0 fix round(s)): 0 problem(s) left",
+              "th": "AI ลองรัน mapping กับ 18 แถวแรก (ดูไฟล์ 0 ครั้ง แก้ 0 รอบ): เหลือปัญหา 0 ข้อ"
+            },
+            "numbers": {
+              "rows": 18,
+              "fix_rounds": 0,
+              "inspections": 0,
+              "problems_left": 0
+            }
+          },
+          {
+            "id": 4,
+            "kind": "questions",
+            "link": "/review?round=rnd_01M6KT35Y4K01DSQRCPWBVXNHA",
+            "text": {
+              "en": "2 fields below the confidence bar",
+              "th": "2 ฟิลด์ยังไม่ถึงเกณฑ์ความมั่นใจ"
+            },
+            "numbers": {
+              "count": 2
+            }
+          }
+        ],
+        "narrative": null,
+        "conclusion": {
+          "en": "First file from X0207; its layout is the same as X0107's (the same ERP?) — confirm the sender, then 2 fields need a confirmation",
+          "th": "ไฟล์แรกของ X0207 โครงสร้างเหมือนของ X0107 (ERP เดียวกัน?) — ยืนยันผู้ส่ง แล้วมี 2 ฟิลด์ที่ต้องยืนยัน"
+        },
+        "confidence": 0.6,
+        "suppressed": {
+          "count": 0,
+          "groups": [
+            {
+              "text": {
+                "en": "3 notes from the mapper",
+                "th": "หมายเหตุจากตัวจับคู่ 3 ข้อ"
+              },
+              "reason": "open_questions",
+              "pointers": []
+            }
+          ]
+        },
+        "must_decide": [
+          {
+            "id": "/currency",
+            "why": {
+              "en": "Below the confidence bar for its risk",
+              "th": "ความมั่นใจต่ำกว่าเกณฑ์ของระดับความเสี่ยงนี้"
+            },
+            "kind": "choice",
+            "scope": null,
+            "default": null,
+            "options": [
+              "Currency",
+              "Company",
+              "Item",
+              "Unit"
+            ],
+            "question": {
+              "en": "Which column holds ISO currency from the applicable price row.?",
+              "th": "คอลัมน์ไหนคือสกุลเงิน?"
+            },
+            "semantic": "currency",
+            "allow_custom": false,
+            "evidence_ids": [
+              4
+            ],
+            "option_labels": null
+          },
+          {
+            "id": "/sell_unit",
+            "why": {
+              "en": "Below the confidence bar for its risk",
+              "th": "ความมั่นใจต่ำกว่าเกณฑ์ของระดับความเสี่ยงนี้"
+            },
+            "kind": "choice",
+            "scope": null,
+            "default": null,
+            "options": [
+              "Full unit",
+              "Unit",
+              "Company",
+              "Item"
+            ],
+            "question": {
+              "en": "Which column holds Full unit name; ask if the code has no definition.?",
+              "th": "คอลัมน์ไหนคือหน่วยขาย?"
+            },
+            "semantic": "unit.sell",
+            "allow_custom": false,
+            "evidence_ids": [
+              4
+            ],
+            "option_labels": null
+          }
+        ],
+        "rules_fired": [
+          "first_time_shared_layout"
+        ],
+        "round_status": "review",
+        "rules_version": "2026.11.04.1",
+        "mapping_status": "proposed",
+        "policy_decision": "review"
+      },
+      "decision": "review",
+      "learning": null,
+      "priority": 131,
+      "workflow": {
+        "roles": [
+          {
+            "data": {
+              "analysis": {
+                "facts": [],
+                "hypotheses": [],
+                "mapping_guidance": [],
+                "missing_information": []
+              }
+            },
+            "role": "analyst",
+            "outcome": "completed",
+            "elapsed_ms": 805
+          },
+          {
+            "data": {
+              "review": {},
+              "repairs": 0,
+              "mapper_data": {
+                "self_check": {
+                  "errors": 0,
+                  "history": [
+                    {
+                      "turn": "ground",
+                      "columns": 4
+                    },
+                    {
+                      "turn": "mapping",
+                      "complete": true,
+                      "coverage": {
+                        "fields": {
+                          "/sku": {
+                            "risk": "medium",
+                            "records": 18,
+                            "records_filled": 18
+                          },
+                          "/price": {
+                            "risk": "critical",
+                            "records": 18,
+                            "records_filled": 18
+                          },
+                          "/currency": {
+                            "risk": "critical",
+                            "records": 18,
+                            "records_filled": 18
+                          },
+                          "/sell_unit": {
+                            "risk": "high",
+                            "records": 18,
+                            "records_filled": 18
+                          },
+                          "/product_name": {
+                            "risk": "medium",
+                            "records": 18,
+                            "records_filled": 18
+                          },
+                          "/inventory/*/qty": {
+                            "risk": "high",
+                            "records": 18,
+                            "records_filled": 18
+                          },
+                          "/inventory/*/warehouse_code": {
+                            "risk": "high",
+                            "records": 18,
+                            "records_filled": 18
+                          }
+                        },
+                        "sources": {
+                          "stock": 54,
+                          "units": 2,
+                          "master": 18,
+                          "prices": 18
+                        },
+                        "collections": {
+                          "/inventory": 54
+                        },
+                        "invalid_records": 0
+                      },
+                      "problems": [],
+                      "rows_out": 18
+                    }
+                  ],
+                  "complete": true,
+                  "coverage": {
+                    "fields": {
+                      "/sku": {
+                        "risk": "medium",
+                        "records": 18,
+                        "records_filled": 18
+                      },
+                      "/price": {
+                        "risk": "critical",
+                        "records": 18,
+                        "records_filled": 18
+                      },
+                      "/currency": {
+                        "risk": "critical",
+                        "records": 18,
+                        "records_filled": 18
+                      },
+                      "/sell_unit": {
+                        "risk": "high",
+                        "records": 18,
+                        "records_filled": 18
+                      },
+                      "/product_name": {
+                        "risk": "medium",
+                        "records": 18,
+                        "records_filled": 18
+                      },
+                      "/inventory/*/qty": {
+                        "risk": "high",
+                        "records": 18,
+                        "records_filled": 18
+                      },
+                      "/inventory/*/warehouse_code": {
+                        "risk": "high",
+                        "records": 18,
+                        "records_filled": 18
+                      }
+                    },
+                    "sources": {
+                      "stock": 54,
+                      "units": 2,
+                      "master": 18,
+                      "prices": 18
+                    },
+                    "collections": {
+                      "/inventory": 54
+                    },
+                    "invalid_records": 0
+                  },
+                  "grounded": 4,
+                  "rows_out": 18,
+                  "fix_rounds": 0,
+                  "inspections": 0,
+                  "python_turns": 0,
+                  "rows_checked": 18,
+                  "problems_left": [],
+                  "candidate_turns": 0
+                },
+                "clarifications": [],
+                "open_questions": []
+              },
+              "reviewer_turns": 0
+            },
+            "role": "mapper",
+            "outcome": "completed",
+            "elapsed_ms": 940
+          },
+          {
+            "data": {
+              "execution": {
+                "errors": 0,
+                "rows_in": 18,
+                "complete": true,
+                "coverage": {
+                  "fields": {
+                    "/sku": {
+                      "risk": "medium",
+                      "records": 18,
+                      "records_filled": 18
+                    },
+                    "/price": {
+                      "risk": "critical",
+                      "records": 18,
+                      "records_filled": 18
+                    },
+                    "/currency": {
+                      "risk": "critical",
+                      "records": 18,
+                      "records_filled": 18
+                    },
+                    "/sell_unit": {
+                      "risk": "high",
+                      "records": 18,
+                      "records_filled": 18
+                    },
+                    "/product_name": {
+                      "risk": "medium",
+                      "records": 18,
+                      "records_filled": 18
+                    },
+                    "/inventory/*/qty": {
+                      "risk": "high",
+                      "records": 18,
+                      "records_filled": 18
+                    },
+                    "/inventory/*/warehouse_code": {
+                      "risk": "high",
+                      "records": 18,
+                      "records_filled": 18
+                    }
+                  },
+                  "sources": {
+                    "stock": 54,
+                    "units": 2,
+                    "master": 18,
+                    "prices": 18
+                  },
+                  "collections": {
+                    "/inventory": 54
+                  },
+                  "invalid_records": 0
+                },
+                "problems": [],
+                "rows_out": 18,
+                "problem_count": 0,
+                "sample_records": [
+                  {
+                    "sku": "SG-000009",
+                    "price": 73.5,
+                    "currency": "MYR",
+                    "inventory": [
+                      {
+                        "qty": 147.0,
+                        "warehouse_code": "MY-01"
+                      },
+                      {
+                        "qty": 149.0,
+                        "warehouse_code": "MY-03"
+                      },
+                      {
+                        "qty": 148.0,
+                        "warehouse_code": "MY-02"
+                      }
+                    ],
+                    "sell_unit": "BOTTLE",
+                    "product_name": "Kopi SG 018 / 7"
+                  },
+                  {
+                    "sku": "SG-000006",
+                    "price": 69.75,
+                    "currency": "MYR",
+                    "inventory": [
+                      {
+                        "qty": 126.0,
+                        "warehouse_code": "MY-01"
+                      },
+                      {
+                        "qty": 128.0,
+                        "warehouse_code": "MY-03"
+                      },
+                      {
+                        "qty": 127.0,
+                        "warehouse_code": "MY-02"
+                      }
+                    ],
+                    "sell_unit": "PIECE",
+                    "product_name": "Kopi SG 015 / 7"
+                  },
+                  {
+                    "sku": "MY-000004",
+                    "price": 56.0,
+                    "currency": "MYR",
+                    "inventory": [
+                      {
+                        "qty": 51.0,
+                        "warehouse_code": "MY-03"
+                      },
+                      {
+                        "qty": 49.0,
+                        "warehouse_code": "MY-01"
+                      },
+                      {
+                        "qty": 50.0,
+                        "warehouse_code": "MY-02"
+                      }
+                    ],
+                    "sell_unit": "BOTTLE",
+                    "product_name": "Kopi MY 004 / 7"
+                  }
+                ]
+              }
+            },
+            "role": "execute",
+            "outcome": "completed",
+            "elapsed_ms": 353
+          },
+          {
+            "data": {
+              "review": {
+                "checked": [
+                  "Scripted model only; real engine verification remains mandatory."
+                ],
+                "verdict": "pass",
+                "concerns": [],
+                "clarifications": []
+              }
+            },
+            "role": "reviewer",
+            "outcome": "completed",
+            "elapsed_ms": 104
+          }
+        ],
+        "review": {
+          "checked": [
+            "Scripted model only; real engine verification remains mandatory."
+          ],
+          "verdict": "pass",
+          "concerns": [],
+          "clarifications": []
+        },
+        "status": "verified_proposal",
+        "repairs": 0,
+        "version": "2026.11.04.2",
+        "analysis": {
+          "facts": [],
+          "hypotheses": [],
+          "mapping_guidance": [],
+          "missing_information": []
+        },
+        "evidence": [],
+        "thread_id": "mapping-8fc7bfc604b28385",
+        "human_resume": "existing versioned question preview/apply service; no automatic approval",
+        "provider_attempts": 3,
+        "usage_unknown_attempts": 0
+      },
+      "agreement": {
+        "ops": [],
+        "agree": [],
+        "record": {
+          "root": {
+            "model": {
+              "file": "fil_01M6KT35Y9T3EFP5B7BP34WWYV",
+              "sheet": "item master 7",
+              "filter": null,
+              "rename": {},
+              "unpivot": null,
+              "data_end": null,
+              "fill_down": [],
+              "data_start": null,
+              "last_column": null,
+              "first_column": null
+            },
+            "matcher": {
+              "file": "fil_01M6KT35Y9T3EFP5B7BP34WWYV",
+              "sheet": "item master 7",
+              "filter": null,
+              "rename": {},
+              "unpivot": null,
+              "data_end": null,
+              "fill_down": [],
+              "data_start": null,
+              "last_column": 5,
+              "first_column": 0
+            }
+          },
+          "joins": {
+            "model": [
+              {
+                "on": [
+                  {
+                    "left": "Company",
+                    "right": "Company"
+                  },
+                  {
+                    "left": "Item",
+                    "right": "Item"
+                  }
+                ],
+                "how": "left",
+                "left": {
+                  "file": "fil_01M6KT35Y9T3EFP5B7BP34WWYV",
+                  "sheet": "item master 7",
+                  "filter": null,
+                  "rename": {},
+                  "unpivot": null,
+                  "data_end": null,
+                  "fill_down": [],
+                  "data_start": null,
+                  "last_column": null,
+                  "first_column": null
+                },
+                "right": {
+                  "file": "fil_01M6KT35Y9T3EFP5B7BP34WWYV",
+                  "sheet": "price list 7",
+                  "filter": null,
+                  "rename": {},
+                  "unpivot": null,
+                  "data_end": null,
+                  "fill_down": [],
+                  "data_start": null,
+                  "last_column": null,
+                  "first_column": null
+                },
+                "cardinality": "1:1",
+                "on_unmatched": "review",
+                "normalize_keys": [
+                  "trim",
+                  "upper"
+                ]
+              },
+              {
+                "on": [
+                  {
+                    "left": "Unit",
+                    "right": "Unit"
+                  }
+                ],
+                "how": "left",
+                "left": {
+                  "file": "fil_01M6KT35Y9T3EFP5B7BP34WWYV",
+                  "sheet": "item master 7",
+                  "filter": null,
+                  "rename": {},
+                  "unpivot": null,
+                  "data_end": null,
+                  "fill_down": [],
+                  "data_start": null,
+                  "last_column": null,
+                  "first_column": null
+                },
+                "right": {
+                  "file": "fil_01M6KT35Y9T3EFP5B7BP34WWYV",
+                  "sheet": "unit dictionary 7",
+                  "filter": null,
+                  "rename": {},
+                  "unpivot": null,
+                  "data_end": null,
+                  "fill_down": [],
+                  "data_start": null,
+                  "last_column": null,
+                  "first_column": null
+                },
+                "cardinality": "N:1",
+                "on_unmatched": "review",
+                "normalize_keys": [
+                  "trim",
+                  "upper"
+                ]
+              }
+            ],
+            "matcher": []
+          },
+          "dedupe": {
+            "model": {
+              "keep": "error",
+              "keys": [
+                "/sku"
+              ]
+            },
+            "matcher": {
+              "keep": "first",
+              "keys": []
+            }
+          }
+        },
+        "dropped": [],
+        "disagree": {
+          "/sku": {
+            "model": [
+              "master.Material Code"
+            ],
+            "matcher": [
+              "Item Master 7.Material Code"
+            ]
+          },
+          "/currency": {
+            "model": [
+              "prices.Currency"
+            ],
+            "matcher": [
+              "{\"op\": \"const\", \"value\": \"THB\"}"
+            ]
+          },
+          "/sell_unit": {
+            "model": [
+              "units.Full unit"
+            ],
+            "matcher": [
+              "Item Master 7.Unit"
+            ]
+          },
+          "/product_name": {
+            "model": [
+              "master.Product Name"
+            ],
+            "matcher": [
+              "Item Master 7.Product Name"
+            ]
+          }
+        },
+        "model_only": [
+          "/inventory/*/qty",
+          "/inventory/*/warehouse_code",
+          "/price"
+        ]
+      },
+      "risk_level": "high",
+      "risk_score": 1.0,
+      "self_check": {
+        "errors": 0,
+        "history": [
+          {
+            "turn": "ground",
+            "columns": 4
+          },
+          {
+            "turn": "mapping",
+            "complete": true,
+            "coverage": {
+              "fields": {
+                "/sku": {
+                  "risk": "medium",
+                  "records": 18,
+                  "records_filled": 18
+                },
+                "/price": {
+                  "risk": "critical",
+                  "records": 18,
+                  "records_filled": 18
+                },
+                "/currency": {
+                  "risk": "critical",
+                  "records": 18,
+                  "records_filled": 18
+                },
+                "/sell_unit": {
+                  "risk": "high",
+                  "records": 18,
+                  "records_filled": 18
+                },
+                "/product_name": {
+                  "risk": "medium",
+                  "records": 18,
+                  "records_filled": 18
+                },
+                "/inventory/*/qty": {
+                  "risk": "high",
+                  "records": 18,
+                  "records_filled": 18
+                },
+                "/inventory/*/warehouse_code": {
+                  "risk": "high",
+                  "records": 18,
+                  "records_filled": 18
+                }
+              },
+              "sources": {
+                "stock": 54,
+                "units": 2,
+                "master": 18,
+                "prices": 18
+              },
+              "collections": {
+                "/inventory": 54
+              },
+              "invalid_records": 0
+            },
+            "problems": [],
+            "rows_out": 18
+          }
+        ],
+        "complete": true,
+        "coverage": {
+          "fields": {
+            "/sku": {
+              "risk": "medium",
+              "records": 18,
+              "records_filled": 18
+            },
+            "/price": {
+              "risk": "critical",
+              "records": 18,
+              "records_filled": 18
+            },
+            "/currency": {
+              "risk": "critical",
+              "records": 18,
+              "records_filled": 18
+            },
+            "/sell_unit": {
+              "risk": "high",
+              "records": 18,
+              "records_filled": 18
+            },
+            "/product_name": {
+              "risk": "medium",
+              "records": 18,
+              "records_filled": 18
+            },
+            "/inventory/*/qty": {
+              "risk": "high",
+              "records": 18,
+              "records_filled": 18
+            },
+            "/inventory/*/warehouse_code": {
+              "risk": "high",
+              "records": 18,
+              "records_filled": 18
+            }
+          },
+          "sources": {
+            "stock": 54,
+            "units": 2,
+            "master": 18,
+            "prices": 18
+          },
+          "collections": {
+            "/inventory": 54
+          },
+          "invalid_records": 0
+        },
+        "grounded": 4,
+        "rows_out": 18,
+        "fix_rounds": 0,
+        "inspections": 0,
+        "python_turns": 0,
+        "rows_checked": 18,
+        "problems_left": [],
+        "candidate_turns": 0
+      },
+      "simulation": {
+        "fill": {
+          "/sku": 1.0,
+          "/price": 1.0,
+          "/currency": 1.0,
+          "/sell_unit": 1.0,
+          "/product_name": 1.0,
+          "/inventory/*/qty": 1.0,
+          "/inventory/*/warehouse_code": 1.0
+        },
+        "rows_in": 18,
+        "sources": {
+          "stock": 54,
+          "units": 2,
+          "master": 18,
+          "prices": 18
+        },
+        "complete": true,
+        "findings": {
+          "info": 0,
+          "error": 0,
+          "warning": 0
+        },
+        "rows_out": 18,
+        "collections": {
+          "/inventory": 54
+        },
+        "duration_ms": 405.2,
+        "identity_keys": [
+          "/sku"
+        ],
+        "invalid_records": 0
+      },
+      "reused_from": null,
+      "field_review": null,
+      "risk_factors": [
+        "ambiguous critical field (price, discount, identity …)"
+      ],
+      "verification": {
+        "scope": "Execution and contract checks; business ambiguities require operator answers",
+        "passed": true,
+        "version": 1,
+        "complete": true,
+        "coverage": {
+          "fields": {
+            "/sku": {
+              "risk": "medium",
+              "records": 18,
+              "records_filled": 18
+            },
+            "/price": {
+              "risk": "critical",
+              "records": 18,
+              "records_filled": 18
+            },
+            "/currency": {
+              "risk": "critical",
+              "records": 18,
+              "records_filled": 18
+            },
+            "/sell_unit": {
+              "risk": "high",
+              "records": 18,
+              "records_filled": 18
+            },
+            "/product_name": {
+              "risk": "medium",
+              "records": 18,
+              "records_filled": 18
+            },
+            "/inventory/*/qty": {
+              "risk": "high",
+              "records": 18,
+              "records_filled": 18
+            },
+            "/inventory/*/warehouse_code": {
+              "risk": "high",
+              "records": 18,
+              "records_filled": 18
+            }
+          },
+          "sources": {
+            "stock": 54,
+            "units": 2,
+            "master": 18,
+            "prices": 18
+          },
+          "collections": {
+            "/inventory": 54
+          },
+          "invalid_records": 0
+        },
+        "problems": [],
+        "rows_out": 18,
+        "warnings": [],
+        "rows_checked": 18,
+        "semantic_checks": {
+          "limitation": "Passing these checks does not prove column meaning. Missing business intent still requires an operator decision.",
+          "contract_rules": [],
+          "source_identity_warnings": []
+        }
+      },
+      "clarifications": [],
+      "confidence_basis": {
+        "capped": [
+          "/sku",
+          "/product_name",
+          "/currency",
+          "/sell_unit"
+        ],
+        "raised": [],
+        "mapping_capped": false
+      },
+      "review_decisions": [],
+      "target_schema_hash": "7ba0bb6f0232b42f",
+      "confirmed_decisions": []
+    },
+    "open_questions": [
+      "Sheet 'Price List 7' has a currency column 'Currency' (MYR), but records are labelled THB: confirm",
+      "Sheet 'Delivery Notes 7' has a currency column 'Target currency' (Effective date, Price list, Stock basis), but records are labelled THB: confirm",
+      "Table 'Warehouse Balances 7' looks like inventory but no column links to root key 'Material Code'"
+    ],
+    "validation": {
+      "ok": true,
+      "issues": []
+    },
+    "parent_id": null,
+    "approved_by": null,
+    "approved_at": null,
+    "comment": null,
+    "created_at": "2026-11-04T17:36:08.164377+00:00",
+    "agent_log": [
+      {
+        "agent": "heuristic",
+        "unmatched": {
+          "inventory": [
+            "Company",
+            "Item",
+            "Warehouse",
+            "Lot",
+            "Quantity"
+          ],
+          "products_0": [
+            "Company",
+            "Item"
+          ],
+          "products_1": [
+            "Company",
+            "Item",
+            "Selling price",
+            "Currency",
+            "Price list",
+            "Valid from",
+            "Valid to"
+          ],
+          "products_3": [
+            "Unit",
+            "Full unit"
+          ]
+        },
+        "confidence": 0.5700000000000001,
+        "table_roles": {
+          "0": "products",
+          "1": "products",
+          "2": "inventory",
+          "3": "products",
+          "4": "other"
+        }
+      },
+      {
+        "data": {
+          "workflow": {
+            "roles": [
+              {
+                "data": {
+                  "analysis": {
+                    "facts": [],
+                    "hypotheses": [],
+                    "mapping_guidance": [],
+                    "missing_information": []
+                  }
+                },
+                "role": "analyst",
+                "outcome": "completed",
+                "elapsed_ms": 805
+              },
+              {
+                "data": {
+                  "review": {},
+                  "repairs": 0,
+                  "mapper_data": {
+                    "self_check": {
+                      "errors": 0,
+                      "history": [
+                        {
+                          "turn": "ground",
+                          "columns": 4
+                        },
+                        {
+                          "turn": "mapping",
+                          "complete": true,
+                          "coverage": {
+                            "fields": {
+                              "/sku": {
+                                "risk": "medium",
+                                "records": 18,
+                                "records_filled": 18
+                              },
+                              "/price": {
+                                "risk": "critical",
+                                "records": 18,
+                                "records_filled": 18
+                              },
+                              "/currency": {
+                                "risk": "critical",
+                                "records": 18,
+                                "records_filled": 18
+                              },
+                              "/sell_unit": {
+                                "risk": "high",
+                                "records": 18,
+                                "records_filled": 18
+                              },
+                              "/product_name": {
+                                "risk": "medium",
+                                "records": 18,
+                                "records_filled": 18
+                              },
+                              "/inventory/*/qty": {
+                                "risk": "high",
+                                "records": 18,
+                                "records_filled": 18
+                              },
+                              "/inventory/*/warehouse_code": {
+                                "risk": "high",
+                                "records": 18,
+                                "records_filled": 18
+                              }
+                            },
+                            "sources": {
+                              "stock": 54,
+                              "units": 2,
+                              "master": 18,
+                              "prices": 18
+                            },
+                            "collections": {
+                              "/inventory": 54
+                            },
+                            "invalid_records": 0
+                          },
+                          "problems": [],
+                          "rows_out": 18
+                        }
+                      ],
+                      "complete": true,
+                      "coverage": {
+                        "fields": {
+                          "/sku": {
+                            "risk": "medium",
+                            "records": 18,
+                            "records_filled": 18
+                          },
+                          "/price": {
+                            "risk": "critical",
+                            "records": 18,
+                            "records_filled": 18
+                          },
+                          "/currency": {
+                            "risk": "critical",
+                            "records": 18,
+                            "records_filled": 18
+                          },
+                          "/sell_unit": {
+                            "risk": "high",
+                            "records": 18,
+                            "records_filled": 18
+                          },
+                          "/product_name": {
+                            "risk": "medium",
+                            "records": 18,
+                            "records_filled": 18
+                          },
+                          "/inventory/*/qty": {
+                            "risk": "high",
+                            "records": 18,
+                            "records_filled": 18
+                          },
+                          "/inventory/*/warehouse_code": {
+                            "risk": "high",
+                            "records": 18,
+                            "records_filled": 18
+                          }
+                        },
+                        "sources": {
+                          "stock": 54,
+                          "units": 2,
+                          "master": 18,
+                          "prices": 18
+                        },
+                        "collections": {
+                          "/inventory": 54
+                        },
+                        "invalid_records": 0
+                      },
+                      "grounded": 4,
+                      "rows_out": 18,
+                      "fix_rounds": 0,
+                      "inspections": 0,
+                      "python_turns": 0,
+                      "rows_checked": 18,
+                      "problems_left": [],
+                      "candidate_turns": 0
+                    },
+                    "clarifications": [],
+                    "open_questions": []
+                  },
+                  "reviewer_turns": 0
+                },
+                "role": "mapper",
+                "outcome": "completed",
+                "elapsed_ms": 940
+              },
+              {
+                "data": {
+                  "execution": {
+                    "errors": 0,
+                    "rows_in": 18,
+                    "complete": true,
+                    "coverage": {
+                      "fields": {
+                        "/sku": {
+                          "risk": "medium",
+                          "records": 18,
+                          "records_filled": 18
+                        },
+                        "/price": {
+                          "risk": "critical",
+                          "records": 18,
+                          "records_filled": 18
+                        },
+                        "/currency": {
+                          "risk": "critical",
+                          "records": 18,
+                          "records_filled": 18
+                        },
+                        "/sell_unit": {
+                          "risk": "high",
+                          "records": 18,
+                          "records_filled": 18
+                        },
+                        "/product_name": {
+                          "risk": "medium",
+                          "records": 18,
+                          "records_filled": 18
+                        },
+                        "/inventory/*/qty": {
+                          "risk": "high",
+                          "records": 18,
+                          "records_filled": 18
+                        },
+                        "/inventory/*/warehouse_code": {
+                          "risk": "high",
+                          "records": 18,
+                          "records_filled": 18
+                        }
+                      },
+                      "sources": {
+                        "stock": 54,
+                        "units": 2,
+                        "master": 18,
+                        "prices": 18
+                      },
+                      "collections": {
+                        "/inventory": 54
+                      },
+                      "invalid_records": 0
+                    },
+                    "problems": [],
+                    "rows_out": 18,
+                    "problem_count": 0,
+                    "sample_records": [
+                      {
+                        "sku": "SG-000009",
+                        "price": 73.5,
+                        "currency": "MYR",
+                        "inventory": [
+                          {
+                            "qty": 147.0,
+                            "warehouse_code": "MY-01"
+                          },
+                          {
+                            "qty": 149.0,
+                            "warehouse_code": "MY-03"
+                          },
+                          {
+                            "qty": 148.0,
+                            "warehouse_code": "MY-02"
+                          }
+                        ],
+                        "sell_unit": "BOTTLE",
+                        "product_name": "Kopi SG 018 / 7"
+                      },
+                      {
+                        "sku": "SG-000006",
+                        "price": 69.75,
+                        "currency": "MYR",
+                        "inventory": [
+                          {
+                            "qty": 126.0,
+                            "warehouse_code": "MY-01"
+                          },
+                          {
+                            "qty": 128.0,
+                            "warehouse_code": "MY-03"
+                          },
+                          {
+                            "qty": 127.0,
+                            "warehouse_code": "MY-02"
+                          }
+                        ],
+                        "sell_unit": "PIECE",
+                        "product_name": "Kopi SG 015 / 7"
+                      },
+                      {
+                        "sku": "MY-000004",
+                        "price": 56.0,
+                        "currency": "MYR",
+                        "inventory": [
+                          {
+                            "qty": 51.0,
+                            "warehouse_code": "MY-03"
+                          },
+                          {
+                            "qty": 49.0,
+                            "warehouse_code": "MY-01"
+                          },
+                          {
+                            "qty": 50.0,
+                            "warehouse_code": "MY-02"
+                          }
+                        ],
+                        "sell_unit": "BOTTLE",
+                        "product_name": "Kopi MY 004 / 7"
+                      }
+                    ]
+                  }
+                },
+                "role": "execute",
+                "outcome": "completed",
+                "elapsed_ms": 353
+              },
+              {
+                "data": {
+                  "review": {
+                    "checked": [
+                      "Scripted model only; real engine verification remains mandatory."
+                    ],
+                    "verdict": "pass",
+                    "concerns": [],
+                    "clarifications": []
+                  }
+                },
+                "role": "reviewer",
+                "outcome": "completed",
+                "elapsed_ms": 104
+              }
+            ],
+            "review": {
+              "checked": [
+                "Scripted model only; real engine verification remains mandatory."
+              ],
+              "verdict": "pass",
+              "concerns": [],
+              "clarifications": []
+            },
+            "status": "verified_proposal",
+            "repairs": 0,
+            "version": "2026.11.04.2",
+            "analysis": {
+              "facts": [],
+              "hypotheses": [],
+              "mapping_guidance": [],
+              "missing_information": []
+            },
+            "evidence": [],
+            "thread_id": "mapping-8fc7bfc604b28385",
+            "human_resume": "existing versioned question preview/apply service; no automatic approval",
+            "provider_attempts": 3,
+            "usage_unknown_attempts": 0
+          },
+          "self_check": {
+            "errors": 0,
+            "history": [
+              {
+                "turn": "ground",
+                "columns": 4
+              },
+              {
+                "turn": "mapping",
+                "complete": true,
+                "coverage": {
+                  "fields": {
+                    "/sku": {
+                      "risk": "medium",
+                      "records": 18,
+                      "records_filled": 18
+                    },
+                    "/price": {
+                      "risk": "critical",
+                      "records": 18,
+                      "records_filled": 18
+                    },
+                    "/currency": {
+                      "risk": "critical",
+                      "records": 18,
+                      "records_filled": 18
+                    },
+                    "/sell_unit": {
+                      "risk": "high",
+                      "records": 18,
+                      "records_filled": 18
+                    },
+                    "/product_name": {
+                      "risk": "medium",
+                      "records": 18,
+                      "records_filled": 18
+                    },
+                    "/inventory/*/qty": {
+                      "risk": "high",
+                      "records": 18,
+                      "records_filled": 18
+                    },
+                    "/inventory/*/warehouse_code": {
+                      "risk": "high",
+                      "records": 18,
+                      "records_filled": 18
+                    }
+                  },
+                  "sources": {
+                    "stock": 54,
+                    "units": 2,
+                    "master": 18,
+                    "prices": 18
+                  },
+                  "collections": {
+                    "/inventory": 54
+                  },
+                  "invalid_records": 0
+                },
+                "problems": [],
+                "rows_out": 18
+              }
+            ],
+            "complete": true,
+            "coverage": {
+              "fields": {
+                "/sku": {
+                  "risk": "medium",
+                  "records": 18,
+                  "records_filled": 18
+                },
+                "/price": {
+                  "risk": "critical",
+                  "records": 18,
+                  "records_filled": 18
+                },
+                "/currency": {
+                  "risk": "critical",
+                  "records": 18,
+                  "records_filled": 18
+                },
+                "/sell_unit": {
+                  "risk": "high",
+                  "records": 18,
+                  "records_filled": 18
+                },
+                "/product_name": {
+                  "risk": "medium",
+                  "records": 18,
+                  "records_filled": 18
+                },
+                "/inventory/*/qty": {
+                  "risk": "high",
+                  "records": 18,
+                  "records_filled": 18
+                },
+                "/inventory/*/warehouse_code": {
+                  "risk": "high",
+                  "records": 18,
+                  "records_filled": 18
+                }
+              },
+              "sources": {
+                "stock": 54,
+                "units": 2,
+                "master": 18,
+                "prices": 18
+              },
+              "collections": {
+                "/inventory": 54
+              },
+              "invalid_records": 0
+            },
+            "grounded": 4,
+            "rows_out": 18,
+            "fix_rounds": 0,
+            "inspections": 0,
+            "python_turns": 0,
+            "rows_checked": 18,
+            "problems_left": [],
+            "candidate_turns": 0
+          },
+          "clarifications": [],
+          "open_questions": []
+        },
+        "agent": "mapping_workflow",
+        "notes": [],
+        "usage": {
+          "calls": 3,
+          "model": "fake-excel100",
+          "cost_usd": 0.0,
+          "latency_ms": 949.2,
+          "input_tokens": 0,
+          "output_tokens": 0
+        },
+        "attempts": 3
+      },
+      {
+        "ops": 0,
+        "agent": "agreement",
+        "agree": 0,
+        "record": 3,
+        "dropped": 0,
+        "disagree": 4,
+        "model_only": 3
+      },
+      {
+        "agent": "question_reconciliation",
+        "basis": "complete execution, populated source-backed fields and unique identities",
+        "retired": [
+          "No SKU-like header found in root table; using 'Material Code' as identity — confirm"
+        ]
+      }
+    ],
+    "sample": [
+      {
+        "sku": "SG-000009",
+        "price": 73.5,
+        "currency": "MYR",
+        "inventory": [
+          {
+            "qty": 147.0,
+            "warehouse_code": "MY-01"
+          },
+          {
+            "qty": 149.0,
+            "warehouse_code": "MY-03"
+          },
+          {
+            "qty": 148.0,
+            "warehouse_code": "MY-02"
+          }
+        ],
+        "sell_unit": "BOTTLE",
+        "source_meta": {
+          "file": "X0207.xlsx",
+          "lineage": {
+            "items": {
+              "/inventory": [
+                5,
+                10,
+                29
+              ]
+            },
+            "joined": {
+              "units": 1,
+              "prices": 6
+            },
+            "source": "master",
+            "root_row": 0
+          }
+        },
+        "product_name": "Kopi SG 018 / 7"
+      },
+      {
+        "sku": "SG-000006",
+        "price": 69.75,
+        "currency": "MYR",
+        "inventory": [
+          {
+            "qty": 126.0,
+            "warehouse_code": "MY-01"
+          },
+          {
+            "qty": 128.0,
+            "warehouse_code": "MY-03"
+          },
+          {
+            "qty": 127.0,
+            "warehouse_code": "MY-02"
+          }
+        ],
+        "sell_unit": "PIECE",
+        "source_meta": {
+          "file": "X0207.xlsx",
+          "lineage": {
+            "items": {
+              "/inventory": [
+                11,
+                31,
+                48
+              ]
+            },
+            "joined": {
+              "units": 0,
+              "prices": 7
+            },
+            "source": "master",
+            "root_row": 1
+          }
+        },
+        "product_name": "Kopi SG 015 / 7"
+      },
+      {
+        "sku": "MY-000004",
+        "price": 56.0,
+        "currency": "MYR",
+        "inventory": [
+          {
+            "qty": 51.0,
+            "warehouse_code": "MY-03"
+          },
+          {
+            "qty": 49.0,
+            "warehouse_code": "MY-01"
+          },
+          {
+            "qty": 50.0,
+            "warehouse_code": "MY-02"
+          }
+        ],
+        "sell_unit": "BOTTLE",
+        "source_meta": {
+          "file": "X0207.xlsx",
+          "lineage": {
+            "items": {
+              "/inventory": [
+                1,
+                2,
+                22
+              ]
+            },
+            "joined": {
+              "units": 1,
+              "prices": 5
+            },
+            "source": "master",
+            "root_row": 2
+          }
+        },
+        "product_name": "Kopi MY 004 / 7"
+      },
+      {
+        "sku": "SG-000001",
+        "price": 63.5,
+        "currency": "MYR",
+        "inventory": [
+          {
+            "qty": 92.0,
+            "warehouse_code": "MY-02"
+          },
+          {
+            "qty": 93.0,
+            "warehouse_code": "MY-03"
+          },
+          {
+            "qty": 91.0,
+            "warehouse_code": "MY-01"
+          }
+        ],
+        "sell_unit": "BOTTLE",
+        "source_meta": {
+          "file": "X0207.xlsx",
+          "lineage": {
+            "items": {
+              "/inventory": [
+                28,
+                30,
+                53
+              ]
+            },
+            "joined": {
+              "units": 1,
+              "prices": 1
+            },
+            "source": "master",
+            "root_row": 3
+          }
+        },
+        "product_name": "Kopi SG 010 / 7"
+      },
+      {
+        "sku": "MY-000003",
+        "price": 54.75,
+        "currency": "MYR",
+        "inventory": [
+          {
+            "qty": 42.0,
+            "warehouse_code": "MY-01"
+          },
+          {
+            "qty": 43.0,
+            "warehouse_code": "MY-02"
+          },
+          {
+            "qty": 44.0,
+            "warehouse_code": "MY-03"
+          }
+        ],
+        "sell_unit": "PIECE",
+        "source_meta": {
+          "file": "X0207.xlsx",
+          "lineage": {
+            "items": {
+              "/inventory": [
+                4,
+                36,
+                43
+              ]
+            },
+            "joined": {
+              "units": 0,
+              "prices": 15
+            },
+            "source": "master",
+            "root_row": 4
+          }
+        },
+        "product_name": "Kopi MY 003 / 7"
+      }
+    ],
+    "document": {
+      "meta": {
+        "model": "fake-excel100",
+        "version": 1,
+        "evidence": [],
+        "confidence": 1.0,
+        "created_by": "ai",
+        "customer_id": "cus_01M6KSRRAENBFNTDM1MVXVZ9Q7",
+        "fingerprints": {
+          "stock": "ca3d15aa0ec5df3b",
+          "units": "ca3d15aa0ec5df3b",
+          "master": "ca3d15aa0ec5df3b",
+          "prices": "ca3d15aa0ec5df3b"
+        },
+        "target_schema": "excel100_x0207@1"
+      },
+      "joins": [
+        {
+          "on": [
+            {
+              "left": "Company",
+              "right": "Company"
+            },
+            {
+              "left": "Item",
+              "right": "Item"
+            }
+          ],
+          "how": "left",
+          "left": "master",
+          "right": "prices",
+          "cardinality": "1:1",
+          "on_unmatched": "review",
+          "normalize_keys": [
+            "trim",
+            "upper"
+          ]
+        },
+        {
+          "on": [
+            {
+              "left": "Unit",
+              "right": "Unit"
+            }
+          ],
+          "how": "left",
+          "left": "master",
+          "right": "units",
+          "cardinality": "N:1",
+          "on_unmatched": "review",
+          "normalize_keys": [
+            "trim",
+            "upper"
+          ]
+        }
+      ],
+      "fields": [
+        {
+          "expr": {
+            "op": "col",
+            "name": "Material Code",
+            "source": "master"
+          },
+          "target": "/sku",
+          "evidence": [
+            "Scripted local model contract; verify against source workbook.",
+            "FORMA's matcher read Item Master 7.Material Code instead: confidence 1.00 → 0.70"
+          ],
+          "confidence": 0.7
+        },
+        {
+          "expr": {
+            "op": "col",
+            "name": "Product Name",
+            "source": "master"
+          },
+          "target": "/product_name",
+          "evidence": [
+            "Scripted local model contract; verify against source workbook.",
+            "FORMA's matcher read Item Master 7.Product Name instead: confidence 1.00 → 0.70"
+          ],
+          "confidence": 0.7
+        },
+        {
+          "expr": {
+            "op": "parse_number_th",
+            "args": [
+              {
+                "op": "col",
+                "name": "Selling price",
+                "source": "prices"
+              }
+            ],
+            "params": {}
+          },
+          "target": "/price",
+          "evidence": [
+            "Scripted local model contract; verify against source workbook."
+          ],
+          "confidence": 1.0
+        },
+        {
+          "expr": {
+            "op": "col",
+            "name": "Currency",
+            "source": "prices"
+          },
+          "target": "/currency",
+          "evidence": [
+            "Scripted local model contract; verify against source workbook.",
+            "FORMA's matcher read {\"op\": \"const\", \"value\": \"THB\"} instead: confidence 1.00 → 0.70"
+          ],
+          "confidence": 0.7
+        },
+        {
+          "expr": {
+            "op": "col",
+            "name": "Full unit",
+            "source": "units"
+          },
+          "target": "/sell_unit",
+          "evidence": [
+            "Scripted local model contract; verify against source workbook.",
+            "FORMA's matcher read Item Master 7.Unit instead: confidence 1.00 → 0.70"
+          ],
+          "confidence": 0.7
+        }
+      ],
+      "record": {
+        "dedupe": {
+          "keep": "error",
+          "keys": [
+            "/sku"
+          ]
+        },
+        "filters": [],
+        "root_source": "master"
+      },
+      "quality": [],
+      "sources": [
+        {
+          "id": "master",
+          "csv": {
+            "encoding": "auto",
+            "delimiter": "auto",
+            "quote_char": "\""
+          },
+          "file": {
+            "sheet_names_any": []
+          },
+          "role": "products",
+          "sheet": {
+            "name": "Item Master 7"
+          },
+          "table": {
+            "fill_down": [],
+            "header_row": 0,
+            "header_rows": 1,
+            "drop_total_rows": true,
+            "drop_empty_columns": true,
+            "stop_at_blank_rows": 2,
+            "drop_repeated_headers": true
+          },
+          "rename": {}
+        },
+        {
+          "id": "prices",
+          "csv": {
+            "encoding": "auto",
+            "delimiter": "auto",
+            "quote_char": "\""
+          },
+          "file": {
+            "sheet_names_any": []
+          },
+          "role": "pricing",
+          "sheet": {
+            "name": "Price List 7"
+          },
+          "table": {
+            "fill_down": [],
+            "header_row": 0,
+            "header_rows": 1,
+            "drop_total_rows": true,
+            "drop_empty_columns": true,
+            "stop_at_blank_rows": 2,
+            "drop_repeated_headers": true
+          },
+          "rename": {}
+        },
+        {
+          "id": "stock",
+          "csv": {
+            "encoding": "auto",
+            "delimiter": "auto",
+            "quote_char": "\""
+          },
+          "file": {
+            "sheet_names_any": []
+          },
+          "role": "inventory",
+          "sheet": {
+            "name": "Warehouse Balances 7"
+          },
+          "table": {
+            "fill_down": [],
+            "header_row": 0,
+            "header_rows": 1,
+            "drop_total_rows": true,
+            "drop_empty_columns": true,
+            "stop_at_blank_rows": 2,
+            "drop_repeated_headers": true
+          },
+          "rename": {}
+        },
+        {
+          "id": "units",
+          "csv": {
+            "encoding": "auto",
+            "delimiter": "auto",
+            "quote_char": "\""
+          },
+          "file": {
+            "sheet_names_any": []
+          },
+          "role": "other",
+          "sheet": {
+            "name": "Unit Dictionary 7"
+          },
+          "table": {
+            "fill_down": [],
+            "header_row": 0,
+            "header_rows": 1,
+            "drop_total_rows": true,
+            "drop_empty_columns": true,
+            "stop_at_blank_rows": 2,
+            "drop_repeated_headers": true
+          },
+          "rename": {}
+        }
+      ],
+      "provenance": true,
+      "collections": [
+        {
+          "link": [
+            {
+              "left": "Company",
+              "right": "Company"
+            },
+            {
+              "left": "Item",
+              "right": "Item"
+            }
+          ],
+          "fields": [
+            {
+              "expr": {
+                "op": "col",
+                "name": "Warehouse",
+                "source": "stock"
+              },
+              "target": "/inventory/*/warehouse_code",
+              "evidence": [
+                "Scripted local model contract; verify against source workbook."
+              ],
+              "confidence": 1.0
+            },
+            {
+              "expr": {
+                "op": "parse_number_th",
+                "args": [
+                  {
+                    "op": "col",
+                    "name": "Quantity",
+                    "source": "stock"
+                  }
+                ],
+                "params": {}
+              },
+              "target": "/inventory/*/qty",
+              "evidence": [
+                "Scripted local model contract; verify against source workbook."
+              ],
+              "confidence": 1.0
+            }
+          ],
+          "source": "stock",
+          "target": "/inventory",
+          "dedupe_keys": [],
+          "normalize_keys": [
+            "trim",
+            "upper"
+          ]
+        }
+      ],
+      "attributes_passthrough": false
+    }
+  },
+  "questions": {
+    "mapping_id": "map_01M6KT3SXR1VC4GR2REERDZT63",
+    "round_id": "rnd_01M6KT35Y4K01DSQRCPWBVXNHA",
+    "status": "proposed",
+    "blocked": false,
+    "questions": [
+      {
+        "id": "/currency",
+        "field": {
+          "pointer": "/currency",
+          "name": "currency",
+          "json_type": [
+            "string"
+          ],
+          "semantic": "currency",
+          "risk": "critical",
+          "required": true,
+          "nullable": false,
+          "enum": null,
+          "format": null,
+          "synonyms_en": [],
+          "synonyms_th": [],
+          "description": "ISO currency from the applicable price row.",
+          "description_th": null,
+          "in_collection": null,
+          "is_collection": false,
+          "system": false,
+          "default": null,
+          "examples": []
+        },
+        "kind": "choice",
+        "options": [
+          "Currency",
+          "Company",
+          "Item",
+          "Unit"
+        ],
+        "current": {
+          "op": "col",
+          "name": "Currency",
+          "source": "prices"
+        },
+        "evidence": [
+          "Scripted local model contract; verify against source workbook.",
+          "FORMA's matcher read {\"op\": \"const\", \"value\": \"THB\"} instead: confidence 1.00 → 0.70",
+          "FORMA's matcher read {\"op\": \"const\", \"value\": \"THB\"} for this field",
+          "ตัวอย่างจากคอลัมน์ Currency: MYR"
+        ],
+        "note": null,
+        "contested": true,
+        "source_examples": [
+          {
+            "source": "prices",
+            "column": "Currency",
+            "values": [
+              "MYR"
+            ],
+            "scope": "profile samples; not all rows"
+          }
+        ]
+      },
+      {
+        "id": "/sell_unit",
+        "field": {
+          "pointer": "/sell_unit",
+          "name": "sell_unit",
+          "json_type": [
+            "string"
+          ],
+          "semantic": "unit.sell",
+          "risk": "high",
+          "required": true,
+          "nullable": false,
+          "enum": null,
+          "format": null,
+          "synonyms_en": [],
+          "synonyms_th": [],
+          "description": "Full unit name; ask if the code has no definition.",
+          "description_th": null,
+          "in_collection": null,
+          "is_collection": false,
+          "system": false,
+          "default": null,
+          "examples": []
+        },
+        "kind": "choice",
+        "options": [
+          "Full unit",
+          "Unit",
+          "Company",
+          "Item"
+        ],
+        "current": {
+          "op": "col",
+          "name": "Full unit",
+          "source": "units"
+        },
+        "evidence": [
+          "Scripted local model contract; verify against source workbook.",
+          "FORMA's matcher read Item Master 7.Unit instead: confidence 1.00 → 0.70",
+          "FORMA's matcher read Unit for this field",
+          "ตัวอย่างจากคอลัมน์ Full unit: PIECE · BOTTLE"
+        ],
+        "note": null,
+        "contested": true,
+        "source_examples": [
+          {
+            "source": "units",
+            "column": "Full unit",
+            "values": [
+              "PIECE",
+              "BOTTLE"
+            ],
+            "scope": "profile samples; not all rows"
+          }
+        ]
+      }
+    ],
+    "open_questions": [
+      "Sheet 'Price List 7' has a currency column 'Currency' (MYR), but records are labelled THB: confirm",
+      "Sheet 'Delivery Notes 7' has a currency column 'Target currency' (Effective date, Price list, Stock basis), but records are labelled THB: confirm",
+      "Table 'Warehouse Balances 7' looks like inventory but no column links to root key 'Material Code'"
+    ],
+    "reasons": [
+      "low confidence on critical fields: /currency (0.70)",
+      "low confidence on high-risk fields: /sell_unit (0.70)",
+      "structure is identical to customer X0107's approved format — confirm this file belongs here",
+      "first time this customer/format is seen",
+      "3 questions still need operator confirmation",
+      "the model selects rows differently from FORMA's matcher (records: dedupe; records: joins; records: root)"
+    ],
+    "sample": [
+      {
+        "sku": "SG-000009",
+        "price": 73.5,
+        "currency": "MYR",
+        "inventory": [
+          {
+            "qty": 147.0,
+            "warehouse_code": "MY-01"
+          },
+          {
+            "qty": 149.0,
+            "warehouse_code": "MY-03"
+          },
+          {
+            "qty": 148.0,
+            "warehouse_code": "MY-02"
+          }
+        ],
+        "sell_unit": "BOTTLE",
+        "source_meta": {
+          "file": "X0207.xlsx",
+          "lineage": {
+            "items": {
+              "/inventory": [
+                5,
+                10,
+                29
+              ]
+            },
+            "joined": {
+              "units": 1,
+              "prices": 6
+            },
+            "source": "master",
+            "root_row": 0
+          }
+        },
+        "product_name": "Kopi SG 018 / 7"
+      },
+      {
+        "sku": "SG-000006",
+        "price": 69.75,
+        "currency": "MYR",
+        "inventory": [
+          {
+            "qty": 126.0,
+            "warehouse_code": "MY-01"
+          },
+          {
+            "qty": 128.0,
+            "warehouse_code": "MY-03"
+          },
+          {
+            "qty": 127.0,
+            "warehouse_code": "MY-02"
+          }
+        ],
+        "sell_unit": "PIECE",
+        "source_meta": {
+          "file": "X0207.xlsx",
+          "lineage": {
+            "items": {
+              "/inventory": [
+                11,
+                31,
+                48
+              ]
+            },
+            "joined": {
+              "units": 0,
+              "prices": 7
+            },
+            "source": "master",
+            "root_row": 1
+          }
+        },
+        "product_name": "Kopi SG 015 / 7"
+      },
+      {
+        "sku": "MY-000004",
+        "price": 56.0,
+        "currency": "MYR",
+        "inventory": [
+          {
+            "qty": 51.0,
+            "warehouse_code": "MY-03"
+          },
+          {
+            "qty": 49.0,
+            "warehouse_code": "MY-01"
+          },
+          {
+            "qty": 50.0,
+            "warehouse_code": "MY-02"
+          }
+        ],
+        "sell_unit": "BOTTLE",
+        "source_meta": {
+          "file": "X0207.xlsx",
+          "lineage": {
+            "items": {
+              "/inventory": [
+                1,
+                2,
+                22
+              ]
+            },
+            "joined": {
+              "units": 1,
+              "prices": 5
+            },
+            "source": "master",
+            "root_row": 2
+          }
+        },
+        "product_name": "Kopi MY 004 / 7"
+      }
+    ],
+    "context": {
+      "customer": {
+        "code": "X0207",
+        "name": "Excel100 X0207"
+      },
+      "round_label": "Excel100 complex suite · X0207.xlsx",
+      "files": [
+        {
+          "id": "fil_01M6KT35Y9T3EFP5B7BP34WWYV",
+          "name": "X0207.xlsx"
+        }
+      ],
+      "mapping_version": 1
+    },
+    "changes": [],
+    "comparison_dataset_id": null,
+    "checks": {
+      "drift": null,
+      "errors": 0,
+      "rows_out": 18,
+      "warnings": 0,
+      "agreement": {
+        "ops": 0,
+        "agree": 0,
+        "record": 3,
+        "dropped": 0,
+        "disagree": 4,
+        "model_only": 3
+      },
+      "llm_fallback": false,
+      "reused_approved": false,
+      "full_verification": true,
+      "mapping_confidence": 1.0,
+      "data_checks_trusted": false,
+      "low_confidence_high": [
+        "/sell_unit (0.70)"
+      ],
+      "unresolved_questions": 3,
+      "plausibility_warnings": 0,
+      "low_confidence_critical": [
+        "/currency (0.70)"
+      ],
+      "verification": {
+        "scope": "Execution and contract checks; business ambiguities require operator answers",
+        "passed": true,
+        "version": 1,
+        "complete": true,
+        "coverage": {
+          "fields": {
+            "/sku": {
+              "risk": "medium",
+              "records": 18,
+              "records_filled": 18
+            },
+            "/price": {
+              "risk": "critical",
+              "records": 18,
+              "records_filled": 18
+            },
+            "/currency": {
+              "risk": "critical",
+              "records": 18,
+              "records_filled": 18
+            },
+            "/sell_unit": {
+              "risk": "high",
+              "records": 18,
+              "records_filled": 18
+            },
+            "/product_name": {
+              "risk": "medium",
+              "records": 18,
+              "records_filled": 18
+            },
+            "/inventory/*/qty": {
+              "risk": "high",
+              "records": 18,
+              "records_filled": 18
+            },
+            "/inventory/*/warehouse_code": {
+              "risk": "high",
+              "records": 18,
+              "records_filled": 18
+            }
+          },
+          "sources": {
+            "stock": 54,
+            "units": 2,
+            "master": 18,
+            "prices": 18
+          },
+          "collections": {
+            "/inventory": 54
+          },
+          "invalid_records": 0
+        },
+        "problems": [],
+        "rows_out": 18,
+        "warnings": [],
+        "rows_checked": 18,
+        "semantic_checks": {
+          "limitation": "Passing these checks does not prove column meaning. Missing business intent still requires an operator decision.",
+          "contract_rules": [],
+          "source_identity_warnings": []
+        }
+      }
+    },
+    "impact": {},
+    "fields": [
+      {
+        "pointer": "/sku",
+        "name": "sku",
+        "json_type": [
+          "string"
+        ],
+        "semantic": "identity.sku",
+        "risk": "medium",
+        "required": true,
+        "nullable": false,
+        "enum": null,
+        "format": null,
+        "synonyms_en": [],
+        "synonyms_th": [],
+        "description": "Preserve identity including leading zeroes.",
+        "description_th": null,
+        "in_collection": null,
+        "is_collection": false,
+        "system": false,
+        "default": null,
+        "examples": []
+      },
+      {
+        "pointer": "/price",
+        "name": "price",
+        "json_type": [
+          "number"
+        ],
+        "semantic": "price.amount",
+        "risk": "critical",
+        "required": true,
+        "nullable": false,
+        "enum": null,
+        "format": null,
+        "synonyms_en": [],
+        "synonyms_th": [],
+        "description": "Selling price for RETAIL in target currency valid 2026-11-05.",
+        "description_th": null,
+        "in_collection": null,
+        "is_collection": false,
+        "system": false,
+        "default": null,
+        "examples": []
+      },
+      {
+        "pointer": "/currency",
+        "name": "currency",
+        "json_type": [
+          "string"
+        ],
+        "semantic": "currency",
+        "risk": "critical",
+        "required": true,
+        "nullable": false,
+        "enum": null,
+        "format": null,
+        "synonyms_en": [],
+        "synonyms_th": [],
+        "description": "ISO currency from the applicable price row.",
+        "description_th": null,
+        "in_collection": null,
+        "is_collection": false,
+        "system": false,
+        "default": null,
+        "examples": []
+      },
+      {
+        "pointer": "/inventory/*/qty",
+        "name": "qty",
+        "json_type": [
+          "number"
+        ],
+        "semantic": "stock.qty",
+        "risk": "high",
+        "required": true,
+        "nullable": false,
+        "enum": null,
+        "format": null,
+        "synonyms_en": [],
+        "synonyms_th": [],
+        "description": "Individual pieces; sum lots within a warehouse.",
+        "description_th": null,
+        "in_collection": "/inventory",
+        "is_collection": false,
+        "system": false,
+        "default": null,
+        "examples": []
+      },
+      {
+        "pointer": "/inventory/*/warehouse_code",
+        "name": "warehouse_code",
+        "json_type": [
+          "string"
+        ],
+        "semantic": "stock.warehouse",
+        "risk": "high",
+        "required": true,
+        "nullable": false,
+        "enum": null,
+        "format": null,
+        "synonyms_en": [],
+        "synonyms_th": [],
+        "description": "Warehouse code.",
+        "description_th": null,
+        "in_collection": "/inventory",
+        "is_collection": false,
+        "system": false,
+        "default": null,
+        "examples": []
+      },
+      {
+        "pointer": "/sell_unit",
+        "name": "sell_unit",
+        "json_type": [
+          "string"
+        ],
+        "semantic": "unit.sell",
+        "risk": "high",
+        "required": true,
+        "nullable": false,
+        "enum": null,
+        "format": null,
+        "synonyms_en": [],
+        "synonyms_th": [],
+        "description": "Full unit name; ask if the code has no definition.",
+        "description_th": null,
+        "in_collection": null,
+        "is_collection": false,
+        "system": false,
+        "default": null,
+        "examples": []
+      },
+      {
+        "pointer": "/product_name",
+        "name": "product_name",
+        "json_type": [
+          "string"
+        ],
+        "semantic": "product.name",
+        "risk": "medium",
+        "required": true,
+        "nullable": false,
+        "enum": null,
+        "format": null,
+        "synonyms_en": [],
+        "synonyms_th": [],
+        "description": "Use the master product description.",
+        "description_th": null,
+        "in_collection": null,
+        "is_collection": false,
+        "system": false,
+        "default": null,
+        "examples": []
+      }
+    ]
+  },
+  "preview": {
+    "ok": true,
+    "validation": {
+      "ok": true,
+      "issues": []
+    },
+    "records": [
+      {
+        "sku": "SG-000009",
+        "product_name": "Kopi SG 018 / 7",
+        "price": 73.5,
+        "currency": "MYR",
+        "sell_unit": "BOTTLE",
+        "inventory": [
+          {
+            "warehouse_code": "MY-01",
+            "qty": 147.0
+          },
+          {
+            "warehouse_code": "MY-03",
+            "qty": 149.0
+          },
+          {
+            "warehouse_code": "MY-02",
+            "qty": 148.0
+          }
+        ],
+        "source_meta": {
+          "file": "X0207.xlsx",
+          "lineage": {
+            "root_row": 0,
+            "source": "master",
+            "items": {
+              "/inventory": [
+                5,
+                10,
+                29
+              ]
+            },
+            "joined": {
+              "prices": 6,
+              "units": 1
+            }
+          }
+        }
+      },
+      {
+        "sku": "SG-000006",
+        "product_name": "Kopi SG 015 / 7",
+        "price": 69.75,
+        "currency": "MYR",
+        "sell_unit": "PIECE",
+        "inventory": [
+          {
+            "warehouse_code": "MY-01",
+            "qty": 126.0
+          },
+          {
+            "warehouse_code": "MY-03",
+            "qty": 128.0
+          },
+          {
+            "warehouse_code": "MY-02",
+            "qty": 127.0
+          }
+        ],
+        "source_meta": {
+          "file": "X0207.xlsx",
+          "lineage": {
+            "root_row": 1,
+            "source": "master",
+            "items": {
+              "/inventory": [
+                11,
+                31,
+                48
+              ]
+            },
+            "joined": {
+              "prices": 7,
+              "units": 0
+            }
+          }
+        }
+      },
+      {
+        "sku": "MY-000004",
+        "product_name": "Kopi MY 004 / 7",
+        "price": 56.0,
+        "currency": "MYR",
+        "sell_unit": "BOTTLE",
+        "inventory": [
+          {
+            "warehouse_code": "MY-03",
+            "qty": 51.0
+          },
+          {
+            "warehouse_code": "MY-01",
+            "qty": 49.0
+          },
+          {
+            "warehouse_code": "MY-02",
+            "qty": 50.0
+          }
+        ],
+        "source_meta": {
+          "file": "X0207.xlsx",
+          "lineage": {
+            "root_row": 2,
+            "source": "master",
+            "items": {
+              "/inventory": [
+                1,
+                2,
+                22
+              ]
+            },
+            "joined": {
+              "prices": 5,
+              "units": 1
+            }
+          }
+        }
+      },
+      {
+        "sku": "SG-000001",
+        "product_name": "Kopi SG 010 / 7",
+        "price": 63.5,
+        "currency": "MYR",
+        "sell_unit": "BOTTLE",
+        "inventory": [
+          {
+            "warehouse_code": "MY-02",
+            "qty": 92.0
+          },
+          {
+            "warehouse_code": "MY-03",
+            "qty": 93.0
+          },
+          {
+            "warehouse_code": "MY-01",
+            "qty": 91.0
+          }
+        ],
+        "source_meta": {
+          "file": "X0207.xlsx",
+          "lineage": {
+            "root_row": 3,
+            "source": "master",
+            "items": {
+              "/inventory": [
+                28,
+                30,
+                53
+              ]
+            },
+            "joined": {
+              "prices": 1,
+              "units": 1
+            }
+          }
+        }
+      },
+      {
+        "sku": "MY-000003",
+        "product_name": "Kopi MY 003 / 7",
+        "price": 54.75,
+        "currency": "MYR",
+        "sell_unit": "PIECE",
+        "inventory": [
+          {
+            "warehouse_code": "MY-01",
+            "qty": 42.0
+          },
+          {
+            "warehouse_code": "MY-02",
+            "qty": 43.0
+          },
+          {
+            "warehouse_code": "MY-03",
+            "qty": 44.0
+          }
+        ],
+        "source_meta": {
+          "file": "X0207.xlsx",
+          "lineage": {
+            "root_row": 4,
+            "source": "master",
+            "items": {
+              "/inventory": [
+                4,
+                36,
+                43
+              ]
+            },
+            "joined": {
+              "prices": 15,
+              "units": 0
+            }
+          }
+        }
+      },
+      {
+        "sku": "SG-000002",
+        "product_name": "Kopi SG 011 / 7",
+        "price": 64.75,
+        "currency": "MYR",
+        "sell_unit": "PIECE",
+        "inventory": [
+          {
+            "warehouse_code": "MY-03",
+            "qty": 100.0
+          },
+          {
+            "warehouse_code": "MY-02",
+            "qty": 99.0
+          },
+          {
+            "warehouse_code": "MY-01",
+            "qty": 98.0
+          }
+        ],
+        "source_meta": {
+          "file": "X0207.xlsx",
+          "lineage": {
+            "root_row": 5,
+            "source": "master",
+            "items": {
+              "/inventory": [
+                21,
+                33,
+                45
+              ]
+            },
+            "joined": {
+              "prices": 11,
+              "units": 0
+            }
+          }
+        }
+      },
+      {
+        "sku": "SG-000008",
+        "product_name": "Kopi SG 017 / 7",
+        "price": 72.25,
+        "currency": "MYR",
+        "sell_unit": "PIECE",
+        "inventory": [
+          {
+            "warehouse_code": "MY-01",
+            "qty": 140.0
+          },
+          {
+            "warehouse_code": "MY-02",
+            "qty": 141.0
+          },
+          {
+            "warehouse_code": "MY-03",
+            "qty": 142.0
+          }
+        ],
+        "source_meta": {
+          "file": "X0207.xlsx",
+          "lineage": {
+            "root_row": 6,
+            "source": "master",
+            "items": {
+              "/inventory": [
+                32,
+                40,
+                47
+              ]
+            },
+            "joined": {
+              "prices": 16,
+              "units": 0
+            }
+          }
+        }
+      },
+      {
+        "sku": "SG-000005",
+        "product_name": "Kopi SG 014 / 7",
+        "price": 68.5,
+        "currency": "MYR",
+        "sell_unit": "BOTTLE",
+        "inventory": [
+          {
+            "warehouse_code": "MY-01",
+            "qty": 119.0
+          },
+          {
+            "warehouse_code": "MY-02",
+            "qty": 120.0
+          },
+          {
+            "warehouse_code": "MY-03",
+            "qty": 121.0
+          }
+        ],
+        "source_meta": {
+          "file": "X0207.xlsx",
+          "lineage": {
+            "root_row": 7,
+            "source": "master",
+            "items": {
+              "/inventory": [
+                24,
+                25,
+                39
+              ]
+            },
+            "joined": {
+              "prices": 13,
+              "units": 1
+            }
+          }
+        }
+      },
+      {
+        "sku": "SG-000007",
+        "product_name": "Kopi SG 016 / 7",
+        "price": 71.0,
+        "currency": "MYR",
+        "sell_unit": "BOTTLE",
+        "inventory": [
+          {
+            "warehouse_code": "MY-01",
+            "qty": 133.0
+          },
+          {
+            "warehouse_code": "MY-02",
+            "qty": 134.0
+          },
+          {
+            "warehouse_code": "MY-03",
+            "qty": 135.0
+          }
+        ],
+        "source_meta": {
+          "file": "X0207.xlsx",
+          "lineage": {
+            "root_row": 8,
+            "source": "master",
+            "items": {
+              "/inventory": [
+                12,
+                13,
+                17
+              ]
+            },
+            "joined": {
+              "prices": 0,
+              "units": 1
+            }
+          }
+        }
+      },
+      {
+        "sku": "SG-000003",
+        "product_name": "Kopi SG 012 / 7",
+        "price": 66.0,
+        "currency": "MYR",
+        "sell_unit": "BOTTLE",
+        "inventory": [
+          {
+            "warehouse_code": "MY-01",
+            "qty": 105.0
+          },
+          {
+            "warehouse_code": "MY-03",
+            "qty": 107.0
+          },
+          {
+            "warehouse_code": "MY-02",
+            "qty": 106.0
+          }
+        ],
+        "source_meta": {
+          "file": "X0207.xlsx",
+          "lineage": {
+            "root_row": 9,
+            "source": "master",
+            "items": {
+              "/inventory": [
+                37,
+                41,
+                44
+              ]
+            },
+            "joined": {
+              "prices": 2,
+              "units": 1
+            }
+          }
+        }
+      },
+      {
+        "sku": "MY-000007",
+        "product_name": "Kopi MY 007 / 7",
+        "price": 59.75,
+        "currency": "MYR",
+        "sell_unit": "PIECE",
+        "inventory": [
+          {
+            "warehouse_code": "MY-02",
+            "qty": 71.0
+          },
+          {
+            "warehouse_code": "MY-03",
+            "qty": 72.0
+          },
+          {
+            "warehouse_code": "MY-01",
+            "qty": 70.0
+          }
+        ],
+        "source_meta": {
+          "file": "X0207.xlsx",
+          "lineage": {
+            "root_row": 10,
+            "source": "master",
+            "items": {
+              "/inventory": [
+                8,
+                9,
+                14
+              ]
+            },
+            "joined": {
+              "prices": 9,
+              "units": 0
+            }
+          }
+        }
+      },
+      {
+        "sku": "SG-000004",
+        "product_name": "Kopi SG 013 / 7",
+        "price": 67.25,
+        "currency": "MYR",
+        "sell_unit": "PIECE",
+        "inventory": [
+          {
+            "warehouse_code": "MY-02",
+            "qty": 113.0
+          },
+          {
+            "warehouse_code": "MY-01",
+            "qty": 112.0
+          },
+          {
+            "warehouse_code": "MY-03",
+            "qty": 114.0
+          }
+        ],
+        "source_meta": {
+          "file": "X0207.xlsx",
+          "lineage": {
+            "root_row": 11,
+            "source": "master",
+            "items": {
+              "/inventory": [
+                7,
+                20,
+                49
+              ]
+            },
+            "joined": {
+              "prices": 10,
+              "units": 0
+            }
+          }
+        }
+      },
+      {
+        "sku": "MY-000008",
+        "product_name": "Kopi MY 008 / 7",
+        "price": 61.0,
+        "currency": "MYR",
+        "sell_unit": "BOTTLE",
+        "inventory": [
+          {
+            "warehouse_code": "MY-01",
+            "qty": 77.0
+          },
+          {
+            "warehouse_code": "MY-03",
+            "qty": 79.0
+          },
+          {
+            "warehouse_code": "MY-02",
+            "qty": 78.0
+          }
+        ],
+        "source_meta": {
+          "file": "X0207.xlsx",
+          "lineage": {
+            "root_row": 12,
+            "source": "master",
+            "items": {
+              "/inventory": [
+                6,
+                35,
+                50
+              ]
+            },
+            "joined": {
+              "prices": 4,
+              "units": 1
+            }
+          }
+        }
+      },
+      {
+        "sku": "MY-000005",
+        "product_name": "Kopi MY 005 / 7",
+        "price": 57.25,
+        "currency": "MYR",
+        "sell_unit": "PIECE",
+        "inventory": [
+          {
+            "warehouse_code": "MY-03",
+            "qty": 58.0
+          },
+          {
+            "warehouse_code": "MY-01",
+            "qty": 56.0
+          },
+          {
+            "warehouse_code": "MY-02",
+            "qty": 57.0
+          }
+        ],
+        "source_meta": {
+          "file": "X0207.xlsx",
+          "lineage": {
+            "root_row": 13,
+            "source": "master",
+            "items": {
+              "/inventory": [
+                19,
+                46,
+                51
+              ]
+            },
+            "joined": {
+              "prices": 17,
+              "units": 0
+            }
+          }
+        }
+      },
+      {
+        "sku": "MY-000001",
+        "product_name": "Kopi MY 001 / 7",
+        "price": 52.25,
+        "currency": "MYR",
+        "sell_unit": "PIECE",
+        "inventory": [
+          {
+            "warehouse_code": "MY-02",
+            "qty": 29.0
+          },
+          {
+            "warehouse_code": "MY-03",
+            "qty": 30.0
+          },
+          {
+            "warehouse_code": "MY-01",
+            "qty": 28.0
+          }
+        ],
+        "source_meta": {
+          "file": "X0207.xlsx",
+          "lineage": {
+            "root_row": 14,
+            "source": "master",
+            "items": {
+              "/inventory": [
+                15,
+                23,
+                26
+              ]
+            },
+            "joined": {
+              "prices": 3,
+              "units": 0
+            }
+          }
+        }
+      },
+      {
+        "sku": "MY-000006",
+        "product_name": "Kopi MY 006 / 7",
+        "price": 58.5,
+        "currency": "MYR",
+        "sell_unit": "BOTTLE",
+        "inventory": [
+          {
+            "warehouse_code": "MY-01",
+            "qty": 63.0
+          },
+          {
+            "warehouse_code": "MY-02",
+            "qty": 64.0
+          },
+          {
+            "warehouse_code": "MY-03",
+            "qty": 65.0
+          }
+        ],
+        "source_meta": {
+          "file": "X0207.xlsx",
+          "lineage": {
+            "root_row": 15,
+            "source": "master",
+            "items": {
+              "/inventory": [
+                0,
+                3,
+                52
+              ]
+            },
+            "joined": {
+              "prices": 8,
+              "units": 1
+            }
+          }
+        }
+      },
+      {
+        "sku": "MY-000009",
+        "product_name": "Kopi MY 009 / 7",
+        "price": 62.25,
+        "currency": "MYR",
+        "sell_unit": "PIECE",
+        "inventory": [
+          {
+            "warehouse_code": "MY-03",
+            "qty": 86.0
+          },
+          {
+            "warehouse_code": "MY-02",
+            "qty": 85.0
+          },
+          {
+            "warehouse_code": "MY-01",
+            "qty": 84.0
+          }
+        ],
+        "source_meta": {
+          "file": "X0207.xlsx",
+          "lineage": {
+            "root_row": 16,
+            "source": "master",
+            "items": {
+              "/inventory": [
+                18,
+                27,
+                42
+              ]
+            },
+            "joined": {
+              "prices": 14,
+              "units": 0
+            }
+          }
+        }
+      },
+      {
+        "sku": "MY-000002",
+        "product_name": "Kopi MY 002 / 7",
+        "price": 53.5,
+        "currency": "MYR",
+        "sell_unit": "BOTTLE",
+        "inventory": [
+          {
+            "warehouse_code": "MY-01",
+            "qty": 35.0
+          },
+          {
+            "warehouse_code": "MY-02",
+            "qty": 36.0
+          },
+          {
+            "warehouse_code": "MY-03",
+            "qty": 37.0
+          }
+        ],
+        "source_meta": {
+          "file": "X0207.xlsx",
+          "lineage": {
+            "root_row": 17,
+            "source": "master",
+            "items": {
+              "/inventory": [
+                16,
+                34,
+                38
+              ]
+            },
+            "joined": {
+              "prices": 12,
+              "units": 1
+            }
+          }
+        }
+      }
+    ],
+    "findings": [],
+    "stats": {
+      "rows_in": 18,
+      "rows_out": 18,
+      "sources": {
+        "master": 18,
+        "prices": 18,
+        "stock": 54,
+        "units": 2
+      },
+      "collections": {
+        "/inventory": 54
+      },
+      "duration_ms": 382.0,
+      "identity_keys": [
+        "/sku"
+      ],
+      "invalid_records": 0
+    }
+  }
+}

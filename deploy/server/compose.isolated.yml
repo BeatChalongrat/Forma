@@ -1,0 +1,26 @@
+# Use a stable, separate project name on the SERVER. Named volumes and network are
+# project-scoped by Compose. Never attach dev volumes or restore the dev database.
+name: ${FORMA_SERVER_PROJECT:?Set a distinct production Compose project name}
+x-policy: &policy
+  FORMA_KNOWLEDGE_POLICY: strict
+  FORMA_AUTH: oidc
+  FORMA_AUTH_ALLOW_DEV_IN_PROD: "false"
+  FORMA_SECRET_KEY: ${FORMA_SECRET_KEY:?Set a new stable production encryption key}
+  FORMA_AUTH_ISSUER: ${FORMA_AUTH_ISSUER:?Set the production OIDC issuer}
+  FORMA_AUTH_AUDIENCE: ${FORMA_AUTH_AUDIENCE:?Set the production API audience}
+  FORMA_AUTH_CLIENT_ID: ${FORMA_AUTH_CLIENT_ID:?Set the production SPA client ID}
+services:
+  api:
+    environment: *policy
+  worker:
+    environment: *policy
+  migrate:
+    environment: *policy
+  backup-nightly:
+    environment: *policy
+  postgres:
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set a separate production database password}
+  minio:
+    environment:
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?Set a separate production object-store password}

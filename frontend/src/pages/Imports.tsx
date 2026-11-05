@@ -1,4 +1,5 @@
 import { Localized } from '../lib/locale'
+import { UploadBackLink } from '../components/UploadBackLink'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
@@ -38,10 +39,10 @@ export function Imports() {
     Object.entries(values).forEach(([k, v]) => v ? next.set(k, v) : next.delete(k))
     return next
   }, { replace: true })
-  const statuses = [['', t('All statuses', 'ทุกสถานะ')], ['review', t('Needs answers', 'รอตอบคำถาม')], ['blocked', t('Check file', 'ต้องตรวจไฟล์')], ['transformed', t('Check results', 'ตรวจผลลัพธ์')], ['closed', t('Cancelled, moved or replaced', 'ยกเลิก ย้าย หรือถูกแทนที่')], ['approved_data', t('Ready to download', 'พร้อมดาวน์โหลด')], ['published', t('Downloaded', 'ส่งออกแล้ว')], ['failed', t('Processing failed', 'ประมวลผลไม่สำเร็จ')], ['uploaded', t('Reading files', 'กำลังอ่านไฟล์')], ['profiled', t('Matching fields', 'กำลังจับคู่ข้อมูล')], ['approved', t('Ready to create results', 'พร้อมสร้างผลลัพธ์')], ['auto_approved', t('Matched automatically', 'จับคู่ผ่านอัตโนมัติ')], ['rejected', t('Needs correction', 'ต้องแก้ไข')]]
+  const statuses = [['', t('All statuses', 'ทุกสถานะ')], ['attention', t('Needs attention', 'งานที่ต้องจัดการ')], ['review', t('Needs answers', 'รอตอบคำถาม')], ['blocked', t('Check file', 'ต้องตรวจไฟล์')], ['transformed', t('Check results', 'ตรวจผลลัพธ์')], ['closed', t('Cancelled, moved or replaced', 'ยกเลิก ย้าย หรือถูกแทนที่')], ['approved_data', t('Ready to download', 'พร้อมดาวน์โหลด')], ['published', t('Downloaded', 'ส่งออกแล้ว')], ['failed', t('Processing failed', 'ประมวลผลไม่สำเร็จ')], ['uploaded', t('Reading files', 'กำลังอ่านไฟล์')], ['profiled', t('Matching fields', 'กำลังจับคู่ข้อมูล')], ['approved', t('Ready to create results', 'พร้อมสร้างผลลัพธ์')], ['auto_approved', t('Matched automatically', 'จับคู่ผ่านอัตโนมัติ')], ['rejected', t('Needs correction', 'ต้องแก้ไข')]]
   if (!filesView) return <WorkRounds />
   return <>
-    <PageHeader title={t('Upload history', 'ประวัติไฟล์')} subtitle={t('Find past deliveries by the date the files were received.', 'ค้นหาไฟล์ย้อนหลังตามวันที่รับไฟล์เข้าระบบ')} actions={<Link to="/imports/new" className="btn btn-primary"><Upload size={16} />{t('Upload files', 'อัปโหลดไฟล์')}</Link>} />
+    <PageHeader title={t('Upload history', 'ประวัติไฟล์')} subtitle={t('Find past deliveries by the date the files were received.', 'ค้นหาไฟล์ย้อนหลังตามวันที่รับไฟล์เข้าระบบ')} actions={<Link to="/imports/new" state={{ uploadReturnTo: `/imports?${params.toString()}` }} className="btn btn-primary"><Upload size={16} />{t('Upload files', 'อัปโหลดไฟล์')}</Link>} />
     <div className="flex gap-2 mb-4"><Link className="btn btn-ghost" to="/imports">{t('Work rounds', 'ตามรอบงาน')}</Link><span className="btn bg-signal-soft" aria-current="page">{t('All files', 'ไฟล์ทั้งหมด')}</span></div>
     <div className="card p-4 mb-5 space-y-4">
       <div className="flex flex-wrap gap-2">{[[0, t('Today', 'วันนี้')], [6, t('Last 7 days', '7 วันล่าสุด')], [29, t('Last 30 days', '30 วันล่าสุด')]].map(([days, label]) => <button key={days} className="btn btn-sm" onClick={() => change({ start: dateInZone(timezone, Number(days)), end: dateInZone(timezone) })}>{label}</button>)}<button className="btn btn-ghost btn-sm" onClick={() => { setSearchText(''); setParams({ view: 'files' }) }}>{t('Clear filters', 'ล้างตัวกรอง')}</button></div>
@@ -129,6 +130,7 @@ export function NewImport() {
 
   return (
     <>
+      <UploadBackLink fallback="/imports/new" />
       <PageHeader title={t('Combine files for one customer', 'รวมไฟล์ของลูกค้ารายเดียว')} subtitle={t('Use related files together in one import, such as products, prices and stock. FORMA matches their fields and relationships to produce one dataset for review.', 'ใช้ไฟล์ที่เกี่ยวข้องกันในงานนำเข้าเดียว เช่น สินค้า ราคา และสต็อก ระบบจับคู่คอลัมน์และความสัมพันธ์เพื่อสร้างข้อมูลชุดเดียวให้ตรวจ')} />
       <Workflow />
       <p className="text-muted mb-4">{t('Use only files for the same customer and delivery. If each file should produce its own result,', 'ใช้เฉพาะไฟล์ของลูกค้ารายเดียวและข้อมูลชุดเดียวกัน หากแต่ละไฟล์ต้องมีผลลัพธ์แยกกัน ให้')} <Link to="/imports/new" className="text-signal underline underline-offset-4">{t('upload files separately', 'อัปโหลดแบบแยกไฟล์')}</Link></p>

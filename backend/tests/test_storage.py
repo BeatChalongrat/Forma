@@ -58,6 +58,48 @@ def test_presigned_url_only_on_s3(storage: Storage) -> None:
         assert url and "exports/c1/x.csv" in url and "Signature" in url and "attachment" in url
 
 
+def test_concurrent_cold_cache_downloads_are_independent(tmp_path: Path) -> None:
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Barrier
+
+    gate = Barrier(2)
+
+    class Client:
+        def download_file(self, bucket: str, key: str, filename: str) -> None:
+            Path(filename).write_bytes(b"complete object")
+            gate.wait(timeout=10)
+
+    storage = S3Storage(bucket="test", cache_dir=tmp_path, client=Client())
+    with ThreadPoolExecutor(2) as pool:
+        for attempt in range(20):
+            paths = list(pool.map(storage.local_path, [f"files/cold-{attempt}.xlsx"] * 2))
+            assert paths[0] == paths[1] and paths[0].read_bytes() == b"complete object"
+    assert not list(tmp_path.rglob("*.part"))
+
+
+@pytest.mark.parametrize("another_download_finished", [True, False])
+def test_cache_publish_permission_error_requires_a_completed_winner(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, another_download_finished: bool
+) -> None:
+    class Client:
+        def download_file(self, bucket: str, key: str, filename: str) -> None:
+            Path(filename).write_bytes(b"complete object")
+
+    def denied_replace(source: Path, target: Path) -> Path:
+        if another_download_finished:
+            target.write_bytes(b"complete object")
+        raise PermissionError("cache publish denied")
+
+    monkeypatch.setattr(Path, "replace", denied_replace)
+    storage = S3Storage(bucket="test", cache_dir=tmp_path, client=Client())
+    if another_download_finished:
+        assert storage.local_path("files/cold.xlsx").read_bytes() == b"complete object"
+    else:
+        with pytest.raises(PermissionError, match="cache publish denied"):
+            storage.local_path("files/cold.xlsx")
+    assert not list(tmp_path.rglob("*.part"))
+
+
 def test_local_put_is_atomic_and_prunes_empty_dirs(tmp_path: Path) -> None:
     st = LocalStorage(tmp_path / "root")
     st.put("files/aa/sha/one.bin", b"1")

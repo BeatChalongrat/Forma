@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy.orm import Session
 
 from forma.api.routes import ctx_dep
@@ -25,13 +25,24 @@ from forma.api.schemas import (
     SchemaIn,
 )
 from forma.auth import Principal, current_principal, llm_rate_limited, require_role
+from forma.core.errors import ValidationFailed
 from forma.db.models import LLMCall
 from forma.db.session import get_session
 from forma.schema_registry import SEMANTICS, SchemaRegistry, schema_findings
 from forma.services import config as cfg
 from forma.services.context import ServiceContext
 
-router = APIRouter(prefix="/api")
+
+def offline_ai_lock(request: Request, ctx: ServiceContext = Depends(ctx_dep)) -> None:
+    if (
+        ctx.settings.llm_mock_only
+        and request.method != "GET"
+        and request.url.path.startswith("/api/settings/ai")
+    ):
+        raise ValidationFailed("ชุดทดลองนี้ล็อกโมเดลจำลองไว้ ไม่อนุญาตให้เชื่อมต่อหรือทดสอบ API ภายนอก")
+
+
+router = APIRouter(prefix="/api", dependencies=[Depends(offline_ai_lock)])
 
 
 # --------------------------------------------------------------------------------------------

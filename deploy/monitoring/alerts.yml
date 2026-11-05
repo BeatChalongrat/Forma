@@ -1,0 +1,31 @@
+groups:
+  - name: forma
+    interval: 30s
+    rules:
+      - alert: FormaOperationalIssue
+        expr: max by (code, severity) (forma_operational_alert) == 1
+        for: 2m
+        annotations:
+          summary: "FORMA needs attention: {{ $labels.code }}"
+          description: "Open System health for the current cause and next action."
+      - alert: FormaMetricsUnavailable
+        expr: max(forma_metrics_refresh_ok) == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "FORMA cannot refresh database-backed monitoring"
+      - alert: FormaApiUnavailable
+        expr: up{job="forma"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "FORMA API metrics endpoint is unavailable"
+      - alert: FormaRequestFailures
+        expr: sum(rate(forma_http_requests_total{status=~"5.."}[5m])) > 0.01
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "FORMA is returning server errors; inspect request IDs and commit failures"

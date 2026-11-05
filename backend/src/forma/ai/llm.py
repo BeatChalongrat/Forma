@@ -92,14 +92,20 @@ class LLMError(RuntimeError):
 
 
 def _post_json(url: str, headers: dict[str, str], body: dict[str, Any], timeout: float) -> dict[str, Any]:
+    if get_settings().llm_mock_only:
+        raise LLMError("Offline reproduction mode: external AI requests are disabled")
     from forma.ai.limiter import provider_slot
 
     with provider_slot(url, headers, timeout):
         return _post_json_admitted(url, headers, body, timeout)
 
 
-def _post_json_admitted(url: str, headers: dict[str, str], body: dict[str, Any], timeout: float) -> dict[str, Any]:
+def _post_json_admitted(
+    url: str, headers: dict[str, str], body: dict[str, Any], timeout: float
+) -> dict[str, Any]:
     """Cancel the network request on wall-clock expiry, including keepalive/whitespace bodies."""
+    if get_settings().llm_mock_only:
+        raise LLMError("Offline reproduction mode: external AI requests are disabled")
     from forma.ai.budget import progress, remaining
 
     left = remaining()
@@ -342,6 +348,8 @@ def _json_instruction(schema: dict[str, Any]) -> str:
 
 def make_provider(kind: str, api_key: str | None, base_url: str | None, timeout: float) -> Provider:
     """The provider for a kind and key; ``MockProvider`` when it cannot be reached (no key, no URL)."""
+    if get_settings().llm_mock_only:
+        return MockProvider()
     if kind in ("openai", "openai_compatible") and api_key:
         return OpenAICompatibleProvider(api_key, base_url, timeout)
     if kind == "openai_compatible" and base_url:
@@ -377,6 +385,8 @@ class LLMClient:
     @classmethod
     def from_settings(cls, settings: Settings | None = None) -> LLMClient:
         s = settings or get_settings()
+        if s.llm_mock_only:
+            return cls(MockProvider(), "mock", s.llm_max_retries)
         provider = make_provider(s.llm_provider, s.llm_api_key, s.llm_base_url, s.llm_timeout_s)
         return cls(provider, s.llm_model, s.llm_max_retries)
 

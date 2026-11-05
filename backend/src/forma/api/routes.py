@@ -6,7 +6,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, File, Form, Query, UploadFile
 from fastapi.responses import RedirectResponse, Response, StreamingResponse
-from sqlalchemy import func, select
+from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 
@@ -60,7 +60,7 @@ from forma.db.session import get_session
 from forma.export.exporter import MEDIA_TYPES
 from forma.jobs import runner
 from forma.mapping_dsl.models import MappingDocument, Op
-from forma.schema_registry import PROVENANCE_KEY, TargetSchema
+from forma.schema_registry import TargetSchema
 from forma.services import assistant, file_actions
 from forma.services import config as cfg
 from forma.services import datasets as ds
@@ -981,10 +981,10 @@ def get_dataset(
 @api.get("/datasets/{dataset_id}/rows")
 def dataset_rows(
     dataset_id: str,
-    offset: int = 0,
-    limit: int = Query(100, le=1000),
-    q: str | None = None,
-    sort: str | None = None,
+    offset: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=1000),
+    q: str | None = Query(None, max_length=500),
+    sort: str | None = Query(None, max_length=500),
     desc: bool = False,
     session: Session = Depends(get_session),
     ctx: ServiceContext = Depends(ctx_dep),
@@ -992,19 +992,11 @@ def dataset_rows(
 ) -> dict[str, Any]:
     d = _dataset_scoped(session, p, dataset_id)
     schema = ctx.registry.get_ref(ms.get_mapping(session, d.mapping_version_id).target_schema)
-    records = ds.records_of(ctx, d)
-    if q:
-        ql = q.lower()
-        records = [
-            r for r in records if ql in str({k: v for k, v in r.items() if k != PROVENANCE_KEY}).lower()
-        ]
-    if sort:
-        from forma.engine.transform import _get_pointer
+    from forma.services import dataset_query
 
-        records.sort(key=lambda r: (_get_pointer(r, sort) is None, str(_get_pointer(r, sort))), reverse=desc)
-    page = records[offset : offset + limit]
+    total, page = dataset_query.page(ctx, d, offset=offset, limit=limit, query=q, sort=sort, descending=desc)
     return {
-        "total": len(records),
+        "total": total,
         "offset": offset,
         "limit": limit,
         "identity_keys": schema.identity_keys,
@@ -1457,7 +1449,26 @@ def dashboard(
             p, failed_query.join(ImportRound, ImportRound.id == Job.round_id), ImportRound.customer_id
         )
     failed_jobs = session.scalar(failed_query) or 0
+    from forma.services.workspace import ATTENTION_STATUSES
+
+    attention = session.scalars(
+        _scoped(p, select(ImportRound), ImportRound.customer_id)
+        .where(ImportRound.status.in_(ATTENTION_STATUSES))
+        .order_by(
+            case({status: i for i, status in enumerate(ATTENTION_STATUSES)}, value=ImportRound.status),
+            ImportRound.created_at,
+            ImportRound.id,
+        )
+        .limit(6)
+    ).all()
     return {
+        "attention": {
+            "total": sum(by_status.get(status, 0) for status in ATTENTION_STATUSES),
+            "unit": "import_rounds",
+            "items": [
+                ser.import_round(r, files=False, customer_obj=cmap.get(r.customer_id)) for r in attention
+            ],
+        },
         "customers": customers,
         "rounds_by_status": by_status,
         "open_reviews": open_reviews,

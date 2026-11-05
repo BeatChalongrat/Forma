@@ -1,0 +1,615 @@
+{
+  "services": {
+    "api": {
+      "mem_limit": "1536m",
+      "memswap_limit": "1536m",
+      "cpus": 0.75,
+      "logging": {
+        "driver": "json-file",
+        "options": {
+          "max-size": "10m",
+          "max-file": "3"
+        }
+      },
+      "environment": {
+        "FORMA_WORKERS": "4",
+        "FORMA_FILE_WORKERS": "1",
+        "FORMA_LLM_SHARED_CONCURRENCY": "32",
+        "FORMA_LLM_SHARED_RPM": "60",
+        "FORMA_LLM_SHARED_LIMITER": "redis",
+        "FORMA_KNOWLEDGE_POLICY": "strict",
+        "FORMA_MAPPING_LAB_SOCKETS": "[\"/run/sandbox/runner.sock\", \"/run/sandbox/runner-2.sock\", \"/run/sandbox/runner-3.sock\", \"/run/sandbox/runner-4.sock\", \"/run/sandbox/runner-5.sock\", \"/run/sandbox/runner-6.sock\", \"/run/sandbox/runner-7.sock\", \"/run/sandbox/runner-8.sock\"]",
+        "POLARS_MAX_THREADS": "2",
+        "OMP_NUM_THREADS": "2",
+        "OPENBLAS_NUM_THREADS": "2"
+      },
+      "depends_on": {
+        "sandbox": {
+          "condition": "service_healthy"
+        },
+        "sandbox-2": {
+          "condition": "service_healthy"
+        },
+        "sandbox-3": {
+          "condition": "service_healthy"
+        },
+        "sandbox-4": {
+          "condition": "service_healthy"
+        },
+        "sandbox-5": {
+          "condition": "service_healthy"
+        },
+        "sandbox-6": {
+          "condition": "service_healthy"
+        },
+        "sandbox-7": {
+          "condition": "service_healthy"
+        },
+        "sandbox-8": {
+          "condition": "service_healthy"
+        }
+      }
+    },
+    "postgres": {
+      "mem_limit": "2048m",
+      "memswap_limit": "2048m",
+      "cpus": 0.75,
+      "logging": {
+        "driver": "json-file",
+        "options": {
+          "max-size": "10m",
+          "max-file": "3"
+        }
+      }
+    },
+    "redis": {
+      "mem_limit": "512m",
+      "memswap_limit": "512m",
+      "cpus": 0.25,
+      "logging": {
+        "driver": "json-file",
+        "options": {
+          "max-size": "10m",
+          "max-file": "3"
+        }
+      },
+      "command": [
+        "redis-server",
+        "--save",
+        "60",
+        "1",
+        "--appendonly",
+        "yes",
+        "--maxmemory",
+        "256mb",
+        "--maxmemory-policy",
+        "noeviction"
+      ]
+    },
+    "minio": {
+      "mem_limit": "1024m",
+      "memswap_limit": "1024m",
+      "cpus": 0.5,
+      "logging": {
+        "driver": "json-file",
+        "options": {
+          "max-size": "10m",
+          "max-file": "3"
+        }
+      }
+    },
+    "web": {
+      "mem_limit": "256m",
+      "memswap_limit": "256m",
+      "cpus": 0.25,
+      "logging": {
+        "driver": "json-file",
+        "options": {
+          "max-size": "10m",
+          "max-file": "3"
+        }
+      }
+    },
+    "backup-nightly": {
+      "mem_limit": "768m",
+      "memswap_limit": "768m",
+      "cpus": 0.25,
+      "logging": {
+        "driver": "json-file",
+        "options": {
+          "max-size": "10m",
+          "max-file": "3"
+        }
+      }
+    },
+    "migrate": {
+      "mem_limit": "1024m",
+      "memswap_limit": "1024m",
+      "cpus": 0.5,
+      "logging": {
+        "driver": "json-file",
+        "options": {
+          "max-size": "10m",
+          "max-file": "3"
+        }
+      }
+    },
+    "minio-init": {
+      "mem_limit": "128m",
+      "memswap_limit": "128m",
+      "cpus": 0.25,
+      "logging": {
+        "driver": "json-file",
+        "options": {
+          "max-size": "10m",
+          "max-file": "3"
+        }
+      }
+    },
+    "worker": {
+      "mem_limit": "6656m",
+      "memswap_limit": "6656m",
+      "cpus": 2.0,
+      "logging": {
+        "driver": "json-file",
+        "options": {
+          "max-size": "10m",
+          "max-file": "3"
+        }
+      },
+      "deploy": {
+        "replicas": 8
+      },
+      "environment": {
+        "FORMA_WORKERS": "4",
+        "FORMA_FILE_WORKERS": "1",
+        "FORMA_LLM_SHARED_CONCURRENCY": "32",
+        "FORMA_LLM_SHARED_RPM": "60",
+        "FORMA_LLM_SHARED_LIMITER": "redis",
+        "FORMA_KNOWLEDGE_POLICY": "strict",
+        "FORMA_MAPPING_LAB_SOCKETS": "[\"/run/sandbox/runner.sock\", \"/run/sandbox/runner-2.sock\", \"/run/sandbox/runner-3.sock\", \"/run/sandbox/runner-4.sock\", \"/run/sandbox/runner-5.sock\", \"/run/sandbox/runner-6.sock\", \"/run/sandbox/runner-7.sock\", \"/run/sandbox/runner-8.sock\"]",
+        "POLARS_MAX_THREADS": "2",
+        "OMP_NUM_THREADS": "2",
+        "OPENBLAS_NUM_THREADS": "2"
+      },
+      "depends_on": {
+        "sandbox": {
+          "condition": "service_healthy"
+        },
+        "sandbox-2": {
+          "condition": "service_healthy"
+        },
+        "sandbox-3": {
+          "condition": "service_healthy"
+        },
+        "sandbox-4": {
+          "condition": "service_healthy"
+        },
+        "sandbox-5": {
+          "condition": "service_healthy"
+        },
+        "sandbox-6": {
+          "condition": "service_healthy"
+        },
+        "sandbox-7": {
+          "condition": "service_healthy"
+        },
+        "sandbox-8": {
+          "condition": "service_healthy"
+        }
+      }
+    },
+    "sandbox": {
+      "mem_limit": "4096m",
+      "memswap_limit": "4096m",
+      "cpus": 2,
+      "logging": {
+        "driver": "json-file",
+        "options": {
+          "max-size": "10m",
+          "max-file": "3"
+        }
+      },
+      "environment": {
+        "SANDBOX_QUEUE_SLOTS": "1",
+        "SANDBOX_SOCKET": "/run/sandbox/runner.sock"
+      },
+      "healthcheck": {
+        "test": [
+          "CMD",
+          "python",
+          "-c",
+          "import socket; s=socket.socket(socket.AF_UNIX); s.connect('/run/sandbox/runner.sock')"
+        ],
+        "interval": "30s",
+        "timeout": "5s",
+        "start_period": "10s"
+      }
+    },
+    "sandbox-2": {
+      "mem_limit": "4096m",
+      "memswap_limit": "4096m",
+      "cpus": 2,
+      "logging": {
+        "driver": "json-file",
+        "options": {
+          "max-size": "10m",
+          "max-file": "3"
+        }
+      },
+      "build": {
+        "context": ".",
+        "dockerfile": "deploy/sandbox/Dockerfile"
+      },
+      "network_mode": "none",
+      "read_only": true,
+      "tmpfs": [
+        "/workspace:size=1g,mode=0711",
+        "/tmp:size=64m,mode=1777"
+      ],
+      "volumes": [
+        "sandbox-socket:/run/sandbox"
+      ],
+      "cap_drop": [
+        "ALL"
+      ],
+      "cap_add": [
+        "SETUID",
+        "SETGID",
+        "KILL",
+        "CHOWN",
+        "DAC_OVERRIDE"
+      ],
+      "security_opt": [
+        "no-new-privileges:true"
+      ],
+      "pids_limit": 256,
+      "environment": {
+        "SANDBOX_SOCKET": "/run/sandbox/runner-2.sock",
+        "SANDBOX_QUEUE_SLOTS": "1"
+      },
+      "healthcheck": {
+        "test": [
+          "CMD",
+          "python",
+          "-c",
+          "import socket; s=socket.socket(socket.AF_UNIX); s.connect('/run/sandbox/runner-2.sock')"
+        ],
+        "interval": "30s",
+        "timeout": "5s",
+        "start_period": "10s"
+      },
+      "restart": "unless-stopped"
+    },
+    "sandbox-3": {
+      "mem_limit": "4096m",
+      "memswap_limit": "4096m",
+      "cpus": 2,
+      "logging": {
+        "driver": "json-file",
+        "options": {
+          "max-size": "10m",
+          "max-file": "3"
+        }
+      },
+      "build": {
+        "context": ".",
+        "dockerfile": "deploy/sandbox/Dockerfile"
+      },
+      "network_mode": "none",
+      "read_only": true,
+      "tmpfs": [
+        "/workspace:size=1g,mode=0711",
+        "/tmp:size=64m,mode=1777"
+      ],
+      "volumes": [
+        "sandbox-socket:/run/sandbox"
+      ],
+      "cap_drop": [
+        "ALL"
+      ],
+      "cap_add": [
+        "SETUID",
+        "SETGID",
+        "KILL",
+        "CHOWN",
+        "DAC_OVERRIDE"
+      ],
+      "security_opt": [
+        "no-new-privileges:true"
+      ],
+      "pids_limit": 256,
+      "environment": {
+        "SANDBOX_SOCKET": "/run/sandbox/runner-3.sock",
+        "SANDBOX_QUEUE_SLOTS": "1"
+      },
+      "healthcheck": {
+        "test": [
+          "CMD",
+          "python",
+          "-c",
+          "import socket; s=socket.socket(socket.AF_UNIX); s.connect('/run/sandbox/runner-3.sock')"
+        ],
+        "interval": "30s",
+        "timeout": "5s",
+        "start_period": "10s"
+      },
+      "restart": "unless-stopped"
+    },
+    "sandbox-4": {
+      "mem_limit": "4096m",
+      "memswap_limit": "4096m",
+      "cpus": 2,
+      "logging": {
+        "driver": "json-file",
+        "options": {
+          "max-size": "10m",
+          "max-file": "3"
+        }
+      },
+      "build": {
+        "context": ".",
+        "dockerfile": "deploy/sandbox/Dockerfile"
+      },
+      "network_mode": "none",
+      "read_only": true,
+      "tmpfs": [
+        "/workspace:size=1g,mode=0711",
+        "/tmp:size=64m,mode=1777"
+      ],
+      "volumes": [
+        "sandbox-socket:/run/sandbox"
+      ],
+      "cap_drop": [
+        "ALL"
+      ],
+      "cap_add": [
+        "SETUID",
+        "SETGID",
+        "KILL",
+        "CHOWN",
+        "DAC_OVERRIDE"
+      ],
+      "security_opt": [
+        "no-new-privileges:true"
+      ],
+      "pids_limit": 256,
+      "environment": {
+        "SANDBOX_SOCKET": "/run/sandbox/runner-4.sock",
+        "SANDBOX_QUEUE_SLOTS": "1"
+      },
+      "healthcheck": {
+        "test": [
+          "CMD",
+          "python",
+          "-c",
+          "import socket; s=socket.socket(socket.AF_UNIX); s.connect('/run/sandbox/runner-4.sock')"
+        ],
+        "interval": "30s",
+        "timeout": "5s",
+        "start_period": "10s"
+      },
+      "restart": "unless-stopped"
+    },
+    "sandbox-5": {
+      "mem_limit": "4096m",
+      "memswap_limit": "4096m",
+      "cpus": 2,
+      "logging": {
+        "driver": "json-file",
+        "options": {
+          "max-size": "10m",
+          "max-file": "3"
+        }
+      },
+      "build": {
+        "context": ".",
+        "dockerfile": "deploy/sandbox/Dockerfile"
+      },
+      "network_mode": "none",
+      "read_only": true,
+      "tmpfs": [
+        "/workspace:size=1g,mode=0711",
+        "/tmp:size=64m,mode=1777"
+      ],
+      "volumes": [
+        "sandbox-socket:/run/sandbox"
+      ],
+      "cap_drop": [
+        "ALL"
+      ],
+      "cap_add": [
+        "SETUID",
+        "SETGID",
+        "KILL",
+        "CHOWN",
+        "DAC_OVERRIDE"
+      ],
+      "security_opt": [
+        "no-new-privileges:true"
+      ],
+      "pids_limit": 256,
+      "environment": {
+        "SANDBOX_SOCKET": "/run/sandbox/runner-5.sock",
+        "SANDBOX_QUEUE_SLOTS": "1"
+      },
+      "healthcheck": {
+        "test": [
+          "CMD",
+          "python",
+          "-c",
+          "import socket; s=socket.socket(socket.AF_UNIX); s.connect('/run/sandbox/runner-5.sock')"
+        ],
+        "interval": "30s",
+        "timeout": "5s",
+        "start_period": "10s"
+      },
+      "restart": "unless-stopped"
+    },
+    "sandbox-6": {
+      "mem_limit": "4096m",
+      "memswap_limit": "4096m",
+      "cpus": 2,
+      "logging": {
+        "driver": "json-file",
+        "options": {
+          "max-size": "10m",
+          "max-file": "3"
+        }
+      },
+      "build": {
+        "context": ".",
+        "dockerfile": "deploy/sandbox/Dockerfile"
+      },
+      "network_mode": "none",
+      "read_only": true,
+      "tmpfs": [
+        "/workspace:size=1g,mode=0711",
+        "/tmp:size=64m,mode=1777"
+      ],
+      "volumes": [
+        "sandbox-socket:/run/sandbox"
+      ],
+      "cap_drop": [
+        "ALL"
+      ],
+      "cap_add": [
+        "SETUID",
+        "SETGID",
+        "KILL",
+        "CHOWN",
+        "DAC_OVERRIDE"
+      ],
+      "security_opt": [
+        "no-new-privileges:true"
+      ],
+      "pids_limit": 256,
+      "environment": {
+        "SANDBOX_SOCKET": "/run/sandbox/runner-6.sock",
+        "SANDBOX_QUEUE_SLOTS": "1"
+      },
+      "healthcheck": {
+        "test": [
+          "CMD",
+          "python",
+          "-c",
+          "import socket; s=socket.socket(socket.AF_UNIX); s.connect('/run/sandbox/runner-6.sock')"
+        ],
+        "interval": "30s",
+        "timeout": "5s",
+        "start_period": "10s"
+      },
+      "restart": "unless-stopped"
+    },
+    "sandbox-7": {
+      "mem_limit": "4096m",
+      "memswap_limit": "4096m",
+      "cpus": 2,
+      "logging": {
+        "driver": "json-file",
+        "options": {
+          "max-size": "10m",
+          "max-file": "3"
+        }
+      },
+      "build": {
+        "context": ".",
+        "dockerfile": "deploy/sandbox/Dockerfile"
+      },
+      "network_mode": "none",
+      "read_only": true,
+      "tmpfs": [
+        "/workspace:size=1g,mode=0711",
+        "/tmp:size=64m,mode=1777"
+      ],
+      "volumes": [
+        "sandbox-socket:/run/sandbox"
+      ],
+      "cap_drop": [
+        "ALL"
+      ],
+      "cap_add": [
+        "SETUID",
+        "SETGID",
+        "KILL",
+        "CHOWN",
+        "DAC_OVERRIDE"
+      ],
+      "security_opt": [
+        "no-new-privileges:true"
+      ],
+      "pids_limit": 256,
+      "environment": {
+        "SANDBOX_SOCKET": "/run/sandbox/runner-7.sock",
+        "SANDBOX_QUEUE_SLOTS": "1"
+      },
+      "healthcheck": {
+        "test": [
+          "CMD",
+          "python",
+          "-c",
+          "import socket; s=socket.socket(socket.AF_UNIX); s.connect('/run/sandbox/runner-7.sock')"
+        ],
+        "interval": "30s",
+        "timeout": "5s",
+        "start_period": "10s"
+      },
+      "restart": "unless-stopped"
+    },
+    "sandbox-8": {
+      "mem_limit": "4096m",
+      "memswap_limit": "4096m",
+      "cpus": 2,
+      "logging": {
+        "driver": "json-file",
+        "options": {
+          "max-size": "10m",
+          "max-file": "3"
+        }
+      },
+      "build": {
+        "context": ".",
+        "dockerfile": "deploy/sandbox/Dockerfile"
+      },
+      "network_mode": "none",
+      "read_only": true,
+      "tmpfs": [
+        "/workspace:size=1g,mode=0711",
+        "/tmp:size=64m,mode=1777"
+      ],
+      "volumes": [
+        "sandbox-socket:/run/sandbox"
+      ],
+      "cap_drop": [
+        "ALL"
+      ],
+      "cap_add": [
+        "SETUID",
+        "SETGID",
+        "KILL",
+        "CHOWN",
+        "DAC_OVERRIDE"
+      ],
+      "security_opt": [
+        "no-new-privileges:true"
+      ],
+      "pids_limit": 256,
+      "environment": {
+        "SANDBOX_SOCKET": "/run/sandbox/runner-8.sock",
+        "SANDBOX_QUEUE_SLOTS": "1"
+      },
+      "healthcheck": {
+        "test": [
+          "CMD",
+          "python",
+          "-c",
+          "import socket; s=socket.socket(socket.AF_UNIX); s.connect('/run/sandbox/runner-8.sock')"
+        ],
+        "interval": "30s",
+        "timeout": "5s",
+        "start_period": "10s"
+      },
+      "restart": "unless-stopped"
+    }
+  }
+}

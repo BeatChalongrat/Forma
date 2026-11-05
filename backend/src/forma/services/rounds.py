@@ -157,11 +157,14 @@ def add_file(
 # Profiling + fingerprint + drift
 # --------------------------------------------------------------------------------------------
 def latest_approved_mapping(session: Session, customer_id: str) -> MappingVersion | None:
-    return session.scalar(
+    from forma.services.knowledge_gate import allowed
+
+    rows = session.scalars(
         select(MappingVersion)
         .where(MappingVersion.customer_id == customer_id, MappingVersion.status == "approved")
         .order_by(MappingVersion.approved_at.desc(), MappingVersion.created_at.desc())
     )
+    return next((m for m in rows if allowed(session, m)), None)
 
 
 def _profile_file(path: Path) -> tuple[dict[str, Any], dict[str, Any], int]:
@@ -294,6 +297,8 @@ def profile_round(
 
 
 def _match_other_customer(session: Session, customer_id: str, fp: Fingerprint) -> dict[str, Any] | None:
+    from forma.services.knowledge_gate import allowed
+
     rows = session.scalars(
         select(MappingVersion).where(
             MappingVersion.status == "approved",
@@ -301,6 +306,7 @@ def _match_other_customer(session: Session, customer_id: str, fp: Fingerprint) -
             MappingVersion.fingerprint_strict == fp.strict,
         )
     ).all()
+    rows = [m for m in rows if allowed(session, m)]
     if rows:
         m = rows[0]
         c = session.get(Customer, m.customer_id)

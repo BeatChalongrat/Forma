@@ -88,13 +88,21 @@ def approved_history(
         query = query.where(MappingVersion.customer_id == customer_id)
     if target_schema is not None:
         query = query.where(MappingVersion.target_schema == target_schema)
-    return list(
-        session.scalars(
-            query.order_by(
-                MappingVersion.approved_at.desc(), MappingVersion.created_at.desc(), MappingVersion.id.desc()
+    from forma.services.knowledge_gate import allowed
+
+    return [
+        m
+        for m in (
+            session.scalars(
+                query.order_by(
+                    MappingVersion.approved_at.desc(),
+                    MappingVersion.created_at.desc(),
+                    MappingVersion.id.desc(),
+                )
             )
         )
-    )
+        if allowed(session, m)
+    ]
 
 
 def mapping_fingerprint(mapping: MappingVersion) -> Fingerprint | None:

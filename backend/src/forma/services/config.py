@@ -138,6 +138,10 @@ def _stamp(row: AppSetting | None) -> dict[str, Any]:
 # --------------------------------------------------------------------------------------------
 def llm_settings(base: Settings, ai: dict[str, Any]) -> Settings:
     """``Settings`` with the web app's AI choices applied (the API key decrypted for this process only)."""
+    if base.llm_mock_only:
+        return base.model_copy(
+            update={"llm_provider": "mock", "llm_model": "mock", "llm_api_key": None, "llm_base_url": None}
+        )
     update: dict[str, Any] = {}
     for name, attr in (
         ("provider", "llm_provider"),
@@ -160,6 +164,8 @@ def build_client(base: Settings, ai: dict[str, Any]) -> LLMClient:
 
     eff = llm_settings(base, ai)
     client = LLMClient.from_settings(eff)
+    if base.llm_mock_only:
+        return client
     client.primary_vision = _vision(ai.get("vision"), eff.llm_provider, eff.llm_base_url, eff.llm_model)
     routes: list[Route] = []
     for b in ai.get("backups") or []:
@@ -218,12 +224,18 @@ def ai_view(session: Session, base: Settings) -> dict[str, Any]:
 
     row = _row(session, AI_KEY)
     ai = dict(row.value or {}) if row else {}
+    if base.llm_mock_only:
+        ai = {}  # Do not decrypt/display restored production credentials or backup routes.
     eff = llm_settings(base, ai)
     client = build_client(base, ai)
     key_source = "ui" if ai.get("api_key_enc") else "env" if base.llm_api_key else None
     active = client.provider.name if not client.is_mock else "mock"
     usable = {r.name for r in client.routes} if not client.is_mock else set()
-    warning = None
+    warning = (
+        "Offline reproduction mode: mock only; saved AI settings and backup keys are ignored"
+        if base.llm_mock_only
+        else None
+    )
     if client.primary_name != "primary":
         warning = "the primary provider has no usable key: the first backup key answers"
     elif eff.llm_provider != "mock" and client.is_mock:
@@ -249,6 +261,7 @@ def ai_view(session: Session, base: Settings) -> dict[str, Any]:
         "vision": client.primary_vision,
         "supports_vision": client.supports_vision,
         "offline": client.is_mock,
+        "mock_only": base.llm_mock_only,
         "warning": warning,
         "providers": list(PROVIDERS),
         "models": model_catalogue(),

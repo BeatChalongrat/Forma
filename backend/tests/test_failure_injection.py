@@ -114,6 +114,24 @@ def test_db_failure_after_object_write_cleans_the_object(
     assert client.get(f"/api/rounds/{rid}").json()["status"] == "failed"
 
 
+def _pause_first_transform(marker: str) -> None:
+    """Spawn-safe initializer: stop at handler entry, only on the first delivery."""
+    from forma.jobs import handlers as _handlers  # noqa: F401
+    from forma.jobs import runner
+
+    original = runner._HANDLERS["transform_round"]
+
+    def paused(ctx: Any, payload: Any, progress: Any) -> Any:
+        path = Path(marker)
+        if not path.exists():
+            path.write_text("entered", encoding="utf-8")
+            time.sleep(30)
+            raise AssertionError("Test did not terminate the paused transform worker")
+        return original(ctx, payload, progress)
+
+    runner._HANDLERS["transform_round"] = paused
+
+
 @pytest.mark.slow
 def test_killed_worker_process_is_recovered(isolated_env: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """A real worker process is killed mid-transform; nothing partial survives; recovery re-runs it."""
@@ -123,15 +141,30 @@ def test_killed_worker_process_is_recovered(isolated_env: Path, monkeypatch: pyt
     from tests.conftest import clear_forma_caches
 
     clear_forma_caches()
+    import multiprocessing as mp
+    from concurrent.futures import ProcessPoolExecutor
+
     from forma.api.app import create_app
     from forma.jobs import runner
 
+    marker = isolated_env / "transform-entered.txt"
+    monkeypatch.setattr(
+        runner.ProcessBackend,
+        "_make_pool",
+        lambda self: ProcessPoolExecutor(
+            max_workers=1,
+            mp_context=mp.get_context("spawn"),
+            initializer=_pause_first_transform,
+            initargs=(str(marker),),
+        ),
+    )
+
     with TestClient(create_app()) as c:
-        # a 70K-row workbook so the transform runs for several seconds in the worker
+        # Workbook size no longer determines whether the worker can be killed in time.
         cust = c.post("/api/customers", json={"code": "F3", "name": "F3"}).json()
         cid = cust["id"]
         rid = c.post("/api/rounds", json={"customer_id": cid}).json()["id"]
-        _upload(c, rid, make_workbook(isolated_env / "big.xlsx", n_products=70000), name="big.xlsx")
+        _upload(c, rid, make_workbook(isolated_env / "recovery.xlsx"), name="recovery.xlsx")
         job = _run(c, rid)
         c.post(f"/api/mappings/{job['result']['mapping_version_id']}/approve", json={})
         assert _dataset_rows(rid) == []
@@ -142,10 +175,9 @@ def test_killed_worker_process_is_recovered(isolated_env: Path, monkeypatch: pyt
         killed = False
         while time.time() < deadline:
             st = runner.job_status(jid)
-            if st["status"] == "running":
+            if st["status"] == "running" and marker.exists():
                 children = me.children(recursive=True)
                 if children:
-                    time.sleep(0.3)  # let it get into the engine
                     for ch in children:
                         ch.kill()
                     killed = True
@@ -158,6 +190,16 @@ def test_killed_worker_process_is_recovered(isolated_env: Path, monkeypatch: pyt
         assert runner.job_status(jid)["status"] == "running"  # the dead worker never reported back
         assert _dataset_rows(rid) == []
         # operator/worker restart: stale recovery re-queues; the broken pool is rebuilt
+        assert runner.recover_stale(stale_s=0) == []  # never steal a still-valid lease
+        import datetime as dt
+
+        from forma.db.models import Job
+        from forma.db.session import session_scope
+
+        with session_scope() as session:
+            dead = session.get(Job, jid)
+            assert dead is not None
+            dead.lease_expires_at = dt.datetime.now(dt.UTC) - dt.timedelta(seconds=1)
         requeued = runner.recover_stale(stale_s=0)
         assert jid in requeued
         for _ in range(1200):
@@ -168,6 +210,7 @@ def test_killed_worker_process_is_recovered(isolated_env: Path, monkeypatch: pyt
         assert st["status"] == "done", st["error"]
         assert st["attempts"] == 2 and len(_dataset_rows(rid)) == 1
         assert len(_dataset_objects(cid)) == 1
+        assert st["result"]["rows"] == 12
 
 
 # --------------------------------------------------------------------------------------------

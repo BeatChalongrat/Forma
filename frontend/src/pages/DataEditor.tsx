@@ -47,6 +47,7 @@ export function DataEditor() {
   const [editing, setEditing] = useState<{ r: number; c: number; value: string } | null>(null)
   const [drawer, setDrawer] = useState<{ kind: 'record' | 'lineage'; identity: string; pointer?: string } | null>(null)
   const [saveOpen, setSaveOpen] = useState(false)
+  const [newerDataset, setNewerDataset] = useState<string | null>(null)
   const [params] = useSearchParams() // ?tab= opens a panel, ?tool=trace explains tracing (links from the round page, the guide, Ctrl+K)
   const [rightTab, setActiveTab] = useState<EditorTab>(() => (EDITOR_TABS as readonly string[]).includes(params.get('tab') ?? '') ? (params.get('tab') as EditorTab) : 'changes')
   const { t } = usePreferences()
@@ -199,7 +200,10 @@ export function DataEditor() {
   const apply = useMutation({
     mutationFn: (b: { kind: string; note: string }) => api.applyChanges(datasetId, { operations: pending.map(strip), kind: b.kind, actor: 'operator', note: b.note || undefined }),
     onSuccess: ({ dataset }) => { qc.invalidateQueries(); setPending([]); setSaveOpen(false); toast.push({ kind: 'ok', title: `Saved as dataset v${dataset.version}` }); nav(`/datasets/${dataset.id}`) },
-    onError: (e: Error & { details?: { errors?: { pointer: string; message: string }[] } }) => toast.push({ kind: 'bad', title: 'Changes rejected by the schema', detail: e.details?.errors?.slice(0, 3).map((x) => `${x.pointer}: ${x.message}`).join('; ') ?? e.message }),
+    onError: (e: Error & { details?: { latest_dataset_id?: string; errors?: { pointer: string; message: string }[] } }) => {
+      if (e.details?.latest_dataset_id) { setNewerDataset(e.details.latest_dataset_id); setSaveOpen(false) }
+      toast.push({ kind: 'bad', title: t('Could not save changes', 'บันทึกการแก้ไขไม่สำเร็จ'), detail: e.details?.errors?.slice(0, 3).map((x) => `${x.pointer}: ${x.message}`).join('; ') ?? e.message })
+    },
   })
   const rollback = useMutation({ mutationFn: () => api.rollback(datasetId), onSuccess: (d) => { qc.invalidateQueries(); toast.push({ kind: 'ok', title: `Rolled back → v${d.version}` }); nav(`/datasets/${d.id}`) } })
   const approve = useMutation({
@@ -237,6 +241,7 @@ export function DataEditor() {
 
   return (
     <div className="workspace">
+      {newerDataset && <div role="alert" className="p-3 border-b border-line bg-warn-soft flex items-center gap-3 flex-wrap"><span>{t('A newer version exists. Your unsaved changes remain on this page. Open the latest version in another tab to compare before editing again.', 'มีเวอร์ชันใหม่แล้ว การแก้ที่ยังไม่บันทึกยังอยู่ในหน้านี้ เปิดเวอร์ชันล่าสุดอีกแท็บเพื่อเปรียบเทียบก่อนแก้ต่อ')}</span><Link className="btn btn-sm" target="_blank" rel="noopener noreferrer" to={`/datasets/${newerDataset}`}>{t('Open latest version', 'เปิดเวอร์ชันล่าสุด')}</Link></div>}
       <div className="workspace-toolbar">
         <Link to={`/rounds/${ds.round_id}`} className="text-muted hover:text-ink text-[12.5px]">← Round</Link>
         <span className="heading">Data Editor</span>
@@ -379,7 +384,7 @@ export function DataEditor() {
       <TraceDrawer open={drawer?.kind === 'lineage'} datasetId={datasetId} identity={drawer?.identity ?? ''} pointer={drawer?.pointer} onPointer={(p) => setDrawer((d) => d && { ...d, pointer: p })} onClose={() => setDrawer(null)} />
 
       <Modal open={saveOpen} onClose={() => setSaveOpen(false)} title="Review changes before saving" width="max-w-3xl"
-        footer={<SaveFooter pending={apply.isPending} valid={!!preview.data && preview.data.validation_errors.length === 0} onCancel={() => setSaveOpen(false)} onSave={(kind, note) => apply.mutate({ kind, note })} />}>
+        footer={<SaveFooter pending={apply.isPending} persistentAllowed={pending.every(op => op.kind === 'set_cell' || op.kind === 'set_field')} valid={!!preview.data && preview.data.validation_errors.length === 0} onCancel={() => setSaveOpen(false)} onSave={(kind, note) => apply.mutate({ kind, note })} />}>
         {preview.isPending && <div className="text-muted flex items-center gap-2"><Spinner /> computing impact…</div>}
         {preview.data && <ImpactView impact={preview.data.impact} rowsAfter={preview.data.rows_after} errors={preview.data.validation_errors} invalid={[preview.data.invalid_before, preview.data.invalid_after]} />}
       </Modal>
@@ -422,18 +427,18 @@ function ImpactView({ impact, rowsAfter, errors, invalid }: { impact: Impact; ro
   )
 }
 
-function SaveFooter({ pending, valid, onCancel, onSave }: { pending: boolean; valid: boolean; onCancel: () => void; onSave: (kind: string, note: string) => void }) {
+function SaveFooter({ pending, valid, persistentAllowed, onCancel, onSave }: { pending: boolean; valid: boolean; persistentAllowed: boolean; onCancel: () => void; onSave: (kind: string, note: string) => void }) {
   const [kind, setKind] = useState('one_time')
   const [note, setNote] = useState('')
   return (
     <div className="flex items-center gap-2 w-full">
-      <select className="input w-auto" value={kind} onChange={(e) => setKind(e.target.value)}>
+      <select className="input w-auto" value={persistentAllowed ? kind : 'one_time'} onChange={(e) => setKind(e.target.value)}>
         <option value="one_time">One-time correction (this round only)</option>
-        <option value="persistent">Persistent override (re-apply on every future import)</option>
+        <option value="persistent" disabled={!persistentAllowed}>ใช้การกำหนดค่านี้ในรอบถัดไปด้วย{!persistentAllowed ? ' (ใช้ได้เฉพาะการกำหนดค่า)' : ''}</option>
       </select>
       <input className="input flex-1" placeholder="Note for the audit log (optional)" value={note} onChange={(e) => setNote(e.target.value)} />
       <button className="btn" onClick={onCancel}><Localized>Cancel</Localized></button>
-      <button className="btn btn-primary" disabled={pending || !valid} onClick={() => onSave(kind, note)}>{pending ? <Spinner className="border-t-white" /> : 'Save as new version'}</button>
+      <button className="btn btn-primary" disabled={pending || !valid} onClick={() => onSave(persistentAllowed ? kind : 'one_time', note)}>{pending ? <Spinner className="border-t-white" /> : 'Save as new version'}</button>
     </div>
   )
 }

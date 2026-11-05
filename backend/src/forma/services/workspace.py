@@ -56,6 +56,18 @@ class Preferences(BaseModel):
         return value
 
 
+ATTENTION_STATUSES = (
+    "blocked",
+    "failed",
+    "rejected",
+    "review",
+    "transformed",
+    "approved",
+    "auto_approved",
+    "approved_data",
+)
+
+
 def history(
     session: Session,
     p: Principal,
@@ -89,6 +101,8 @@ def history(
     # Closed rounds (ADR-052) are history, not work: shown only when asked for.
     if status == "closed":
         q = q.where(ImportRound.status.in_(CLOSED))
+    elif status == "attention":
+        q = q.where(ImportRound.status.in_(ATTENTION_STATUSES))
     elif status:
         q = q.where(ImportRound.status == status)
     else:

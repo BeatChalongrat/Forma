@@ -45,6 +45,7 @@ class Learned:
     anchors: list[dict[str, Any]] = field(default_factory=list)  # other customers' pairs below the share bar
     anchored: int = 0  # pairs that became aliases because enough customers approved them (ADR-059)
     rules: list[dict[str, Any]] = field(default_factory=list)
+    dependencies: set[str] = field(default_factory=set)
 
     @property
     def empty(self) -> bool:
@@ -90,8 +91,10 @@ class Learned:
                 if header not in hs:
                     hs[header] = f"learned: {n} other customers map this header here (anchor, ADR-059)"
                     self.anchored += 1
+                    self.dependencies.update(anchors.sources.get((header, target), set()))
             else:
                 self.anchors.append({"header": header, "target": target, "customers": n})
+                self.dependencies.update(anchors.sources.get((header, target), set()))
 
 
 @dataclass
@@ -99,9 +102,12 @@ class Anchors:
     """(normalized header, target pointer) → the other customers whose approved mappings read it so."""
 
     pairs: dict[tuple[str, str], set[str]] = field(default_factory=dict)
+    sources: dict[tuple[str, str], set[str]] = field(default_factory=dict)
 
-    def add(self, header: str, target: str, customer_id: str) -> None:
+    def add(self, header: str, target: str, customer_id: str, source: str | None = None) -> None:
         self.pairs.setdefault((header, target), set()).add(customer_id)
+        if source:
+            self.sources.setdefault((header, target), set()).add(source)
 
 
 def _single_column(expr: Any) -> str | None:
@@ -142,7 +148,7 @@ def anchors_for(
         for f in fields:
             target, col = str(f.get("target") or ""), _single_column(f.get("expr"))
             if target in known and col and (h := norm_header(col)):
-                out.add(h, target, m.customer_id)
+                out.add(h, target, m.customer_id, "mapping:" + m.id)
     for c in session.scalars(
         select(Correction).where(
             Correction.status == "confirmed",
@@ -153,7 +159,7 @@ def anchors_for(
         )
     ):
         if c.target in known and c.header and c.customer_id and _same_contract(session, c, schema):
-            out.add(c.header, c.target, c.customer_id)
+            out.add(c.header, c.target, c.customer_id, "correction:" + c.id)
     return out
 
 
@@ -339,6 +345,10 @@ def learned_for(
 
 def _same_contract(session: Session, correction: Correction, schema: TargetSchema) -> bool:
     from forma.services.format_memory import compatible
+    from forma.services.knowledge_gate import allowed
+
+    if not allowed(session, correction):
+        return False
 
     if correction.mapping_version_id:
         mapping = session.get(MappingVersion, correction.mapping_version_id)

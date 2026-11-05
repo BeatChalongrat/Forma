@@ -122,9 +122,21 @@ forma restore /backups/forma-backup-20261028T020000Z.tar.gz
 forma db upgrade                                 # only if the running code is newer than the backup's revision
 ```
 
-`manifest.json` lists every object key with size and sha256 and the schema revision; `forma restore`
-reports keys that are in the manifest but missing from the backup and the bucket, so a partial restore is
-visible, never silent. A backup that failed leaves nothing with that name, and older ones are kept.
+`manifest.json` lists every object and the database dump with size and sha256, plus the schema revision.
+Verified restore rejects missing/corrupt content and unsafe paths before restoring the database. It will
+not overwrite a target object containing different bytes. PostgreSQL import is transactional and stops
+on SQL errors. A backup that failed leaves nothing with that name, and older ones are kept.
+
+Backups created before ADR-070 lack a database checksum and are refused by default. Prefer creating a
+new verified backup. For a historical backup that is the only available copy, inspect it in an isolated
+recovery environment and use the explicit `--no-verify` legacy option only after accepting that integrity
+cannot be established from its manifest; then validate records/downloads and create a new backup.
+
+Before upgrading to revision `c6e8fa123456`, check for duplicate dataset version numbers. The migration
+fails with the affected round/version list and leaves history untouched. Review any conflicts explicitly;
+do not delete or renumber old versions automatically. Rehearse upgrades and recovery using the
+[isolated mock repro](../deploy/repro/README.md). Production notification setup is in
+[monitoring](../deploy/monitoring/README.md).
 
 Restore a backup into an empty stack after changing Postgres or the image. That is how ADR-054 found that no backup of
 this stack could be restored. On another machine a restore also needs `.env.production`, because AI keys are stored

@@ -54,6 +54,7 @@ export function OpsPage() {
         actions={ready && <Badge tone={ready.status === 'ok' ? 'ok' : 'warn'}>{ready.status === 'ok' ? t('Connections ready', 'เชื่อมต่อบริการได้') : `${t('Connection issue', 'การเชื่อมต่อมีปัญหา')}: ${Object.entries(ready.checks).filter(([, v]) => !v.ok).map(([k]) => k).join(', ')}`}</Badge>}
       />
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-5">
+        {!!ops?.alerts?.length && <div className="col-span-full card p-4 space-y-3" role="status"><h2 className="font-semibold">{t('Needs an operator', 'เรื่องที่ผู้ดูแลต้องตรวจ')}</h2>{ops.alerts.map(a => <div key={a.code} className="flex gap-3 items-start"><Badge tone={a.severity === 'critical' ? 'bad' : 'warn'}>{a.severity === 'critical' ? t('Urgent', 'เร่งด่วน') : t('Check', 'ควรตรวจ')}</Badge><div><p className="font-medium">{a.message}</p><p className="text-muted text-sm">{a.action}</p></div></div>)}</div>}
         <Stat label="Queued" value={fmtInt(q?.queued)} tone={q && q.queued > (q.limit ?? 500) * 0.8 ? 'warn' : undefined} hint={q?.oldest_queued_age_s ? `oldest waiting ${Math.round(q.oldest_queued_age_s)} s` : `limit ${fmtInt(q?.limit)}`} />
         <Stat label="Running" value={fmtInt(q?.running)} hint={q ? `${q.backend} backend · ${fmtInt(q.workers)} workers${q.nodes ? ` · ${q.nodes} node` : ''}` : ''} />
         <Stat label="Failed jobs" value={fmtInt(q?.failed)} tone={q?.failed ? 'bad' : undefined} hint="retry re-queues the same job; finished stages are skipped" />

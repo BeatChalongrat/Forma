@@ -1,0 +1,85 @@
+{
+  "date": "2026-11-05",
+  "api_cost_usd": 0,
+  "backend_full_suite": {
+    "status": "passed",
+    "tests": 983,
+    "passed": 978,
+    "failed": 0,
+    "skipped": 5,
+    "parallel_test_processes": 4,
+    "coverage_percent": 90.78,
+    "coverage_gate_threshold": 85,
+    "reports": [
+      "backend-shard-1.xml",
+      "backend-shard-2.xml",
+      "backend-shard-3.xml",
+      "backend-shard-4.xml"
+    ]
+  },
+  "targeted_final_regressions": {
+    "passed": 41,
+    "failed": 0,
+    "files": [
+      "test_real_world_cases.py",
+      "test_data_integrity.py",
+      "test_failure_injection.py"
+    ]
+  },
+  "frontend": {
+    "passed": 12,
+    "failed": 0,
+    "typescript_build": "passed",
+    "lint_errors": 0,
+    "lint_warnings": 19
+  },
+  "python_quality": {
+    "ruff": "passed",
+    "formatted_files": 263,
+    "mypy_sources": 149
+  },
+  "deployment": {
+    "server_planner_tests": 7,
+    "compose_concurrency_profiles": [
+      2,
+      4,
+      8,
+      16,
+      32
+    ],
+    "prometheus_rules": 4,
+    "nginx_config": "passed"
+  },
+  "repro": {
+    "proof": "repro-proof.json",
+    "storage": "s3-compatible MinIO",
+    "database": "PostgreSQL",
+    "queue": "Redis/ARQ",
+    "model": "mock-only",
+    "concurrent_edit_responses": [
+      201,
+      409
+    ],
+    "restart_and_restore": "passed",
+    "stopped_after_verification": true
+  },
+  "manual_browser_checks": [
+    "filtered history -> upload -> combined upload -> back -> back preserves search filter",
+    "system alerts rendered"
+  ],
+  "dev": {
+    "container_ids_unchanged": true,
+    "ready_status": "ok",
+    "model": "deepseek-flash",
+    "migrated": false,
+    "restarted": false
+  },
+  "hosted_ci": {
+    "status": "not_verified_in_this_local_report"
+  },
+  "limitations": [
+    "Mock results do not measure real-model mapping accuracy.",
+    "Local Windows suite skips POSIX/PostgreSQL/MinIO-specific tests; PostgreSQL and MinIO are exercised separately by the isolated repro smoke.",
+    "External alert delivery and off-host disaster recovery are not configured by this task."
+  ]
+}

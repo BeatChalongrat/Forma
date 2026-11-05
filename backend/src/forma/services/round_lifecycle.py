@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from forma.auth import Principal
@@ -25,6 +25,34 @@ def is_closed(r: ImportRound) -> bool:
     return r.status in CLOSED
 
 
+def lock_round(session: Session, round_id: str, *, require_open: bool = True) -> ImportRound:
+    """Serialize lifecycle and dataset writes, always refreshing state after the lock is acquired."""
+    if session.get_bind().dialect.name == "sqlite":
+        # SQLite ignores FOR UPDATE. Acquire its writer lock before reading the current head.
+        session.execute(
+            update(ImportRound)
+            .where(ImportRound.id == round_id)
+            .values(status=ImportRound.status)
+            .execution_options(synchronize_session=False)
+        )
+    r = session.scalar(
+        select(ImportRound)
+        .where(ImportRound.id == round_id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
+    if r is None:
+        from forma.core.errors import NotFound
+
+        raise NotFound(f"round {round_id} not found")
+    if require_open and is_closed(r):
+        raise Conflict(
+            "ไฟล์ชุดนี้ถูกยกเลิก ย้าย หรือแทนที่แล้ว กรุณาเปิดชุดที่ใช้งานอยู่",
+            details={"status": r.status, "successor_id": r.successor_id},
+        )
+    return r
+
+
 def _reason(reason: str) -> str:
     reason = " ".join(reason.split())
     if not reason:
@@ -37,9 +65,7 @@ def _reason(reason: str) -> str:
 def _close(session: Session, p: Principal, r: ImportRound, kind: str, reason: str) -> list[str]:
     """Mark the round closed and set its open review tasks aside. Returns the ids of the tasks set aside."""
     # Same lock order as publication fencing: round first, then its jobs.
-    session.refresh(r, with_for_update=True)
-    if is_closed(r):
-        raise Conflict(f"This round is already {r.status}", details={"status": r.status})
+    r = lock_round(session, r.id)
     from sqlalchemy import update
 
     from forma.db.models import Job
@@ -89,6 +115,7 @@ def cancel(session: Session, p: Principal, r: ImportRound, reason: str) -> Impor
 
 def reopen(session: Session, p: Principal, r: ImportRound) -> ImportRound:
     """Only a cancelled round comes back: a moved or replaced one has a successor that took its place."""
+    r = lock_round(session, r.id, require_open=False)
     if r.status != "cancelled":
         raise Conflict("Only a cancelled round can be reopened", details={"status": r.status})
     if any(f.status == "purged" for f in r.files):

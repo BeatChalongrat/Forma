@@ -72,6 +72,15 @@ LLM_COST_BY_ROUND = Gauge(
     registry=REGISTRY,
 )
 WORKERS = Gauge("forma_workers", "Configured workers for this node", registry=REGISTRY)
+OPS_ALERT = Gauge(
+    "forma_operational_alert",
+    "Active operational signals from persistent state",
+    ["code", "severity"],
+    registry=REGISTRY,
+)
+METRICS_REFRESH_OK = Gauge(
+    "forma_metrics_refresh_ok", "1 when database-backed metrics refreshed", registry=REGISTRY
+)
 
 
 def _age(now: dt.datetime, d: dt.datetime | None) -> float:
@@ -93,6 +102,7 @@ def refresh_from_db() -> None:
     now = dt.datetime.now(dt.UTC)
     try:
         with session_scope() as s:
+            ROUNDS_BY_STATUS.clear()
             for status, n in s.execute(select(ImportRound.status, func.count()).group_by(ImportRound.status)):
                 ROUNDS_BY_STATUS.labels(status=status).set(n)
             open_n = (
@@ -127,9 +137,19 @@ def refresh_from_db() -> None:
             LLM_COST_BY_ROUND.clear()
             for rid, cost in rows:
                 LLM_COST_BY_ROUND.labels(round_id=str(rid)).set(float(cost or 0.0))
+            from forma.jobs import runner
+            from forma.services import health_alerts, retention
+            from forma.services.context import get_context
+
+            ctx = get_context()
+            alerts = health_alerts.collect(s, ctx, runner.queue_stats(), retention.status(ctx, s))
+            OPS_ALERT.clear()
+            for alert in alerts:
+                OPS_ALERT.labels(code=alert["code"], severity=alert["severity"]).set(1)
         WORKERS.set(get_settings().workers)
+        METRICS_REFRESH_OK.set(1)
     except Exception:  # pragma: no cover - DB unreachable: in-process metrics still render
-        pass
+        METRICS_REFRESH_OK.set(0)
 
 
 def render() -> bytes:

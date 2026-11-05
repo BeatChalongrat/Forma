@@ -1,0 +1,96 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://forma.local/eval/excel100_x0907",
+  "type": "object",
+  "title": "Competing price rows: must not silently choose a price",
+  "additionalProperties": false,
+  "required": [
+    "sku",
+    "product_name",
+    "price",
+    "currency",
+    "sell_unit",
+    "inventory"
+  ],
+  "properties": {
+    "sku": {
+      "type": "string",
+      "description": "Preserve identity including leading zeroes.",
+      "x-forma": {
+        "semantic": "identity.sku"
+      }
+    },
+    "product_name": {
+      "type": "string",
+      "description": "Use the master product description.",
+      "x-forma": {
+        "semantic": "product.name"
+      }
+    },
+    "price": {
+      "type": "number",
+      "description": "Selling price for RETAIL in target currency valid 2026-11-05.",
+      "x-forma": {
+        "semantic": "price.amount"
+      }
+    },
+    "currency": {
+      "type": "string",
+      "description": "ISO currency from the applicable price row.",
+      "x-forma": {
+        "semantic": "currency"
+      }
+    },
+    "sell_unit": {
+      "type": "string",
+      "description": "Full unit name; ask if the code has no definition.",
+      "x-forma": {
+        "semantic": "unit.sell"
+      }
+    },
+    "inventory": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "warehouse_code",
+          "qty"
+        ],
+        "properties": {
+          "warehouse_code": {
+            "type": "string",
+            "description": "Warehouse code.",
+            "x-forma": {
+              "semantic": "stock.warehouse"
+            }
+          },
+          "qty": {
+            "type": "number",
+            "description": "Individual pieces; sum lots within a warehouse.",
+            "x-forma": {
+              "semantic": "stock.qty"
+            }
+          }
+        }
+      }
+    }
+  },
+  "x-forma": {
+    "schema_id": "excel100_x0907",
+    "version": 1,
+    "identity_keys": [
+      "/sku"
+    ],
+    "collections": {
+      "/inventory": {
+        "identity_keys": [
+          "/warehouse_code"
+        ],
+        "key_fields": [
+          "/warehouse_code"
+        ]
+      }
+    }
+  }
+}

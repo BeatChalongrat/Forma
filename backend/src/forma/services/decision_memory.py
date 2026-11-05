@@ -67,7 +67,9 @@ def record(session: Session, m: MappingVersion, actor: str) -> list[Correction]:
 
 def eligible(session: Session, m: MappingVersion) -> bool:
     """An approved one-delivery exception is not a reusable format."""
-    if not verification_allows_recall(m):
+    from forma.services.knowledge_gate import allowed
+
+    if not allowed(session, m) or not verification_allows_recall(m):
         return False
     decisions = (m.policy or {}).get("confirmed_decisions", [])
     if any(not reusable(d) for d in decisions):
@@ -140,6 +142,10 @@ def recall(
         .order_by(Correction.created_at.desc())
     )
     for row in rows:
+        from forma.services.knowledge_gate import allowed
+
+        if not allowed(session, row):
+            continue
         data = row.after or {}
         if not reusable(data) or data.get("requirements_hash") != stable_hash(r.notes or ""):
             continue

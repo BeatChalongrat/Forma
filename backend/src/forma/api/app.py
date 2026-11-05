@@ -15,6 +15,7 @@ from starlette.concurrency import run_in_threadpool
 from forma import __version__
 from forma.api.batch_routes import router as batch_router
 from forma.api.config_routes import router as config_router
+from forma.api.knowledge_routes import router as knowledge_router
 from forma.api.routes import api
 from forma.api.workspace_routes import router as workspace_router
 from forma.auth import ensure_auth_is_safe
@@ -84,7 +85,18 @@ def create_app() -> FastAPI:
         try:
             response = await call_next(request)
             # the handler's rows are committed here, before the client sees the response (ADR-057)
-            await run_in_threadpool(commit_request_sessions, request, ok=response.status_code < 400)
+            try:
+                await run_in_threadpool(commit_request_sessions, request, ok=response.status_code < 400)
+            except Exception:
+                structlog.get_logger().exception("request.commit_failed")
+                response = JSONResponse(
+                    status_code=503,
+                    content={
+                        "error": "commit_failed",
+                        "message": "บันทึกข้อมูลไม่สำเร็จ กรุณาโหลดข้อมูลล่าสุดแล้วลองอีกครั้ง",
+                        "details": {"request_id": rid},
+                    },
+                )
         finally:
             structlog.contextvars.unbind_contextvars("request_id", "path")
         response.headers["X-Request-Id"] = rid
@@ -124,6 +136,7 @@ def create_app() -> FastAPI:
 
     app.include_router(api)
     app.include_router(config_router)
+    app.include_router(knowledge_router)
     app.include_router(batch_router)
     app.include_router(workspace_router)
     app.dependency_overrides[get_session] = request_session  # committed before the response (ADR-057)

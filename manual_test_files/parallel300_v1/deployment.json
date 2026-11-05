@@ -1,0 +1,42 @@
+{
+  "ready": {
+    "status": "ok",
+    "checks": {
+      "db": {
+        "ok": true,
+        "ms": 17.2
+      },
+      "storage": {
+        "ok": true,
+        "ms": 5.6,
+        "detail": "s3"
+      },
+      "queue": {
+        "ok": true,
+        "ms": 345.4,
+        "detail": "arq"
+      }
+    }
+  },
+  "containers": {
+    "forma-api-1": {
+      "workers": 4,
+      "llm_shared_concurrency": 8,
+      "llm_shared_rpm": 60
+    },
+    "forma-worker-1": {
+      "workers": 4,
+      "llm_shared_concurrency": 8,
+      "llm_shared_rpm": 60
+    },
+    "forma-worker-2": {
+      "workers": 4,
+      "llm_shared_concurrency": 8,
+      "llm_shared_rpm": 60
+    }
+  },
+  "model": "deepseek-flash",
+  "provider": "openai_compatible",
+  "paid_api_called": false,
+  "note": "nginx reloaded to resolve recreated API container; existing credentials untouched"
+}
