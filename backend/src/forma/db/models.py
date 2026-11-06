@@ -196,6 +196,27 @@ Index("ix_mapping_customer_fp", MappingVersion.customer_id, MappingVersion.finge
 Index("ix_mapping_customer_status", MappingVersion.customer_id, MappingVersion.status)
 
 
+class ReviewDraft(Base):
+    """Personal, version-bound drafts. Saving a draft never changes a mapping or teaches knowledge."""
+
+    __tablename__ = "review_drafts"
+    mapping_id: Mapped[str] = mapped_column(ForeignKey("mapping_versions.id"), primary_key=True)
+    owner: Mapped[str] = mapped_column(String(64), primary_key=True)
+    revision: Mapped[int] = mapped_column(Integer, default=1)
+    payload: Mapped[dict[str, Any]] = mapped_column(JSONType, default=dict)
+    updated_at: Mapped[dt.datetime] = mapped_column(UTCDateTime, default=utcnow)
+
+
+class ReviewReceipt(Base):
+    """Retry a confirmed review after a lost response without another version or job."""
+
+    __tablename__ = "review_receipts"
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    mapping_id: Mapped[str] = mapped_column(ForeignKey("mapping_versions.id"), index=True)
+    result: Mapped[dict[str, Any]] = mapped_column(JSONType)
+    created_at: Mapped[dt.datetime] = mapped_column(UTCDateTime, default=utcnow)
+
+
 REVIEW_UNRESOLVED = ("open", "waiting")  # a question that still needs an answer, from somebody
 
 

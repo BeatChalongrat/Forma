@@ -1,3 +1,4 @@
+import { reviewReturn, reviewToolUrl, latestReview } from '../lib/reviewNavigation'
 import { Localized } from '../lib/locale'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -66,6 +67,7 @@ export function MappingStudio() {
   const [selected, setSelected] = useState<string | null>(null) // target pointer being edited
   const [selectedSource, setSelectedSource] = useState<string | null>(null)
   const [params] = useSearchParams() // ?tab= and ?view= open a tool directly (links from the round page, the guide, Ctrl+K)
+  const reviewBack = params.has('reviewReturn') ? reviewReturn(params.get('reviewReturn')) : null
   const [rightTab, setActiveTab] = useState<StudioTab>(() => (STUDIO_TABS as readonly string[]).includes(params.get('tab') ?? '') ? (params.get('tab') as StudioTab) : 'json')
   const { t } = usePreferences()
   const [view, setView] = useState<'fields' | 'results' | 'relationships' | 'json'>(() => (params.get('view') === 'relationships' ? 'relationships' : params.get('tab') ? 'results' : 'fields'))
@@ -143,7 +145,7 @@ export function MappingStudio() {
   const rejectM = useMutation({ mutationFn: () => api.rejectMapping(mappingId, { actor: 'operator', comment }), onSuccess: () => { qc.invalidateQueries(); setReject(false); toast.push({ kind: 'ok', title: 'Mapping rejected' }) } })
   const save = useMutation({
     mutationFn: () => api.editMapping(mappingId, doc!, 'operator'),
-    onSuccess: (m) => { qc.invalidateQueries(); toast.push({ kind: 'ok', title: `Saved as v${m.version}`, detail: 'New proposed version created; the previous one is kept in history.' }); nav(`/rounds/${roundId}/mapping/${m.id}`); setDoc(null); setDirty(false) },
+    onSuccess: (m) => { qc.invalidateQueries(); toast.push({ kind: 'ok', title: `Saved as v${m.version}`, detail: 'New proposed version created; the previous one is kept in history.' }); nav(reviewBack ? reviewToolUrl(`/rounds/${roundId}/mapping/${m.id}`, latestReview(reviewBack, m.id)) : `/rounds/${roundId}/mapping/${m.id}`); setDoc(null); setDirty(false) },
     onError: (e: Error & { details?: { issues?: { message: string }[] } }) => toast.push({ kind: 'bad', title: 'Mapping is not valid', detail: e.details?.issues?.map((i) => i.message).join('; ') ?? e.message }),
   })
 
@@ -208,7 +210,7 @@ export function MappingStudio() {
       {/* top bar */}
       <div className="workspace-toolbar">
         <div className="min-w-0 flex items-center gap-3 flex-wrap">
-          <Link to={`/rounds/${roundId}`} className="text-muted hover:text-ink text-[12.5px]">← {round?.customer?.code} · {round?.label}</Link>
+          <Link to={reviewBack || `/rounds/${roundId}`} onClick={e => { if (dirty && !window.confirm(t('Discard unsaved field edits? Your review answers are saved separately.', 'ยังไม่ได้บันทึกการแก้ฟิลด์ ต้องการกลับโดยไม่เก็บการแก้นี้หรือไม่? ร่างคำตอบของการตรวจยังเก็บแยกไว้'))) e.preventDefault() }} className="btn btn-ghost btn-sm">← {reviewBack ? t('Back to this file’s review', 'กลับมาตรวจไฟล์นี้') : `${round?.customer?.code} · ${round?.label}`}</Link>
           <span className="heading">Match fields</span>
           <span className="text-muted tnum">v{mv.version}</span>
           <StatusBadge status={mv.status} />
@@ -221,17 +223,17 @@ export function MappingStudio() {
           {!dirty && !locked && (
             <>
               <button className="btn btn-sm btn-danger" onClick={() => setReject(true)}><X size={13} /> Reject</button>
-              {mv.policy.decision === 'block'
+              {reviewBack && mv.policy.decision !== 'block' ? <Link className="btn btn-sm btn-primary" to={reviewBack}>{t('Back to review & confirm', 'กลับไปตรวจผลและยืนยัน')}</Link> : mv.policy.decision === 'block'
                 ? <button className="btn btn-sm" onClick={() => setOverrideOpen(true)} title="Blocked by policy — approving needs the approver role and a reason"><ShieldAlert size={13} /> Override block…</button>
                 : <button className="btn btn-sm btn-primary" disabled={approve.isPending} onClick={() => approve.mutate(false)}><Check size={13} /> Approve</button>}
             </>
           )}
-          {!dirty && mv.status === 'approved' && <Link to={`/rounds/${roundId}`} className="btn btn-sm">Back to round</Link>}
+          {!dirty && mv.status === 'approved' && <Link to={reviewBack || `/rounds/${roundId}`} className="btn btn-sm">{reviewBack ? t('Back to this file’s review', 'กลับมาตรวจไฟล์นี้') : t('Back to round', 'กลับรอบนำเข้า')}</Link>}
         </div>
       </div>
 
       <div className="px-5 py-3 border-b border-line bg-surface shrink-0 max-h-[30dvh] overflow-auto">
-        <p className="text-[13px] text-ink-2 m-0 inline-flex items-center gap-2 flex-wrap"><RiskLevel level={mv.policy.risk_level} factors={mv.policy.risk_factors} /><span>{mv.policy.decision === 'block' ? 'Approval is blocked. Review the reasons before continuing.' : mv.policy.decision === 'review' ? 'Review the suggested fields before approving.' : 'Fields checked. Inspect the output before continuing.'}</span></p>
+        <p className="text-[13px] text-ink-2 m-0 inline-flex items-center gap-2 flex-wrap"><RiskLevel level={mv.policy.risk_level} factors={mv.policy.risk_factors} /><span>{reviewBack && mv.policy.decision !== 'block' ? <Link className="btn btn-sm btn-primary" to={reviewBack}>{t('Back to review & confirm', 'กลับไปตรวจผลและยืนยัน')}</Link> : mv.policy.decision === 'block' ? 'Approval is blocked. Review the reasons before continuing.' : mv.policy.decision === 'review' ? 'Review the suggested fields before approving.' : 'Fields checked. Inspect the output before continuing.'}</span></p>
         <div className="mt-3 space-y-2 text-[13px]">
           {mv.policy.impact?.affected_records !== undefined && !mv.policy.impact.high && <p className="font-medium">{fmtInt(mv.policy.impact.affected_records)} of {fmtInt(mv.policy.impact.of_records)} records change compared with the approved version.</p>}
           {mv.policy.reasons.map((reason, i) => <p key={i}>{reason}</p>)}

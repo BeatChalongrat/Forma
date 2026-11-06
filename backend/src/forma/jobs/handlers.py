@@ -261,6 +261,54 @@ def transform_round(ctx: ServiceContext, payload: dict[str, Any], prog: JobProgr
     return res
 
 
+@handler("finish_review")
+def finish_review(ctx: ServiceContext, payload: dict[str, Any], prog: JobProgress) -> dict[str, Any]:
+    """Finish only the mapping the person confirmed; never invoke the mapper/LLM again."""
+    from forma.core.errors import Conflict
+    from forma.services.round_lifecycle import lock_round
+
+    rid, mid = payload["round_id"], payload["mapping_version_id"]
+    if prog.done("transform"):
+        result = dict(prog.stages["transform"])
+    else:
+        prog.update(10, "Preparing the reviewed output")
+        with session_scope() as s:
+            r = lock_round(s, rid)
+            mv = ms.get_mapping(s, mid)
+            if (r.summary or {}).get("mapping_version_id") != mid or mv.approved_at is None:
+                raise Conflict("The reviewed mapping changed; open the latest review")
+            dv = ds.transform_round(ctx, s, rid, mapping_version_id=mid, actor=payload["actor"])
+            result = {"dataset_version_id": dv.id, "rows": dv.row_count}
+            prog.mark_in(s, "transform", **result)
+    if prog.done("publish"):
+        return {**result, **prog.stages["publish"]}
+    with session_scope() as s:
+        r = lock_round(s, rid)
+        if (r.summary or {}).get("mapping_version_id") != mid or (r.summary or {}).get(
+            "dataset_version_id"
+        ) != result["dataset_version_id"]:
+            raise Conflict("The output changed while preparing the download; review the latest result")
+        # Persistent data corrections run after mapping. They were not part of the person's
+        # mapping preview, so require inspection of the actual result before publishing it.
+        output = ds.get_dataset(s, result["dataset_version_id"])
+        corrections = (output.stats or {}).get("overrides", {})
+        changed_by_corrections = corrections.get("rows_affected") or corrections.get("rows_deleted")
+        published = (
+            pub.auto_publish(ctx, s, rid)
+            if (r.summary or {}).get("auto_publish") and not changed_by_corrections
+            else {
+                "decision": "review",
+                "reasons": [
+                    "persistent corrections require inspection"
+                    if changed_by_corrections
+                    else "manual data approval required"
+                ],
+            }
+        )
+        prog.mark_in(s, "publish", publish=published)
+    return {**result, "publish": published}
+
+
 @handler("export_dataset")
 def export_dataset(ctx: ServiceContext, payload: dict[str, Any], prog: JobProgress) -> dict[str, Any]:
     if prog.done("export"):

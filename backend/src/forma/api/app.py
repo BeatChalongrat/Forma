@@ -17,6 +17,7 @@ from forma.api.batch_routes import router as batch_router
 from forma.api.config_routes import router as config_router
 from forma.api.knowledge_revision_routes import router as knowledge_revision_router
 from forma.api.knowledge_routes import router as knowledge_router
+from forma.api.review_journey_routes import router as review_journey_router
 from forma.api.routes import api
 from forma.api.workspace_routes import router as workspace_router
 from forma.auth import ensure_auth_is_safe
@@ -141,6 +142,7 @@ def create_app() -> FastAPI:
     app.include_router(knowledge_revision_router)
     app.include_router(batch_router)
     app.include_router(workspace_router)
+    app.include_router(review_journey_router)
     app.dependency_overrides[get_session] = request_session  # committed before the response (ADR-057)
     return app
 

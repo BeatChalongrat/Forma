@@ -898,7 +898,10 @@ def review_queue(
     session: Session = Depends(get_session),
     p: Principal = Depends(current_principal),
 ) -> list[dict[str, Any]]:
+    from forma.db.models import ReviewDraft
     from forma.services.review_explanations import explain
+    from forma.services.review_journey import owner
+    from forma.services.review_questions import questions
 
     rq.wake_due(session)
     q = _scoped(p, select(ReviewTask), ReviewTask.customer_id)
@@ -930,12 +933,30 @@ def review_queue(
         ).all()
     }
     out = []
+    catalogues = {mid: questions(get_context(), m) for mid, m in mappings.items()}
+    progress = {mid: catalogue["progress"] for mid, catalogue in catalogues.items()}
+    drafts = {
+        d.mapping_id: d
+        for d in session.scalars(
+            select(ReviewDraft).where(ReviewDraft.owner == owner(p), ReviewDraft.mapping_id.in_(mappings))
+        ).all()
+    }
     for t in tasks:
         c = customers.get(t.customer_id)
         r = rounds.get(t.round_id)
+        draft = drafts.get(t.mapping_version_id)
+        draft_info = None
+        if draft and mappings[t.mapping_version_id].status == "proposed":
+            ids = {item["id"] for item in catalogues[t.mapping_version_id]["questions"]}
+            draft_info = {
+                "answers": sum(key in ids for key in draft.payload.get("answers", {})),
+                "updated_at": draft.updated_at.isoformat(),
+            }
         out.append(
             ser.review_task(
                 t,
+                progress=progress.get(t.mapping_version_id) if t.kind != "audit" else None,
+                draft=draft_info,
                 explanations=explain(
                     get_context(),
                     t.reasons,

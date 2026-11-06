@@ -1,3 +1,4 @@
+import { reviewReturn, reviewToolUrl } from '../lib/reviewNavigation'
 import { parseValue, type NumberStyle } from '../lib/valueInput'
 import { setPointerLocal } from '../lib/jsonPointer'
 import { JsonRecordEditor } from '../components/JsonRecordEditor'
@@ -49,6 +50,8 @@ export function DataEditor() {
   const [saveOpen, setSaveOpen] = useState(false)
   const [newerDataset, setNewerDataset] = useState<string | null>(null)
   const [params] = useSearchParams() // ?tab= opens a panel, ?tool=trace explains tracing (links from the round page, the guide, Ctrl+K)
+  const reviewBack = params.has('reviewReturn') ? reviewReturn(params.get('reviewReturn')) : null
+  const datasetUrl = (id: string) => reviewBack ? reviewToolUrl(`/datasets/${id}`, reviewBack) : `/datasets/${id}`
   const [rightTab, setActiveTab] = useState<EditorTab>(() => (EDITOR_TABS as readonly string[]).includes(params.get('tab') ?? '') ? (params.get('tab') as EditorTab) : 'changes')
   const { t } = usePreferences()
   const [view, setView] = useState<'grid' | 'assistant' | 'review'>(() => { const tab = params.get('tab'); return tab === 'copilot' ? 'assistant' : tab ? 'review' : 'grid' })
@@ -199,13 +202,13 @@ export function DataEditor() {
   const preview = useMutation({ mutationFn: () => api.previewChanges(datasetId, pending.map(strip)) })
   const apply = useMutation({
     mutationFn: (b: { kind: string; note: string }) => api.applyChanges(datasetId, { operations: pending.map(strip), kind: b.kind, actor: 'operator', note: b.note || undefined }),
-    onSuccess: ({ dataset }) => { qc.invalidateQueries(); setPending([]); setSaveOpen(false); toast.push({ kind: 'ok', title: `Saved as dataset v${dataset.version}` }); nav(`/datasets/${dataset.id}`) },
+    onSuccess: ({ dataset }) => { qc.invalidateQueries(); setPending([]); setSaveOpen(false); toast.push({ kind: 'ok', title: `Saved as dataset v${dataset.version}` }); nav(datasetUrl(dataset.id)) },
     onError: (e: Error & { details?: { latest_dataset_id?: string; errors?: { pointer: string; message: string }[] } }) => {
       if (e.details?.latest_dataset_id) { setNewerDataset(e.details.latest_dataset_id); setSaveOpen(false) }
       toast.push({ kind: 'bad', title: t('Could not save changes', 'บันทึกการแก้ไขไม่สำเร็จ'), detail: e.details?.errors?.slice(0, 3).map((x) => `${x.pointer}: ${x.message}`).join('; ') ?? e.message })
     },
   })
-  const rollback = useMutation({ mutationFn: () => api.rollback(datasetId), onSuccess: (d) => { qc.invalidateQueries(); toast.push({ kind: 'ok', title: `Rolled back → v${d.version}` }); nav(`/datasets/${d.id}`) } })
+  const rollback = useMutation({ mutationFn: () => api.rollback(datasetId), onSuccess: (d) => { qc.invalidateQueries(); toast.push({ kind: 'ok', title: `Rolled back → v${d.version}` }); nav(datasetUrl(d.id)) } })
   const approve = useMutation({
     mutationFn: (b: { acknowledge_anomalies?: boolean; comment?: string }) => api.approveDataset(datasetId, b),
     onSuccess: () => { qc.invalidateQueries(); setAck(null); toast.push({ kind: 'ok', title: 'Dataset approved' }) },
@@ -241,9 +244,9 @@ export function DataEditor() {
 
   return (
     <div className="workspace">
-      {newerDataset && <div role="alert" className="p-3 border-b border-line bg-warn-soft flex items-center gap-3 flex-wrap"><span>{t('A newer version exists. Your unsaved changes remain on this page. Open the latest version in another tab to compare before editing again.', 'มีเวอร์ชันใหม่แล้ว การแก้ที่ยังไม่บันทึกยังอยู่ในหน้านี้ เปิดเวอร์ชันล่าสุดอีกแท็บเพื่อเปรียบเทียบก่อนแก้ต่อ')}</span><Link className="btn btn-sm" target="_blank" rel="noopener noreferrer" to={`/datasets/${newerDataset}`}>{t('Open latest version', 'เปิดเวอร์ชันล่าสุด')}</Link></div>}
+      {newerDataset && <div role="alert" className="p-3 border-b border-line bg-warn-soft flex items-center gap-3 flex-wrap"><span>{t('A newer version exists. Your unsaved changes remain on this page. Open the latest version in another tab to compare before editing again.', 'มีเวอร์ชันใหม่แล้ว การแก้ที่ยังไม่บันทึกยังอยู่ในหน้านี้ เปิดเวอร์ชันล่าสุดอีกแท็บเพื่อเปรียบเทียบก่อนแก้ต่อ')}</span><Link className="btn btn-sm" target="_blank" rel="noopener noreferrer" to={datasetUrl(newerDataset!)}>{t('Open latest version', 'เปิดเวอร์ชันล่าสุด')}</Link></div>}
       <div className="workspace-toolbar">
-        <Link to={`/rounds/${ds.round_id}`} className="text-muted hover:text-ink text-[12.5px]">← Round</Link>
+        <Link to={reviewBack || `/rounds/${ds.round_id}`} onClick={e => { if ((pending.length || editing) && !window.confirm(t('Discard unsaved data edits? Your review answers are saved separately.', 'ยังไม่ได้บันทึกการแก้ข้อมูล ต้องการกลับโดยไม่เก็บการแก้นี้หรือไม่? ร่างคำตอบยังเก็บแยกไว้'))) e.preventDefault() }} className="btn btn-ghost btn-sm">← {reviewBack ? t('Back to this file’s review', 'กลับมาตรวจไฟล์นี้') : t('Back to round', 'กลับรอบนำเข้า')}</Link>
         <span className="heading">Data Editor</span>
         <span className="tnum text-muted">v{ds.version}</span>
         <StatusBadge status={ds.status} />

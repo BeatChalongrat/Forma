@@ -29,7 +29,8 @@ export function ScrollMemory({ scrollRef }: { scrollRef: RefObject<HTMLElement |
     current.scroll = saved?.scroll ?? 0
     visits.current = recordVisit(visits.current, current, action)
     const page = pageIdentity(url)
-    if (lastPage.current !== page) scrollRef.current?.scrollTo({ top: action === 'POP' ? current.scroll : 0 })
+    const requestedScroll: unknown = location.state?.restoreScroll
+    if (lastPage.current !== page) scrollRef.current?.scrollTo({ top: typeof requestedScroll === 'number' && Number.isFinite(requestedScroll) ? requestedScroll : action === 'POP' ? current.scroll : 0 })
     lastPage.current = page
     const persist = () => {
       current.scroll = scrollRef.current?.scrollTop ?? 0
@@ -38,7 +39,7 @@ export function ScrollMemory({ scrollRef }: { scrollRef: RefObject<HTMLElement |
     persist()
     window.addEventListener('pagehide', persist)
     return () => { persist(); window.removeEventListener('pagehide', persist) }
-  }, [action, index, location.key, scrollRef, url])
+  }, [action, index, location.key, location.state, scrollRef, url])
 
   return null
 }
