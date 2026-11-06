@@ -131,6 +131,11 @@ def test_answer_preview_versions_and_policy(client: TestClient, isolated_env: Pa
     before = client.get(f"/api/mappings/{mid}").json()["document"]
     questions = client.get(f"/api/mappings/{mid}/questions").json()
     assert questions["questions"][0]["kind"] == "boolean"
+    queue = client.get("/api/review").json()
+    task = next(t for t in queue if t["mapping_version_id"] == mid)
+    assert task["progress"] == questions["progress"]
+    assert questions["progress"]["remaining_questions"] == len(questions["questions"])
+    assert questions["progress"]["saved_answers"] == 0
     answers = {ptr: False}
     preview = client.post(f"/api/mappings/{mid}/answers/preview", json={"answers": answers})
     assert preview.status_code == 200, preview.text
@@ -154,6 +159,11 @@ def test_answer_preview_versions_and_policy(client: TestClient, isolated_env: Pa
     assert saved.json()["parent_id"] == mid
     assert saved.json()["policy"]["decision"] == "block"
     assert saved.json()["open_questions"] == ["Confirm VAT rate", "Unrelated unresolved question"]
+    after = client.get(f"/api/mappings/{saved.json()['id']}/questions").json()
+    assert after["progress"]["saved_answers"] == 1
+    assert after["progress"]["state"] == "blocked"
+    task = next(t for t in client.get("/api/review").json() if t["mapping_version_id"] == saved.json()["id"])
+    assert task["progress"] == after["progress"]
     assert client.get(f"/api/mappings/{mid}").json()["document"] == before
     assert client.get(f"/api/rounds/{r['id']}").json()["status"] == "blocked"
     assert (
@@ -163,6 +173,32 @@ def test_answer_preview_versions_and_policy(client: TestClient, isolated_env: Pa
         ).status_code
         == 409
     )
+
+
+def test_saved_review_progress_moves_to_final_review_without_approving(
+    client: TestClient, isolated_env: Path
+) -> None:
+    _, mid, ptr = uncertain_mapping(client, isolated_env)
+    payload = {
+        "answers": {ptr: False},
+        "acknowledged": ["Confirm VAT rate", "Unrelated unresolved question"],
+    }
+    preview = client.post(f"/api/mappings/{mid}/answers/preview", json=payload)
+    assert preview.status_code == 200, preview.text
+    saved = client.post(
+        f"/api/mappings/{mid}/answers/apply", json={**payload, "digest": preview.json()["digest"]}
+    )
+    assert saved.status_code == 201, saved.text
+    new_id = saved.json()["id"]
+    q = client.get(f"/api/mappings/{new_id}/questions").json()
+    assert q["status"] == "proposed"
+    assert q["progress"]["state"] == "final_review"
+    assert q["progress"]["remaining_questions"] == 0
+    assert q["progress"]["remaining_notes"] == 0
+    assert q["progress"]["saved_answers"] == 1
+    task = next(t for t in client.get("/api/review").json() if t["mapping_version_id"] == new_id)
+    assert task["progress"] == q["progress"]
+    assert client.get("/api/review", headers={"X-Forma-Customers": ""}).json() == []
 
 
 def test_questions_access_and_invalid_answer(client: TestClient, isolated_env: Path) -> None:

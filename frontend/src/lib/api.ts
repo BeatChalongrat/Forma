@@ -1,6 +1,8 @@
 /** Typed API client. All calls go through the Vite proxy (/api → FastAPI). */
 import { authHeaders, login } from './auth'
 
+export type ReviewDraftPayload = { answers: Record<string, boolean | number | string>; remember: string[]; acknowledged: string[]; unsure: Record<string, boolean>; section: string; comment: string }
+export type ReviewDraft = { mapping_id: string; revision: number; payload: Partial<ReviewDraftPayload>; updated_at: string | null }
 export class ApiError extends Error {
   status: number
   code: string
@@ -208,7 +210,10 @@ export type MappingVersion = {
 }
 /** The same question across several open files (ADR-059): one answer settles them all. */
 export type QuestionGroup = { key: string; kind: 'choice' | 'boolean'; field: FieldSpec; options: string[]; current: Expr; members: { task_id: string; mapping_id: string; round_id: string; customer_code: string }[] }
+export type ReviewProgress = { state: string; saved_answers: number; remaining_questions: number; remaining_notes: number; topics: { en: string; th: string }[] }
 export type ReviewTask = {
+  draft?: { answers: number; updated_at: string } | null;
+  progress?: ReviewProgress | null;
   explanations?: { en: string; th: string }[]
   age_days: number; waiting_until: string | null; waiting_note: string | null
   id: string; round_id: string; customer_id: string; mapping_version_id: string | null; dataset_version_id: string | null; kind: string; priority: number; status: string
@@ -311,7 +316,7 @@ export type Preferences = { display_name: string; avatar?: string; language: 'th
 export type MemoryItem = { id: string; topic: string; content: string; origin: 'chat' | 'user'; sensitive: boolean; source_chat_id: string | null; created_at: string; updated_at: string }
 export type MemoryChange = { action: 'save' | 'change' | 'forget'; id: string; topic: string; sensitive?: boolean }
 export type HistoryFilters = { status?: string; customer_id?: string; search?: string; start?: string; end?: string; timezone?: string; offset?: number; limit?: number }
-export type ReviewQuestions = { mapping_id: string; round_id: string; status: string; blocked: boolean; questions: { id: string; field: FieldSpec; kind: 'boolean' | 'number' | 'confirm' | 'choice' | 'text' | 'enum'; question?: string; question_th?: string | null; reason_th?: string; action?: string; source_value?: string | null; source_examples?: { file?: string; sheet?: string; column: string; values: string[]; context_only?: boolean }[]; scope?: string; option_labels?: Record<string, string>; allow_custom?: boolean; options?: string[]; current: Expr; evidence: string[]; note?: string; contested?: boolean }[]; open_questions: string[]; reasons: string[]; sample: Record<string, unknown>[]; context: { customer: { code: string; name: string } | null; round_label: string | null; files: { id: string; name: string }[]; mapping_version: number }; changes: (FieldChange & { field: FieldSpec })[]; comparison_dataset_id: string | null; checks: Record<string, unknown>; impact: PolicyDecision['impact'] | null; fields: FieldSpec[] }
+export type ReviewQuestions = { progress?: ReviewProgress; mapping_id: string; round_id: string; status: string; blocked: boolean; questions: { id: string; field: FieldSpec; kind: 'boolean' | 'number' | 'confirm' | 'choice' | 'text' | 'enum'; question?: string; question_th?: string | null; reason_th?: string; action?: string; source_value?: string | null; source_examples?: { file?: string; sheet?: string; column: string; values: string[]; context_only?: boolean }[]; scope?: string; option_labels?: Record<string, string>; allow_custom?: boolean; options?: string[]; current: Expr; evidence: string[]; note?: string; contested?: boolean }[]; open_questions: string[]; reasons: string[]; sample: Record<string, unknown>[]; context: { customer: { code: string; name: string } | null; round_label: string | null; files: { id: string; name: string }[]; mapping_version: number }; changes: (FieldChange & { field: FieldSpec })[]; comparison_dataset_id: string | null; checks: Record<string, unknown>; impact: PolicyDecision['impact'] | null; fields: FieldSpec[] }
 export type ReviewEvidence = { execution_scope?: string; field: string; sample_limit: number; sample_records: number; constant: boolean; context_only: boolean; unavailable: boolean; examples: { identity: string; item: number | null; value: unknown; source_complete: boolean; cells: { file: string | null; sheet: string | null; row: number | null; column: string | null; header: string; raw: unknown; verified: boolean | null }[] }[] }
 export type EffectCheck = { complete: boolean; passed: boolean; records_checked?: number; remaining_errors?: number; error?: string; checked_at?: string; before_mapping_id?: string; mapping_id?: string; actor?: string }
 export type AuditEvent = { id: string; actor: string; action: string; entity: string; entity_id: string; details: Record<string, unknown>; at: string }
@@ -390,6 +395,10 @@ export const api = {
   verdict: (roundId: string) => get<{ round_id: string; status: string; verdict: Verdict | null }>(`/api/rounds/${roundId}/verdict`),
   acceptVerdict: (roundId: string, b: { digest: string; decisions?: Record<string, boolean | number | string | null>; comment?: string }) => post<VerdictAccepted>(`/api/rounds/${roundId}/verdict/accept`, b),
   reviewQuestions: (id: string) => get<ReviewQuestions>(`/api/mappings/${id}/questions`),
+  reviewDraft: (id: string) => get<ReviewDraft>(`/api/mappings/${id}/review/draft`),
+  saveReviewDraft: (id: string, revision: number, payload: ReviewDraftPayload) => put<ReviewDraft>(`/api/mappings/${id}/review/draft`, { revision, payload }),
+  reviewPreview: (id: string, body: Pick<ReviewDraftPayload, 'answers' | 'remember' | 'acknowledged'>) => post<AnswerPreview>(`/api/mappings/${id}/review/preview`, body),
+  confirmReview: (id: string, body: Pick<ReviewDraftPayload, 'answers' | 'remember' | 'acknowledged' | 'comment'> & { digest: string }) => post<{ mapping_id: string; job_id: string | null; state: 'processing' | 'needs_review' }>(`/api/mappings/${id}/review/confirm`, body),
   reviewEvidence: (id: string, field: string) => get<ReviewEvidence>(`/api/mappings/${id}/questions/evidence?field=${encodeURIComponent(field)}`),
   previewAnswers: (id: string, answers: Record<string, boolean | number | string>, remember: string[] = [], acknowledged: string[] = []) => post<AnswerPreview>(`/api/mappings/${id}/answers/preview`, { answers, remember, acknowledged }),
   applyAnswers: (id: string, answers: Record<string, boolean | number | string>, digest: string, remember: string[] = [], acknowledged: string[] = []) => post<MappingVersion>(`/api/mappings/${id}/answers/apply`, { answers, digest, remember, acknowledged }),

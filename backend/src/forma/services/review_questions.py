@@ -421,6 +421,12 @@ def questions(ctx: ServiceContext, m: MappingVersion) -> dict[str, Any]:
 
         item.update(presentation(item))
     aliases = {p for q in items for p in q.get("related_questions", []) if p != q.get("question")}
+    # The legacy inclusivity warning is answered by the VAT question, not a second checkbox.
+    # Never suppress VAT-rate/registration questions or warnings with no corresponding field.
+    if any(q["field"].get("semantic") == "price.vat_included" for q in items):
+        aliases.update(
+            p for p in m.open_questions or [] if isinstance(p, str) and VAT_ASSUMED_QUESTION_RE.fullmatch(p)
+        )
     items.sort(
         key=lambda item: (
             not item["contested"],
@@ -428,7 +434,7 @@ def questions(ctx: ServiceContext, m: MappingVersion) -> dict[str, Any]:
             item["field"]["risk"] != "critical",
         )
     )
-    return {
+    result: dict[str, Any] = {
         "mapping_id": m.id,
         "round_id": m.round_id,
         "status": m.status,
@@ -438,6 +444,10 @@ def questions(ctx: ServiceContext, m: MappingVersion) -> dict[str, Any]:
         "reasons": (m.policy or {}).get("reasons", []),
         "sample": (m.policy or {}).get("sample", [])[:3],
     }
+    from forma.services.review_progress import describe
+
+    result["progress"] = describe(m, result)
+    return result
 
 
 def answer_document(
