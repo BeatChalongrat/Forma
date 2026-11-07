@@ -68,6 +68,7 @@ def run(dataset_id: str, export_id: str, expected_hash: str) -> dict:
             name: connection.scalar(text(f'SELECT COUNT(*) FROM "{name}"'))
             for name in runtime_tables
         }
+        activity_count = connection.scalar(text("SELECT COUNT(*) FROM job_activity"))
     backup = create_backup(
         ctx, Path("/data/recovery-check"), include_objects=True, archive=True
     )
@@ -88,6 +89,10 @@ def run(dataset_id: str, export_id: str, expected_hash: str) -> dict:
     restored_ctx.storage.ensure_bucket()
     result = restore_backup(restored_ctx, Path(backup["path"]), verify=True)
     with get_engine().connect() as connection:
+        assert (
+            connection.scalar(text("SELECT COUNT(*) FROM job_activity"))
+            == activity_count
+        )
         for name, count in runtime_counts.items():
             assert connection.scalar(text(f'SELECT COUNT(*) FROM "{name}"')) == count
     with workflow_storage(get_settings(), thread_id) as (saver, ledger):

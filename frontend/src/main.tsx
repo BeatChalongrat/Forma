@@ -25,6 +25,8 @@ import { AuthCallback } from './pages/AuthCallback'
 import { ensureAuthenticated } from './lib/auth'
 import { PreferencesProvider } from './lib/preferences'
 import { AssistantPage } from './components/Assistant'
+import { ActivityPage } from './pages/Activity'
+import { InspectionPage } from './pages/Inspection'
 
 const qc = new QueryClient({ defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false, staleTime: 5000 } } })
 
@@ -48,6 +50,8 @@ const router = createBrowserRouter([
       { path: 'datasets/:datasetId', element: <DataEditor /> },
       { path: 'settings', element: <SettingsPage /> },
       { path: 'ops', element: <OpsPage /> },
+      { path: 'activity', element: <ActivityPage /> },
+      { path: 'inspection', element: <InspectionPage /> },
       { path: 'guide', element: <GuidePage /> },
     ],
   },

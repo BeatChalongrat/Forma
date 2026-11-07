@@ -26,6 +26,7 @@ import tarfile
 import tempfile
 import time
 from collections.abc import Iterator
+from contextlib import closing
 from pathlib import Path, PurePosixPath
 from typing import Any
 
@@ -101,6 +102,15 @@ def dump_database(dest_dir: Path) -> Path:
             dst = sqlite3.connect(str(out))
             with dst:
                 src.backup(dst)
+            # The SQLite live journal uses a separate writer; include a consistent snapshot in
+            # the main backup so normal integrity checking and retention cover it as well.
+            journal = Path(str(url.database) + ".activity.sqlite")
+            if journal.exists():
+                dst.execute("ATTACH DATABASE ? AS activity_source", (str(journal),))
+                with dst:
+                    dst.execute("DELETE FROM job_activity")
+                    dst.execute("INSERT INTO job_activity SELECT * FROM activity_source.job_activity")
+                dst.execute("DETACH DATABASE activity_source")
             dst.close()
         finally:
             src.close()
@@ -132,6 +142,11 @@ def restore_database(dump: Path) -> None:
         raise RuntimeError("refusing to restore into a non-empty database (see RUNBOOK: restore)")
     url = engine.url
     if url.get_backend_name() == "sqlite":
+        journal = Path(str(url.database) + ".activity.sqlite")
+        if journal.exists():
+            with closing(sqlite3.connect(str(journal))) as existing:
+                if existing.execute("SELECT COUNT(*) FROM job_activity").fetchone()[0]:
+                    raise RuntimeError("refusing to restore over an existing activity journal")
         engine.dispose()
         src = sqlite3.connect(str(dump))
         dst = sqlite3.connect(str(url.database))
@@ -141,6 +156,18 @@ def restore_database(dump: Path) -> None:
         finally:
             src.close()
             dst.close()
+        from forma.jobs import activity
+
+        # Older backups need not contain activity. The migration creates it when upgraded.
+        with closing(sqlite3.connect(str(dump))) as check:
+            has_activity = check.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name='job_activity'"
+            ).fetchone()
+        if has_activity:
+            activity.engine().dispose()
+            with closing(sqlite3.connect(str(journal))) as restored, restored:
+                restored.execute("ATTACH DATABASE ? AS recovered", (str(dump),))
+                restored.execute("INSERT INTO job_activity SELECT * FROM recovered.job_activity")
         return
     pg_url = url.render_as_string(hide_password=False).replace("postgresql+psycopg://", "postgresql://")
     with tempfile.TemporaryDirectory(prefix="forma-restore-") as tmp:

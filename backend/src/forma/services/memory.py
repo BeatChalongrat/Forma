@@ -283,14 +283,16 @@ def apply_call(
         if not args.get("memory_id"):
             raise ValidationFailed("forget needs the memory_id of a topic in memory")
         topic = remove(session, p, recall.owner, args["memory_id"])
-        session.commit()
+        if not session.info.get("assistant_atomic_tool"):
+            session.commit()
         return {"action": "forget", "id": args["memory_id"], "topic": topic}
     sensitive = bool(args.get("sensitive"))
     if sensitive and not recall.allow_sensitive:
         raise ValidationFailed("Not kept: sensitive topics are switched off in this person's memory settings")
     if args.get("memory_id"):
         row = update(session, p, recall.owner, args["memory_id"], args.get("topic"), args.get("content"))
-        session.commit()
+        if not session.info.get("assistant_atomic_tool"):
+            session.commit()
         return {"action": "change", "id": row.id, "topic": row.topic, "sensitive": row.sensitive}
     if not args.get("topic") or not args.get("content"):
         raise ValidationFailed("save needs a topic and its content")
@@ -305,7 +307,8 @@ def apply_call(
         turn_id,
         sensitive=sensitive,
     )
-    session.commit()
+    if not session.info.get("assistant_atomic_tool"):
+        session.commit()
     return {"action": "save", "id": row.id, "topic": row.topic, "sensitive": row.sensitive}
 
 

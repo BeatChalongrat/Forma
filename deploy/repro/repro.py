@@ -31,6 +31,9 @@ LIMITS = {
     "sandbox": 3072,
     "web": 128,
     "migrate": 512,
+    "report-worker": 512,
+    "assistant-worker": 768,
+    "report-sandbox": 3072,
 }
 
 
@@ -90,7 +93,12 @@ def local_daemon() -> None:
 
 
 def build_config(
-    name: str, token: str, ports: list[int], passwords: dict[str, str]
+    name: str,
+    token: str,
+    ports: list[int],
+    passwords: dict[str, str],
+    *,
+    reports: bool = True,
 ) -> dict:
     project = PREFIX + name
     labels = {OWNER: token}
@@ -269,6 +277,38 @@ def build_config(
             ],
         },
     }
+    if reports:
+        env["FORMA_REPORT_SANDBOX_SOCKET"] = "/run/report-sandbox/runner.sock"
+        env["FORMA_REPORT_WORKERS"] = "1"
+        services["report-sandbox"] = copy.deepcopy(services["sandbox"])
+        services["report-sandbox"]["volumes"] = ["report-sandbox-socket:/run/sandbox"]
+        services["report-worker"] = copy.deepcopy(services["worker"])
+        services["report-worker"]["command"] = ["forma", "worker", "--queue", "reports"]
+        services["report-worker"]["volumes"] = [
+            "formadata:/data",
+            "report-sandbox-socket:/run/report-sandbox",
+        ]
+        services["report-worker"]["depends_on"].pop("sandbox")
+        services["report-worker"]["depends_on"]["report-sandbox"] = {
+            "condition": "service_started"
+        }
+        services["report-worker"]["healthcheck"]["test"][-1] = services["worker"][
+            "healthcheck"
+        ]["test"][-1].replace("arq:queue", "arq:reports")
+    services["assistant-worker"] = copy.deepcopy(services["worker"])
+    services["assistant-worker"]["command"] = [
+        "forma",
+        "worker",
+        "--queue",
+        "assistant",
+    ]
+    services["assistant-worker"]["healthcheck"]["test"][-1] = services["worker"][
+        "healthcheck"
+    ]["test"][-1].replace("arq:queue", "arq:assistant")
+    if reports:
+        services["assistant-worker"]["volumes"].append(
+            "report-sandbox-socket:/run/report-sandbox"
+        )
     for key, service in services.items():
         service.update(
             {
@@ -290,7 +330,14 @@ def build_config(
         },
         "volumes": {
             v: {"labels": labels}
-            for v in ("pgdata", "redis", "minio", "formadata", "sandbox-socket")
+            for v in (
+                "pgdata",
+                "redis",
+                "minio",
+                "formadata",
+                "sandbox-socket",
+                *(["report-sandbox-socket"] if reports else []),
+            )
         },
     }
 
@@ -358,6 +405,7 @@ def load(name: str) -> tuple[Path, dict, dict]:
             "minio": env["FORMA_S3_SECRET_KEY"],
             "secret": env["FORMA_SECRET_KEY"],
         },
+        reports="report-worker" in config["services"],
     )
     legacy = copy.deepcopy(expected)
     legacy["services"]["worker"]["healthcheck"]["test"][-1] = LEGACY_WORKER_CHECK

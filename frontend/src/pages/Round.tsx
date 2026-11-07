@@ -50,13 +50,14 @@ export function RoundPage() {
 
   return (
     <>
+      {params.has('activityJob') && <Link className="btn btn-ghost btn-sm mb-4" to={`/activity?round=${r.id}&job=${encodeURIComponent(params.get('activityJob') || '')}`}>← กลับห้องทำงาน</Link>}
       {params.has('reviewReturn') && <Link className="btn btn-ghost btn-sm mb-4" to={reviewReturn(params.get('reviewReturn'))}>← {t('Back to this file’s review', 'กลับมาตรวจไฟล์นี้')}</Link>}
       <PageHeader
         crumbs={<><Link to="/imports" className="hover:text-ink">Imports</Link><span>/</span><Link to={`/customers/${r.customer_id}`} className="hover:text-ink">{r.customer?.code}</Link></>}
         title={<span>{r.customer?.name} <span className="text-muted font-normal">· {r.label}</span></span>}
         subtitle={<span className="flex items-center gap-2 flex-wrap"><StatusBadge status={r.status} />{drift && <Badge tone={driftTone(drift)}>format: {formatLabel(drift)}</Badge>}<span className="text-muted">{fmtDate(r.created_at)}</span></span>}
         hint="รอบนี้อยู่ขั้นไหน และต้องทำอะไรต่อ ดูที่แถบด้านล่าง"
-        actions={<><Link className="btn" to={`/assistant?round=${r.id}`}><AssistantIcon size={16} /> Ask about this file</Link><RoundMenu round={r} moveRequest={moveRequest} /></>}
+        actions={<><Link className="btn" to={`/inspection?scope=round&id=${r.id}`}>ตรวจสอบย้อนหลัง</Link><Link className="btn" to={`/activity?round=${r.id}`}>ห้องทำงาน · ดูกิจกรรม</Link><Link className="btn" to={`/assistant?round=${r.id}`}><AssistantIcon size={16} /> Ask about this file</Link><RoundMenu round={r} moveRequest={moveRequest} /></>}
       />
 
       <ClosedNote r={r} />

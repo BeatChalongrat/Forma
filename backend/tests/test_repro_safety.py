@@ -83,8 +83,11 @@ def test_config_isolated_and_edits_refused(repro):
             assert port.startswith("127.0.0.1:")
         for volume in service.get("volumes", []):
             assert volume.split(":")[0] in config["volumes"]
-    for service in ("api", "worker", "migrate"):
+    for service in ("api", "worker", "migrate", "report-worker"):
         assert config["services"][service]["environment"]["FORMA_LLM_MOCK_ONLY"] == "true"
+    assert config["services"]["report-worker"]["command"][-2:] == ["--queue", "reports"]
+    assert config["services"]["report-sandbox"]["network_mode"] == "none"
+    assert config["services"]["report-sandbox"]["volumes"] == ["report-sandbox-socket:/run/sandbox"]
     config["volumes"]["pgdata"] = {"external": True, "name": "forma_pgdata"}
     (path / "compose.json").write_text(json.dumps(config), encoding="utf-8")
     with pytest.raises(RuntimeError, match="edited"):

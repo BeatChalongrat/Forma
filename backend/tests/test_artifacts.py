@@ -234,6 +234,25 @@ def test_a_run_the_model_redid_leaves_no_version(client: TestClient, sandbox: Lo
     assert detail["latest"] == 1 and "second try" in detail["versions"][0]["code"]
     file = detail["versions"][0]["file"]
     assert client.get(f"/api/assistant/attachments/{file['id']}").content == b"second try"
+    assert made[0]["file"]["id"] == file["id"]
+    history = client.get(f"/api/assistant/conversations/{chat}").json()
+    saved = history["turns"][0]
+    assert len(saved["reply"]["code_runs"]) == 2
+    assert saved["reply"]["artifacts"][0]["file"]["id"] == file["id"]
+    # Simulate a previously saved reply before output references included attachment metadata.
+    from forma.db.models import AssistantTurn
+
+    with session_scope() as s:
+        turn = s.get(AssistantTurn, saved["id"])
+        old = dict(turn.reply)
+        old["artifacts"] = [{k: v for k, v in a.items() if k != "file"} for a in old["artifacts"]]
+        turn.reply = old
+    loaded = client.get(f"/api/assistant/conversations/{chat}").json()["turns"][0]["reply"]
+    assert loaded["artifacts"][0]["file"]["id"] == file["id"]
+    assert len(loaded["code_runs"]) == 2
+    with session_scope() as s:
+        assert "file" not in s.get(AssistantTurn, saved["id"]).reply["artifacts"][0]
+    assert client.get(f"/api/assistant/conversations/{chat}", headers=OTHER).status_code == 404
 
 
 def test_a_failed_run_makes_nothing(client: TestClient, sandbox: LocalRunner) -> None:

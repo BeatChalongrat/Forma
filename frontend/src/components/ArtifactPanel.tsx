@@ -104,17 +104,17 @@ function WorkBody({ detail, version, picked, onTarget, onAsk, flowPick, onFlowPi
   return <p className="text-sm text-muted">{t('Download this file to open it.', 'ดาวน์โหลดเพื่อเปิดไฟล์นี้')}</p>
 }
 
-export function ArtifactPanel({ id, target, onTarget, onAsk, onPrompt, onClose, busy }: { id: string; target: string; onTarget: (target: string) => void; onAsk: (text: string) => void; onPrompt: (text: string) => void; onClose: () => void; busy: boolean }) {
+export function ArtifactPanel({ id, target, onTarget, onAsk, onPrompt, onClose, busy, initialVersion }: { initialVersion?: number; id: string; target: string; onTarget: (target: string) => void; onAsk: (text: string) => void; onPrompt: (text: string) => void; onClose: () => void; busy: boolean }) {
   const { t, prefs } = usePreferences(), qc = useQueryClient()
   const { data: detail, isError, refetch } = useQuery({ queryKey: ['artifact', id], queryFn: () => api.artifact(id) })
   const [chosen, setChosen] = useState<{ number: number; latest: number }>(), [view, setView] = useState<'work' | 'code'>('work'), [copied, setCopied] = useState(false), [box, setFlowPick] = useState(''), [failed, setFailed] = useState(false)
   const svgRef = useRef<SVGSVGElement>(null), layoutRef = useRef<FlowLayout>(null)
   const flowPick = target ? box : ''
-  const restore = useMutation({ mutationFn: (n: number) => api.restoreArtifact(id, n), onSuccess: result => { qc.setQueryData(['artifact', id], result); void qc.invalidateQueries({ queryKey: ['artifacts'] }); setChosen(undefined) } })
+  const restore = useMutation({ mutationFn: (n: number) => api.restoreArtifact(id, n), onSuccess: result => { qc.setQueryData(['artifact', id], result); void qc.invalidateQueries({ queryKey: ['artifacts'] }); setChosen({ number: result.latest, latest: result.latest }) } })
   if (isError) return <aside className="artifact-panel" aria-label={t('Work', 'ผลงาน')}><div className="p-6 text-bad" role="alert">{t('This work could not be opened.', 'ยังเปิดผลงานนี้ไม่ได้')}<button className="btn btn-sm ml-2" onClick={() => void refetch()}>{t('Retry', 'ลองอีกครั้ง')}</button></div></aside>
   if (!detail) return <aside className="artifact-panel" aria-label={t('Work', 'ผลงาน')}><div className="grid place-items-center h-full"><Spinner /></div></aside>
   // A choice lasts until a newer version arrives: then the newest one is what the reader asked for.
-  const number = chosen?.latest === detail.latest ? chosen.number : detail.latest
+  const number = chosen?.latest === detail.latest ? chosen.number : (initialVersion ?? detail.latest)
   const version = detail.versions.find(v => v.number === number) ?? detail.versions[detail.versions.length - 1]
   const previous = detail.versions.find(v => v.number === version.number - 1)
   const changes = detail.kind === 'flow' && version.content ? flowChanges(previous?.content, version.content) : null
@@ -148,7 +148,7 @@ export function ArtifactPanel({ id, target, onTarget, onAsk, onPrompt, onClose, 
       </div>
       <div className="artifact-source">
         <span><Database size={14} className="shrink-0" />{version.uses_data ? t(`Real data as of ${when}, counted for your access`, `ข้อมูลจริง ณ ${when} นับตามสิทธิ์ของคุณ`) : t('No customer data in this work', 'ผลงานนี้ไม่ได้ใช้ข้อมูลลูกค้า')}</span>
-        {version.checked > 0 && <span className="text-ok"><CircleCheck size={14} className="shrink-0" />{t(`The AI looked at ${version.checked} picture(s) of it`, `AI ตรวจภาพแล้ว ${version.checked} ภาพ`)}</span>}
+        {version.checked > 0 && <span><CircleCheck size={14} className="shrink-0" />{t(`${version.checked} preview image(s) were sent to the model; this is not a quality certification`, `ส่งภาพตัวอย่าง ${version.checked} ภาพให้โมเดลแล้ว ยังไม่ใช่การรับรองคุณภาพ`)}</span>}
         {!!changes && !!previous && <span>{t('Since', 'เทียบ')} v{previous.number}: {[changes.addedCount && t(`${changes.addedCount} added`, `เพิ่ม ${changes.addedCount} กล่อง`), changes.changedCount && t(`${changes.changedCount} changed`, `แก้ ${changes.changedCount} กล่อง`), changes.removedCount && t(`${changes.removedCount} removed`, `ลบ ${changes.removedCount} กล่อง`)].filter(Boolean).join(' · ') || t('arrows only', 'เปลี่ยนเฉพาะเส้น')}</span>}
       </div>
       {detail.stale && !isOld && <div className="artifact-stale"><TriangleAlert size={15} className="shrink-0" /><span className="flex-1 min-w-[180px]">{t('The data has changed since this was made. This version stays as it is.', 'ข้อมูลเปลี่ยนหลังจากสร้างผลงานนี้ ฉบับนี้จะไม่ถูกแก้เอง')}</span><button type="button" className="btn btn-sm" disabled={busy} onClick={() => onAsk(t('Make this again with the latest data.', 'ทำผลงานนี้ใหม่ด้วยข้อมูลล่าสุด'))}>{t('Make it again with the latest data', 'ทำใหม่ด้วยข้อมูลล่าสุด')}</button></div>}

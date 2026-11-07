@@ -39,6 +39,7 @@ class AnswerStream:
     emit: Callable[[dict[str, Any]], None]
     checkpoint: Callable[[], None] = lambda: None
     text: str = ""
+    phase: str = "research"
     metadata: dict[str, Any] = field(default_factory=dict)
     cancelled: threading.Event = field(default_factory=threading.Event)
     close_provider: Callable[[], None] | None = None
@@ -56,6 +57,11 @@ class AnswerStream:
             with contextlib.suppress(Exception):
                 self.close_provider()
 
+    def set_phase(self, phase: str) -> None:
+        self.phase = phase
+        self.check()
+        self.emit({"type": "phase", "phase": phase})
+
     def delta(self, text: str) -> None:
         self.check()
         candidate = self.text + text
@@ -66,6 +72,7 @@ class AnswerStream:
             raise guard.GuardRejected(errors)
         self.text = candidate
         self.emit({"type": "delta", "text": text})
+        self.checkpoint()
 
 
 def stream_text(
@@ -86,6 +93,9 @@ def stream_text(
         t0, ok, started = time.perf_counter(), False, False
         try:
             breaker.before_call()
+            from forma.ai.budget import reserve_request
+
+            reserve_request()
             headers = {"Content-Type": "application/json"}
             if isinstance(provider, AnthropicProvider):
                 url = provider.base_url + "/v1/messages"

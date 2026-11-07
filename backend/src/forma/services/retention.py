@@ -377,6 +377,7 @@ def apply(
         j = session.get(Job, jid)
         if j:
             session.delete(j)
+            session.info.setdefault("activity_retired_jobs", []).append(jid)
             done["jobs"] += 1
     for tid in plan_.get("review_tasks", []):
         task = session.get(ReviewTask, tid)

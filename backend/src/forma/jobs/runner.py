@@ -42,6 +42,8 @@ log = get_logger(__name__)
 Handler = Callable[[ServiceContext, dict[str, Any], "JobProgress"], dict[str, Any]]
 _HANDLERS: dict[str, Handler] = {}
 _BACKEND: Backend | None = None
+_REPORT_BACKEND: Backend | None = None
+_ASSISTANT_BACKEND: Backend | None = None
 _LOCK = threading.Lock()
 TERMINAL = ("done", "failed", "cancelled")
 
@@ -77,6 +79,9 @@ class JobProgress:
                 self.stages = dict(j.result["stages"])
 
     def update(self, progress: int, message: str | None = None) -> None:
+        from forma.jobs.activity import emit
+
+        emit("progress", detail={"message": message, "progress": progress})
         with session_scope() as s:
             s.info["job_bookkeeping"] = True
             j = s.get(Job, self.job_id)
@@ -190,8 +195,9 @@ class ArqBackend:
 
     name = "arq"
 
-    def __init__(self, redis_url: str) -> None:
+    def __init__(self, redis_url: str, queue: str = "arq:queue") -> None:
         self.redis_url = redis_url
+        self.queue = queue
 
     def submit(self, job_id: str) -> None:
         import asyncio
@@ -202,7 +208,6 @@ class ArqBackend:
         from arq import create_pool
         from arq.connections import RedisSettings
         from arq.constants import (
-            default_queue_name,
             in_progress_key_prefix,
             job_key_prefix,
             result_key_prefix,
@@ -230,10 +235,12 @@ class ArqBackend:
                 job_key_prefix + delivery,
                 result_key_prefix + delivery,
                 in_progress_key_prefix + delivery,
-                default_queue_name,
+                self.queue,
                 delivery,
             )
-            await pool.enqueue_job("arq_run_job", job_id, generation, _job_id=delivery)
+            await pool.enqueue_job(
+                "arq_run_job", job_id, generation, _job_id=delivery, _queue_name=self.queue
+            )
         finally:
             await pool.close()
 
@@ -248,12 +255,12 @@ class ArqBackend:
     async def _stats(self) -> dict[str, Any]:
         from arq import create_pool
         from arq.connections import RedisSettings
-        from arq.constants import default_queue_name, health_check_key_suffix
+        from arq.constants import health_check_key_suffix
 
         pool = await create_pool(RedisSettings.from_dsn(self.redis_url))
         try:
-            depth = await pool.zcard(default_queue_name)
-            health = await pool.get(default_queue_name + health_check_key_suffix)
+            depth = await pool.zcard(self.queue)
+            health = await pool.get(self.queue + health_check_key_suffix)
         finally:
             await pool.close()
         return {
@@ -278,9 +285,27 @@ def make_backend(name: str | None = None) -> Backend:
     raise ValueError(f"unknown FORMA_JOB_BACKEND {kind!r} (thread | process | arq)")
 
 
-def get_backend() -> Backend:
-    global _BACKEND
+def get_backend(kind: str | None = None) -> Backend:
+    global _BACKEND, _REPORT_BACKEND, _ASSISTANT_BACKEND
     with _LOCK:
+        if kind == "assistant_message":
+            if _ASSISTANT_BACKEND is None:
+                settings = get_settings()
+                _ASSISTANT_BACKEND = (
+                    ArqBackend(settings.redis_url, "arq:assistant")
+                    if settings.job_backend == "arq"
+                    else ThreadBackend(settings.assistant_workers)
+                )
+            return _ASSISTANT_BACKEND
+        if kind == "create_document":
+            if _REPORT_BACKEND is None:
+                s = get_settings()
+                _REPORT_BACKEND = (
+                    ArqBackend(s.redis_url, "arq:reports")
+                    if s.job_backend == "arq"
+                    else ThreadBackend(s.report_workers)
+                )
+            return _REPORT_BACKEND
         if _BACKEND is None:
             _BACKEND = make_backend()
         return _BACKEND
@@ -288,12 +313,18 @@ def get_backend() -> Backend:
 
 def reset_backend() -> None:
     """Drop the cached backend (tests / config reload)."""
-    global _BACKEND
+    global _BACKEND, _REPORT_BACKEND, _ASSISTANT_BACKEND
     _stop_recovery_scheduler()
     with _LOCK:
         if _BACKEND is not None:
             _BACKEND.shutdown()
         _BACKEND = None
+        if _REPORT_BACKEND is not None:
+            _REPORT_BACKEND.shutdown()
+        _REPORT_BACKEND = None
+        if _ASSISTANT_BACKEND is not None:
+            _ASSISTANT_BACKEND.shutdown()
+        _ASSISTANT_BACKEND = None
 
 
 def start() -> dict[str, Any]:
@@ -302,7 +333,7 @@ def start() -> dict[str, Any]:
 
     # CREATE INDEX CONCURRENTLY in the checkpoint saver must run before business transactions.
     # Doing its first setup inside a mapping transaction can wait on that very transaction.
-    if get_settings().mapping_workflow == "graph":
+    if get_settings().mapping_workflow == "graph" and get_settings().worker_queue != "reports":
         from forma.ai.workflow_store import workflow_storage
 
         with workflow_storage(get_settings(), "startup-schema"):
@@ -377,7 +408,12 @@ def dispatch_pending(only: str | None = None) -> list[str]:
             won = getattr(changed, "rowcount", 0) == 1
         if won:
             try:
-                get_backend().submit(jid)
+                with session_scope() as s:
+                    kind = s.scalar(select(Job.kind).where(Job.id == jid))
+                backend = (
+                    get_backend(kind) if kind in ("create_document", "assistant_message") else get_backend()
+                )
+                backend.submit(jid)
                 sent.append(jid)
             except Exception:
                 log.exception("job saved; dispatch will retry", job_id=jid)
@@ -639,6 +675,7 @@ def _heartbeat(job_id: str, token: str, stopped: threading.Event, deadline: floa
 
 def run_job(job_id: str, generation: int | None = None, lease_token: str | None = None) -> bool:
     """Execute one job in this process. Safe to call from any backend, any number of times."""
+    from forma.jobs import activity
     from forma.jobs import handlers as _h  # noqa: F401  (register handlers in worker processes)
     from forma.jobs.execution import Execution, JobStopped, current
     from forma.jobs.recovery import completed_job_result, record_reconciliation
@@ -656,6 +693,7 @@ def run_job(job_id: str, generation: int | None = None, lease_token: str | None 
     with session_scope() as s:
         j0 = s.get(Job, job_id)
         req_id = j0.request_id if j0 else None
+        attempt = j0.attempts if j0 else 0
     structlog.contextvars.bind_contextvars(job_id=job_id, job_kind=kind, request_id=req_id)
     t0 = time.perf_counter()
     execution = Execution(job_id, lease, time.monotonic() + get_settings().job_timeout_s)
@@ -663,6 +701,8 @@ def run_job(job_id: str, generation: int | None = None, lease_token: str | None 
         target=_heartbeat, args=(job_id, lease, execution.stopped, execution.deadline), daemon=True
     )
     pulse.start()
+    activity_token = activity.context.set((job_id, attempt))
+    activity.emit("job", "started", detail={"kind": kind, "attempt": attempt})
     try:
         scope = current.set(execution)
         try:
@@ -698,6 +738,7 @@ def run_job(job_id: str, generation: int | None = None, lease_token: str | None 
                     j.message = "Reconciled with existing published output"
                     record_reconciliation(s, job_id, result)
         metrics.observe_job(kind, "done", time.perf_counter() - t0)
+        activity.emit("job", "completed", detail={"result": result, "committed": j is not None})
         return True
     except (Exception, JobStopped) as e:
         log.error("job failed", job=job_id, kind=kind, error=str(e))
@@ -722,8 +763,10 @@ def run_job(job_id: str, generation: int | None = None, lease_token: str | None 
                     r.status = "failed"
                     r.summary = {**(r.summary or {}), "error": str(e)[:500]}
         metrics.observe_job(kind, "failed", time.perf_counter() - t0)
+        activity.emit("job", "failed", detail={"error": str(e)[:1000]})
         return True
     finally:
+        activity.context.reset(activity_token)
         execution.stopped.set()
         pulse.join(timeout=2)
         structlog.contextvars.unbind_contextvars("job_id", "job_kind", "request_id")
@@ -933,10 +976,16 @@ def _visible(s: Session, j: Job, customers: frozenset[str] | None) -> bool:
     return r is not None and r.customer_id in customers
 
 
-def job_status(job_id: str, *, customers: frozenset[str] | None = None) -> dict[str, Any]:
+def job_status(
+    job_id: str, *, customers: frozenset[str] | None = None, private: bool = False
+) -> dict[str, Any]:
     with session_scope() as s:
         j = s.get(Job, job_id)
-        if j is None or not _visible(s, j, customers):
+        if (
+            j is None
+            or (j.kind in ("create_document", "assistant_message") and not private)
+            or not _visible(s, j, customers)
+        ):
             raise KeyError(job_id)
         return _job_dict(j)
 
@@ -950,7 +999,13 @@ def list_jobs(
     customers: frozenset[str] | None = None,
 ) -> list[dict[str, Any]]:
     with session_scope() as s:
-        q = select(Job).order_by(Job.created_at.desc()).limit(limit).offset(offset)
+        q = (
+            select(Job)
+            .where(Job.kind.not_in(("create_document", "assistant_message")))
+            .order_by(Job.created_at.desc())
+            .limit(limit)
+            .offset(offset)
+        )
         if status:
             q = q.where(Job.status == status)
         if kind:
@@ -965,7 +1020,11 @@ def list_jobs(
 def batch_status(batch_id: str, *, customers: frozenset[str] | None = None) -> dict[str, Any]:
     with session_scope() as s:
         found = s.scalars(select(Job).where(Job.batch_id == batch_id).order_by(Job.created_at))
-        jobs = [j for j in found if _visible(s, j, customers)]
+        jobs = [
+            j
+            for j in found
+            if j.kind not in ("create_document", "assistant_message") and _visible(s, j, customers)
+        ]
         if not jobs:
             raise KeyError(batch_id)
         by: dict[str, int] = {}
@@ -1018,7 +1077,7 @@ async def arq_run_job(ctx: dict[str, Any], job_id: str, generation: int | None =
     import asyncio
     import sys
 
-    state = await asyncio.to_thread(job_status, job_id)
+    state = await asyncio.to_thread(job_status, job_id, private=True)
     if state["status"] != "queued" or (generation is not None and state["attempts"] != generation):
         return False
 
@@ -1041,7 +1100,7 @@ async def arq_run_job(ctx: dict[str, Any], job_id: str, generation: int | None =
                     await asyncio.wait_for(asyncio.shield(waiter), timeout=1)
                 except TimeoutError:
                     try:
-                        state = await asyncio.to_thread(job_status, job_id)
+                        state = await asyncio.to_thread(job_status, job_id, private=True)
                         if state["status"] == "cancelled":
                             break
                     except Exception:
@@ -1092,8 +1151,11 @@ def arq_worker_settings() -> type:
 
     class WorkerSettings:
         functions = [arq_run_job]
+        queue_name = {"reports": "arq:reports", "assistant": "arq:assistant"}.get(s.worker_queue, "arq:queue")
         redis_settings = RedisSettings.from_dsn(s.redis_url)
-        max_jobs = s.workers
+        max_jobs = {"reports": s.report_workers, "assistant": s.assistant_workers}.get(
+            s.worker_queue, s.workers
+        )
         job_timeout = s.job_timeout_s + 20
         on_startup = _arq_startup
         on_shutdown = _arq_shutdown

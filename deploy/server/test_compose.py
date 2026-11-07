@@ -33,10 +33,10 @@ class ComposeMergeTests(unittest.TestCase):
                 if not k.startswith(("FORMA_", "POSTGRES_", "MINIO_", "COMPOSE_"))
             }
             for jobs, cpu, ram in (
-                (2, 8, 20),
-                (4, 10, 24),
-                (8, 16, 48),
-                (16, 24, 64),
+                (2, 12, 24),
+                (4, 12, 32),
+                (8, 18, 48),
+                (16, 32, 80),
                 (32, 48, 128),
             ):
                 with self.subTest(jobs=jobs):
@@ -96,7 +96,13 @@ class ComposeMergeTests(unittest.TestCase):
                     self.assertEqual(
                         services["worker"]["deploy"]["replicas"], max(1, jobs // 4)
                     )
-                    for name in ("worker", "api", "migrate", "backup-nightly"):
+                    for name in (
+                        "worker",
+                        "report-worker",
+                        "api",
+                        "migrate",
+                        "backup-nightly",
+                    ):
                         self.assertEqual(
                             services[name]["environment"]["FORMA_KNOWLEDGE_POLICY"],
                             "strict",

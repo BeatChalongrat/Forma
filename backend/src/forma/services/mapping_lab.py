@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from forma.code_sandbox.client import Input, RunnerPool, SandboxUnavailable
+from forma.jobs.activity import observed
 from forma.services.code_sandbox import MAX_CODE_CHARS, get_runner
 
 
@@ -47,6 +48,7 @@ def executor(ctx: Any, files: list[Any], schema: Any) -> Any:
         data = json.dumps(value, ensure_ascii=False).encode("utf-8")
         inputs.append(Input(path, len(data), lambda data=data: io.BytesIO(data)))
 
+    @observed("sandbox.python", arguments=("code",))
     def execute(code: str) -> dict[str, Any]:
         from forma.ai.budget import progress, remaining
 

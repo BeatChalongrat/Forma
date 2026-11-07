@@ -15,7 +15,6 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 
-from forma.ai.text_stream import AnswerStream
 from forma.api import serialize as ser
 from forma.api.routes import _mapping_scoped, _round_scoped, ctx_dep, read_upload
 from forma.auth import Principal, ensure_all_customers, ensure_customer, llm_rate_limited, require_role
@@ -471,6 +470,7 @@ class TurnIn(BaseModel):
     attachment_ids: list[str] = Field(default_factory=list, max_length=attachments.MAX_PER_MESSAGE)
     artifact_id: str | None = Field(default=None, max_length=40)
     target: str = Field(default="", max_length=160)
+    clarification_turn_id: str | None = Field(default=None, max_length=40)
 
     @field_validator("timezone")
     @classmethod
@@ -716,19 +716,18 @@ def send_message(
     p: Principal = Depends(require_role("importer")),
     _limit: Principal = Depends(llm_rate_limited),
 ) -> dict[str, Any]:
-    return conversations.send(
-        ctx,
-        session,
-        p,
-        chat_id,
-        body.question,
-        body.request_id,
-        body.language,
-        body.timezone,
-        attachment_ids=body.attachment_ids,
-        artifact_id=body.artifact_id,
-        target=body.target,
-    )
+    import time
+
+    from forma.services import assistant_jobs
+
+    result = assistant_jobs.accept(ctx, session, p, chat_id, {**body.model_dump(), "_stream": False})
+    # Compatibility endpoint: wait briefly, then return a saved pending turn for polling.
+    until = time.monotonic() + 25
+    while result["status"] == "pending" and time.monotonic() < until:
+        time.sleep(0.05)
+        session.rollback()
+        result = conversations.message_progress(session, p, chat_id, body.request_id)
+    return result
 
 
 class StopIn(BaseModel):
@@ -746,6 +745,16 @@ def stop_message(
     return conversations.stop(session, p, chat_id, body.request_id)
 
 
+@router.get("/assistant/conversations/{chat_id}/messages/{request_id}")
+def message_progress(
+    chat_id: str,
+    request_id: str,
+    session: Session = Depends(get_session),
+    p: Principal = Depends(require_role("importer")),
+) -> dict[str, Any]:
+    return conversations.message_progress(session, p, chat_id, request_id)
+
+
 @router.post("/assistant/conversations/{chat_id}/messages/stream")
 async def stream_message(
     chat_id: str,
@@ -754,66 +763,37 @@ async def stream_message(
     p: Principal = Depends(require_role("importer")),
     _limit: Principal = Depends(llm_rate_limited),
 ) -> StreamingResponse:
-    # Authorize before opening SSE; the worker rechecks ownership in its own DB session.
-    def authorize() -> None:
+    from forma.services import assistant_jobs
+
+    def accept() -> dict[str, Any]:
         with session_scope() as session:
-            conversations.get_chat(session, p, chat_id)
+            return assistant_jobs.accept(ctx, session, p, chat_id, body.model_dump())
 
-    await run_in_threadpool(authorize)
-    loop = asyncio.get_running_loop()
-    events: asyncio.Queue[dict[str, Any]] = asyncio.Queue()
+    initial = await run_in_threadpool(accept)
 
-    def emit(event: dict[str, Any]) -> None:
-        loop.call_soon_threadsafe(events.put_nowait, event)
-
-    control = AnswerStream(emit)
-
-    def work() -> None:
-        try:
-            with session_scope() as session:
-                result = conversations.send(
-                    ctx,
-                    session,
-                    p,
-                    chat_id,
-                    body.question,
-                    body.request_id,
-                    body.language,
-                    body.timezone,
-                    stream=control,
-                    attachment_ids=body.attachment_ids,
-                    artifact_id=body.artifact_id,
-                    target=body.target,
-                )
-            control.emit({"type": "done", "turn": result})
-        except Exception:
-            control.emit(
-                {
-                    "type": "error",
-                    "message": "Could not complete this reply. Reopen the chat to check its saved state.",
-                }
-            )
-        finally:
-            if conversations.ACTIVE_STREAMS.get((chat_id, body.request_id)) is control:
-                conversations.ACTIVE_STREAMS.pop((chat_id, body.request_id), None)
+    def read() -> dict[str, Any]:
+        with session_scope() as session:
+            return conversations.message_progress(session, p, chat_id, body.request_id)
 
     async def events_body() -> Any:
-        task = asyncio.create_task(asyncio.to_thread(work))
-        try:
-            while True:
-                try:
-                    event = await asyncio.wait_for(events.get(), timeout=10)
-                except TimeoutError:
-                    yield ": heartbeat\n\n"
-                    continue
-                yield "data: " + json.dumps(event, ensure_ascii=False, default=str) + "\n\n"
-                if event["type"] in ("done", "error"):
-                    break
-        finally:
-            if not task.done():
-                control.cancel()
-            # Keep the task referenced through cleanup; its worker persists any stopped partial reply.
-            task.add_done_callback(lambda t: t.exception() if not t.cancelled() else None)
+        turn = initial
+        previous = ""
+        yield "data: " + json.dumps({"type": "started", "request_id": body.request_id}) + "\n\n"
+        while True:
+            payload = json.dumps(
+                {"type": "snapshot" if turn["status"] == "pending" else "done", "turn": turn},
+                ensure_ascii=False,
+                default=str,
+            )
+            if payload != previous:
+                yield "id: " + str(turn.get("cursor", 0)) + "\ndata: " + payload + "\n\n"
+                previous = payload
+            else:
+                yield ": heartbeat\n\n"
+            if turn["status"] != "pending":
+                break
+            await asyncio.sleep(0.3)
+            turn = await run_in_threadpool(read)
 
     return StreamingResponse(
         events_body(),
@@ -825,6 +805,172 @@ async def stream_message(
 def _origin(request: Request, ctx: ServiceContext) -> bool:
     origin = request.headers.get("origin")
     return origin is None or origin.rstrip("/") in {o.rstrip("/") for o in ctx.settings.cors_origins}
+
+
+class ChatDraftIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    revision: int = Field(ge=0)
+    draft: dict[str, Any]
+
+    @field_validator("draft")
+    @classmethod
+    def bounded(cls, value: dict[str, Any]) -> dict[str, Any]:
+        if len(json.dumps(value, ensure_ascii=False)) > 64000:
+            raise ValueError("Draft is too large")
+        return value
+
+
+@router.get("/assistant/conversations/{chat_id}/state")
+def chat_state(
+    chat_id: str, session: Session = Depends(get_session), p: Principal = Depends(require_role("importer"))
+) -> dict[str, Any]:
+    from forma.services import chat_workspace as cw
+
+    return cw.read_state(session, p, chat_id)
+
+
+@router.put("/assistant/conversations/{chat_id}/state")
+def save_chat_state(
+    chat_id: str,
+    body: ChatDraftIn,
+    session: Session = Depends(get_session),
+    p: Principal = Depends(require_role("importer")),
+) -> dict[str, Any]:
+    from forma.services import chat_workspace as cw
+
+    return cw.save_draft(session, p, chat_id, body.revision, body.draft)
+
+
+class BranchIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    turn_id: str = Field(max_length=40)
+    question: str = Field(default="", max_length=2000)
+    request_id: str = Field(pattern=r"^[a-zA-Z0-9_-]{8,64}$")
+    mode: Literal["edit", "regenerate"]
+
+
+@router.post("/assistant/conversations/{chat_id}/branch")
+def branch_chat(
+    chat_id: str,
+    body: BranchIn,
+    ctx: ServiceContext = Depends(ctx_dep),
+    session: Session = Depends(get_session),
+    p: Principal = Depends(require_role("importer")),
+) -> dict[str, Any]:
+    from forma.services import chat_workspace as cw
+
+    return cw.branch(ctx, session, p, chat_id, body.turn_id, body.question, body.request_id, body.mode)
+
+
+class FeedbackIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    rating: Literal["helpful", "incorrect", "unclear"]
+    comment: str = Field(default="", max_length=1000)
+
+
+@router.put("/assistant/conversations/{chat_id}/turns/{turn_id}/feedback")
+def chat_feedback(
+    chat_id: str,
+    turn_id: str,
+    body: FeedbackIn,
+    session: Session = Depends(get_session),
+    p: Principal = Depends(require_role("importer")),
+) -> dict[str, Any]:
+    from forma.services import chat_workspace as cw
+
+    return cw.feedback(session, p, chat_id, turn_id, body.rating, body.comment)
+
+
+@router.post("/assistant/conversations/{chat_id}/seen")
+def chat_seen(
+    chat_id: str, session: Session = Depends(get_session), p: Principal = Depends(require_role("importer"))
+) -> dict[str, Any]:
+    from sqlalchemy import func, select
+
+    from forma.db.models import AssistantTurn
+    from forma.services import chat_workspace as cw
+
+    state = cw.get_state(session, p, chat_id, True)
+    state.seen_sequence = (
+        session.scalar(
+            select(func.max(AssistantTurn.sequence)).where(
+                AssistantTurn.conversation_id == chat_id, AssistantTurn.status != "pending"
+            )
+        )
+        or 0
+    )
+    return {"seen_sequence": state.seen_sequence}
+
+
+@router.get("/assistant/work")
+def assistant_work(
+    session: Session = Depends(get_session), p: Principal = Depends(require_role("importer"))
+) -> dict[str, Any]:
+    from sqlalchemy import func, select
+
+    from forma.db.models import AssistantChatState, AssistantConversation, AssistantRun, AssistantTurn, Job
+
+    chats = list(
+        session.scalars(conversations.visible(p).order_by(AssistantConversation.updated_at.desc()).limit(100))
+    )
+    ids = [chat.id for chat in chats]
+    latest_ids = (
+        select(AssistantTurn.conversation_id, func.max(AssistantTurn.sequence).label("seq"))
+        .where(AssistantTurn.conversation_id.in_(ids))
+        .group_by(AssistantTurn.conversation_id)
+        .subquery()
+    )
+    turns = {
+        turn.conversation_id: turn
+        for turn in session.scalars(
+            select(AssistantTurn).join(
+                latest_ids,
+                (AssistantTurn.conversation_id == latest_ids.c.conversation_id)
+                & (AssistantTurn.sequence == latest_ids.c.seq),
+            )
+        )
+    }
+    states = {
+        state.conversation_id: state
+        for state in session.scalars(
+            select(AssistantChatState).where(AssistantChatState.conversation_id.in_(ids))
+        )
+    }
+    jobs = {
+        run.turn_id: job
+        for run, job in session.execute(
+            select(AssistantRun, Job)
+            .join(Job, Job.id == AssistantRun.job_id)
+            .where(AssistantRun.turn_id.in_([turn.id for turn in turns.values()]))
+        )
+    }
+    items = []
+    for chat in chats:
+        latest = turns.get(chat.id)
+        if not latest:
+            continue
+        state = states.get(chat.id)
+        job = jobs.get(latest.id)
+        pending = bool(job and job.status in ("queued", "running"))
+        unread = latest.sequence > (state.seen_sequence if state else 0)
+        if pending or unread:
+            items.append(
+                {
+                    "chat_id": chat.id,
+                    "title": chat.title,
+                    "status": "queued"
+                    if pending and job and job.status == "queued"
+                    else "running"
+                    if pending
+                    else "needs_input"
+                    if (latest.reply or {}).get("clarifications")
+                    else latest.status,
+                    "unread": unread,
+                    "phase": (latest.reply or {}).get("phase"),
+                    "question": latest.question[:160],
+                }
+            )
+    return {"items": items[:20]}
 
 
 @router.get("/mcp")

@@ -78,7 +78,7 @@ def serve(host: str = "127.0.0.1", port: int = 8000, reload: bool = False) -> No
 
 
 @app.command()
-def worker(backend: str | None = None, workers: int | None = None) -> None:
+def worker(backend: str | None = None, workers: int | None = None, queue: str = "mapping") -> None:
     """Run a job worker. With FORMA_JOB_BACKEND=arq this is an arq worker (Redis); otherwise it drains the
     database queue with the thread/process pool and keeps polling for new rows (single-node fallback)."""
     import os
@@ -94,6 +94,7 @@ def worker(backend: str | None = None, workers: int | None = None) -> None:
         os.environ["FORMA_JOB_BACKEND"] = backend
     if workers:
         os.environ["FORMA_WORKERS"] = str(workers)
+    os.environ["FORMA_WORKER_QUEUE"] = queue
     get_settings.cache_clear()
     s = get_settings()
     configure_logging(s.log_level, s.log_format)
@@ -107,15 +108,7 @@ def worker(backend: str | None = None, workers: int | None = None) -> None:
     try:
         while True:
             time.sleep(2.0)
-            from sqlalchemy import select
-
-            from forma.db.models import Job
-            from forma.db.session import session_scope
-
-            with session_scope() as sess:
-                ids = list(sess.scalars(select(Job.id).where(Job.status == "queued")))
-            for jid in ids:
-                runner.get_backend().submit(jid)
+            runner.dispatch_pending()
     except KeyboardInterrupt:
         runner.stop()
 

@@ -137,7 +137,8 @@ def test_long_history_pagination_and_tool_scope(client, replies):
     assert len(page["turns"]) == 30 and page["older_before"] == 6
     assert len(client.get(f"/api/assistant/conversations/{cid}?before=6").json()["turns"]) == 5
     assert send(client, cid, "Remember topic zero", "request-0035").status_code == 200
-    assert len(replies[-1][0][6]) == 16
+    assert len(replies[-1][0][6]) == 17
+    assert "Topic 0" in replies[-1][0][6][0]["content"]
     me = client.get("/api/me").json()
     owner = Principal(subject=me["subject"], roles=frozenset(me["roles"]), mode=me["mode"])
     with session_scope() as s:
@@ -233,7 +234,7 @@ def test_pending_is_durable_and_blocks_concurrent_send(client, replies, monkeypa
             pending = client.get(f"/api/assistant/conversations/{cid}").json()
             assert pending["conversation"]["busy"]
             assert pending["turns"][0]["status"] == "pending"
-            assert send(client, cid).status_code == 409
+            assert send(client, cid, "Another question", "parallel-request").status_code == 409
         finally:
             release.set()
         assert response.result(timeout=15).status_code == 200
@@ -271,7 +272,7 @@ def test_model_retrieves_older_context_via_tool(client):
         def complete_json(self, **kwargs):
             payload = json.loads(kwargs["user"])
             assert payload["current_conversation_id"] == cid
-            assert "Orchard" not in json.dumps(payload["history"])
+            assert "Orchard" in json.dumps(payload["history"])
             evidence = next((e for e in payload["evidence"] if e["tool"] == "conversation_history"), None)
             if evidence:
                 assert "Orchard" in evidence["data"]["messages"][0]["question"]

@@ -30,7 +30,10 @@ def ops_summary(session: Session, ctx: ServiceContext, ready: dict[str, Any]) ->
     failed = [
         {**runner._job_dict(j), "customer_code": customers.get(rounds.get(j.round_id or "", ""))}
         for j in session.scalars(
-            select(Job).where(Job.status == "failed").order_by(Job.finished_at.desc()).limit(50)
+            select(Job)
+            .where(Job.status == "failed", Job.kind.not_in(("create_document", "assistant_message")))
+            .order_by(Job.finished_at.desc())
+            .limit(50)
         )
     ]
     since = now - dt.timedelta(days=7)
