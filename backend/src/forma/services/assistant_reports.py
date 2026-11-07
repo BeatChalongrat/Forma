@@ -17,6 +17,7 @@ from forma.core.errors import Forbidden, NotFound, ValidationFailed
 from forma.db.models import Batch, Customer, ImportRound, MappingVersion, SourceFile
 from forma.services import batches, datasets
 from forma.services.context import ServiceContext
+from forma.services.report_numbers import add
 
 
 def text(en: str, th: str) -> dict[str, str]:
@@ -285,10 +286,17 @@ def _grouped(ctx: ServiceContext, session: Session, p: Principal, a: dict[str, A
         "promo.price",
         "discount.amount",
     )
+    if monetary and (currency is None or currency.in_collection is not None):
+        raise ValidationFailed(
+            "Confirm a scalar currency field in the target format before aggregating money"
+        )
     currencies: set[str] = set()
     grouped: dict[str, dict[str, Any]] = {}
     scanned = matched = skipped = 0
     for record in datasets.iter_records(ctx.records_path(d)):
+        from forma.jobs.execution import check
+
+        check()
         scanned += 1
         if any(_at(record, f["field"]) != f["value"] for f in filters):
             continue
@@ -323,7 +331,7 @@ def _grouped(ctx: ServiceContext, session: Session, p: Principal, a: dict[str, A
             skipped += 1
             continue
         g["n"] += 1
-        g["sum"] += number
+        g["sum"] = add(g["sum"], number)
         g["min"] = number if g["min"] is None else min(g["min"], number)
         g["max"] = number if g["max"] is None else max(g["max"], number)
     if len(currencies) > 1 or "unknown" in currencies:
@@ -379,7 +387,7 @@ def _grouped(ctx: ServiceContext, session: Session, p: Principal, a: dict[str, A
     if filters:
         shown = "; ".join(f"{fields[f['field']].name} = {f['value']}" for f in filters)
         notes.append(text("Filters: " + shown, "ตัวกรอง: " + shown))
-    return report(
+    result = report(
         text(f"{name} by {label}", f"{name_th} แยกตาม {label}"),
         [
             column("label", label, label, "text"),
@@ -397,23 +405,112 @@ def _grouped(ctx: ServiceContext, session: Session, p: Principal, a: dict[str, A
         notes,
         [{"label": f"Dataset v{d.version}", "url": "/datasets/" + d.id}],
     )
+    result["report"]["measurement"] = {
+        "operation": operation,
+        "field": measure,
+        "currencies": sorted(currencies),
+        "monetary": monetary,
+        "contract": m.target_schema,
+    }
+    result["report"]["coverage"] = {
+        "scanned": scanned,
+        "matched": matched,
+        "missing_numeric": skipped,
+        "complete": True,
+    }
+    return result
 
 
 def build_report(ctx: ServiceContext, session: Session, p: Principal, a: dict[str, Any]) -> dict[str, Any]:
+    from forma.services import review_analytics
+
+    analytics = {"review_issues", "review_statuses", "import_statuses", "processing_statuses"}
     allowed = {
         "work_rounds": {"batch_ids"},
         "work_round_files": {"batch_ids", "states"},
         "uploads_by_day": {"start", "end", "timezone", "customer_id"},
         "dataset_grouped": {"dataset_id", "group_by", "field", "operation", "filters"},
+        "dataset_comparison": {"dataset_ids", "group_by", "field", "operation", "filters", "unit"},
+        **{
+            name: {"customer_id", "round_id", "batch_id", "status", "start", "end", "timezone"}
+            for name in analytics
+        },
     }
     if set(a) - {"report"} - allowed.get(a["report"], set()):
         raise ValidationFailed(
             "Some filters do not apply to this report; choose the correct report rather than ignoring filters"
         )
-    if a["report"] in ("work_rounds", "work_round_files"):
+    if a["report"] in analytics:
+        filters = {k: v for k, v in a.items() if k != "report"}
+        review = a["report"].startswith("review_")
+        summary = (
+            review_analytics.summary(session, p, filters)
+            if review
+            else review_analytics.operations(
+                session, p, {**filters, "resource": "imports" if a["report"] == "import_statuses" else "jobs"}
+            )
+        )
+        rows = (
+            [{"label": c["label"], "value": c["count"]} for c in summary["categories"]]
+            if a["report"] == "review_issues"
+            else [{"label": k, "value": v} for k, v in sorted(summary["statuses"].items())]
+        )
+        title = {
+            "review_issues": "งานตรวจแยกตามประเภทปัญหา",
+            "review_statuses": "สถานะงานตรวจ",
+            "import_statuses": "สถานะชุดนำเข้า",
+            "processing_statuses": "สถานะงานประมวลผล",
+        }[a["report"]]
+        unit = "งานตรวจ" if review else "ชุดนำเข้า" if a["report"] == "import_statuses" else "งานประมวลผล"
+        notes = [text(n, n) for n in summary.get("notes", [])]
+        status_labels = {
+            "open": "รอตรวจ",
+            "waiting": "รอข้อมูล",
+            "approved": "อนุมัติแล้ว",
+            "rejected": "ไม่อนุมัติ",
+            "dismissed": "ปิดรายการ",
+            "all": "ทุกสถานะ",
+        }
+        selected_status = summary["scope"].get("status", "all")
+        scope_note = "สถานะ: " + status_labels.get(selected_status, selected_status)
+        if filters.get("customer_id"):
+            customer = session.get(Customer, filters["customer_id"])
+            scope_note += " · ลูกค้า: " + (customer.code if customer else "ไม่พบ")
+        if filters.get("round_id"):
+            scope_note += " · เฉพาะชุดนำเข้าที่เลือกและมีสิทธิ์เข้าถึง"
+        if filters.get("batch_id"):
+            scope_note += " · เฉพาะรอบงานที่เลือกและมีสิทธิ์เข้าถึง"
+        if filters.get("start"):
+            scope_note += f" · วันที่สร้าง: {filters['start']} – {filters['end']} ({filters['timezone']})"
+        else:
+            scope_note += " · ทุกวันที่สร้างในข้อมูลที่มีสิทธิ์เข้าถึง"
+        notes.append(text(scope_note, scope_note))
+        notes.append(
+            text(
+                "Counts cover every matching record in the selected scope.",
+                "นับครบทุกระเบียนที่ตรงเงื่อนไข ณ เวลาสรุป ไม่ได้นับจากตัวอย่างหน้าแรก",
+            )
+        )
+        result = report(
+            text(a["report"].replace("_", " ").title(), title),
+            [column("label", "Category", "หมวด", "text"), column("value", "Count", "จำนวน")],
+            rows,
+            ["value"],
+            text(f"{summary['total']} {summary['unit']}", f"ตรวจครบ {summary['total']} {unit}"),
+            notes,
+            summary["links"],
+        )
+        result["report"]["coverage"] = summary["coverage"]
+        result["report"]["filters"] = summary["scope"]
+        result["report"]["categories_overlap"] = a["report"] == "review_issues"
+    elif a["report"] in ("work_rounds", "work_round_files"):
         result = _work_rounds(session, p, a)
     elif a["report"] == "uploads_by_day":
         result = _daily(session, p, a)
+    elif a["report"] == "dataset_comparison":
+        from forma.services.report_comparison import compare
+
+        result = compare(ctx, session, p, a)
     else:
         result = _grouped(ctx, session, p, a)
     result["report"]["query"] = dict(a)

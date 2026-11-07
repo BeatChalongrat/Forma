@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import type { WorkspaceAnswer } from '../lib/api'
-import { safeSourceLink, sourceName } from '../lib/assistantPresentation'
+import { coverageLabel, safeSourceLink, sourceName } from '../lib/assistantPresentation'
 import { usePreferences } from '../lib/preferences'
 import { CodeRunCard } from './ChatFiles'
 import { DetailValue } from './Inspection'
@@ -21,6 +21,7 @@ export function AssistantDetails({ reply, initial, onClose, onFix }: { reply: Wo
       <p className="text-sm text-muted">{t('Sources saved with this answer. They may contain only part of the data and may differ from current records.', 'อ้างอิงข้อมูลที่บันทึกตอนตอบ อาจเป็นข้อมูลบางส่วนและต่างจากข้อมูลปัจจุบัน')}</p>
       <div className="flex flex-wrap gap-2">{reply.evidence.map((e, i) => <button key={`${e.id}:${i}`} className={`btn btn-sm ${i === source ? 'btn-primary' : ''}`} aria-pressed={i === source} onClick={() => { setSource(i); setRaw(false) }}>{sourceName(e.tool, prefs.language)} · {i + 1}</button>)}</div>
       <h3 className="font-medium">{sourceName(evidence.tool, prefs.language)}</h3>
+      {coverageLabel(evidence.data, prefs.language) && <p className="text-sm" role="status">{coverageLabel(evidence.data, prefs.language)}</p>}
       <div className="flex flex-wrap gap-2">{evidence.links?.filter(l => safeSourceLink(l.url)).map((l, i) => <Link className="btn btn-sm" key={i} to={l.url}>{l.label}</Link>)}</div>
       <button className="btn btn-sm" aria-pressed={raw} onClick={() => setRaw(!raw)}>{raw ? t('Close saved data', 'ปิดข้อมูลที่บันทึก') : t('Inspect saved data', 'ดูข้อมูลที่บันทึก')}</button>
       {raw && <div className="border-t border-line pt-4 text-xs"><DetailValue value={evidence.data} /></div>}

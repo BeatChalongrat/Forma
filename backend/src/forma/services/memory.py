@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from jsonschema import Draft202012Validator
-from sqlalchemy import Select, delete, or_, select
+from sqlalchemy import Select, case, delete, func, literal, or_, select
 from sqlalchemy.orm import Session
 
 from forma.ai import guard
@@ -85,7 +85,10 @@ SEARCH_TOOL: dict[str, Any] = {
     ),
     "inputSchema": {
         "type": "object",
-        "properties": {"query": {"type": "string", "minLength": 1, "maxLength": 120}},
+        "properties": {
+            "query": {"type": "string", "minLength": 1, "maxLength": 120},
+            "offset": {"type": "integer", "minimum": 0, "maximum": 1000000},
+        },
         "required": ["query"],
         "additionalProperties": False,
     },
@@ -316,40 +319,51 @@ def _links(chats: dict[str, str]) -> list[dict[str, str]]:
     return [{"url": f"/assistant?chat={chat_id}", "label": title} for chat_id, title in chats.items()]
 
 
-def search_chats(session: Session, chats: Select[Any], current: str, query: str) -> dict[str, Any]:
+def search_chats(
+    session: Session, chats: Select[Any], current: str, query: str, offset: int = 0
+) -> dict[str, Any]:
     """Words, not vectors: a chat is short, and Thai has no spaces for a keyword index to rely on."""
     terms = query.split()[:6] or [query]
-    rows = session.execute(
-        select(Turn, Chat.title)
+    predicates = [
+        or_(Turn.question.icontains(t, autoescape=True), Turn.answer.icontains(t, autoescape=True))
+        for t in terms
+    ]
+    score = sum((case((condition, 1), else_=0) for condition in predicates), start=literal(0))
+    ranked = (
+        select(
+            Turn.id.label("turn_id"),
+            Chat.title.label("title"),
+            score.label("score"),
+            Turn.created_at.label("created"),
+            func.row_number()
+            .over(
+                partition_by=Turn.conversation_id,
+                order_by=(score.desc(), Turn.created_at.desc(), Turn.id.desc()),
+            )
+            .label("position"),
+        )
         .join(Chat, Chat.id == Turn.conversation_id)
         .where(
             Chat.id.in_(chats.with_only_columns(Chat.id)),
             Chat.id != current,
             Turn.status == "complete",
-            or_(
-                *[
-                    or_(
-                        Turn.question.icontains(t, autoescape=True), Turn.answer.icontains(t, autoescape=True)
-                    )
-                    for t in terms
-                ]
-            ),
+            or_(*predicates),
         )
-        .order_by(Turn.created_at.desc())
-        .limit(100)
+    ).subquery()
+    total = session.scalar(select(func.count()).select_from(ranked).where(ranked.c.position == 1)) or 0
+    found = session.execute(
+        select(Turn, ranked.c.title)
+        .join(ranked, ranked.c.turn_id == Turn.id)
+        .where(ranked.c.position == 1)
+        .order_by(ranked.c.score.desc(), ranked.c.created.desc(), ranked.c.turn_id.desc())
+        .offset(offset)
+        .limit(SEARCH_LIMIT)
     ).all()
-
-    def score(turn: Turn) -> int:
-        text = f"{turn.question}\n{turn.answer}".lower()
-        return sum(term.lower() in text for term in terms)
-
-    ranked = sorted(rows, key=lambda row: score(row[0]), reverse=True)
-    best: dict[str, tuple[Turn, str]] = {}
-    for turn, title in ranked:
-        best.setdefault(turn.conversation_id, (turn, title))
-    found = list(best.values())[:SEARCH_LIMIT]
     return {
         "query": query,
+        "total": total,
+        "next_offset": offset + SEARCH_LIMIT if offset + SEARCH_LIMIT < total else None,
+        "scan_complete": True,
         "results": [
             {
                 "chat": title,
