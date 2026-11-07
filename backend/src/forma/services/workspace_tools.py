@@ -34,6 +34,15 @@ from forma.services.context import ServiceContext
 
 TEXT = {"type": "string", "maxLength": 200}
 OFFSET = {"type": "integer", "minimum": 0, "maximum": 10000000}
+SCOPE = {
+    "customer_id": TEXT,
+    "round_id": TEXT,
+    "batch_id": TEXT,
+    "status": TEXT,
+    "start": TEXT,
+    "end": TEXT,
+    "timezone": TEXT,
+}
 
 
 def tool(
@@ -54,16 +63,51 @@ def tool(
 
 EXTRA_TOOLS = [
     tool(
+        "review_summary",
+        "Exact full-scope review counts and overlapping saved-reason categories. "
+        "Default status open; use all for all statuses. Counts REVIEW TASKS, not files or questions. "
+        "Unknown reasons remain unclassified. Optional dates filter task creation, not upload/completion. "
+        "Use this instead of counting review_queue pages. Read coverage and overlap notes.",
+        SCOPE,
+    ),
+    tool(
+        "operations_summary",
+        "Exact full-scope counts by status for imports or import processing jobs. "
+        "Never includes private chat/report jobs. Dates filter creation of the selected resource. "
+        "Counts import rounds or jobs, NOT Excel files. Use build_report for charts.",
+        {**SCOPE, "resource": {"enum": ["imports", "jobs"]}},
+    ),
+    tool(
         "build_report",
         "Build an exact server-computed table/chart snapshot, never model-generated values. "
+        "review_issues counts ALL review tasks by overlapping saved-reason categories (unknown reasons stay unclassified); "
+        "review_statuses counts review status; both default to open, status=all includes other states. "
+        "import_statuses counts import rounds, processing_statuses counts import jobs (never private chat jobs). "
+        "These four support customer_id/round_id/batch_id/status and optional start/end/timezone for CREATION dates. "
         "work_rounds compares 1-8 explicit batch_ids (discover with work_rounds); work_round_files lists up to 50 files of ONE batch, optional states filter. "
         "uploads_by_day requires explicit start/end YYYY-MM-DD and timezone (max 92 days); CURRENT status grouped by upload date, NOT completions by date, excludes unassigned/duplicate files. "
         "dataset_grouped scans ONE dataset version; requires dataset_id, scalar group_by pointer, operation; numeric field for non-count operations. "
+        "dataset_comparison compares exactly two explicit dataset_ids in before/after order; same customer and contract, never sums versions. Non-monetary numeric comparison requires a confirmed unit. "
         "Inspect target_formats first. Optional exact-match filters; no collection cross-products, no mixed currencies, max 30 groups. "
         "Ask for missing scope, period, metric or business units; never silently pick latest rounds or add dataset versions. "
         "Select the returned report via visualizations in the final reply; values, labels, sources and permitted views are server-owned.",
         {
-            "report": {"enum": ["work_rounds", "work_round_files", "uploads_by_day", "dataset_grouped"]},
+            "report": {
+                "enum": [
+                    "work_rounds",
+                    "work_round_files",
+                    "uploads_by_day",
+                    "dataset_grouped",
+                    "dataset_comparison",
+                    "review_issues",
+                    "review_statuses",
+                    "import_statuses",
+                    "processing_statuses",
+                ]
+            },
+            "status": TEXT,
+            "round_id": TEXT,
+            "batch_id": TEXT,
             "batch_ids": {"type": "array", "minItems": 1, "maxItems": 8, "uniqueItems": True, "items": TEXT},
             "states": {
                 "type": "array",
@@ -84,6 +128,14 @@ EXTRA_TOOLS = [
             "timezone": TEXT,
             "customer_id": TEXT,
             "dataset_id": TEXT,
+            "dataset_ids": {
+                "type": "array",
+                "minItems": 2,
+                "maxItems": 2,
+                "uniqueItems": True,
+                "items": TEXT,
+            },
+            "unit": {"type": "string", "minLength": 1, "maxLength": 80},
             "group_by": TEXT,
             "field": TEXT,
             "operation": {"enum": ["count", "sum", "average", "min", "max"]},
@@ -151,8 +203,8 @@ EXTRA_TOOLS = [
     ),
     tool(
         "review_queue",
-        "Exact count and prioritized page of questions/issues. Defaults to open. Includes reasons and IDs for deeper inspection.",
-        {"customer_id": TEXT, "status": TEXT, "offset": OFFSET},
+        "Prioritized page of questions/issues with a full-scope overview on the first page. Defaults to open; all includes all statuses. Includes reasons and IDs for deeper inspection. Dates filter creation of review tasks.",
+        {**SCOPE, "offset": OFFSET},
     ),
     tool(
         "bulk_uploads",
@@ -246,6 +298,9 @@ def query_records(ctx: ServiceContext, session: Session, p: Principal, a: dict[s
     high: Decimal | None = None
     rows = []
     for record in ds.iter_records(ctx.records_path(dataset)):
+        from forma.jobs.execution import check
+
+        check()
         scanned += 1
         if search not in json.dumps(record, ensure_ascii=False, default=str).casefold():
             continue
@@ -302,6 +357,12 @@ def run_extra(
     offset = a.get("offset", 0)
     q: Any
     result: dict[str, Any]
+    if name in {"review_summary", "operations_summary"}:
+        from forma.services import review_analytics
+
+        return (review_analytics.summary if name == "review_summary" else review_analytics.operations)(
+            session, p, a
+        )
     if name == "build_report":
         from forma.services.assistant_reports import build_report
 
@@ -502,12 +563,9 @@ def run_extra(
         result["links"] = [{"label": r.label or r.id, "url": "/rounds/" + r.id}]
         return result
     if name == "review_queue":
-        q = scoped(
-            p, select(ReviewTask).where(ReviewTask.status == a.get("status", "open")), ReviewTask.customer_id
-        )
-        if a.get("customer_id"):
-            ensure_customer(p, a["customer_id"])
-            q = q.where(ReviewTask.customer_id == a["customer_id"])
+        from forma.services.review_analytics import query_scope, summary
+
+        q = query_scope(select(ReviewTask), ReviewTask, p, {"status": "open", **a})
         result = page(
             session,
             q.order_by(ReviewTask.priority.desc(), ReviewTask.created_at, ReviewTask.id),
@@ -518,6 +576,15 @@ def run_extra(
             ),
         )
         result["links"] = [{"label": "Questions & issues", "url": "/review"}]
+        if offset == 0:
+            result["overview"] = summary(session, p, a)
+        result["coverage"] = {
+            "matched": result["total"],
+            "returned": len(result["items"]),
+            "complete": offset == 0 and result["next_offset"] is None,
+            "unit": "review_tasks",
+            "offset": offset,
+        }
         return result
     if name == "work_rounds":
         from forma.services import batches

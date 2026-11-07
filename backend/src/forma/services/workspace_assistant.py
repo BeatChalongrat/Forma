@@ -25,7 +25,17 @@ from forma.core.logging import get_logger
 from forma.db.models import Customer, DatasetVersion, ImportRound, LLMCall, MappingVersion, ReviewTask
 from forma.reporting.registry import catalog as report_catalog
 from forma.reporting.registry import skill as report_skill
-from forma.services import artifacts, code_sandbox, document_reports, memory, review_questions, workspace
+from forma.services import (
+    artifacts,
+    assistant_pages,
+    assistant_scope,
+    code_sandbox,
+    document_reports,
+    memory,
+    review_questions,
+    workspace,
+    workspace_search,
+)
 from forma.services import datasets as ds
 from forma.services.assistant_navigation import navigation_choices
 from forma.services.assistant_runtime import RecoveryPaused, step
@@ -55,6 +65,8 @@ def _tool(
 _TEXT = {"type": "string", "maxLength": 200}
 _OFFSET = {"type": "integer", "minimum": 0, "maximum": 1000000}
 TOOLS = [
+    assistant_pages.TOOL,
+    workspace_search.TOOL,
     _tool(
         "conversation_history",
         "Search earlier completed turns in the saved chat, excluding the current question. Historical context, not live business facts. Paginated, oldest first.",
@@ -94,7 +106,7 @@ TOOLS = [
     ),
     _tool(
         "search_records",
-        "Find a product, SKU or text in a dataset. Scans at most 100000 records; returns a page and explicit scan limits.",
+        "Find a product, SKU or text across ALL records of one dataset; returns a page and exact match count.",
         {"dataset_id": _TEXT, "search": _TEXT, "offset": _OFFSET},
         ["dataset_id", "search"],
     ),
@@ -130,6 +142,10 @@ def run_tool(
     errors = list(Draft202012Validator(tool["inputSchema"]).iter_errors(arguments))
     if errors:
         raise ValidationFailed("Invalid tool arguments: " + errors[0].message[:200])
+    if name == "read_pages":
+        return assistant_pages.read(ctx, p, arguments)
+    if name == "search_workspace":
+        return workspace_search.search(session, p, arguments)
     if name in {t["name"] for t in EXTRA_TOOLS}:
         return run_extra(ctx, session, p, name, arguments)
     if name == "conversation_history":
@@ -184,6 +200,9 @@ def run_tool(
             else:
                 args.pop(key, None)
         result = workspace.history(session, p, **args, limit=20)
+        result["next_offset"] = (
+            args.get("offset", 0) + 20 if args.get("offset", 0) + 20 < result["total"] else None
+        )
         # History summaries do not need internal pipeline payloads.
         for item in result["items"]:
             item.pop("summary", None)
@@ -262,7 +281,10 @@ def run_tool(
         if name == "search_records":
             word = arguments["search"].casefold()
             records = []
-            for record in islice(ds.iter_records(ctx.records_path(d)), 100000):
+            from forma.jobs.execution import check
+
+            for record in ds.iter_records(ctx.records_path(d)):
+                check()
                 scanned += 1
                 if word in json.dumps(record, ensure_ascii=False, default=str).casefold():
                     if offset <= matched < offset + 20:
@@ -277,6 +299,10 @@ def run_tool(
             "records": records,
             "offset": offset,
             "limit": 20,
+            "total": matched if name == "search_records" else d.row_count,
+            "next_offset": offset + 20
+            if offset + 20 < (matched if name == "search_records" else d.row_count)
+            else None,
             "sample_only": True,
             "search": {"scanned": scanned, "matches_in_scan": matched, "truncated": scanned < d.row_count}
             if name == "search_records"
@@ -489,7 +515,13 @@ def ask(
             name,
             arguments,
             lambda: (
-                memory.search_chats(session, chats, conversation_id, str(arguments.get("query", "")))
+                memory.search_chats(
+                    session,
+                    chats,
+                    conversation_id,
+                    str(arguments.get("query", "")),
+                    int(arguments.get("offset", 0)),
+                )
                 if name == memory.SEARCH_NAME
                 else memory.recent_chats(session, chats, conversation_id, int(arguments.get("limit", 5)))
             ),
@@ -506,6 +538,13 @@ def ask(
         )
 
     def collect(name: str, arguments: dict[str, Any]) -> None:
+        if name == "search_workspace" and (not recall or not recall.can_search):
+            arguments = {
+                **arguments,
+                "sources": [s for s in arguments.get("sources", workspace_search.SOURCES) if s != "chats"],
+            }
+            if not arguments["sources"]:
+                raise ValidationFailed("Chat recall is disabled for this conversation")
         if stream:
             stream.check()
             stream.set_phase("research")
@@ -517,6 +556,8 @@ def ask(
             elif name == "read_report_skill":
                 data = step(name, arguments, lambda: report_skill(arguments["skill"]))
                 loaded_report_skills.add(arguments["skill"])
+            elif name == "inspect_document":
+                data = step(name, arguments, lambda: document_reports.inspect_plan(session, p, arguments))
             else:
                 assert conversation_id and turn_id
                 data = step(
@@ -548,23 +589,7 @@ def ask(
                 "tool": name,
                 "arguments": arguments,
                 # Tool rows can contain dates/Decimals. Persist exactly the JSON-safe evidence sent to the model.
-                "data": json.loads(raw)
-                if len(raw) <= 18000
-                else {
-                    "excerpt": raw[:18000],
-                    "truncated": True,
-                    **(
-                        {
-                            "report_available": True,
-                            "views": data["report"]["views"],
-                            "title": data["report"]["title"],
-                            "scope": data["report"]["scope"],
-                            "notes": data["report"]["notes"],
-                        }
-                        if name == "build_report" and "report" in data
-                        else {}
-                    ),
-                },
+                "data": assistant_scope.compact(json.loads(raw), arguments),
                 "links": data.get("links", []),
                 "actions": navigation_choices(session, p, name, arguments, data, language),
             }
@@ -607,6 +632,14 @@ def ask(
         "Retrieve more evidence when needed. Counts are scoped to the current user's access; paginated records "
         "are NOT the whole dataset. State limitations and ask for clarification if evidence is insufficient. "
         "Use query_records for exact counts, sums or averages across a complete dataset, never calculate from a sample. "
+        "For review workload, use review_summary (or the full overview in review_queue), not just its first 20 items. "
+        "For review-category charts use build_report report=review_issues; review_statuses, import_statuses and processing_statuses are also available. "
+        "These reports count ALL matching records; honor scope, units, overlap, unknown classifications and coverage. "
+        "One review task can have several issue categories; do not sum categories into a task/file total. "
+        "Use operations_summary for exact import/job counts. Use read_pages when ALL individual details are needed, "
+        "rather than asking the user to request the next page. If capped, narrow scope or continue from next_offset; "
+        "never claim the system has only 20 records or request facts that available tools can retrieve. "
+        "Large analyses run in the durable assistant worker: continue the tools, do not stop merely because the browser might leave. "
         "For tables/charts, call build_report, then select its cited evidence_id and a permitted view in visualizations. "
         "Select each report only ONCE, using the requested chart view; the same card already has a Table switch. "
         "For report replies, answer in 2-3 short sentences; do not repeat the data rows or calculate new totals. "

@@ -299,7 +299,7 @@ def test_revision_keeps_original_version(app):
 
 
 def test_packaged_skill_versions():
-    assert catalog()["version"] == "1.0.0"
+    assert catalog()["version"] == "1.1.0"
     for item in catalog()["skills"]:
         assert len(skill(item["id"])["sha256"]) == 64
     assert digest({"b": 2, "a": 1}) == digest({"a": 1, "b": 2})
@@ -420,6 +420,10 @@ def test_real_formal_templates(case, tmp_path):
             },
         }
     ]
+    if case == "partial_unknown":
+        with pytest.raises(ValidationFailed, match="preview"):
+            dr.freeze(args_, {1: r}, evidence, language, "Asia/Bangkok", {"formal-report"})
+        return  # Partial evidence must be rejected before entering the renderer.
     spec = dr.freeze(
         args_, {1: r}, evidence, language, "Asia/Bangkok", {"formal-report", "presentation", "process-flow"}
     )

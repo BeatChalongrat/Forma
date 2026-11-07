@@ -1,6 +1,16 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { assistantPresentation, safeSourceLink } from '../src/lib/assistantPresentation.ts'
+import { assistantPresentation, coverageLabel, safeSourceLink } from '../src/lib/assistantPresentation.ts'
+
+test('full aggregate coverage stays distinct from paginated and shortened detail', () => {
+  const text = coverageLabel({ overview: { total: 177, coverage: { complete: true } }, coverage: { matched: 177, returned: 20, complete: false }, truncated: true }, 'th')
+  assert.match(text, /ภาพรวมนับครบ 177/)
+  assert.match(text, /20 จาก 177/)
+  assert.match(text, /ยังไม่ครบ/)
+  assert.match(text, /ถูกย่อ/)
+  assert.equal(coverageLabel(null, 'en'), '')
+  assert.match(coverageLabel({ report: { coverage: { matched: 300, scanned: 300, complete: true } } }, 'th'), /นับ 300 จาก 300.*ครบ/)
+})
 
 const file = (id, name = 'chart.png', kind = 'output') => ({ id, name, kind, media_type: 'image/png', size: 100 })
 const run = (id, files, status = 'ok') => ({ id, files, status, code: 'private execution receipt', omitted: [] })

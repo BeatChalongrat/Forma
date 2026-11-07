@@ -41,6 +41,9 @@ def run() -> None:
     th = spec["language"] == "th"
     brand = spec["brand"]
     font, ink = brand["font"], brand["ink"]
+    installed = subprocess.run(["fc-list", ":", "family"], check=True, capture_output=True, text=True).stdout
+    if font.casefold() not in installed.casefold():
+        raise ValueError("Required brand/Thai font is unavailable; install it before rendering")
 
     def tr(en: str, thai: str) -> str:
         return thai if th else en
@@ -92,6 +95,24 @@ def run() -> None:
             )
         )
     notes = [label(n) for src in spec["sources"] for n in src["report"]["notes"]]
+    # Check glyph support before rendering; PDF CID text extraction is not a glyph test.
+    from fontTools.ttLib import TTFont
+
+    supported: set[int] = set()
+    for family in (font, "Noto Sans"):
+        font_path = subprocess.run(
+            ["fc-match", "-f", "%{file}", family], check=True, capture_output=True, text=True
+        ).stdout
+        with TTFont(font_path) as font_file:
+            supported.update(font_file.getBestCmap() or {})
+    authored_text = json.dumps(spec, ensure_ascii=False)
+    missing_glyphs = {
+        ord(ch)
+        for ch in authored_text
+        if (32 <= ord(ch) <= 126 or 0x0E01 <= ord(ch) <= 0x0E5B) and ord(ch) not in supported
+    }
+    if missing_glyphs:
+        raise ValueError(f"Brand fonts lack required Thai/Latin glyphs: {sorted(missing_glyphs)}")
     provenance = [
         f"{s['report']['id']} · {s['report']['generated_at']}\n"
         + json.dumps(s["query"], ensure_ascii=False, sort_keys=True)
@@ -128,7 +149,12 @@ thead {{display:table-header-group;}}
     body = (
         f"<div class='brand'>{esc(brand['name'])}</div><h1>{esc(title)}</h1><p class='meta'>{esc(meta)}</p>"
     )
-    doc = Document()
+    company = spec.get("company_template", {})
+    doc = Document("inputs/company.docx") if company.get("format") == "docx" else Document()
+    if company.get("format") == "docx":
+        for element in list(doc.element.body):
+            if element.tag != qn("w:sectPr"):
+                doc.element.body.remove(element)
     section = doc.sections[0]
     section.top_margin = section.bottom_margin = Inches(0.75)
     section.left_margin = section.right_margin = Inches(0.7)
@@ -147,15 +173,20 @@ thead {{display:table-header-group;}}
         node.getparent().remove(node)
     doc.styles["Normal"].font.size = Pt(10)
     doc.styles["Normal"].paragraph_format.space_after = Pt(6)
-    section.header.paragraphs[0].text = brand["name"]
+    if company.get("format") != "docx":
+        section.header.paragraphs[0].text = brand["name"]
     footer = section.footer.paragraphs[0]
-    footer.text = f"FORMA · {spec['snapshot_id'][:12]} · "
+    footer.add_run(f" · FORMA · {spec['snapshot_id'][:12]} · ")
     field = OxmlElement("w:fldSimple")
     field.set(qn("w:instr"), "PAGE")
     footer._p.append(field)
     doc.add_heading(title, 0)
     doc.add_paragraph(meta)
-    deck = Presentation()
+    deck = Presentation("inputs/company.pptx") if company.get("format") == "pptx" else Presentation()
+    if company.get("format") == "pptx":
+        for slide_id in list(deck.slides._sldIdLst):
+            deck.part.drop_rel(slide_id.rId)
+            deck.slides._sldIdLst.remove(slide_id)
     deck.slide_width, deck.slide_height = PI(13.333), PI(7.5)
 
     def box(slide: Any, value: str, x: float, y: float, w: float, h: float, size: int = 18) -> None:
@@ -169,7 +200,17 @@ thead {{display:table-header-group;}}
             p.space_after = PP(5)
 
     def slide(title_text: str, subtitle: str = "") -> Any:
-        s = deck.slides.add_slide(deck.slide_layouts[6])
+        blank = next(
+            (
+                layout
+                for layout in deck.slide_layouts
+                if not any(p.placeholder_format.type not in (13, 15, 16) for p in layout.placeholders)
+            ),
+            None,
+        )
+        if blank is None:
+            raise ValueError("Company template requires a blank layout without body placeholders")
+        s = deck.slides.add_slide(blank)
         box(s, brand["name"], 0.6, 0.2, 11.9, 0.35, 11)
         box(s, title_text, 0.6, 0.75, 12, 0.9, 25)
         if subtitle:
@@ -178,8 +219,71 @@ thead {{display:table-header-group;}}
         return s
 
     cover = slide(title, meta)
-    box(cover, tr("Evidence-backed report", "รายงานจากข้อมูลที่ตรวจสอบย้อนกลับได้"), 0.6, 3.2, 11.8, 1, 24)
+    box(cover, tr("Evidence-backed report", "รายงานจากข้อมูลที่ตรวจสอบย้อนกลับได้"), 0.6, 3.2, 11.8, 0.75, 24)
     box(cover, note, 0.6, 5.3, 11.8, 1, 15)
+    if spec.get("brief"):
+        brief = spec["brief"]
+        doc.add_paragraph(tr("Prepared for: ", "สำหรับ: ") + brief["audience"])
+        doc.add_paragraph(brief["purpose"])
+        body += f"<p class='meta'>{esc(brief['audience'])}</p><p>{esc(brief['purpose'])}</p>"
+        box(cover, brief["audience"] + "\n" + brief["purpose"], 0.6, 4.15, 11.8, 1, 15)
+    if company.get("format") != "pptx":
+        cover.background.fill.solid()
+        cover.background.fill.fore_color.rgb = PPTColor.from_string(ink)
+        for shape in cover.shapes:
+            if shape.has_text_frame:
+                for paragraph in shape.text_frame.paragraphs:
+                    paragraph.font.color.rgb = PPTColor.from_string("FFFFFF")
+    # Four editorial layouts precede the full, unchanged data appendix.
+    from pptx.enum.shapes import MSO_AUTO_SHAPE_TYPE
+
+    for editorial in spec.get("sections", []):
+        heading, points, layout = editorial["title"], editorial["points"], editorial["layout"]
+        kind = (
+            tr("Proposed next steps", "ข้อเสนอแนะ — ยังไม่ใช่การตัดสินใจ")
+            if layout == "actions"
+            else tr("Analysis — review interpretation", "บทวิเคราะห์ — โปรดตรวจความหมาย")
+            if editorial.get("interpretation") == "analysis_requires_review"
+            else tr("Source summary", "สรุปจากข้อมูลต้นทาง")
+        )
+        citation = tr("Evidence ", "ข้อมูลอ้างอิง ") + ", ".join(str(i) for i in editorial["evidence_ids"])
+        doc.add_heading(heading, 1)
+        doc.add_paragraph(kind)
+        body += f"<section><h2>{esc(heading)}</h2><p class='meta'>{esc(kind)}</p>"
+        for point in points:
+            doc.add_paragraph(point, style="List Bullet")
+            body += f"<p>{esc(point)}</p>"
+        body += f"<p class='meta'>{esc(citation)}</p></section>"
+        doc.add_paragraph(citation)
+        s = slide(heading, kind)
+        if any(len(point) > 140 for point in points):
+            for start in range(0, len(points), 2):
+                if start:
+                    s = slide(heading, kind)
+                for i, point in enumerate(points[start : start + 2]):
+                    box(s, point, 0.8, 2.8 + i * 1.65, 11.5, 1.5, 18)
+                box(s, citation, 0.6, 6.65, 12, 0.25, 10)
+            continue
+        if layout in ("summary", "comparison"):
+            for i, point in enumerate(points):
+                x, y = 0.6 + (i % 2) * 6.1, 2.7 + (i // 2) * 1.85
+                width = 11.8 if len(points) == 1 else 5.85
+                shape = s.shapes.add_shape(MSO_AUTO_SHAPE_TYPE.RECTANGLE, PI(x), PI(y), PI(width), PI(1.65))
+                shape.fill.solid()
+                shape.fill.fore_color.rgb = PPTColor.from_string("F2F5FA")
+                shape.line.fill.background()
+                from pptx.oxml.xmlchemy import OxmlElement as PPTElement
+
+                shape._element.spPr.append(PPTElement("a:effectLst"))
+                for effect in shape._element.xpath("./p:style/a:effectRef"):
+                    effect.set("idx", "0")
+                box(s, point, x + 0.25, y + 0.22, width - 0.5, 1.2, 20 if len(points) == 1 else 18)
+        else:
+            for i, point in enumerate(points):
+                y = 2.7 + i * 0.87
+                box(s, str(i + 1).zfill(2), 0.6, y, 0.55, 0.5, 20)
+                box(s, point, 1.35, y, 11.2, 0.8, 17)
+        box(s, citation, 0.6, 6.65, 12, 0.25, 10)
     purpose = {
         "executive": tr("Management overview", "ภาพรวมสำหรับผู้บริหาร"),
         "monthly": tr("Reporting period and coverage", "ช่วงเวลาและขอบเขตรายงาน"),
@@ -416,6 +520,22 @@ thead {{display:table-header-group;}}
         box(s, "\n".join(source_lines[start : start + 12]), 0.6, 2, 12, 4.7, 13)
     if len(deck.slides) > 60:
         raise ValueError("Report exceeds 60 slides; narrow the source scope")
+    # Check competing content shapes, excluding intentional background panels and flow connectors.
+    overlaps = []
+    for page_no, s in enumerate(deck.slides, 1):
+        regions = [
+            shape
+            for shape in s.shapes
+            if shape.has_table or shape.has_chart or (shape.has_text_frame and shape.text.strip())
+        ]
+        for i, first in enumerate(regions):
+            for second in regions[i + 1 :]:
+                dx = min(first.left + first.width, second.left + second.width) - max(first.left, second.left)
+                dy = min(first.top + first.height, second.top + second.height) - max(first.top, second.top)
+                if dx > PI(0.03) and dy > PI(0.03):
+                    overlaps.append(page_no)
+    if overlaps and not spec.get("flow"):
+        raise ValueError(f"Competing slide content overlaps on pages {sorted(set(overlaps))}")
     paths = []
     if "docx" in spec["formats"]:
         doc.save(root / "report.docx")
@@ -501,6 +621,7 @@ thead {{display:table-header-group;}}
                 )
                 if outside:
                     raise ValueError("Rendered text extends outside a page")
+                extraction_warning = "\ufffd" in text or "(cid:" in text
                 page_count = len(opened.pages)
             subprocess.run(
                 ["pdftoppm", "-png", "-scale-to", "1000", str(pdf), str(folder / "page")],
@@ -522,6 +643,14 @@ thead {{display:table-header-group;}}
                 "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
                 "rendered": True,
                 "page_bounds": "passed",
+                "required_font": "installed",
+                "thai_latin_glyph_coverage": "passed",
+                "text_extraction": "font_encoding_requires_visual_review"
+                if extraction_warning
+                else "readable",
+                "content_overlap": "passed"
+                if path.suffix == ".pptx" and not spec.get("flow")
+                else "human_review_required",
             }
     receipt = {
         "snapshot_id": spec["snapshot_id"],

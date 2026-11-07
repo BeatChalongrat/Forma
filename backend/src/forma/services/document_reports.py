@@ -19,6 +19,7 @@ from forma.core.errors import NotFound, ValidationFailed
 from forma.db.models import (
     AssistantArtifact,
     AssistantArtifactVersion,
+    AssistantAttachment,
     AssistantTurn,
     Job,
     utcnow,
@@ -26,6 +27,7 @@ from forma.db.models import (
 from forma.db.session import session_scope
 from forma.jobs import runner
 from forma.jobs.execution import check
+from forma.reporting import authoring
 from forma.reporting.registry import catalog, digest, skill
 from forma.services import artifacts, attachments, code_sandbox, conversations
 from forma.services.context import ServiceContext
@@ -70,12 +72,28 @@ CREATE_TOOL = {
             "flow_artifact_id": {"type": "string", "maxLength": 40},
             "flow_version": {"type": "integer", "minimum": 1},
             "revise_artifact_id": {"type": "string", "maxLength": 40},
+            **authoring.PROPERTIES,
         },
         "required": ["template", "formats"],
         "additionalProperties": False,
     },
 }
-TOOLS = [CATALOG_TOOL, SKILL_TOOL, CREATE_TOOL]
+INSPECT_TOOL = {
+    "name": "inspect_document",
+    "description": "Read an owned formal report's exact version, editorial section IDs, source rows and previous changes before editing. For targeted changes pass revise_artifact_id, base_version and section_patches to create_document; preserve all unpatched sections and frozen data.",
+    "inputSchema": {
+        "type": "object",
+        "properties": {
+            "artifact_id": {"type": "string", "maxLength": 40},
+            "section_id": {"type": "string", "maxLength": 40},
+            "evidence_id": {"type": "integer", "minimum": 1},
+            "offset": {"type": "integer", "minimum": 0, "maximum": 1000000},
+        },
+        "required": ["artifact_id"],
+        "additionalProperties": False,
+    },
+}
+TOOLS = [CATALOG_TOOL, SKILL_TOOL, INSPECT_TOOL, CREATE_TOOL]
 NOTE = (
     "For formal executive/monthly/incident reports, presentations and SOP documents, call report_templates, "
     "read_report_skill, then build_report for grounded metrics (or save_flow for a process), and create_document. "
@@ -84,6 +102,12 @@ NOTE = (
     "Call it at most once per user turn. It accepts only evidence from this turn, not copied numbers. "
     "For custom content outside these templates use run_python, clearly stating that it lacks the formal numerical gate. "
     "To revise a formal report, pass revise_artifact_id from working_on, retaining the original chat. "
+    "Use brief (title, audience, purpose) and sections to write a useful narrative before the data appendix. "
+    "Section layouts: summary, findings, comparison, actions. Each section needs a stable id and evidence_ids. "
+    "Bind every number with {{e<EVIDENCE_ID>.r<ZERO_BASED_ROW>.<COLUMN>}}; the server resolves it, never type a number. "
+    "Analysis is labeled interpretation, actions are proposals; never invent causes or owners. "
+    "A company template_attachment_id can reference a PPTX or DOCX uploaded in this chat; matching format only, supported widescreen PPTX master or DOCX styles/header/footer. "
+    "For a targeted edit call inspect_document first, then create_document with base_version and section_patches; do not rebuild evidence or replace unmentioned sections. "
 )
 
 
@@ -117,9 +141,15 @@ def freeze(
         source = next((e for e in evidence if e["id"] == eid and e["tool"] == "build_report"), None)
         if report is None or source is None:
             raise ValidationFailed("Only current build_report evidence can supply formal report numbers")
+        if not report.get("complete"):
+            raise ValidationFailed(
+                "This report contains only a preview. Build a complete summary or narrow its scope before publishing"
+            )
         if len(report["rows"]) > 500 or len(report["columns"]) > 25:
             raise ValidationFailed("Choose a narrower report; no rows will be silently removed")
-        sources.append({"report": report, "query": source["arguments"], "sha256": digest(report)})
+        sources.append(
+            {"report": report, "query": source["arguments"], "sha256": digest(report), "evidence_id": eid}
+        )
     if not sources and args["template"] != "process":
         raise ValidationFailed("Build a scoped data report first; ask the user if scope is unclear")
     if args["template"] == "monthly" and not all(
@@ -147,6 +177,36 @@ def freeze(
         "flow": None,
         "renderer_sha256": digest(files("forma.reporting").joinpath("render.py").read_text(encoding="utf-8")),
     }
+    if not args.get("sections") and sources:
+        sections = []
+        for i, source in enumerate(sources):
+            r = source["report"]
+
+            def translated(v: Any) -> str:
+                return str(v.get(language, v.get("en", ""))) if isinstance(v, dict) else str(v)
+
+            # Defaults carry source-owned titles/scope, not model-authored conclusions.
+            sections.append(
+                {
+                    "id": f"overview-{i + 1}",
+                    "layout": "findings"
+                    if args["template"] == "incident"
+                    else "comparison"
+                    if r.get("comparison")
+                    else "summary",
+                    "title": translated(r["title"]),
+                    "points": [translated(r["scope"])],
+                    "evidence_ids": [source["evidence_id"]],
+                    "interpretation": "source_summary",
+                }
+            )
+        result["sections"] = sections
+        if args.get("brief"):
+            authored = {"sources": sources}
+            authoring.compose({"brief": args["brief"]}, authored)
+            result.update({k: v for k, v in authored.items() if k in {"title", "brief"}})
+    else:
+        authoring.compose(args, result)
     # Detach from ORM/model-owned references before persisting.
     return cast(dict[str, Any], json.loads(json.dumps(result, ensure_ascii=False, allow_nan=False)))
 
@@ -186,8 +246,53 @@ def create(
         return view(existing)
     if not (ctx.settings.report_sandbox_socket or code_sandbox.get_runner(ctx.settings)):
         raise ValidationFailed("The report sandbox is not configured")
-    spec = freeze(args, reports, evidence, language, timezone, loaded)
-    if args["template"] == "process":
+    validate(CREATE_TOOL, args)
+    if args.get("section_patches"):
+        if not args.get("revise_artifact_id") or not args.get("base_version"):
+            raise ValidationFailed(
+                "Targeted edits require an artifact and the base_version from inspect_document"
+            )
+        if any(
+            k in args
+            for k in (
+                "brief",
+                "sections",
+                "evidence_ids",
+                "template_attachment_id",
+                "flow_artifact_id",
+                "flow_version",
+            )
+        ):
+            raise ValidationFailed(
+                "Targeted edits retain existing data, brief and templates; send only section_patches"
+            )
+        prior_report = inspect(session, p, args["revise_artifact_id"])
+        if prior_report["version"] != args["base_version"]:
+            raise ValidationFailed("This report has a newer version. Inspect it again before editing")
+        if (
+            args["template"] != prior_report["snapshot"]["template"]
+            or args["formats"] != prior_report["snapshot"]["formats"]
+        ):
+            raise ValidationFailed("Targeted edits preserve the original template and formats")
+        spec = authoring.revise(prior_report["snapshot"], args["section_patches"])
+        spec["created_at"] = utcnow().isoformat()
+        spec["renderer_sha256"] = digest(
+            files("forma.reporting").joinpath("render.py").read_text(encoding="utf-8")
+        )
+    else:
+        if args.get("base_version"):
+            raise ValidationFailed("base_version is used with section_patches")
+        spec = freeze(args, reports, evidence, language, timezone, loaded)
+    if args.get("template_attachment_id"):
+        from forma.reporting.brand_templates import inspect_template
+
+        attached = company_attachment(session, chat_id, args["template_attachment_id"])
+        spec["company_template"] = inspect_template(
+            attached.name, ctx.storage.get(attached.storage_key), attached.id
+        )
+        if spec["company_template"]["format"] not in spec["formats"]:
+            raise ValidationFailed("Include the matching output format for the uploaded company template")
+    if args["template"] == "process" and not args.get("section_patches"):
         item = artifacts.find(session, args.get("flow_artifact_id", ""))
         conversations.get_chat(session, p, item.conversation_id)
         version = session.scalar(
@@ -219,6 +324,8 @@ def create(
         if old_job is None or old_job.status != "done":
             raise ValidationFailed("Only a completed formal report can be revised with this tool")
         payload["family_id"] = old_job.payload.get("family_id", old_job.id)
+        if args.get("section_patches"):
+            payload["revision_base"] = {"artifact_id": previous.id, "version": args["base_version"]}
     job_id = runner.stage_job(session, KIND, payload, request_id=p.request_id)
     pending = (
         session.scalar(
@@ -293,7 +400,81 @@ def view(j: Job) -> dict[str, Any]:
         "quality": (j.result or {}).get("quality"),
         "files": (j.result or {}).get("files", []),
         "attempts": j.attempts,
+        "brief": spec.get("brief"),
+        "outline": [
+            {"id": s["id"], "title": s["title"], "layout": s["layout"]} for s in spec.get("sections", [])
+        ],
+        "revision": spec.get("revision"),
+        "company_template": spec.get("company_template"),
     }
+
+
+def inspect(session: Session, p: Principal, artifact_id: str) -> dict[str, Any]:
+    item = artifacts.find(session, artifact_id)
+    conversations.get_chat(session, p, item.conversation_id)
+    version = artifacts._latest(session, item)
+    jid = (version.source or {}).get("report", {}).get("job_id")
+    if not jid:
+        raise ValidationFailed("This artifact is not a formal report")
+    job = scoped(session, p, jid)
+    if job.status != "done":
+        raise ValidationFailed("Wait for the report to finish before revising it")
+    return {
+        "artifact_id": item.id,
+        "version": version.number,
+        "snapshot": job.payload["snapshot"],
+        "links": [],
+    }
+
+
+def company_attachment(session: Session, chat_id: str, attachment_id: str) -> AssistantAttachment:
+    attached = session.get(AssistantAttachment, attachment_id)
+    if attached is None or attached.conversation_id != chat_id or attached.kind != "upload":
+        raise NotFound("Upload the company template in this conversation first")
+    return attached
+
+
+def inspect_plan(session: Session, p: Principal, args: dict[str, Any]) -> dict[str, Any]:
+    found = inspect(session, p, args["artifact_id"])
+    spec = found["snapshot"]
+    sections = spec.get("sections", [])
+    if args.get("section_id"):
+        sections = [s for s in sections if s["id"] == args["section_id"]]
+        if not sections:
+            raise ValidationFailed("Section not found in this report")
+    result = {
+        "artifact_id": found["artifact_id"],
+        "version": found["version"],
+        "template": spec["template"],
+        "formats": spec["formats"],
+        "brief": spec.get("brief"),
+        "sections": [{k: v for k, v in section.items() if k != "authored"} for section in sections],
+        "section_ids": [s["id"] for s in spec.get("sections", [])],
+        "sources": [
+            {
+                "evidence_id": s.get("evidence_id"),
+                "title": s["report"]["title"],
+                "columns": s["report"]["columns"],
+                "scope": s["report"]["scope"],
+                "rows": len(s["report"]["rows"]),
+            }
+            for s in spec["sources"]
+        ],
+        "links": [],
+    }
+    if args.get("evidence_id"):
+        source = next((s for s in spec["sources"] if s.get("evidence_id") == args["evidence_id"]), None)
+        if source is None:
+            raise ValidationFailed("Evidence not found in this report")
+        offset = args.get("offset", 0)
+        rows = source["report"]["rows"]
+        result.update(
+            rows=rows[offset : offset + 20],
+            offset=offset,
+            total=len(rows),
+            next_offset=offset + 20 if offset + 20 < len(rows) else None,
+        )
+    return result
 
 
 @runner.handler(KIND)
@@ -329,9 +510,21 @@ def render_report(ctx: ServiceContext, payload: dict[str, Any], prog: runner.Job
         raise ValidationFailed(
             "The report renderer changed after this request. Create a new report to use the current version."
         )
-    result = sandbox.run(
-        script, [Input("report.json", len(data), lambda: io.BytesIO(data))], ctx.settings.report_timeout_s
-    )
+    inputs = [Input("report.json", len(data), lambda: io.BytesIO(data))]
+    if spec.get("company_template"):
+        import hashlib
+
+        template = spec["company_template"]
+        with session_scope() as s:
+            conversations.get_chat(s, p, payload["chat_id"])
+            attached = company_attachment(s, payload["chat_id"], template["attachment_id"])
+            template_data = ctx.storage.get(attached.storage_key)
+        if hashlib.sha256(template_data).hexdigest() != template["sha256"]:
+            raise ValidationFailed("Company template changed after the report was queued")
+        inputs.append(
+            Input("company." + template["format"], len(template_data), lambda: io.BytesIO(template_data))
+        )
+    result = sandbox.run(script, inputs, ctx.settings.report_timeout_s)
     check()
     prog.update(75, "ตรวจตัวเลขและตัวอย่างทุกหน้า")
     output = dict(result.files)
@@ -362,6 +555,13 @@ def render_report(ctx: ServiceContext, payload: dict[str, Any], prog: runner.Job
             .returning(type(chat).id)
         ):
             raise NotFound("Conversation not found")
+        if payload.get("revision_base"):
+            base = payload["revision_base"]
+            original = artifacts.find(s, base["artifact_id"])
+            if original.latest != base["version"]:
+                raise ValidationFailed(
+                    "A newer report version was published while this edit was rendering; inspect it before retrying"
+                )
         saved, refs = [], []
         for fmt in spec["formats"]:
             name = f"report-{payload.get('family_id', prog.job_id)}.{fmt}"
