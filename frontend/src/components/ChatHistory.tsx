@@ -1,3 +1,4 @@
+import { AssistantWork } from './AssistantWork'
 import { Fragment, useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query'
@@ -24,6 +25,8 @@ export function ChatHistory({ compact, onNavigate }: { compact: boolean; onNavig
     try { localStorage.setItem('forma.assistant-history', next ? 'expanded' : 'collapsed') } catch { /* private mode */ }
   }
   const { data: me } = useQuery({ queryKey: ['me'], queryFn: api.me })
+  const work = useQuery({ queryKey: ['assistant-work', me ? chatIdentity(me) : ''], queryFn: api.assistantWork, enabled: !!me, refetchInterval: 4000 })
+  const workCount = work.data?.items.length ?? 0
   useEffect(() => { const timer = setTimeout(() => setTerm(search), 250); return () => clearTimeout(timer) }, [search])
   const history = useInfiniteQuery({ queryKey: ['assistant-chats', me ? chatIdentity(me) : '', term, archived], queryFn: ({ pageParam }) => api.chats(term, pageParam, archived), initialPageParam: 0, getNextPageParam: page => page.next_offset ?? undefined, enabled: !!me && !compact && expanded && view !== 'work', refetchInterval: active && expanded && !compact && view !== 'work' ? 10000 : false })
   const works = useQuery({ queryKey: ['artifacts'], queryFn: api.artifacts, enabled: !compact && expanded && view === 'work' })
@@ -32,11 +35,11 @@ export function ChatHistory({ compact, onNavigate }: { compact: boolean; onNavig
   const tab = (value: typeof view, text: string) => <button type="button" aria-pressed={view === value} className={cn(view === value && 'is-on')} onClick={() => setView(value)}>{text}</button>
   return <div className="mb-1">
     <div className={cn('flex items-center rounded-lg hover:bg-surface-2', active && 'bg-signal-soft text-navy')}>
-      {compact ? <Link to="/assistant" onClick={onNavigate} title={t('Assistant', 'ผู้ช่วย')} aria-label={t('Assistant', 'ผู้ช่วย')} className="flex justify-center px-3 py-2.5 flex-1"><AssistantIcon size={18} aria-hidden="true" /></Link> : <button type="button" onClick={toggleHistory} aria-expanded={expanded} aria-controls="assistant-chat-history" className="flex items-center gap-3 px-3 py-2.5 min-w-0 w-full text-left rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal"><AssistantIcon size={18} className="shrink-0" aria-hidden="true" /><span className="flex-1 text-[13px] font-medium">{t('Assistant', 'ผู้ช่วย')}</span><ChevronDown size={15} className={cn('shrink-0 text-muted transition-transform motion-reduce:transition-none', !expanded && '-rotate-90')} aria-hidden="true" /></button>}
+      {compact ? <Link to="/assistant" onClick={onNavigate} title={t('Assistant', 'ผู้ช่วย')} aria-label={t('Assistant', 'ผู้ช่วย')} className="flex justify-center px-3 py-2.5 flex-1"><AssistantIcon size={18} aria-hidden="true" />{!!workCount && <span className="h-1.5 w-1.5 rounded-full bg-brand-lime" aria-label={t("Assistant updates", "งานและคำตอบใหม่")} />}</Link> : <button type="button" onClick={toggleHistory} aria-expanded={expanded} aria-controls="assistant-chat-history" className="flex items-center gap-3 px-3 py-2.5 min-w-0 w-full text-left rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal"><AssistantIcon size={18} className="shrink-0" aria-hidden="true" /><span className="flex-1 text-[13px] font-medium">{t('Assistant', 'ผู้ช่วย')}</span>{!!workCount && <span className="text-xs text-muted" aria-label={t('Assistant updates', 'งานและคำตอบใหม่')}>{workCount}</span>}<ChevronDown size={15} className={cn('shrink-0 text-muted transition-transform motion-reduce:transition-none', !expanded && '-rotate-90')} aria-hidden="true" /></button>}
     </div>
     {!compact && <div id="assistant-chat-history" hidden={!expanded} className="pl-3 pr-1 py-2 space-y-2">
       <button onClick={() => { navigate(newChatUrl()); onNavigate() }} className="flex items-center gap-2 text-[12px] px-2 py-2 w-full rounded-lg hover:bg-surface-2 text-left font-medium"><SquarePen size={15} />{t('New chat', 'แชตใหม่')}</button>
-      <div className="chat-tabs" role="group" aria-label={t('What to list', 'เลือกรายการ')}>{tab('chats', t('Chat history', 'ประวัติแชต'))}{tab('work', t('Work', 'ผลงาน'))}{tab('archived', t('Archived', 'ที่เก็บไว้'))}</div>
+      <AssistantWork items={work.data?.items ?? []} /><div className="chat-tabs" role="group" aria-label={t('What to list', 'เลือกรายการ')}>{tab('chats', t('Chat history', 'ประวัติแชต'))}{tab('work', t('Work', 'ผลงาน'))}{tab('archived', t('Archived', 'ที่เก็บไว้'))}</div>
       <label className="flex items-center gap-2 border border-line rounded-lg px-2 py-1.5 text-muted"><Search size={13} className="shrink-0" /><input value={search} onChange={e => setSearch(e.target.value)} maxLength={200} placeholder={searchLabel} aria-label={searchLabel} className="min-w-0 w-full bg-transparent border-0 text-xs" /></label>
       <div className="max-h-60 overflow-y-auto space-y-0.5">
         {view === 'work' ? <>

@@ -163,16 +163,22 @@ def test_structural_questions_retire_only_for_the_verified_source(schema):
 
 @pytest.mark.parametrize("report", [{"complete": True, "passed": False}, {"complete": False, "passed": True}])
 @pytest.mark.parametrize("override", [False, True])
-def test_human_confirmation_cannot_override_execution_failure(monkeypatch, report, override):
+def test_human_confirmation_cannot_override_execution_failure(isolated_env, monkeypatch, report, override):
     from types import SimpleNamespace
 
     from forma.core.errors import ValidationFailed
+    from forma.db.session import init_db, session_scope
     from forma.services import mapping
 
-    version = SimpleNamespace(status="proposed", policy={"verification": report})
+    # Approval also checks retired knowledge in the database before the execution gate.
+    # Use a real empty database rather than None; keep both checks active.
+    init_db()
+    version = SimpleNamespace(
+        customer_id="verification-customer", status="proposed", policy={"verification": report}
+    )
     monkeypatch.setattr(mapping, "get_mapping", lambda *a: version)
-    with pytest.raises(ValidationFailed, match="verify all records"):
-        mapping.approve_mapping(None, "test", "reviewer", "reviewed", override_block=override)
+    with session_scope() as session, pytest.raises(ValidationFailed, match="verify all records"):
+        mapping.approve_mapping(session, "test", "reviewer", "reviewed", override_block=override)
     assert version.status == "proposed"
 
 

@@ -1,5 +1,9 @@
 /** Typed API client. All calls go through the Vite proxy (/api → FastAPI). */
 import { authHeaders, login } from './auth'
+import type { ActivityList, ActivityDetail, Receipt } from './activity'
+import type { InspectionItem, InspectionTimeline, InspectionDetail } from './inspection'
+import { inspectionFilters } from './inspection'
+import { recoverChatTurn } from './chatRecovery'
 
 export type ReviewDraftPayload = { answers: Record<string, boolean | number | string>; remember: string[]; acknowledged: string[]; unsure: Record<string, boolean>; section: string; comment: string }
 export type ReviewDraft = { mapping_id: string; revision: number; payload: Partial<ReviewDraftPayload>; updated_at: string | null }
@@ -34,6 +38,16 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 const get = <T>(p: string) => request<T>(p)
+export const inspectionApi = {
+  items: (filters: Record<string, string>) => get<{ items: InspectionItem[]; total: number; next_offset: number | null }>('/api/inspection/items?' + inspectionFilters(filters)),
+  timeline: (scope: string, id: string, cursor: string, category: string) => get<InspectionTimeline>(`/api/inspection/${encodeURIComponent(scope)}/${encodeURIComponent(id)}/events?` + new URLSearchParams({ cursor, category })),
+  detail: (scope: string, id: string, kind: string, event: string, offset: number) => get<InspectionDetail>(`/api/inspection/${encodeURIComponent(scope)}/${encodeURIComponent(id)}/events/${encodeURIComponent(kind)}/${encodeURIComponent(event)}?offset=${offset}`),
+}
+export const activityApi = {
+  span: (job: string, span: string) => get<Receipt[]>(`/api/activity/jobs/${encodeURIComponent(job)}/spans/${encodeURIComponent(span)}`),
+  jobs: (filters: Record<string, string | number>) => get<ActivityList>('/api/activity/jobs?' + new URLSearchParams(Object.entries(filters).filter(([, v]) => v !== '').map(([k, v]) => [k, String(v)]))),
+  detail: (id: string, attempt: string, before: string) => get<ActivityDetail>(`/api/activity/jobs/${encodeURIComponent(id)}?` + new URLSearchParams(Object.entries({ attempt, before }).filter(([, v]) => v !== ''))),
+}
 const post = <T>(p: string, body?: unknown) => request<T>(p, { method: 'POST', body: body === undefined ? undefined : JSON.stringify(body) })
 const del = <T>(p: string) => request<T>(p, { method: 'DELETE' })
 const put = <T>(p: string, body: unknown) => request<T>(p, { method: 'PUT', body: JSON.stringify(body) })
@@ -55,7 +69,7 @@ export const knowledgeTransfer = {
   },
 }
 
-export type ChatStreamEvent = { type: 'started'; request_id: string } | { type: 'phase'; phase: 'research' | 'coding' | 'writing' } | { type: 'delta'; text: string } | { type: 'reset' } | { type: 'done'; turn: ChatTurn } | { type: 'error'; message: string }
+export type ChatStreamEvent = { type: 'started'; request_id: string } | { type: 'phase'; phase: 'research' | 'coding' | 'writing' } | { type: 'delta'; text: string } | { type: 'reset' } | { type: 'done'; turn: ChatTurn } | { type: 'error'; message: string } | { type: 'snapshot'; turn: ChatTurn } | { type: 'connection'; state: 'reconnecting' | 'following' }
 async function chatFile(id: string): Promise<Blob> {
   const res = await fetch(`/api/assistant/attachments/${encodeURIComponent(id)}`, { headers: authHeaders() })
   if (!res.ok) throw new ApiError(res.status, 'error', res.statusText)
@@ -68,15 +82,30 @@ function attachChatFile(id: string, file: File): Promise<ChatFile> {
   return request<ChatFile>(`/api/assistant/conversations/${encodeURIComponent(id)}/attachments`, { method: 'POST', body })
 }
 
-async function chatStream(id: string, body: { question: string; request_id: string; language: 'th' | 'en'; timezone: string; attachment_ids?: string[]; artifact_id?: string; target?: string }, onEvent: (event: ChatStreamEvent) => void, signal: AbortSignal): Promise<ChatTurn> {
-  const response = await fetch(`/api/assistant/conversations/${encodeURIComponent(id)}/messages/stream`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() }, body: JSON.stringify(body), signal })
+async function chatStream(id: string, body: { clarification_turn_id?: string; question: string; request_id: string; language: 'th' | 'en'; timezone: string; attachment_ids?: string[]; artifact_id?: string; target?: string }, onEvent: (event: ChatStreamEvent) => void, signal: AbortSignal): Promise<ChatTurn> {
+  try { return await openChatStream(id, body, onEvent, signal) } catch (error) {
+    signal.throwIfAborted()
+    if (error instanceof ApiError && error.status < 500) throw error
+    onEvent({ type: 'connection', state: 'reconnecting' })
+    return recoverChatTurn(
+      () => request<ChatTurn>(`/api/assistant/conversations/${encodeURIComponent(id)}/messages/${encodeURIComponent(body.request_id)}`, { signal: AbortSignal.any([signal, AbortSignal.timeout(10000)]) }),
+      signal, turn => onEvent({ type: 'snapshot', turn }), state => onEvent({ type: 'connection', state }),
+    )
+  }
+}
+
+async function openChatStream(id: string, body: { clarification_turn_id?: string; question: string; request_id: string; language: 'th' | 'en'; timezone: string; attachment_ids?: string[]; artifact_id?: string; target?: string }, onEvent: (event: ChatStreamEvent) => void, signal: AbortSignal): Promise<ChatTurn> {
+  const opening = new AbortController(), deadline = setTimeout(() => opening.abort(), 30000)
+  const response = await fetch(`/api/assistant/conversations/${encodeURIComponent(id)}/messages/stream`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() }, body: JSON.stringify(body), signal: AbortSignal.any([signal, opening.signal]) }).finally(() => clearTimeout(deadline))
   if (response.status === 401) void login()
   if (!response.ok || !response.body) throw new ApiError(response.status, 'stream_failed', 'Could not start reply')
   const reader = response.body.getReader(), decoder = new TextDecoder()
   let buffer = ''
   try {
     while (true) {
-      const { done, value } = await reader.read()
+      // The server sends a heartbeat every 10 s. A silent transport must reconnect too.
+      const silence = setTimeout(() => { void reader.cancel().catch(() => undefined) }, 45000)
+      const { done, value } = await reader.read().finally(() => clearTimeout(silence))
       buffer += decoder.decode(value, { stream: !done })
       let end: number
       while ((end = buffer.indexOf('\n')) >= 0) {
@@ -337,7 +366,7 @@ export type AssistantReport = {
 }
 export type ChatFile = { id: string; name: string; media_type: string; size: number; kind: 'upload' | 'output' | 'preview' }
 export type ArtifactKind = 'flow' | 'deck' | 'doc' | 'sheet' | 'web' | 'image' | 'text' | 'file'
-export type ArtifactRef = { id: string; kind: ArtifactKind; title: string; version: number; note: string }
+export type ArtifactRef = { id: string; kind: ArtifactKind; title: string; version: number; note: string; file?: ChatFile | null }
 export type FlowNode = { id: string; label: string; detail?: string; tone?: 'plain' | 'question' | 'problem' | 'done' }
 export type FlowEdge = { from: string; to: string; label?: string; back?: boolean }
 export type FlowContent = { nodes: FlowNode[]; edges: FlowEdge[]; direction: 'down' | 'right' }
@@ -345,11 +374,13 @@ export type SheetPreview = { name: string; rows: string[][]; formulas: Record<st
 export type ArtifactVersion = { number: number; note: string; restored_from: number | null; file: ChatFile | null; content: FlowContent | null; preview: { status: 'ready' | 'failed' | 'none'; pages?: string[]; pdf?: string | null; sheets?: SheetPreview[] } | null; code: string | null; checked: number; generated_at: string | null; uses_data: boolean; created_at: string }
 export type ArtifactSummary = { id: string; conversation_id: string; kind: ArtifactKind; title: string; name: string; latest: number; created_at: string; updated_at: string; chat_title?: string }
 export type ArtifactDetail = ArtifactSummary & { stale: boolean; versions: ArtifactVersion[] }
+export type DocumentJob = { sources: { title: string; scope: string; generated_at: string; complete: boolean; rows: number }[]; id: string; title: string; status: string; progress: number; message: string | null; error: string | null; snapshot_id: string; formats: string[]; template: string; template_version: string; artifacts: ArtifactRef[]; files: ChatFile[]; quality?: { status: string; visual_review: string; files: Record<string, { pages: number; rendered_pages: number }> }; error_detail?: string; snapshot?: unknown }
 export type CodeRun = { id: string; code: string; status: 'ok' | 'error' | 'timeout' | 'killed'; exit_code: number; duration_ms: number; stdout: string; stderr: string; files: ChatFile[]; omitted: string[]; inputs: string[] }
-export type WorkspaceAnswer = { answer: string; ai: boolean; reason?: string; clarifications?: Clarification[]; tools_used?: string[]; actions?: AssistantAction[]; visualizations?: AssistantReport[]; code_runs?: CodeRun[]; artifacts?: ArtifactRef[]; memory_changes?: MemoryChange[]; evidence: { id: number; tool: string; data: unknown; links: { label: string; url: string }[] }[] }
+export type WorkspaceAnswer = { phase?: 'research' | 'coding' | 'writing'; answer: string; ai: boolean; reason?: string; clarifications?: Clarification[]; tools_used?: string[]; actions?: AssistantAction[]; visualizations?: AssistantReport[]; code_runs?: CodeRun[]; artifacts?: ArtifactRef[]; memory_changes?: MemoryChange[]; evidence: { id: number; tool: string; data: unknown; links: { label: string; url: string }[] }[] }
 
 export type ChatSummary = { id: string; title: string; round_id: string | null; dataset_id: string | null; mapping_id?: string | null; archived: boolean; pinned: boolean; memory_off?: boolean; incognito?: boolean; created_at: string; updated_at: string; busy: boolean }
-export type ChatTurn = { id: string; request_id: string; sequence: number; question: string; reply: WorkspaceAnswer | null; attachments?: ChatFile[]; status: 'pending' | 'complete' | 'failed' | 'stopped'; created_at: string }
+export type ChatTurn = { feedback?: { rating: string; comment: string } | null; id: string; request_id: string; sequence: number; question: string; reply: WorkspaceAnswer | null; attachments?: ChatFile[]; status: 'pending' | 'complete' | 'failed' | 'stopped'; created_at: string }
+export type ChatWorkspaceState = { revision: number; draft: import('./chatDraft').ChatDraft; branch: { chat_id?: string; turn_id?: string; title?: string; mode?: string }; seen_sequence: number }
 export type ChatDetail = { conversation: ChatSummary; turns: ChatTurn[]; total: number; older_before: number | null }
 export type ChatList = { items: ChatSummary[]; total: number; next_offset: number | null }
 
@@ -362,6 +393,12 @@ export const api = {
   deleteChat: (id: string) => del<void>(`/api/assistant/conversations/${encodeURIComponent(id)}`),
   chatSend: (id: string, b: { question: string; request_id: string; language: 'th' | 'en'; timezone: string }) => post<ChatTurn>(`/api/assistant/conversations/${encodeURIComponent(id)}/messages`, b),
   chatStream,
+  chatState: (id: string) => get<ChatWorkspaceState>(`/api/assistant/conversations/${encodeURIComponent(id)}/state`),
+  saveChatState: (id: string, revision: number, draft: import('./chatDraft').ChatDraft) => put<ChatWorkspaceState>(`/api/assistant/conversations/${encodeURIComponent(id)}/state`, { revision, draft }),
+  chatBranch: (id: string, turn_id: string, question: string, mode: 'edit' | 'regenerate', request_id: string) => post<{ id: string }>(`/api/assistant/conversations/${encodeURIComponent(id)}/branch`, { turn_id, question, mode, request_id }),
+  chatSeen: (id: string) => post(`/api/assistant/conversations/${encodeURIComponent(id)}/seen`),
+  chatFeedback: (id: string, turn: string, rating: 'helpful' | 'incorrect' | 'unclear', comment: string) => put(`/api/assistant/conversations/${encodeURIComponent(id)}/turns/${encodeURIComponent(turn)}/feedback`, { rating, comment }),
+  assistantWork: () => get<{ items: { chat_id: string; title: string; status: string; unread: boolean; phase?: string }[] }>('/api/assistant/work'),
   chatFile,
   attachChatFile,
   memory: () => get<{ items: MemoryItem[] }>('/api/assistant/memory'),
@@ -370,6 +407,10 @@ export const api = {
   deleteMemory: (id: string) => del<void>(`/api/assistant/memory/${encodeURIComponent(id)}`),
   resetMemory: () => del<{ deleted: number }>('/api/assistant/memory'),
   artifacts: () => get<{ items: ArtifactSummary[] }>('/api/assistant/artifacts'),
+  reportTemplates: () => get<{ version: string; templates: { id: string; name: string; description: string }[] }>('/api/assistant/report-templates'),
+  documentJobs: (chat: string, offset = 0) => get<{ items: DocumentJob[]; next_offset: number | null }>(`/api/assistant/conversations/${encodeURIComponent(chat)}/reports?offset=${offset}`),
+  documentJob: (id: string) => get<DocumentJob>(`/api/assistant/reports/${encodeURIComponent(id)}`),
+  documentAction: (id: string, action: 'cancel' | 'retry') => post<{ id: string }>(`/api/assistant/reports/${encodeURIComponent(id)}/${action}`),
   artifact: (id: string) => get<ArtifactDetail>(`/api/assistant/artifacts/${encodeURIComponent(id)}`),
   restoreArtifact: (id: string, number: number) => post<ArtifactDetail>(`/api/assistant/artifacts/${encodeURIComponent(id)}/versions/${number}/restore`),
   chatStop: (id: string, request_id: string) => post<ChatTurn>(`/api/assistant/conversations/${encodeURIComponent(id)}/stop`, { request_id }),

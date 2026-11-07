@@ -13,8 +13,11 @@ from fastapi.responses import JSONResponse, Response
 from starlette.concurrency import run_in_threadpool
 
 from forma import __version__
+from forma.api.activity_routes import router as activity_router
 from forma.api.batch_routes import router as batch_router
 from forma.api.config_routes import router as config_router
+from forma.api.document_routes import router as document_router
+from forma.api.inspection_routes import router as inspection_router
 from forma.api.knowledge_revision_routes import router as knowledge_revision_router
 from forma.api.knowledge_routes import router as knowledge_router
 from forma.api.review_journey_routes import router as review_journey_router
@@ -58,6 +61,7 @@ def create_app() -> FastAPI:
         docs_url="/api/docs",
         openapi_url="/api/openapi.json",
     )
+    app.include_router(document_router)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=s.cors_origins,
@@ -137,6 +141,8 @@ def create_app() -> FastAPI:
         return JSONResponse(status_code=200 if body["status"] == "ok" else 503, content=body)
 
     app.include_router(api)
+    app.include_router(activity_router)
+    app.include_router(inspection_router)
     app.include_router(config_router)
     app.include_router(knowledge_router)
     app.include_router(knowledge_revision_router)

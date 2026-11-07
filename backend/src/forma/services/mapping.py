@@ -344,6 +344,16 @@ def propose_for_round(
         ]
         agent_log.append({"agent": "memory", "result": "reuse", "previous": previous.id, "drift": drift})
         source_kind = "memory"
+        from forma.jobs.activity import emit
+
+        emit(
+            "format.reused",
+            detail={
+                "mapping_id": previous.id,
+                "drift": drift,
+                "note": "Reused approved mapping; validation still required",
+            },
+        )
     else:
         # 2) deterministic draft, reading what this customer's operators taught FORMA before (ADR-038)
         from forma.services import learning
@@ -638,8 +648,8 @@ def propose_for_round(
         if rep.ok and source_kind != "memory"
         else None
     )
-    # 7) self-healing review: what changed per field vs the approved mapping, checked on the data. A reused
-    #    mapping is checked too (ADR-056): the layout did not move, but the values may have.
+    # 7) Check unchanged fields too: re-proposing after a locale/context change can produce the same
+    #    expressions as the baseline. That must not bypass VAT/scale checks against published values.
     review = (
         _field_review(
             ctx,
@@ -650,7 +660,7 @@ def propose_for_round(
             sim.records if sim else None,
             r.customer_id,
             r.id,
-            check_unchanged=source_kind == "memory",
+            check_unchanged=True,
         )
         if previous is not None and rep.ok
         else None

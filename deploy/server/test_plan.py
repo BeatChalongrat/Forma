@@ -13,7 +13,7 @@ import plan
 def arguments(**overrides):
     a = plan.parser().parse_args([])
     for key, value in dict(
-        cpus=16,
+        cpus=18,
         ram_gib=48,
         disk_total_gib=1000,
         disk_free_gib=900,
@@ -26,7 +26,7 @@ def arguments(**overrides):
 
 class CapacityTests(unittest.TestCase):
     def test_large_profiles_require_opt_in_and_account_every_replica(self):
-        for cpus, ram, jobs in ((24, 64, 16), (48, 128, 32)):
+        for cpus, ram, jobs in ((32, 80, 16), (48, 128, 32)):
             a = arguments()
             a.cpus, a.ram_gib = cpus, ram
             self.assertEqual(plan.calculate(a)["selected"]["jobs"], 8)
@@ -92,6 +92,14 @@ class CapacityTests(unittest.TestCase):
         )
         self.assertGreaterEqual(
             first["disk"]["scratch_gib"], 2 * first["disk"]["live_data_gib"]
+        )
+
+    def test_assistant_worker_is_reserved_before_mapping_capacity(self):
+        a = arguments()
+        a.cpus = 16
+        self.assertEqual(plan.calculate(a)["selected"]["jobs"], 4)
+        self.assertIn(
+            "assistant-worker", plan.compose(plan.calculate(arguments()))["services"]
         )
 
     def test_external_workloads_reduce_capacity(self):

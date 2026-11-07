@@ -137,6 +137,39 @@ class Settings(BaseSettings):
         default="thread", description="thread | process | arq (Redis-backed, `forma worker`)."
     )
     workers: int = Field(default=4, description="Worker threads/processes per node.")
+    report_workers: int = Field(default=1, ge=1, le=4, description="Separate document worker concurrency.")
+    assistant_workers: int = Field(
+        default=2, ge=1, le=8, description="Independent assistant queue concurrency per worker container."
+    )
+    assistant_run_max_calls: int = Field(
+        default=48,
+        ge=1,
+        le=100,
+        description="Persistent model request budget per assistant message, including retries.",
+    )
+    assistant_step_attempts: int = Field(
+        default=3, ge=1, le=5, description="Maximum attempts of each unfinished assistant step."
+    )
+    assistant_run_max_cost_usd: float = Field(
+        default=2.0,
+        gt=0,
+        description="Pause new calls after recorded estimated spend; not a provider billing cap.",
+    )
+    assistant_run_timeout_s: int = Field(
+        default=1800, ge=30, description="Assistant message lifetime, including queue wait and recovery."
+    )
+    report_queue_max: int = Field(
+        default=20, ge=1, le=100, description="Bounded pending/running document jobs."
+    )
+    worker_queue: str = Field(
+        default="mapping",
+        pattern="^(mapping|reports|assistant)$",
+        description="ARQ queue selected by this worker: mapping, reports or assistant.",
+    )
+    report_sandbox_socket: str | None = Field(default=None, description="Isolated document renderer socket.")
+    report_timeout_s: float = Field(
+        default=240, ge=30, le=300, description="Document renderer time limit in seconds."
+    )
     file_workers: int = Field(default=4, description="Files profiled concurrently inside one round.")
     queue_max: int = Field(default=500, description="Max queued+running jobs before the API answers 429.")
     job_stale_s: int = Field(

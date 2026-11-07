@@ -14,6 +14,7 @@ from forma.core.settings import get_settings
 
 @event.listens_for(Session, "after_rollback")
 def _discard_uncommitted_objects(session: Session) -> None:
+    session.info.pop("activity_retired_jobs", None)
     from forma.core.logging import get_logger
     from forma.db.models import DatasetVersion, ExportArtifact
 
@@ -39,6 +40,11 @@ def _discard_uncommitted_objects(session: Session) -> None:
 @event.listens_for(Session, "after_commit")
 def _keep_committed_objects(session: Session) -> None:
     session.info.pop("rollback_objects", None)
+    retired = session.info.pop("activity_retired_jobs", [])
+    if retired:
+        from forma.jobs.activity import purge_jobs
+
+        purge_jobs(retired)
 
 
 @event.listens_for(Session, "before_flush")

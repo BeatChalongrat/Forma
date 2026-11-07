@@ -10,7 +10,7 @@
 
 ```bash
 # จำลอง server ที่กำลังพิจารณา ซื้อเครื่องตามผลนี้ทันทีไม่ได้ ต้องปรับสมมติฐานไฟล์ด้วย
-python3 deploy/server/plan.py --cpus 16 --ram-gib 48 \
+python3 deploy/server/plan.py --cpus 18 --ram-gib 48 \
   --disk-total-gib 1000 --disk-free-gib 900 \
   --files 300 --average-file-mib 5 --retained-batches 7 \
   --output-multiplier 1 --backup-copies 15 --database-gib 5 \
@@ -36,11 +36,11 @@ python3 deploy/server/plan.py --probe --data-path /var/lib/docker \
 
 | งานพร้อมกัน | Worker containers × slots | Sandbox | ตัวอย่าง CPU / RAM | ยอด RAM limits รวม |
 |---|---|---|---|---|
-| 8 (ค่าเริ่มต้น) | 2 × 4 | 2 | 16 vCPU / 48 GiB | 28.125 GiB |
-| 16 (เลือกเพิ่ม) | 4 × 4 | 4 | 24 vCPU / 64 GiB | 49.125 GiB |
-| 32 (เลือกเพิ่ม) | 8 × 4 | 8 | 48 vCPU / 128 GiB | 91.125 GiB |
+| 8 (ค่าเริ่มต้น) | 2 × 4 | 2 | 18 vCPU / 48 GiB | 32.625 GiB |
+| 16 (เลือกเพิ่ม) | 4 × 4 | 4 | 32 vCPU / 80 GiB | 53.625 GiB |
+| 32 (เลือกเพิ่ม) | 8 × 4 | 8 | 48 vCPU / 128 GiB | 95.625 GiB |
 
-ตัวเลขเป็นสมมติฐาน capacity ของไฟล์ซับซ้อน ไม่ใช่ผล load test หรือการรับประกัน throughput การเพิ่มงานไม่ได้เพิ่มโควตาของผู้ให้บริการ LLM อัตโนมัติ เมื่อชน RPM/TPM หรือ sandbox จะยังต้องรอ ตัวอย่างที่สร้างไว้ตรวจได้ใน `examples/server-48g`, `examples/server-64g-16jobs` และ `examples/server-128g-32jobs`
+ตัวเลขเป็นสมมติฐาน capacity ของไฟล์ซับซ้อน ไม่ใช่ผล load test หรือการรับประกัน throughput การเพิ่มงานไม่ได้เพิ่มโควตาของผู้ให้บริการ LLM อัตโนมัติ เมื่อชน RPM/TPM หรือ sandbox จะยังต้องรอ ตัวอย่างที่สร้างไว้ตรวจได้ใน `examples/server-48g`, `examples/server-64g-16jobs` (ชื่อโฟลเดอร์เดิม แต่ปรับสมมติฐานเป็น 80 GiB แล้ว) และ `examples/server-128g-32jobs`
 
 **เริ่ม production ใหม่และ deploy ครั้งต่อไป:** ใช้ [คู่มือแยกฐานและย้ายความรู้](KNOWLEDGE.md) ซึ่งเพิ่ม `compose.isolated.yml` และ env เฉพาะ server ห้ามใช้ฐาน dev ทั้งก้อนเป็นจุดเริ่ม production
 
@@ -52,11 +52,12 @@ python3 deploy/server/plan.py --probe --data-path /var/lib/docker \
 - CPU กันไว้ `max(1 vCPU, 12.5% ของ CPU)` แล้วหัก CPU ของแอปอื่น
 - รวม **hard limit ทุก replica** ต้องไม่เกินส่วนที่เหลือ ไม่คิดว่า swap คือ RAM เพิ่ม
 - Worker เผื่อฐาน 0.5 GiB + `slots × --ram-per-job-gib` (เริ่มต้น **1.5 GiB/งาน**) และ 0.5 CPU/slot
+- Assistant worker แยกคิวแชต: 0.75 GiB / 0.5 CPU, เริ่มต้น 2 งานแชตพร้อมกัน เพิ่มจาก mapping workers โดยไม่ลด 8 งานใน config dev
 - API 1.5 GiB, PostgreSQL 2 GiB, Redis 0.5 GiB, MinIO 1 GiB, เว็บ 0.25 GiB, backup 0.75 GiB รวมถึง migration 1 GiB และ init 0.125 GiB เพื่อเผื่อช่วงเริ่มระบบด้วย
 - Sandbox ตัวละ 4 GiB / 2 CPU; 2–4 งานใช้หนึ่งตัว, 8/16/32 งานใช้ 2/4/8 ตัว Python ยังคง virtual-address limit 2560 MiB เดิม ส่วนที่เพิ่มเผื่อ tmpfs/runner/ผลลัพธ์ ไม่ได้ทำให้โปรแกรมใช้ RAM 4 GiB ได้ทั้งหมด
 - `FORMA_FILE_WORKERS=1` และจำกัด thread ของไลบรารีคำนวณ เพื่อลดการซ้อนขนานภายในแต่ละงาน ยังไม่มี memory-aware scheduler ที่กันทุก job ให้โดยอัตโนมัติ
 
-ภายใต้สมมติฐานนี้ ตัวอย่าง 16 vCPU / 48 GiB เลือก 8 งาน ใช้ยอดเพดาน RAM รวม **28.125 GiB**, CPU รวม **11.5 vCPU** เหลือจาก capacity ทั้งหมด 19.875 GiB / 4.5 vCPU (รวมส่วนเผื่อแล้ว อย่าหักซ้ำ) เครื่อง 32 GiB อาจแนะนำ 4 งานในนโยบายนี้ แม้เคยรัน 8 งานเล็กได้ เพราะกัน RAM ต่อไฟล์ซับซ้อนไว้มากกว่าเดิม ไม่ใช่ข้อพิสูจน์ว่า 32 GiB ใช้ 8 งานไม่ได้
+ภายใต้สมมติฐานนี้ ตัวอย่าง 18 vCPU / 48 GiB เลือก 8 งาน ใช้ยอดเพดาน RAM รวม **32.625 GiB**, CPU รวม **14.5 vCPU** เหลือจาก capacity ทั้งหมด 15.375 GiB / 3.5 vCPU (รวมส่วนเผื่อแล้ว อย่าหักซ้ำ) ตัวอย่างเครื่อง 16 vCPU / 48 GiB จะเลือก 4 งานตามนโยบายเผื่อ CPU นี้; ถ้าต้องการ 8 งานให้ประเมินสเปกจริงใหม่ เครื่อง 32 GiB อาจแนะนำ 4 งานในนโยบายนี้ แม้เคยรัน 8 งานเล็กได้ เพราะกัน RAM ต่อไฟล์ซับซ้อนไว้มากกว่าเดิม ไม่ใช่ข้อพิสูจน์ว่า 32 GiB ใช้ 8 งานไม่ได้
 
 ดิสก์คำนวณจากข้อมูลใหม่ที่จะเก็บเพิ่ม:
 
@@ -117,3 +118,7 @@ python3 deploy/server/test_compose.py
 ผลตรวจตอนเตรียมชุดนี้: unit tests 7 ข้อผ่าน (รวมไล่สเปก CPU/RAM 35 คู่), และ Compose merge test ผ่านทั้ง 2/4/8/16/32 งาน โดยใช้ env จำลองแยกต่างหาก ยืนยันชื่อ project/volumes แยก, strict knowledge, OIDC, replica, socket/healthcheck และ sandbox ไม่ได้รับ secrets ของแอป ตัวอย่างทั้งหมดใช้สมมติฐานดิสก์ 1000 GiB ว่าง 900 GiB / ไฟล์เฉลี่ย 5 MiB ไม่ได้ start หรือ deploy config นี้ และยังไม่ได้ทำ load test บน server
 
 แนวคิดอ้างอิง: [Kubernetes Node Allocatable / reserve](https://kubernetes.io/docs/tasks/administer-cluster/reserve-compute-resources/), [Docker memory/CPU limits](https://docs.docker.com/engine/containers/resource_constraints/), [tmpfs นับเป็น RAM ของ container](https://docs.docker.com/engine/storage/tmpfs/), [Compose override merge](https://docs.docker.com/compose/how-tos/multiple-compose-files/merge/). นำหลัก reserve-before-scheduling มาใช้กับ Compose แบบคงที่ ไม่ได้อ้างว่าได้ระบบ scheduler ของ Kubernetes มาแล้ว
+
+### คิวรายงานทางการ
+
+แยก `report-worker` (0.75 GiB / 0.5 CPU) และ `report-sandbox` (3 GiB / 2 CPU) จากคิว mapping โดยรวมงบนี้ในทุก profile แล้ว รายงานเริ่มต้นทำทีละ 1 งาน คิวสูงสุด 20 งาน การเพิ่ม `FORMA_REPORT_WORKERS` ต้องคำนวณทรัพยากร sandbox ใหม่ด้วย ไม่ได้ทำให้ renderer ขนานเพิ่มเอง

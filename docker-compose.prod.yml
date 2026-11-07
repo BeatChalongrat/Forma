@@ -24,6 +24,8 @@ x-forma-env: &forma-env
     FORMA_CORS_ORIGINS: '["${FORMA_PUBLIC_URL:-http://localhost}"]'
     FORMA_OTEL_ENDPOINT: ${FORMA_OTEL_ENDPOINT:-}
     FORMA_CODE_SANDBOX_SOCKET: /run/sandbox/runner.sock
+    FORMA_REPORT_SANDBOX_SOCKET: /run/report-sandbox/runner.sock
+    FORMA_REPORT_WORKERS: ${FORMA_REPORT_WORKERS:-1}
 
 services:
   postgres:
@@ -130,6 +132,55 @@ services:
       replicas: ${FORMA_WORKER_REPLICAS:-2}
     restart: unless-stopped
 
+  report-sandbox:
+    build: { context: ., dockerfile: deploy/sandbox/Dockerfile }
+    network_mode: none
+    read_only: true
+    tmpfs: ["/workspace:size=1g,mode=0711", "/tmp:size=64m,mode=1777"]
+    volumes: ["report-sandbox-socket:/run/sandbox"]
+    cap_drop: [ALL]
+    cap_add: [SETUID, SETGID, KILL, CHOWN, DAC_OVERRIDE]
+    security_opt: ["no-new-privileges:true"]
+    pids_limit: 256
+    mem_limit: 3g
+    memswap_limit: 3g
+    cpus: 2
+    restart: unless-stopped
+
+  report-worker:
+    build: { context: ., dockerfile: backend/Dockerfile }
+    <<: *forma-env
+    command: ["forma", "worker", "--queue", "reports"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import os, redis; r=redis.Redis.from_url(os.environ['FORMA_REDIS_URL'], socket_timeout=2); assert r.get('arq:reports:health-check')"]
+      interval: 30s
+      timeout: 10s
+      start_period: 20s
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      redis: { condition: service_healthy }
+      minio-init: { condition: service_completed_successfully }
+      report-sandbox: { condition: service_started }
+    volumes: ["formadata:/data", "report-sandbox-socket:/run/report-sandbox"]
+    restart: unless-stopped
+
+  assistant-worker:
+    build: { context: ., dockerfile: backend/Dockerfile }
+    <<: *forma-env
+    command: ["forma", "worker", "--queue", "assistant"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import os, redis; r=redis.Redis.from_url(os.environ['FORMA_REDIS_URL'], socket_timeout=2); assert r.get('arq:assistant:health-check')"]
+      interval: 30s
+      timeout: 10s
+      start_period: 20s
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      redis: { condition: service_healthy }
+      minio-init: { condition: service_completed_successfully }
+      report-sandbox: { condition: service_started }
+    volumes: ["formadata:/data", "sandbox-socket:/run/sandbox", "report-sandbox-socket:/run/report-sandbox"]
+    restart: unless-stopped
+
   web:
     build: { context: ./frontend, dockerfile: Dockerfile }
     depends_on: [api]
@@ -174,6 +225,7 @@ services:
       minio: { condition: service_healthy }
 
 volumes:
+  report-sandbox-socket:
   pgdata: {}
   redis: {}
   minio: {}

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
-import { Server, BookOpen, House, Inbox, ListChecks, NotebookPen, Search, Settings, Users, WifiOff, PanelLeft, type LucideIcon } from 'lucide-react'
+import { Server, BookOpen, History, House, Inbox, ListChecks, NotebookPen, Search, Settings, Users, WifiOff, Workflow, PanelLeft, type LucideIcon } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../lib/api'
 import { AssistantIcon } from '../lib/icons'
@@ -25,6 +25,8 @@ const GROUPS: { title: string; items: NavItem[]; admin?: boolean }[] = [
       { to: '/', label: 'Home', th: 'งานที่รอคุณ', icon: House, end: true },
       { to: '/imports', label: 'Imports', th: 'ทุกไฟล์ที่ลูกค้าส่งมา', icon: Inbox },
       { to: '/review', label: 'Review', th: 'ตอบคำถามและตรวจปัญหา', icon: ListChecks, badge: 'review' },
+      { to: '/activity', label: 'ห้องทำงาน', th: 'กิจกรรมและประวัติการทำงาน', icon: Workflow },
+      { to: '/inspection', label: 'ตรวจสอบย้อนหลัง', th: 'เหตุการณ์ หลักฐาน และการตัดสินใจของแต่ละงาน', icon: History },
     ],
   },
   {

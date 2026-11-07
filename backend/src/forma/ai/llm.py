@@ -410,15 +410,42 @@ class LLMClient:
         deterministic. A call with images only goes to routes tested to read them (ADR-049): a backup that
         cannot see them must not answer as if it had."""
         pictures: dict[str, Any] = {"images": images} if images else {}
+
+        def invoke(provider: Provider, model: str) -> tuple[str, Usage]:
+            from forma.ai.budget import record_request_usage, reserve_request
+            from forma.jobs.activity import span
+
+            reserve_request()
+
+            with span(
+                "model.request",
+                inputs={
+                    "provider": provider.name,
+                    "model": model,
+                    "images": len(images),
+                    "agent": _agent_name(),
+                },
+            ) as receipt:
+                response = provider.complete_json(
+                    system=system,
+                    user=user,
+                    schema=schema,
+                    model=model,
+                    temperature=self.temperature,
+                    **pictures,
+                )
+                usage = response[1]
+                record_request_usage(usage)
+                receipt["usage"] = {
+                    "model": usage.model,
+                    "input_tokens": usage.input_tokens,
+                    "output_tokens": usage.output_tokens,
+                    "latency_ms": usage.latency_ms,
+                }
+                return response
+
         if self.is_mock:
-            return self.provider.complete_json(
-                system=system,
-                user=user,
-                schema=schema,
-                model=self.model,
-                temperature=self.temperature,
-                **pictures,
-            )
+            return invoke(self.provider, self.model)
         from forma.ai.breaker import CircuitOpen, get_breaker, guarded_call
         from forma.core.logging import get_logger
         from forma.core.settings import get_settings
@@ -435,14 +462,7 @@ class LLMClient:
                 from forma.ai.budget import remaining
 
                 remaining()
-                return r.provider.complete_json(
-                    system=system,
-                    user=user,
-                    schema=schema,
-                    model=r.model,
-                    temperature=self.temperature,
-                    **pictures,
-                )
+                return invoke(r.provider, r.model)
 
             try:
                 out: tuple[str, Usage] = guarded_call(

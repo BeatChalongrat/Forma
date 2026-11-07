@@ -318,6 +318,24 @@ class ExportArtifact(Base):
     created_at: Mapped[dt.datetime] = mapped_column(UTCDateTime, default=utcnow)
 
 
+class JobActivity(Base):
+    """Append-only observations; no FK locks against the worker's business transaction."""
+
+    __tablename__ = "job_activity"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    job_id: Mapped[str] = mapped_column(String(40))
+    attempt: Mapped[int] = mapped_column(Integer)
+    span_id: Mapped[str] = mapped_column(String(40))
+    parent_id: Mapped[str | None] = mapped_column(String(40))
+    role: Mapped[str] = mapped_column(String(32))
+    action: Mapped[str] = mapped_column(String(80))
+    state: Mapped[str] = mapped_column(String(20))
+    at: Mapped[str] = mapped_column(String(40))
+    duration_ms: Mapped[int | None] = mapped_column(Integer)
+    detail: Mapped[str] = mapped_column(Text)
+    __table_args__ = (Index("ix_activity_job_attempt_id", "job_id", "attempt", "id"),)
+
+
 class Job(Base):
     __tablename__ = "jobs"
     id: Mapped[str] = mapped_column(String(40), primary_key=True, default=lambda: new_id("job"))
@@ -570,3 +588,34 @@ class AssistantTurn(Base):
         UniqueConstraint("conversation_id", "request_id", name="uq_assistant_request"),
         UniqueConstraint("conversation_id", "sequence", name="uq_assistant_sequence"),
     )
+
+
+class AssistantRun(Base):
+    """Durable assistant checkpoint, separate from its visible transcript."""
+
+    __tablename__ = "assistant_runs"
+    turn_id: Mapped[str] = mapped_column(String(40), primary_key=True)
+    conversation_id: Mapped[str] = mapped_column(String(40), index=True)
+    job_id: Mapped[str] = mapped_column(String(40), unique=True)
+    state: Mapped[dict[str, Any]] = mapped_column(JSONType, default=dict)
+    revision: Mapped[int] = mapped_column(Integer, default=0)
+    calls: Mapped[int] = mapped_column(Integer, default=0)
+    cost_usd: Mapped[float] = mapped_column(Float, default=0)
+    expires_at: Mapped[dt.datetime] = mapped_column(UTCDateTime)
+
+
+class AssistantChatState(Base):
+    __tablename__ = "assistant_chat_state"
+    conversation_id: Mapped[str] = mapped_column(String(40), primary_key=True)
+    revision: Mapped[int] = mapped_column(Integer, default=0)
+    draft: Mapped[dict[str, Any]] = mapped_column(JSONType, default=dict)
+    branch: Mapped[dict[str, Any]] = mapped_column(JSONType, default=dict)
+    seen_sequence: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class AssistantFeedback(Base):
+    __tablename__ = "assistant_feedback"
+    turn_id: Mapped[str] = mapped_column(String(40), primary_key=True)
+    rating: Mapped[str] = mapped_column(String(12))
+    comment: Mapped[str] = mapped_column(Text, default="")
+    updated_at: Mapped[dt.datetime] = mapped_column(UTCDateTime, default=utcnow)

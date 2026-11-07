@@ -8,23 +8,33 @@ skip work that is already done. ``payload["force"]`` disables the skips.
 from __future__ import annotations
 
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from forma.ai.budget import task_budget
-from forma.core.telemetry import span
+from forma.core.telemetry import span as trace_span
 from forma.db.models import DatasetVersion, ImportRound, Job, MappingVersion
 from forma.db.session import session_scope
+from forma.jobs.activity import span as activity_span
 from forma.jobs.runner import JobProgress, handler
+from forma.services import assistant_jobs as _assistant_jobs  # noqa: F401
 from forma.services import batches as bs
 from forma.services import datasets as ds
+from forma.services import document_reports as _document_reports  # noqa: F401 (register report handler)
 from forma.services import mapping as ms
 from forma.services import publishing as pub
 from forma.services import rounds as rs
 from forma.services.context import ServiceContext
+
+
+@contextmanager
+def span(name: str, **attrs: Any) -> Iterator[None]:
+    with activity_span(name, agent="system", inputs=attrs), trace_span(name, **attrs):
+        yield
 
 
 def _ms(t0: float) -> float:

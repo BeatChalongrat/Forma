@@ -17,6 +17,7 @@ from typing import Any, Protocol
 import polars as pl
 
 from forma.engine.transform import BoundSource, TransformEngine
+from forma.jobs.activity import observed
 from forma.mapping_dsl.models import MappingDocument
 from forma.profiling.profile import WorkbookProfile
 from forma.schema_registry import TargetSchema
@@ -211,6 +212,7 @@ class FileWorkbench:
             raise ValueError("the table's file is not in this round")
         return f
 
+    @observed("inspect", arguments=("requests",))
     def inspect(self, requests: list[dict[str, Any]]) -> list[dict[str, Any]]:
         out: list[dict[str, Any]] = []
         for r in requests[:MAX_INSPECT_REQUESTS]:
@@ -463,6 +465,7 @@ class FileWorkbench:
         return self.inspect(reqs) if reqs else []
 
     # ---- run ----------------------------------------------------------------------------------------
+    @observed("verify", arguments=("doc", "full"))
     def run(self, doc: MappingDocument, *, full: bool = False) -> RunReport:
         from forma.ai import plausibility
         from forma.ai.budget import progress

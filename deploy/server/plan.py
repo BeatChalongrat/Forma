@@ -26,6 +26,9 @@ BASE = {
     "backup-nightly": (0.75, 0.25),
     "migrate": (1.0, 0.5),
     "minio-init": (0.125, 0.25),
+    "report-worker": (0.75, 0.5),
+    "assistant-worker": (0.75, 0.5),
+    "report-sandbox": (3.0, 2.0),
 }
 
 

@@ -16,9 +16,18 @@ from sqlalchemy.orm import Session
 from forma.ai.text_stream import AnswerStream, StreamCancelled
 from forma.auth import Principal, ensure_customer
 from forma.core.errors import Conflict, NotFound, ValidationFailed
+from forma.db.models import (
+    AssistantChatState,
+    AssistantFeedback,
+    AssistantRun,
+    DatasetVersion,
+    ImportRound,
+    Job,
+    MappingVersion,
+    utcnow,
+)
 from forma.db.models import AssistantConversation as Chat
 from forma.db.models import AssistantTurn as Turn
-from forma.db.models import DatasetVersion, ImportRound, MappingVersion, utcnow
 from forma.db.session import session_scope
 from forma.services import artifacts, attachments, memory
 from forma.services.context import ServiceContext
@@ -36,12 +45,16 @@ def stop(session: Session, p: Principal, chat_id: str, request_id: str) -> dict[
     turn = session.scalar(select(Turn).where(Turn.conversation_id == chat_id, Turn.request_id == request_id))
     if turn is None:
         raise NotFound("Message not found")
-    if turn.status == "pending":
+    run = session.get(AssistantRun, turn.id)
+    job = session.get(Job, run.job_id) if run else None
+    if turn.status == "pending" or (turn.status == "failed" and job and job.status in ("queued", "running")):
         turn.status, turn.completed_at = "stopped", utcnow()
         if turn.reply:
             turn.reply = {**turn.reply, "reason": "stopped", "actions": []}
         chat.active_run, chat.busy_until = None, None
         audit(session, "assistant.stop", "conversation", chat_id, actor=p.actor, turn_id=turn.id)
+        if job and job.status in ("queued", "running"):
+            job.status, job.lease_token, job.lease_expires_at = "cancelled", None, None
         session.commit()
         control = ACTIVE_STREAMS.get((chat_id, request_id))
         if control:
@@ -102,6 +115,31 @@ def turn_view(turn: Turn, chat: Chat) -> dict[str, Any]:
         "status": state,
         "created_at": turn.created_at,
     }
+
+
+def _run_view(view: dict[str, Any], turn: Turn, run: AssistantRun | None, job: Job | None) -> None:
+    if run:
+        view["cursor"] = run.revision
+        view["work_status"] = job.status if job else "failed"
+        if turn.status in ("pending", "failed") and job and job.status in ("queued", "running"):
+            view["status"] = "pending"
+        elif turn.status == "pending" and job and job.status in ("failed", "cancelled"):
+            view["status"] = "stopped" if job.status == "cancelled" else "failed"
+
+
+def message_progress(session: Session, p: Principal, chat_id: str, request_id: str) -> dict[str, Any]:
+    """Read a saved attempt; reconnecting never starts another provider request."""
+    chat = get_chat(session, p, chat_id)
+    turn = session.scalar(select(Turn).where(Turn.conversation_id == chat.id, Turn.request_id == request_id))
+    if turn is None:
+        raise NotFound("Message not found")
+    view = turn_view(turn, chat)
+    run = session.get(AssistantRun, turn.id)
+    _run_view(view, turn, run, session.get(Job, run.job_id) if run else None)
+    if view["reply"] is not None:
+        refs = artifacts.refs_for_turns(session, [turn.id], chat.id)
+        view["reply"] = {**view["reply"], "artifacts": refs.get(turn.id, [])}
+    return view
 
 
 def create(
@@ -167,6 +205,32 @@ def sweep_incognito(session: Session, p: Principal) -> list[str]:
     ).all()
     keys: list[str] = []
     for chat in stale:
+        # Match publish/delete lock order and recheck expiry after waiting for a writer.
+        locked = session.scalar(
+            update(Chat)
+            .where(
+                Chat.id == chat.id,
+                Chat.updated_at < utcnow() - timedelta(days=INCOGNITO_DAYS),
+                or_(Chat.busy_until.is_(None), Chat.busy_until <= utcnow()),
+            )
+            .values(updated_at=Chat.updated_at)
+            .returning(Chat.id)
+        )
+        if not locked:
+            continue
+        session.execute(
+            delete(Job).where(
+                Job.kind.in_(("create_document", "assistant_message")),
+                Job.payload["chat_id"].as_string() == chat.id,
+            )
+        )
+        session.execute(
+            delete(AssistantFeedback).where(
+                AssistantFeedback.turn_id.in_(select(Turn.id).where(Turn.conversation_id == chat.id))
+            )
+        )
+        session.execute(delete(AssistantRun).where(AssistantRun.conversation_id == chat.id))
+        session.execute(delete(AssistantChatState).where(AssistantChatState.conversation_id == chat.id))
         artifacts.delete_rows(session, chat.id)
         keys += attachments.delete_rows(session, chat.id)
         session.execute(delete(Turn).where(Turn.conversation_id == chat.id))
@@ -221,7 +285,17 @@ def remove(session: Session, p: Principal, chat_id: str) -> list[str]:
     if not removed.rowcount:  # type: ignore[attr-defined]
         get_chat(session, p, chat_id)  # 404 for another account; never reveal its busy state.
         raise Conflict("Wait for the current reply before deleting this conversation")
+    tids = select(Turn.id).where(Turn.conversation_id == chat_id)
+    session.execute(delete(AssistantFeedback).where(AssistantFeedback.turn_id.in_(tids)))
+    session.execute(delete(AssistantRun).where(AssistantRun.conversation_id == chat_id))
+    session.execute(delete(AssistantChatState).where(AssistantChatState.conversation_id == chat_id))
+    session.execute(
+        delete(Job).where(Job.kind == "assistant_message", Job.payload["chat_id"].as_string() == chat_id)
+    )
     artifacts.delete_rows(session, chat_id)
+    session.execute(
+        delete(Job).where(Job.kind == "create_document", Job.payload["chat_id"].as_string() == chat_id)
+    )
     keys = attachments.delete_rows(session, chat_id)
     session.execute(delete(Turn).where(Turn.conversation_id == chat_id))
     session.execute(delete(Chat).where(Chat.id == chat_id))
@@ -236,9 +310,32 @@ def detail(session: Session, p: Principal, chat_id: str, before: int | None = No
     if before:
         q = q.where(Turn.sequence < before)
     turns = list(reversed(session.scalars(q.order_by(Turn.sequence.desc()).limit(30)).all()))
+    refs = artifacts.refs_for_turns(session, [t.id for t in turns], chat.id)
+    views = [turn_view(t, chat) for t in turns]
+    runs = {
+        r.turn_id: r
+        for r in session.scalars(select(AssistantRun).where(AssistantRun.turn_id.in_([t.id for t in turns])))
+    }
+    jobs = {
+        j.id: j for j in session.scalars(select(Job).where(Job.id.in_([r.job_id for r in runs.values()])))
+    }
+    for t, view in zip(turns, views, strict=True):
+        run = runs.get(t.id)
+        _run_view(view, t, run, jobs.get(run.job_id) if run else None)
+    feedback = {
+        f.turn_id: f
+        for f in session.scalars(
+            select(AssistantFeedback).where(AssistantFeedback.turn_id.in_([t.id for t in turns]))
+        )
+    }
+    for view in views:
+        item = feedback.get(view["id"])
+        view["feedback"] = {"rating": item.rating, "comment": item.comment} if item else None
+        if view["reply"] is not None:
+            view["reply"] = {**view["reply"], "artifacts": refs.get(view["id"], [])}
     return {
-        "conversation": summary(chat),
-        "turns": [turn_view(t, chat) for t in turns],
+        "conversation": {**summary(chat), "busy": any(v["status"] == "pending" for v in views)},
+        "turns": views,
         "total": total,
         "older_before": turns[0].sequence if turns and turns[0].sequence > 1 else None,
     }
@@ -332,6 +429,7 @@ def send(
     attachment_ids: list[str] | None = None,
     artifact_id: str | None = None,
     target: str = "",
+    prepared_job: str | None = None,
 ) -> dict[str, Any]:
     from forma.services import config, workspace_assistant
 
@@ -348,10 +446,17 @@ def send(
         return turn_view(existing, chat)
     attachments.check(session, chat.id, file_ids, existing.id if existing else None)
     open_work = artifacts.working_on(session, chat.id, artifact_id, target) if artifact_id else None
-    run_id, now = uuid4().hex, utcnow()
+    run_id, now = prepared_job or uuid4().hex, utcnow()
     locked = session.execute(
         update(Chat)
-        .where(Chat.id == chat.id, or_(Chat.busy_until.is_(None), Chat.busy_until <= now))
+        .where(
+            Chat.id == chat.id,
+            or_(
+                Chat.busy_until.is_(None),
+                Chat.busy_until <= now,
+                Chat.active_run == prepared_job if prepared_job else Chat.id.is_(None),
+            ),
+        )
         .values(active_run=run_id, busy_until=now + timedelta(minutes=15), updated_at=now)
     )
     if not locked.rowcount:  # type: ignore[attr-defined]
@@ -393,26 +498,39 @@ def send(
     session.commit()  # The question survives disconnects/restarts before the provider is called.
     if stream:
         last_checkpoint = 0.0
+        saved_text = ""
 
         def checkpoint() -> None:
-            nonlocal last_checkpoint
+            nonlocal last_checkpoint, saved_text
             now_tick = time.monotonic()
-            if now_tick - last_checkpoint < 0.4:
+            if now_tick - last_checkpoint < 0.4 and not (stream.text and not saved_text):
                 return
             last_checkpoint = now_tick
+            saved_text = stream.text
             with session_scope() as progress:
                 active = progress.scalar(select(Chat.active_run).where(Chat.id == chat_id))
                 if active != run_id:
                     stream.cancelled.set()
                     raise StreamCancelled()
-                if stream.text:
+                if stream.text or stream.phase:
                     partial = {
                         "answer": stream.text,
                         "ai": True,
                         "reason": "streaming",
+                        "phase": stream.phase,
                         "evidence": [],
                         "actions": [],
                     }
+                    progress.execute(
+                        update(AssistantRun)
+                        .where(AssistantRun.turn_id == turn_id)
+                        .values(revision=AssistantRun.revision + 1)
+                    )
+                    progress.execute(
+                        update(Chat)
+                        .where(Chat.id == chat_id, Chat.active_run == run_id)
+                        .values(busy_until=utcnow() + timedelta(minutes=15))
+                    )
                     progress.execute(
                         update(Turn)
                         .where(Turn.id == turn_id, Turn.status == "pending")
@@ -459,7 +577,11 @@ def send(
                 )[:6000],
             },
         ]
+    from forma.services.assistant_runtime import context_history, step
+
+    history = context_history(session, chat.id, turn.sequence, history)
     try:
+        history = step("input.history", {}, lambda: history)
         extra: dict[str, Any] = {}
         if chat.mapping_id:
             extra["mapping_id"] = chat.mapping_id
@@ -478,19 +600,76 @@ def send(
         extra["recall"] = memory.recall_for(
             session, identity(p)[0], prefs, chat, visible(p), str(prefs.get("display_name", ""))
         )
-        reply = workspace_assistant.ask(
-            ctx,
-            session,
-            p,
-            question,
-            language,
-            chat.round_id,
-            history,
-            chat.dataset_id,
-            timezone,
-            conversation_id=chat.id,
-            **extra,
-        )
+        # Freeze prompt data across recovery; live authorization is still checked on every run.
+        extra["recall"].items = step("input.memory", {}, lambda: extra["recall"].items)
+        extra["attachments"] = step("input.files", {}, lambda: extra.get("attachments", []))
+        extra["images"] = step("input.images", {}, lambda: extra.get("images", []))
+        if not extra["images"]:
+            extra.pop("images")
+        if open_work:
+            extra["working_on"] = step("input.artifact", {}, lambda: open_work)
+        branch_state = session.get(AssistantChatState, chat.id)
+        rewrite = (branch_state.branch or {}).get("answer_only") if branch_state else None
+        if rewrite and branch_state is not None and not branch_state.branch.get("rewrite_sent"):
+            from forma.services.assistant_runtime import step
+
+            if ctx.llm.is_mock:
+                rewritten = str(rewrite.get("answer", ""))
+            else:
+                result = step(
+                    "model.rewrite",
+                    {},
+                    lambda: ctx.llm.structured(
+                        system="Rewrite the saved answer using ONLY the supplied frozen evidence. Do not run tools, create files, change data or infer new facts. Clearly retain uncertainty. Reply in "
+                        + language,
+                        user=json.dumps(
+                            {"question": question, "saved": rewrite}, ensure_ascii=False, default=str
+                        ),
+                        schema={
+                            "type": "object",
+                            "properties": {"answer": {"type": "string"}},
+                            "required": ["answer"],
+                            "additionalProperties": False,
+                        },
+                    ),
+                )
+                rewritten = result.data["answer"]
+            from forma.ai.guard import GuardRejected, scan
+
+            problems = scan({"answer": rewritten}, max_text=24000, allow_credential_terms=True)
+            if problems:
+                raise GuardRejected(problems)
+            reply = {**rewrite, "answer": rewritten, "ai": True, "actions": [], "memory_changes": []}
+            if stream:
+                stream.metadata = reply
+                stream.delta(rewritten)
+            branch_state.branch = {**branch_state.branch, "rewrite_sent": True}
+            from forma.db.models import AssistantArtifact, AssistantArtifactVersion
+
+            session.execute(
+                update(AssistantArtifactVersion)
+                .where(
+                    AssistantArtifactVersion.turn_id.is_(None),
+                    AssistantArtifactVersion.artifact_id.in_(
+                        select(AssistantArtifact.id).where(AssistantArtifact.conversation_id == chat.id)
+                    ),
+                )
+                .values(turn_id=turn_id)
+            )
+        else:
+            reply = workspace_assistant.ask(
+                ctx,
+                session,
+                p,
+                question,
+                language,
+                chat.round_id,
+                history,
+                chat.dataset_id,
+                timezone,
+                conversation_id=chat.id,
+                **extra,
+            )
         state = "complete" if reply.get("ai") else "failed"
     except StreamCancelled:
         session.rollback()
@@ -502,17 +681,38 @@ def send(
             "actions": [],
         }
         state = "stopped"
-    except Exception:
+    except Exception as error:
+        from forma.services.assistant_runtime import RecoveryPaused
+
         # Never persist raw provider errors, credentials, or stack traces as chat content.
         session.rollback()
+        saved_run = session.get(AssistantRun, turn_id)
+        if saved_run:
+            saved_run.state = {
+                **saved_run.state,
+                "last_failure": {
+                    "type": type(error).__name__,
+                    "at": utcnow().isoformat(),
+                    "reason": str(error)
+                    if isinstance(error, RecoveryPaused)
+                    else "An unfinished step failed; inspect its receipt and attempt count",
+                },
+            }
         reply = {
             "answer": stream.text
             if stream and stream.text
             else ("ยังตอบไม่ได้ ลองส่งคำถามนี้อีกครั้ง" if language == "th" else "Could not answer. Please retry."),
             "ai": False,
-            "reason": "request_failed",
+            "reason": "recovery_paused" if isinstance(error, RecoveryPaused) else "request_failed",
             "evidence": [],
         }
+        if stream and stream.metadata:
+            reply = {
+                **stream.metadata,
+                **reply,
+                "code_runs": stream.metadata.get("code_runs", []),
+                "evidence": stream.metadata.get("evidence", []),
+            }
         state = "failed"
     finally:
         if stream and ACTIVE_STREAMS.get((chat_id, request_id)) is stream:

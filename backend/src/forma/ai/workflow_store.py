@@ -101,7 +101,18 @@ def workflow_storage(
             psycopg.connect(dsn, autocommit=True, row_factory=dict_row) as ledger_conn,
         ):
             saver = PostgresSaver(conn)
-            conn.execute("SELECT pg_advisory_lock(736211934)")
+            # A blocking lock SELECT keeps its statement transaction open. PostgresSaver's
+            # CREATE INDEX CONCURRENTLY can wait for that transaction while its owner holds
+            # this lock, producing a deadlock at simultaneous API/worker startup. Poll short
+            # autocommit statements instead: each unsuccessful waiter releases its snapshot.
+            deadline = time.monotonic() + 60
+            while True:
+                row = conn.execute("SELECT pg_try_advisory_lock(736211934) AS locked").fetchone()
+                if row and row["locked"]:
+                    break
+                if time.monotonic() >= deadline:
+                    raise LLMError("Checkpoint schema setup is busy; retry startup shortly")
+                time.sleep(0.05)
             try:
                 saver.setup()
                 conn.execute(ddl)
@@ -133,15 +144,15 @@ def workflow_storage(
         directory = settings.resolve(settings.data_dir)
         directory.mkdir(parents=True, exist_ok=True)
         with (
-            _setup_lock,
             sqlite3.connect(directory / "mapping-workflows.sqlite", check_same_thread=False) as conn,
             sqlite3.connect(directory / "mapping-attempts.sqlite", check_same_thread=False) as ledger_conn,
         ):
-            ledger_conn.execute(ddl)
-            ledger_conn.execute(calls_ddl)
-            ledger_conn.commit()
             saver_sqlite = SqliteSaver(conn)
-            saver_sqlite.setup()
+            with _setup_lock:
+                ledger_conn.execute(ddl)
+                ledger_conn.execute(calls_ddl)
+                ledger_conn.commit()
+                saver_sqlite.setup()
             yield (
                 saver_sqlite,
                 AttemptLedger(

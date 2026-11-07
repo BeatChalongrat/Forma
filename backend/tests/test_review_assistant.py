@@ -123,7 +123,11 @@ def test_structured_question_stream_persists_and_followup_has_choices(client):
     turn = detail["turns"][0]
     assert turn["status"] == "complete", turn
     assert len(turn["reply"]["clarifications"]) == 1
-    assert "delta" in wire.text and "clarifications" in wire.text
+    events = [json.loads(line[6:]) for line in wire.text.splitlines() if line.startswith("data: ")]
+    assert events[0]["type"] == "started"
+    assert any(event["type"] == "snapshot" for event in events)
+    assert events[-1]["type"] == "done"
+    assert events[-1]["turn"]["reply"]["clarifications"] == turn["reply"]["clarifications"]
     second = client.post(
         f"/api/assistant/conversations/{cid}/messages",
         json={"question": "ยังไม่ทราบ ขอเว้นเรื่องนี้ไว้ก่อน", "request_id": "clarify-002"},

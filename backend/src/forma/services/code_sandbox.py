@@ -199,7 +199,8 @@ def run(
         inputs=[i.path for i in inputs],
         outputs=[f["name"] for f in files],
     )
-    session.commit()
+    if not session.info.get("assistant_atomic_tool"):
+        session.commit()
     looks = _looks(ctx, result)
     return {
         "id": new_id("run"),

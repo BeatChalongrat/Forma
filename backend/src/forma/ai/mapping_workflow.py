@@ -360,10 +360,14 @@ def build_workflow(
 
     def wrapped(name: str, fn: Any) -> Any:
         def run(state: State) -> dict[str, Any]:
+            from forma.jobs.activity import span
+
             started = time.monotonic()
             try:
                 budget.remaining()
-                update = fn(state)
+                with span("agent." + name, agent=name) as receipt:
+                    update = fn(state)
+                    receipt.update({k: v for k, v in update.items() if k != "mapping"})
             except LLMError as exc:
                 update = {"failure": str(exc)[:1500], "phase": "failed"}
             event = {

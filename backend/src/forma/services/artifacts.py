@@ -286,7 +286,8 @@ def save_flow(
         )
     artifact.updated_at = utcnow()
     audit(session, "assistant.artifact", "artifact", artifact.id, actor=p.actor, version=artifact.latest)
-    session.commit()
+    if not session.info.get("assistant_atomic_tool"):
+        session.commit()
     return {"artifact_id": artifact.id, "version": artifact.latest, "title": artifact.title, "saved": True}
 
 
@@ -398,7 +399,6 @@ def settle_turn(
     newest: dict[str, str] = {}  # name -> attachment id, the last save of each name
     for run in runs:
         newest.update({file["name"]: file["id"] for file in run["files"]})
-    checked = sum(int(r.get("looked_at", 0)) for r in runs)
     tools = set(reply.get("tools_called", [])) - NO_DATA_TOOLS
     uses_data = bool(tools) or any(
         path.startswith(("datasets/", "sources/")) for run in runs for path in run.get("inputs", [])
@@ -408,7 +408,8 @@ def settle_turn(
         if row is None or row.conversation_id != chat_id:
             continue
         try:
-            _add_file(ctx, session, p, row, last_run[file_id], turn_id, checked, uses_data)
+            run = last_run[file_id]
+            _add_file(ctx, session, p, row, run, turn_id, int(run.get("looked_at", 0)), uses_data)
             session.commit()
         except Exception as error:  # the answer still arrives; the file stays downloadable from its run
             session.rollback()
@@ -417,15 +418,41 @@ def settle_turn(
 
 
 def refs_for_turn(session: Session, turn_id: str) -> list[dict[str, Any]]:
-    rows = session.execute(
-        select(Artifact, Version)
+    return refs_for_turns(session, [turn_id]).get(turn_id, [])
+
+
+def refs_for_turns(
+    session: Session, turn_ids: list[str], chat_id: str | None = None
+) -> dict[str, list[dict[str, Any]]]:
+    """Canonical output references, including legacy turns, without rewriting their saved receipts."""
+    query = (
+        select(Artifact, Version, Attachment)
         .join(Version, Version.artifact_id == Artifact.id)
-        .where(Version.turn_id == turn_id)
+        .outerjoin(
+            Attachment,
+            (Attachment.id == Version.attachment_id)
+            & (Attachment.conversation_id == Artifact.conversation_id),
+        )
+        .where(Version.turn_id.in_(turn_ids))
         .order_by(Version.created_at)
-    ).all()
-    return [
-        {"id": a.id, "kind": a.kind, "title": a.title, "version": v.number, "note": v.note} for a, v in rows
-    ]
+    )
+    if chat_id is not None:
+        query = query.where(Artifact.conversation_id == chat_id)
+    result: dict[str, list[dict[str, Any]]] = {}
+    for a, v, file in session.execute(query):
+        if v.turn_id is None:
+            continue
+        result.setdefault(v.turn_id, []).append(
+            {
+                "id": a.id,
+                "kind": a.kind,
+                "title": a.title,
+                "version": v.number,
+                "note": v.note,
+                "file": attachments.view(file) if file else None,
+            }
+        )
+    return result
 
 
 def find(session: Session, artifact_id: str) -> Artifact:
@@ -462,6 +489,7 @@ def _version_view(session: Session, version: Version) -> dict[str, Any]:
         "checked": version.checked,
         "generated_at": source.get("generated_at"),
         "uses_data": bool(source.get("uses_data")),
+        "report": source.get("report"),
         "created_at": version.created_at,
     }
 

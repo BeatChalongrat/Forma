@@ -29,7 +29,7 @@ Compose แยก PostgreSQL, Redis, MinIO, local cache, backup และ sandbo
 อ่าน [สูตร capacity](README.md) แล้วสร้างแผนจากสเปกจริง ตัวอย่าง 16 งาน:
 
 ```bash
-python3 deploy/server/plan.py --cpus 24 --ram-gib 64 --max-jobs 16 \
+python3 deploy/server/plan.py --cpus 32 --ram-gib 80 --max-jobs 16 \
   --disk-total-gib 1000 --disk-free-gib 900 --average-file-mib 5 \
   --files 300 --retained-batches 7 --out deploy/server/generated/capacity-v1
 ```
