@@ -26,7 +26,11 @@ jobs:
         with:
           python-version: "3.12"
       - working-directory: backend
-        run: uv venv --python 3.12 && uv pip install -e ".[dev]"
+        run: uv venv --python 3.12 && uv pip install --python .venv/bin/python -e ".[dev]"
+      - name: Build disposable storage fixtures from pinned upstream source
+        run: |
+          docker build -f deploy/testing/Minio.Dockerfile --target server -t minio/minio:latest .
+          docker build -f deploy/testing/Minio.Dockerfile --target client -t minio/mc:latest .
       - name: Upload, review, concurrent edits, download, restart, backup/restore, 300 jobs
         run: backend/.venv/bin/python tools/quality.py runtime --jobs 300 --out test-results/runtime
       - uses: actions/upload-artifact@v4

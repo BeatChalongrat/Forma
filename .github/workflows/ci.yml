@@ -39,12 +39,13 @@ jobs:
           python-version: "3.12"
       - name: Install backend
         working-directory: backend
-        run: uv venv --python 3.12 && uv pip install -e ".[dev]"
+        run: uv venv --python 3.12 && uv pip install --python .venv/bin/python -e ".[dev]"
       - name: Start isolated MinIO
         run: |
+          docker build -f deploy/testing/Minio.Dockerfile --target server -t forma-ci-minio .
           docker run -d --name forma-ci-minio -p 127.0.0.1:9000:9000 \
             -e MINIO_ROOT_USER=forma -e MINIO_ROOT_PASSWORD=forma12345 \
-            minio/minio@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e server /data
+            forma-ci-minio server /data
           for attempt in $(seq 1 60); do
             if curl --fail --silent http://127.0.0.1:9000/minio/health/live; then exit 0; fi
             sleep 1
@@ -112,7 +113,7 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       - working-directory: backend
-        run: uv venv --python 3.12 && uv pip install -e ".[dev]"
+        run: uv venv --python 3.12 && uv pip install --python .venv/bin/python -e ".[dev]"
       - working-directory: frontend
         run: npm ci --no-audit --no-fund && npx playwright install --with-deps chromium
       - name: Isolated browser journeys, no provider credentials
@@ -143,7 +144,7 @@ jobs:
         with:
           python-version: "3.12"
       - working-directory: backend
-        run: uv venv --python 3.12 && uv pip install -e ".[dev]"
+        run: uv venv --python 3.12 && uv pip install --python .venv/bin/python -e ".[dev]"
       - name: Real Office and PDF renderer without provider or network
         run: backend/.venv/bin/python tools/quality.py renderer --report-image forma-sandbox:ci --out test-results/renderer
       - name: Compose config is valid
