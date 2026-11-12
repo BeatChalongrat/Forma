@@ -41,7 +41,11 @@ test:
 test-web:
 	cd frontend && npm test
 
-check: lint typecheck test test-web   ## everything CI runs
+check: lint typecheck test test-web   ## fast developer checks; qa-release includes browser/runtime
+
+.PHONY: qa-backend qa-frontend qa-eval qa-browser qa-renderer qa-runtime qa-release
+qa-backend qa-frontend qa-eval qa-browser qa-renderer qa-runtime qa-release:
+	$(PY) tools/quality.py $(patsubst qa-%,%,$@)
 
 synth:               ## regenerate the synthetic ERP corpus (30 variants, ground truth)
 	cd $(BACKEND) && .venv/bin/forma synth --out ../data/synthetic --seed 42 --variants 30

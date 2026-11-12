@@ -5,7 +5,12 @@ import tempfile
 import time
 from pathlib import Path
 
-root = Path(tempfile.mkdtemp(prefix="forma-chat-browser-"))
+root = (
+    Path(os.environ["FORMA_BROWSER_FIXTURE_ROOT"])
+    if os.environ.get("FORMA_BROWSER_FIXTURE_ROOT")
+    else Path(tempfile.mkdtemp(prefix="forma-chat-browser-"))
+)
+root.mkdir(parents=True, exist_ok=True)
 os.environ.update(
     {
         "FORMA_DATABASE_URL": "sqlite:///" + (root / "test.db").as_posix(),
@@ -15,7 +20,7 @@ os.environ.update(
         "FORMA_LLM_PROVIDER": "mock",
         "FORMA_LLM_MOCK_ONLY": "true",
         "FORMA_JOB_BACKEND": "thread",
-        "FORMA_STORAGE_BACKEND": "local",
+        "FORMA_STORAGE": "local",
         "FORMA_RETENTION_INTERVAL_H": "0",
     }
 )
@@ -64,8 +69,19 @@ code_sandbox.get_runner = lambda settings: FakeSandbox()
 workspace_assistant.ask = fake
 if __name__ == "__main__":
     import uvicorn
+    from fastapi.testclient import TestClient
+    from tests.test_workspace import uncertain_mapping
 
     from forma.api.app import create_app
 
+    app = create_app()
+    with TestClient(app) as client:
+        rnd, mid, pointer = uncertain_mapping(client, root)
+
+    @app.get("/api/test-fixture")
+    def fixture():
+        # Exists ONLY in this disposable test entrypoint, never in the production app.
+        return {"round_id": rnd["id"], "mapping_id": mid, "pointer": pointer, "mock_only": True}
+
     print("Disposable mock database:", root, flush=True)
-    uvicorn.run(create_app(), host="127.0.0.1", port=18171)
+    uvicorn.run(app, host="127.0.0.1", port=18171)

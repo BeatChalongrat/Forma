@@ -1,12 +1,14 @@
 // Usage: node tests/chat-continuity.browser.cjs <playwright module> <chromium executable>
 // Requires disposable tests/assistant_browser_server.py on 18171 and Vite proxy on 15174.
-const {chromium} = require(process.argv[2]);
+const {chromium} = require(process.argv[2] || 'playwright');
 const assert = require('node:assert/strict');
 (async () => {
   const browser = await chromium.launch({executablePath: process.argv[3], headless: true});
+  const context = await browser.newContext({viewport:{width:1440,height:1000}});
+  const page = await context.newPage(), errors=[];
+  const out=process.env.FORMA_QA_OUTPUT || require('node:os').tmpdir();
+  await context.tracing.start({screenshots:true,snapshots:true});
   try {
-    const context = await browser.newContext({viewport:{width:1440,height:1000}});
-    const page = await context.newPage(), errors=[];
     page.on('pageerror', e => errors.push(e.message));
     const base='http://127.0.0.1:15174';
     const cid=(await (await page.request.post(base+'/api/assistant/conversations',{data:{}})).json()).id;
@@ -89,8 +91,12 @@ const assert = require('node:assert/strict');
     assert.equal(uploads,3); assert.equal(uploadChat,originalUploadChat);
     assert.deepEqual(attached.map(f=>f.name).sort(),['first.csv','second.csv']);
     await page.unroute('**/api/assistant/conversations/*/attachments');
-    await page.screenshot({path:require('node:path').join(require('node:os').tmpdir(),'forma-chat-continuity.png'),fullPage:true});
+    await page.screenshot({path:require('node:path').join(process.env.FORMA_QA_OUTPUT || require('node:os').tmpdir(),'forma-chat-continuity.png'),fullPage:true});
     assert.deepEqual(errors,[]);
     console.log(JSON.stringify({passed:['draft reload','background completion after navigation','Markdown table','message actions','feedback reload','clarification draft reload','send clarification','edit branch preserves original','back to original','network reconnect without duplicate request','stop persists after reload','partial attachment upload survives reload without duplicates'],consoleErrors:errors}));
-  } finally { await browser.close() }
+  } finally {
+    await page.screenshot({path:require('node:path').join(out,'chat-last.png'),fullPage:true}).catch(()=>{});
+    await context.tracing.stop({path:require('node:path').join(out,'chat-trace.zip')});
+    await browser.close();
+  }
 })().catch(e=>{console.error(e);process.exitCode=1});

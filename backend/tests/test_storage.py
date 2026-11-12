@@ -142,7 +142,16 @@ def test_make_storage_from_settings(tmp_path: Path, monkeypatch: pytest.MonkeyPa
 
     monkeypatch.setenv("FORMA_DATA_DIR", str(tmp_path))
     assert make_storage(Settings(storage="local")).name == "local"
-    s3 = make_storage(Settings(storage="s3", s3_bucket="b", s3_endpoint_url="http://localhost:9000"))
+    # Constructing a client must not query cloud instance metadata for real credentials.
+    s3 = make_storage(
+        Settings(
+            storage="s3",
+            s3_bucket="b",
+            s3_endpoint_url="http://localhost:9000",
+            s3_access_key="test",
+            s3_secret_key="test",
+        )
+    )
     assert s3.name == "s3"
     with pytest.raises(ValueError):
         make_storage(Settings(storage="gcs"))

@@ -99,7 +99,9 @@ def test_mock_provider_records_calls() -> None:
     assert p.calls == [{"system": "a" * 40, "user": "b" * 40}]
 
 
-def test_from_settings_provider_selection() -> None:
+def test_from_settings_provider_selection(monkeypatch: pytest.MonkeyPatch) -> None:
+    # This contract checks provider defaults, not a gateway inherited from the test runner.
+    monkeypatch.setenv("FORMA_LLM_BASE_URL", "")
     assert isinstance(LLMClient.from_settings(Settings(llm_provider="mock")).provider, MockProvider)
     c = LLMClient.from_settings(Settings(llm_provider="openai", llm_api_key="k", llm_model="gpt-4o"))
     assert isinstance(c.provider, OpenAICompatibleProvider) and c.model == "gpt-4o"

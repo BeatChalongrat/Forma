@@ -1,0 +1,37 @@
+name: runtime-release
+on:
+  workflow_dispatch:
+    inputs:
+      runner:
+        description: "Runner label with Docker and at least 10 GiB available RAM"
+        type: string
+        default: ubuntu-latest
+  workflow_call:
+    inputs:
+      runner:
+        type: string
+        default: ubuntu-latest
+permissions:
+  contents: read
+concurrency:
+  group: runtime-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  runtime:
+    runs-on: ${{ inputs.runner }}
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+      - working-directory: backend
+        run: uv venv --python 3.12 && uv pip install -e ".[dev]"
+      - name: Upload, review, concurrent edits, download, restart, backup/restore, 300 jobs
+        run: backend/.venv/bin/python tools/quality.py runtime --jobs 300 --out test-results/runtime
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: runtime-evidence
+          path: test-results/runtime/
+          retention-days: 14

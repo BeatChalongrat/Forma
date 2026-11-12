@@ -71,6 +71,19 @@ def repro(tmp_path, monkeypatch):
     return module
 
 
+def test_ci_capacity_is_explicit_owned_and_keeps_default(repro):
+    repro.init("qa-ci", [8083, 19004, 19005], capacity="ci")
+    _, marker, config = repro.load("qa-ci")
+    assert marker["capacity"] == "ci"
+    assert config["services"]["worker"]["mem_limit"] == "1024m"
+    assert config["services"]["sandbox"]["network_mode"] == "none"
+    assert sum(repro.CI_LIMITS.values()) < sum(repro.LIMITS.values())
+    repro.init("normal", [8084, 19006, 19007])
+    _, marker, config = repro.load("normal")
+    assert marker["capacity"] == "standard"
+    assert config["services"]["worker"]["mem_limit"] == f"{repro.LIMITS['worker']}m"
+
+
 def test_config_isolated_and_edits_refused(repro):
     repro.init("issue-123", [8081, 19000, 19001])
     path, marker, config = repro.load("issue-123")
