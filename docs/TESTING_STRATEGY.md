@@ -63,6 +63,9 @@ Job `quality-gate` จะผ่านต่อเมื่อทุก job ผ�
 ไม่เปิด schedule หรือ deployment อัตโนมัติ. การรัน local `--jobs` ต่ำกว่า 300 ใช้ debug ได้ แต่ไม่แทน release gate.
 ช่อง `runner` ใน Run workflow / workflow_call เลือก label ของ runner ที่มี Docker และ RAM เพียงพอได้
 (ค่าเริ่มต้น `ubuntu-latest`; ตรวจขนาด runner ตามสิทธิ์ของ repository ก่อนใช้งาน).
+CI สร้าง MinIO/mc จาก source ทางการที่ pin commit ใน `deploy/testing/Minio.Dockerfile`
+เพราะ image เดิมถูกถอนจาก public registry; การสร้างนี้อยู่เฉพาะ runner ไม่เปลี่ยน storage ของ dev.
+การบังคับ required checks บน private repository ต้องมี GitHub plan ที่รองรับ branch protection/rulesets.
 
 ### การแยกข้อมูลและค่า API
 
