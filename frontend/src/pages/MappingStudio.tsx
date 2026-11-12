@@ -1,3 +1,4 @@
+import { LoadError } from '../components/LoadError'
 import { reviewReturn, reviewToolUrl, latestReview } from '../lib/reviewNavigation'
 import { Localized } from '../lib/locale'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -59,9 +60,11 @@ export function MappingStudio() {
   const qc = useQueryClient()
   const toast = useToast()
   const nav = useNavigate()
-  const { data: mv } = useQuery({ queryKey: ['mapping', mappingId], queryFn: () => api.mapping(mappingId) })
+  const mappingQuery = useQuery({ queryKey: ['mapping', mappingId], queryFn: () => api.mapping(mappingId) })
+  const mv = mappingQuery.data
   const { data: round } = useQuery({ queryKey: ['round', roundId], queryFn: () => api.round(roundId) })
-  const { data: schema } = useQuery({ queryKey: ['schema', mv?.target_schema], queryFn: () => api.schema(mv!.target_schema), enabled: !!mv })
+  const schemaQuery = useQuery({ queryKey: ['schema', mv?.target_schema], queryFn: () => api.schema(mv!.target_schema), enabled: !!mv })
+  const schema = schemaQuery.data
   const [doc, setDoc] = useState<MappingDocument | null>(null)
   const [dirty, setDirty] = useState(false)
   const [selected, setSelected] = useState<string | null>(null) // target pointer being edited
@@ -201,7 +204,7 @@ export function MappingStudio() {
   }
   const addCollection = (ptr: string) => update((d) => { if (!d.collections.find((c) => c.target === ptr)) d.collections.push({ target: ptr, source: d.record.root_source, link: [{ left: '', right: '' }], fields: [] }); return d })
 
-  if (!mv || !doc || !schema) return <div className="p-10 text-center"><Spinner /></div>
+  if (!mv || !doc || !schema) return <div className="p-6 space-y-4"><Link className="btn btn-ghost" to={reviewBack || `/rounds/${roundId}`}>← {t('Back to files or review', 'กลับไปยังไฟล์หรือหน้าตรวจ')}</Link>{mappingQuery.isError || schemaQuery.isError ? <LoadError error={mappingQuery.error || schemaQuery.error} busy={mappingQuery.isFetching || schemaQuery.isFetching} retry={() => { if (mappingQuery.isError) void mappingQuery.refetch(); if (schemaQuery.isError) void schemaQuery.refetch() }} /> : <Spinner />}</div>
   const pv = preview.data
   const locked = mv.status !== 'proposed'
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import shutil
@@ -16,6 +17,23 @@ import uuid
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def source_identity(root=ROOT):
+    """Bind evidence to a checkout, including local changes; never read ignored secrets."""
+
+    def git(*args):
+        return subprocess.check_output(["git", *args], cwd=root, stderr=subprocess.PIPE)
+
+    sha = git("rev-parse", "HEAD").decode().strip()
+    status = git("status", "--porcelain", "--untracked-files=all")
+    digest = hashlib.sha256(git("diff", "HEAD", "--binary"))
+    for raw in git("ls-files", "--others", "--exclude-standard", "-z").split(b"\0"):
+        if raw:
+            digest.update(raw)
+            path = root / raw.decode("utf-8")
+            digest.update(path.read_bytes())
+    return {"sha": sha, "dirty": bool(status), "changes_sha256": digest.hexdigest()}
 
 
 def clean_env(root: Path) -> dict[str, str]:
@@ -101,6 +119,7 @@ class Gates:
         self.status = "running"
         self.error = None
         self.python = sys.executable
+        self.source = source_identity()
 
     def run(self, name, args, cwd=ROOT, timeout=3600, env=None):
         started = time.monotonic()
@@ -149,6 +168,10 @@ class Gates:
                     "model": "mock",
                     "paid_api_calls": 0,
                     "gates": self.results,
+                    "source": self.source,
+                    "source_after": source_identity(),
+                    "run_id": os.environ.get("GITHUB_RUN_ID"),
+                    "run_attempt": os.environ.get("GITHUB_RUN_ATTEMPT"),
                 },
                 indent=2,
             ),
@@ -168,7 +191,12 @@ class Gates:
             ],
             ROOT / "backend",
             env=self.env
-            | {"FORMA_LLM_MOCK_ONLY": "false", "FORMA_TEST_BLOCK_EXTERNAL": "1"},
+            | {
+                "FORMA_LLM_MOCK_ONLY": "false",
+                "FORMA_TEST_BLOCK_EXTERNAL": "1",
+                "COVERAGE_FILE": str(self.out / (name + ".coverage")),
+            },
+            timeout=7200,
         )
 
     def backend(self):
@@ -182,10 +210,24 @@ class Gates:
             "backend",
             extra=[
                 "--cov=forma",
-                "--cov-fail-under=85",
+                "--cov-branch",
+                "--cov-fail-under=0",  # independent floors below, not the combined line+branch ratio
                 "--maxfail=5",
                 f"--cov-report=xml:{self.out / 'coverage.xml'}",
+                f"--cov-report=json:{self.out / 'coverage.json'}",
+                f"--cov-report=html:{self.out / 'backend-coverage'}",
                 "--cov-report=term",
+            ],
+        )
+        self.run(
+            "backend-coverage",
+            [
+                self.python,
+                ROOT / "tools/coverage_gate.py",
+                "backend",
+                self.out / "coverage.json",
+                "--out",
+                self.out / "backend-coverage-gate.json",
             ],
         )
 
@@ -193,8 +235,53 @@ class Gates:
         npm = shutil.which("npm")
         if not npm:
             raise RuntimeError("Install Node.js/npm first")
-        for task in ("lint", "test", "build"):
-            self.run("frontend-" + task, [npm, "run", task], ROOT / "frontend")
+        for task in ("lint", "test:typecheck", "test:coverage", "build"):
+            self.run(
+                "frontend-" + task.replace(":", "-"),
+                [npm, "run", task],
+                ROOT / "frontend",
+                env=self.env | {"FORMA_QA_OUTPUT": str(self.out)},
+            )
+        self.run(
+            "frontend-coverage",
+            [
+                self.python,
+                ROOT / "tools/coverage_gate.py",
+                "frontend",
+                self.out / "coverage/coverage-summary.json",
+                "--out",
+                self.out / "frontend-coverage-gate.json",
+            ],
+        )
+
+    def critical_report(self):
+        self.run(
+            "critical-flows",
+            [
+                self.python,
+                ROOT / "tools/critical_flows.py",
+                "--evidence",
+                self.out,
+                "--out",
+                self.out / "critical-flows.json",
+            ],
+        )
+
+    def critical(self):
+        from critical_flows import read_catalog
+
+        selectors = sorted(
+            {
+                check["class"].replace(".", "/") + ".py::" + check["name"]
+                for flow in read_catalog()
+                for check in flow["checks"]
+                if check["kind"] == "junit" and check["report"] == "backend.xml"
+            }
+        )
+        self.pytest("backend", selectors, ["--no-cov"])
+        self.frontend()
+        self.browser()
+        self.critical_report()
 
     def renderer(self, image):
         self.run(
@@ -391,6 +478,7 @@ def main():
             "browser",
             "renderer",
             "runtime",
+            "critical",
             "release",
         ],
     )
@@ -422,6 +510,8 @@ def main():
                 gates.renderer(a.report_image)
             else:
                 getattr(gates, "evaluation" if suite == "eval" else suite)()
+        if a.suite == "release":
+            gates.critical_report()
         gates.status = "passed"
     except BaseException as exc:
         gates.status = "failed"

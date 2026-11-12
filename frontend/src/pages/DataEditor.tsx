@@ -3,6 +3,7 @@ import { parseValue, type NumberStyle } from '../lib/valueInput'
 import { setPointerLocal } from '../lib/jsonPointer'
 import { JsonRecordEditor } from '../components/JsonRecordEditor'
 import { Localized } from '../lib/locale'
+import { LoadError } from '../components/LoadError'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
@@ -32,13 +33,16 @@ export function DataEditor() {
   const qc = useQueryClient()
   const nav = useNavigate()
   const toast = useToast()
-  const { data: ds } = useQuery({ queryKey: ['dataset', datasetId], queryFn: () => api.dataset(datasetId) })
+  const datasetQuery = useQuery({ queryKey: ['dataset', datasetId], queryFn: () => api.dataset(datasetId) })
+  const ds = datasetQuery.data
   const [q, setQ] = useState('')
   const [qDebounced, setQDebounced] = useState('')
   const [sort, setSort] = useState<{ ptr: string; desc: boolean } | null>(null)
   const [offset, setOffset] = useState(0)
   useEffect(() => { const t = setTimeout(() => { setQDebounced(q); setOffset(0) }, 300); return () => clearTimeout(t) }, [q])
-  const { data: page, isLoading } = useQuery({ queryKey: ['rows', datasetId, offset, qDebounced, sort], queryFn: () => api.rows(datasetId, { offset, limit: PAGE, q: qDebounced || undefined, sort: sort?.ptr, desc: sort?.desc }), placeholderData: (prev) => prev })
+  const rowsQuery = useQuery({ queryKey: ['rows', datasetId, offset, qDebounced, sort], queryFn: () => api.rows(datasetId, { offset, limit: PAGE, q: qDebounced || undefined, sort: sort?.ptr, desc: sort?.desc }), enabled: !!ds, placeholderData: (prev) => prev })
+  const { data: page, isLoading } = rowsQuery
+  const readUnavailable = datasetQuery.isError || rowsQuery.isError || rowsQuery.isPlaceholderData || !page
 
   const [numberStyle, setNumberStyle] = useState<NumberStyle>('plain')
   const [pending, setPending] = useState<Pending[]>([])
@@ -114,7 +118,7 @@ export function DataEditor() {
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sel, anchor, editing, drawer, saveOpen, rows.length, columns.length, pending])
+  }, [sel, anchor, editing, drawer, saveOpen, rows.length, columns.length, pending, readUnavailable])
   useEffect(() => { if (sel) rowVirt.scrollToIndex(sel.r) }, [sel, rowVirt])
   // paste a block from Excel / Sheets (tab-separated) starting at the selected cell
   useEffect(() => {
@@ -129,7 +133,7 @@ export function DataEditor() {
     window.addEventListener('paste', onPaste)
     return () => window.removeEventListener('paste', onPaste)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sel, editing, drawer, saveOpen, rows, columns, pending, numberStyle])
+  }, [sel, editing, drawer, saveOpen, rows, columns, pending, numberStyle, readUnavailable])
 
   const range = sel ? { r0: Math.min(sel.r, (anchor ?? sel).r), r1: Math.max(sel.r, (anchor ?? sel).r), c0: Math.min(sel.c, (anchor ?? sel).c), c1: Math.max(sel.c, (anchor ?? sel).c) } : null
   const inRange = (r: number, c: number) => !!range && (range.r0 !== range.r1 || range.c0 !== range.c1) && r >= range.r0 && r <= range.r1 && c >= range.c0 && c <= range.c1
@@ -143,7 +147,7 @@ export function DataEditor() {
   }
   const original = (row: Record<string, unknown>) => page?.rows.find((r) => identityOf(r) === identityOf(row)) ?? row
   const pasteBlock = (grid: string[][]) => {
-    if (!sel || ds?.status === 'published') return
+    if (!sel || (ds?.status === 'published' || readUnavailable)) return
     const cells: { identity: string; f: FieldSpec; value: unknown; before: unknown }[] = []
     const errs: string[] = []
     grid.forEach((line, i) => line.forEach((text, j) => {
@@ -166,7 +170,7 @@ export function DataEditor() {
     toast.push({ kind: 'info', title: `Copied ${(range.r1 - range.r0 + 1) * (range.c1 - range.c0 + 1)} cells` })
   }
   const clearRange = () => {
-    if (!range || ds?.status === 'published') return
+    if (!range || (ds?.status === 'published' || readUnavailable)) return
     const cells: { identity: string; f: FieldSpec; value: unknown; before: unknown }[] = []
     for (let r = range.r0; r <= range.r1; r++) for (let c = range.c0; c <= range.c1; c++) {
       const f = columns[c]
@@ -184,7 +188,7 @@ export function DataEditor() {
 
   const startEdit = (r: number, c: number) => {
     const f = columns[c]
-    if (!f || f.is_collection || ds?.status === 'published') return
+    if (!f || f.is_collection || (ds?.status === 'published' || readUnavailable)) return
     const v = getPointer(rows[r], f.pointer)
     setEditing({ r, c, value: v === null || v === undefined ? '' : typeof v === 'object' ? JSON.stringify(v) : typeof v === 'number' && numberStyle === 'comma' ? String(v).replace('.', ',') : String(v) })
   }
@@ -208,7 +212,7 @@ export function DataEditor() {
       toast.push({ kind: 'bad', title: t('Could not save changes', 'บันทึกการแก้ไขไม่สำเร็จ'), detail: e.details?.errors?.slice(0, 3).map((x) => `${x.pointer}: ${x.message}`).join('; ') ?? e.message })
     },
   })
-  const rollback = useMutation({ mutationFn: () => api.rollback(datasetId), onSuccess: (d) => { qc.invalidateQueries(); toast.push({ kind: 'ok', title: `Rolled back → v${d.version}` }); nav(datasetUrl(d.id)) } })
+  const rollback = useMutation({ mutationFn: () => api.rollback(datasetId), onSuccess: (d) => { qc.invalidateQueries(); toast.push({ kind: 'ok', title: t(`Restored as version ${d.version}`, `คืนข้อมูลเป็นเวอร์ชัน ${d.version} แล้ว`) }); nav(datasetUrl(d.id)) }, onError: () => toast.push({ kind: 'bad', title: t('Could not restore this version. Try again.', 'คืนข้อมูลไม่สำเร็จ กรุณาลองอีกครั้ง') }) })
   const approve = useMutation({
     mutationFn: (b: { acknowledge_anomalies?: boolean; comment?: string }) => api.approveDataset(datasetId, b),
     onSuccess: () => { qc.invalidateQueries(); setAck(null); toast.push({ kind: 'ok', title: 'Dataset approved' }) },
@@ -230,24 +234,34 @@ export function DataEditor() {
       toast.push({ kind: 'ok', title: 'Plan added to pending changes', detail: `${r.impact?.rows_affected ?? '?'} rows affected — review and save when ready.` })
     },
   })
-  const { data: report } = useQuery({ queryKey: ['change-report', datasetId], queryFn: () => api.changeReport(datasetId), enabled: rightTab === 'diff' })
+  const reportQuery = useQuery({ queryKey: ['change-report', datasetId], queryFn: () => api.changeReport(datasetId), enabled: rightTab === 'diff' })
 
   const pricePointer = (page?.columns ?? []).map((c) => c.pointer).find((p) => (page?.columns ?? []).find((c) => c.pointer === p)?.semantic === 'price.amount')
   const stageBulk = (op: Operation, label: string) => { const batch = ++batchSeq.current; setPending((p) => [...p, { ...op, identities: [...picked], batch, label }]) }
   const pageIds = rows.map(identityOf)
   const allPicked = pageIds.length > 0 && pageIds.every((i) => picked.has(i))
 
-  if (!ds) return <div className="p-10 text-center"><Spinner /></div>
+  if (!ds) return <div className="p-6 space-y-4">
+    <Link className="btn btn-ghost btn-sm" to={reviewBack || '/imports'}>← {t('Back to files or review', 'กลับไปยังไฟล์หรือหน้าตรวจ')}</Link>
+    {datasetQuery.isError ? <LoadError error={datasetQuery.error} busy={datasetQuery.isFetching} retry={() => void datasetQuery.refetch()} /> : <div role="status"><Spinner /> {t('Loading data…', 'กำลังโหลดข้อมูล…')}</div>}
+  </div>
   const invalid = ds.invalid_records ?? 0
   const errors = ds.findings.filter((f) => f.severity === 'error' && f.kind !== 'validation').length
   const widths = (f: FieldSpec) => (f.is_collection ? 220 : f.semantic === 'product_name' || f.semantic === 'description' ? 240 : f.json_type.includes('number') ? 110 : 140)
 
   return (
     <div className="workspace">
+      {datasetQuery.isError && <LoadError error={datasetQuery.error} retained busy={datasetQuery.isFetching} retry={() => void datasetQuery.refetch()} />}
+      {rowsQuery.isError && <LoadError error={rowsQuery.error} retained={!!page || pending.length > 0} busy={rowsQuery.isFetching} retry={() => void rowsQuery.refetch()} />}
       {newerDataset && <div role="alert" className="p-3 border-b border-line bg-warn-soft flex items-center gap-3 flex-wrap"><span>{t('A newer version exists. Your unsaved changes remain on this page. Open the latest version in another tab to compare before editing again.', 'มีเวอร์ชันใหม่แล้ว การแก้ที่ยังไม่บันทึกยังอยู่ในหน้านี้ เปิดเวอร์ชันล่าสุดอีกแท็บเพื่อเปรียบเทียบก่อนแก้ต่อ')}</span><Link className="btn btn-sm" target="_blank" rel="noopener noreferrer" to={datasetUrl(newerDataset!)}>{t('Open latest version', 'เปิดเวอร์ชันล่าสุด')}</Link></div>}
+      <div role="status" className="px-5 py-2 text-sm border-b border-line">{readUnavailable ? t('Load the latest data before continuing.', 'โหลดข้อมูลล่าสุดให้สำเร็จก่อนทำต่อ') : pending.length || editing
+        ? t('Unsaved changes — review and save before leaving.', 'ยังไม่บันทึกการแก้ไข — ตรวจและบันทึกก่อนออกจากหน้านี้')
+        : ds.status === 'approved' || ds.status === 'published'
+          ? t('Approved — ready to download.', 'อนุมัติแล้ว — พร้อมดาวน์โหลด')
+          : t('Saved version — review before approval. Editing creates a new version.', 'ข้อมูลเวอร์ชันที่บันทึกแล้ว — ตรวจข้อมูลก่อนอนุมัติ การแก้ไขจะสร้างเวอร์ชันใหม่')}</div>
       <div className="workspace-toolbar">
         <Link to={reviewBack || `/rounds/${ds.round_id}`} onClick={e => { if ((pending.length || editing) && !window.confirm(t('Discard unsaved data edits? Your review answers are saved separately.', 'ยังไม่ได้บันทึกการแก้ข้อมูล ต้องการกลับโดยไม่เก็บการแก้นี้หรือไม่? ร่างคำตอบยังเก็บแยกไว้'))) e.preventDefault() }} className="btn btn-ghost btn-sm">← {reviewBack ? t('Back to this file’s review', 'กลับมาตรวจไฟล์นี้') : t('Back to round', 'กลับรอบนำเข้า')}</Link>
-        <span className="heading">Data Editor</span>
+        <span className="heading">{t("Data Editor", "แก้ไขข้อมูล")}</span>
         <span className="tnum text-muted">v{ds.version}</span>
         <StatusBadge status={ds.status} />
         <span className="tnum text-muted text-[12.5px]">{fmtInt(ds.row_count)} rows</span>
@@ -258,10 +272,10 @@ export function DataEditor() {
         <div className="relative min-w-0"><Search size={13} className="absolute left-2.5 top-2.5 text-muted" /><input className="input pl-7 w-52 max-w-full" placeholder="Search any field…" value={q} onChange={(e) => setQ(e.target.value)} /></div>
         <div className="ml-auto flex items-center gap-2 flex-wrap">
 
-          {pending.length > 0 && <><button className="btn btn-sm" onClick={() => setPending([])}><Undo2 size={13} /> Discard</button><button className="btn btn-sm btn-primary" onClick={() => { preview.mutate(); setSaveOpen(true) }}>Review {pending.length} change{pending.length > 1 ? 's' : ''}</button></>}
-          {!pending.length && ds.status === 'draft' && <button className="btn btn-sm" disabled={approve.isPending || invalid > 0} title={invalid ? `Fix or remove the ${invalid} record${invalid > 1 ? 's' : ''} that do not match the target format first` : undefined} onClick={() => approve.mutate({})}><CircleCheck size={13} /> Approve data</button>}
-          {!pending.length && ds.parent_id && <button className="btn btn-sm" onClick={() => rollback.mutate()} title="New version with the parent's content"><History size={13} /> Roll back</button>}
-          {!pending.length && (ds.status === 'approved' || ds.status === 'published') && <div className="flex items-center rounded-[var(--radius-md)] border border-line overflow-hidden">{['json', 'jsonl', 'csv'].map((f) => <button key={f} className="h-8 px-2.5 text-[12.5px] font-medium hover:bg-surface-2 border-r border-line last:border-0 flex items-center gap-1" onClick={() => doExport.mutate(f)}><Download size={12} /> {f.toUpperCase()}</button>)}</div>}
+          {pending.length > 0 && <><button className="btn btn-sm" onClick={() => setPending([])}><Undo2 size={13} /> {t("Discard", "ยกเลิกการแก้")}</button><button className="btn btn-sm btn-primary" disabled={readUnavailable} onClick={() => { preview.mutate(); setSaveOpen(true) }}>{t(`Review ${pending.length} change${pending.length > 1 ? 's' : ''}`, `ตรวจการแก้ไข ${pending.length} รายการ`)}</button></>}
+          {!pending.length && ds.status === 'draft' && <button className="btn btn-sm" disabled={approve.isPending || invalid > 0 || readUnavailable} title={invalid ? `Fix or remove the ${invalid} record${invalid > 1 ? 's' : ''} that do not match the target format first` : undefined} onClick={() => approve.mutate({})}><CircleCheck size={13} /> {t("Approve data", "อนุมัติข้อมูล")}</button>}
+          {!pending.length && ds.parent_id && <button className="btn btn-sm" disabled={rollback.isPending || readUnavailable} onClick={() => rollback.mutate()} title="New version with the parent's content"><History size={13} /> {t("Roll back", "คืนข้อมูลเวอร์ชันก่อน")}</button>}
+          {!pending.length && (ds.status === 'approved' || ds.status === 'published') && <div className="flex items-center rounded-[var(--radius-md)] border border-line overflow-hidden">{['json', 'jsonl', 'csv'].map((f) => <button key={f} className="h-8 px-2.5 text-[12.5px] font-medium hover:bg-surface-2 border-r border-line last:border-0 flex items-center gap-1" disabled={doExport.isPending || readUnavailable} onClick={() => doExport.mutate(f)}><Download size={12} /> {f.toUpperCase()}</button>)}</div>}
         </div>
       </div>
 
@@ -277,14 +291,14 @@ export function DataEditor() {
         )}
         <label className="flex flex-wrap items-center gap-2 text-xs my-2">{t('Number input format', 'รูปแบบตัวเลขที่กรอก')}<select className="input w-auto" value={numberStyle} onChange={e => setNumberStyle(e.target.value as NumberStyle)} aria-label={t('Number input format', 'รูปแบบตัวเลขที่กรอก')}><option value="plain">1234.56 · JSON</option><option value="dot">1,234.56 · decimal .</option><option value="comma">1.234,56 · decimal ,</option></select><span className="text-muted">{t('Applies to typing and pasting. No automatic rounding.', 'ใช้กับการกรอกและวางค่า ไม่ปัดตัวเลขให้อัตโนมัติ')}</span></label>
         <HelpStrip>
-          Edit like Excel: double-click or <span className="kbd">↵</span> to edit, paste a block from Excel, tick rows to change many at once. Every change waits in <b>Pending</b> until you review its impact and save it as a new version. Use <b>Changes &amp; anomalies</b> before approving. <span className="text-muted">— แก้เหมือน Excel ทุกการแก้รออยู่ใน Pending จนกว่าจะกดบันทึก ดู Changes &amp; anomalies ก่อนกด Approve data</span>
+          {t('Double-click a cell to edit or paste values from Excel. Changes are not saved until you review and save a new version. Then approve the data before downloading.', 'ดับเบิลคลิกเซลล์เพื่อแก้ หรือวางค่าจาก Excel การแก้ไขยังไม่ถูกบันทึกจนกว่าจะตรวจและบันทึกเป็นเวอร์ชันใหม่ จากนั้นอนุมัติข้อมูลก่อนดาวน์โหลด')}
         </HelpStrip>
       </div>
 
       <div className="workspace-body">
         {/* grid */}
         <div className={cn('min-w-0 flex-1 flex flex-col', view !== 'grid' && 'hidden')}>
-          {picked.size > 0 && ds.status !== 'published' && (
+          {picked.size > 0 && ds.status !== 'published' && !readUnavailable && (
             <BulkBar count={picked.size} fields={columns.filter((c) => !c.is_collection && !c.system)} pricePointer={pricePointer}
               onSet={(fld, text) => { const v = parseValue(fld, text, numberStyle); if (!v.ok) { toast.push({ kind: 'bad', title: v.error }); return } stageBulk({ kind: 'set_field', target: fld.pointer, value: v.value }, `set ${fld.name} = ${cellText(v.value) || '∅'} on ${picked.size} rows`) }}
               onScale={(pct) => pricePointer && stageBulk({ kind: 'scale_field', target: pricePointer, factor: Math.round((1 + pct / 100) * 10000) / 10000 }, `price ${pct > 0 ? '+' : ''}${pct}% on ${picked.size} rows`)}
@@ -328,7 +342,7 @@ export function DataEditor() {
                         </div>
                       )
                     })}
-                    <button className="w-9 shrink-0 grid place-items-center text-muted hover:text-bad" title="Delete row" aria-label={`Delete record ${id}`} disabled={ds.status === 'published'} onClick={() => setPending((p) => [...p, { kind: 'delete_row', identity: id, label: `delete ${id}` }])}><Trash2 size={12} /></button>
+                    <button className="w-9 shrink-0 grid place-items-center text-muted hover:text-bad" title="Delete row" aria-label={`Delete record ${id}`} disabled={ds.status === 'published' || readUnavailable} onClick={() => setPending((p) => [...p, { kind: 'delete_row', identity: id, label: `delete ${id}` }])}><Trash2 size={12} /></button>
                   </div>
                 )
               })}
@@ -367,7 +381,7 @@ export function DataEditor() {
             {rightTab === 'findings' && (ds.findings.length ? ds.findings.map((f, i) => (f.kind === 'validation' && f.identity
               ? <button key={i} className="block w-full text-left hover:bg-surface-2 rounded" title="Show this row" onClick={() => { setQ(f.identity ?? ''); setView('grid') }}><FindingRow f={{ ...f, message: `${f.identity} · ${f.message}` }} /></button>
               : <FindingRow key={i} f={f} />)) : <div className="text-muted">No findings. Every record passed the schema and quality rules.</div>)}
-            {rightTab === 'diff' && <DiffPanel report={report} ack={ack} acking={approve.isPending} onAcknowledge={(comment) => approve.mutate({ acknowledge_anomalies: true, comment })} onTrace={(identity, kind) => setDrawer({ kind: 'lineage', identity, pointer: /price|discount|promo/.test(kind) && pricePointer ? pricePointer.replace('/*/', '/0/') : undefined })} />}
+            {rightTab === 'diff' && (reportQuery.isError ? <LoadError error={reportQuery.error} busy={reportQuery.isFetching} retry={() => void reportQuery.refetch()} /> : <DiffPanel report={reportQuery.data} ack={ack} acking={approve.isPending} onAcknowledge={(comment) => approve.mutate({ acknowledge_anomalies: true, comment })} onTrace={(identity, kind) => setDrawer({ kind: 'lineage', identity, pointer: /price|discount|promo/.test(kind) && pricePointer ? pricePointer.replace('/*/', '/0/') : undefined })} />)}
             {rightTab === 'versions' && (
               <ul className="flex flex-col gap-1">
                 {ds.history?.slice().reverse().map((v) => (
@@ -383,12 +397,13 @@ export function DataEditor() {
         </section>}
       </div>
 
-      <RecordDrawer readOnly={ds.status === 'published'} numberStyle={numberStyle} open={drawer?.kind === 'record'} identity={drawer?.identity ?? ''} rows={rows} identityOf={identityOf} columns={page?.columns ?? []} onClose={() => setDrawer(null)} onLineage={(pointer) => setDrawer({ kind: 'lineage', identity: drawer!.identity, pointer })} onEdit={(target, value, label) => setPending((p) => [...p, { kind: 'set_item', identity: drawer!.identity, target, value, label }])} />
+      <RecordDrawer readOnly={ds.status === 'published' || readUnavailable} numberStyle={numberStyle} open={drawer?.kind === 'record'} identity={drawer?.identity ?? ''} rows={rows} identityOf={identityOf} columns={page?.columns ?? []} onClose={() => setDrawer(null)} onLineage={(pointer) => setDrawer({ kind: 'lineage', identity: drawer!.identity, pointer })} onEdit={(target, value, label) => setPending((p) => [...p, { kind: 'set_item', identity: drawer!.identity, target, value, label }])} />
       <TraceDrawer open={drawer?.kind === 'lineage'} datasetId={datasetId} identity={drawer?.identity ?? ''} pointer={drawer?.pointer} onPointer={(p) => setDrawer((d) => d && { ...d, pointer: p })} onClose={() => setDrawer(null)} />
 
-      <Modal open={saveOpen} onClose={() => setSaveOpen(false)} title="Review changes before saving" width="max-w-3xl"
-        footer={<SaveFooter pending={apply.isPending} persistentAllowed={pending.every(op => op.kind === 'set_cell' || op.kind === 'set_field')} valid={!!preview.data && preview.data.validation_errors.length === 0} onCancel={() => setSaveOpen(false)} onSave={(kind, note) => apply.mutate({ kind, note })} />}>
+      <Modal open={saveOpen} onClose={() => setSaveOpen(false)} title={t("Review changes before saving", "ตรวจการแก้ไขก่อนบันทึก")} width="max-w-3xl"
+        footer={<SaveFooter pending={apply.isPending} persistentAllowed={pending.every(op => op.kind === 'set_cell' || op.kind === 'set_field')} valid={!readUnavailable && !preview.isPending && !preview.isError && !!preview.data && preview.data.validation_errors.length === 0} onCancel={() => setSaveOpen(false)} onSave={(kind, note) => apply.mutate({ kind, note })} />}>
         {preview.isPending && <div className="text-muted flex items-center gap-2"><Spinner /> computing impact…</div>}
+        {preview.isError && <div role="alert" className="text-bad text-sm space-y-3"><p>{t('Could not check these changes. Your unsaved edits are still here.', 'ยังตรวจการแก้ไขไม่ได้ การแก้ที่ยังไม่บันทึกยังอยู่ครบ')} {preview.error.message}</p><button className="btn btn-sm" onClick={() => preview.mutate()}>{t('Retry check', 'ตรวจใหม่')}</button></div>}
         {preview.data && <ImpactView impact={preview.data.impact} rowsAfter={preview.data.rows_after} errors={preview.data.validation_errors} invalid={[preview.data.invalid_before, preview.data.invalid_after]} />}
       </Modal>
     </div>
@@ -431,17 +446,18 @@ function ImpactView({ impact, rowsAfter, errors, invalid }: { impact: Impact; ro
 }
 
 function SaveFooter({ pending, valid, persistentAllowed, onCancel, onSave }: { pending: boolean; valid: boolean; persistentAllowed: boolean; onCancel: () => void; onSave: (kind: string, note: string) => void }) {
+  const { t } = usePreferences()
   const [kind, setKind] = useState('one_time')
   const [note, setNote] = useState('')
   return (
     <div className="flex items-center gap-2 w-full">
       <select className="input w-auto" value={persistentAllowed ? kind : 'one_time'} onChange={(e) => setKind(e.target.value)}>
-        <option value="one_time">One-time correction (this round only)</option>
-        <option value="persistent" disabled={!persistentAllowed}>ใช้การกำหนดค่านี้ในรอบถัดไปด้วย{!persistentAllowed ? ' (ใช้ได้เฉพาะการกำหนดค่า)' : ''}</option>
+        <option value="one_time">{t("One-time correction (this round only)", "แก้เฉพาะรอบนี้")}</option>
+        <option value="persistent" disabled={!persistentAllowed}>{t('Apply these values in future rounds', 'ใช้ค่าที่กำหนดนี้ในรอบถัดไปด้วย')}{!persistentAllowed ? t(' (value changes only)', ' (ใช้ได้เฉพาะการกำหนดค่า)') : ''}</option>
       </select>
-      <input className="input flex-1" placeholder="Note for the audit log (optional)" value={note} onChange={(e) => setNote(e.target.value)} />
+      <input className="input flex-1" placeholder={t("Note for the audit log (optional)", "เหตุผลที่แก้ไข (ไม่บังคับ)")} value={note} onChange={(e) => setNote(e.target.value)} />
       <button className="btn" onClick={onCancel}><Localized>Cancel</Localized></button>
-      <button className="btn btn-primary" disabled={pending || !valid} onClick={() => onSave(persistentAllowed ? kind : 'one_time', note)}>{pending ? <Spinner className="border-t-white" /> : 'Save as new version'}</button>
+      <button className="btn btn-primary" disabled={pending || !valid} onClick={() => onSave(persistentAllowed ? kind : 'one_time', note)}>{pending ? <Spinner className="border-t-white" /> : t('Save as new version', 'บันทึกเป็นเวอร์ชันใหม่')}</button>
     </div>
   )
 }

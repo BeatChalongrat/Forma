@@ -119,6 +119,43 @@ def test_oidc_requires_issuer() -> None:
         OIDCVerifier(Settings(auth="oidc"))
 
 
+@pytest.mark.parametrize("missing", ["exp", "iat", "sub"])
+def test_oidc_missing_required_claim_never_grants_access(rsa: dict[str, Any], missing: str) -> None:
+    import jwt
+
+    from forma.core.errors import Unauthorized
+
+    claims = jwt.decode(_token(rsa), options={"verify_signature": False})
+    del claims[missing]
+    token = jwt.encode(claims, rsa["pem"], algorithm="RS256", headers={"kid": "k1"})
+    with pytest.raises(Unauthorized):
+        _verifier(rsa).verify(token)
+
+
+def test_oidc_key_outage_and_modified_signature_fail_closed(rsa: dict[str, Any], monkeypatch) -> None:
+    import jwt
+
+    from forma.core.errors import Unauthorized
+
+    verifier = _verifier(rsa)
+    token = _token(rsa)
+    header, body, signature = token.split(".")
+    changed = ("A" if signature[0] != "A" else "B") + signature[1:]
+    with pytest.raises(Unauthorized):
+        verifier.verify(f"{header}.{body}.{changed}")
+    claims = jwt.decode(token, options={"verify_signature": False})
+    no_kid = jwt.encode(claims, rsa["pem"], algorithm="RS256")
+    with pytest.raises(Unauthorized, match="no kid"):
+        verifier.verify(no_kid)
+
+    def unavailable(_kid):
+        raise ConnectionError("identity provider offline")
+
+    monkeypatch.setattr(verifier.jwks, "get", unavailable)
+    with pytest.raises(Unauthorized, match="invalid token"):
+        verifier.verify(token)
+
+
 # --------------------------------------------------------------------------------------------
 # API enforcement
 # --------------------------------------------------------------------------------------------

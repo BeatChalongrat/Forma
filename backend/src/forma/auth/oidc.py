@@ -85,8 +85,11 @@ class OIDCVerifier:
         customers: frozenset[str] | None = None
         if isinstance(cust, list | tuple):
             customers = frozenset(str(c) for c in cust)
-        elif isinstance(cust, str) and cust.strip():
+        elif isinstance(cust, str):
             customers = frozenset(c.strip() for c in cust.split(",") if c.strip())
+        elif cust is not None:
+            # A malformed restriction must never turn into access to every customer.
+            raise Unauthorized("invalid customer scope claim")
         return Principal(
             subject=str(claims["sub"]),
             roles=roles,
