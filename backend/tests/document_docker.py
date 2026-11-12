@@ -45,7 +45,7 @@ class DockerDocumentSandbox:
                 "/tmp:size=64m,mode=1777",
                 "--entrypoint",
                 "python",
-                "forma-sandbox:latest",
+                os.environ.get("FORMA_TEST_REPORT_IMAGE", "forma-sandbox:latest"),
                 "-c",
                 program,
             ],

@@ -80,6 +80,12 @@ def test_full_flow_on_postgres(pg_env: Path) -> None:
         assert dash["published_rows"] == 12
 
 
+def test_populated_upgrade_preserves_work_on_postgres(pg_env: Path) -> None:
+    from tests.test_upgrade_preservation import test_upgrade_retains_work_and_is_idempotent
+
+    test_upgrade_retains_work_and_is_idempotent(pg_env)
+
+
 def test_stale_recovery_on_postgres(pg_env: Path) -> None:
     import datetime as dt
 

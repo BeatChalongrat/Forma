@@ -1,8 +1,97 @@
 # Testing strategy and quality gates
 
-> **สรุปภาษาไทย** — ระบบมีด่านคุณภาพ 4 ชั้น: lint/type (ruff, mypy strict), unit + API tests (~500 ตัว,
-> coverage ≥ 80% local / 85% CI), eval ความแม่นบน corpus สังเคราะห์ที่ห้ามตก, และ drift guards (migration,
-> config example) + build ทั้งสอง image ใน CI ทุก feature ใหม่ต้องมี test ที่ล้มก่อนแก้และผ่านหลังแก้
+> **สรุปภาษาไทย** — ใช้ `tools/quality.py` เป็นคำสั่งกลางสำหรับ static checks, unit/integration,
+> browser E2E, multi-sheet evaluation และ Docker runtime/load/recovery โดยเก็บผลกับ exit code สำหรับ pipeline
+> ทุกชุดเป็นข้อมูลทดลองและไม่ใช้ API เสียเงิน ชุดจำลองพิสูจน์กลไกของระบบ ไม่ใช่คะแนนความแม่นของ DeepSeek จริง
+
+## Automated entrypoints (Windows / CI)
+
+รันจาก repo root หลังติดตั้ง backend dev dependencies และ `npm ci` ใน `frontend` แล้ว:
+
+```powershell
+# เตรียม Chromium ครั้งแรก
+cd frontend
+npx playwright install chromium
+cd ..
+
+backend\.venv\Scripts\python tools/quality.py backend
+backend\.venv\Scripts\python tools/quality.py frontend
+backend\.venv\Scripts\python tools/quality.py eval
+backend\.venv\Scripts\python tools/quality.py browser
+
+# ต้องเปิด Docker Desktop: สร้างและลบเฉพาะ stack ทดลอง qa-<random>
+backend\.venv\Scripts\python tools/quality.py runtime --jobs 300
+
+# ทุกชุดตามลำดับ หยุดเมื่อพบด่านที่ไม่ผ่าน
+backend\.venv\Scripts\python tools/quality.py release
+```
+
+Linux ใช้ `backend/.venv/bin/python` แทน หรือ `make qa-release`.
+บน Linux ติดตั้ง browser dependencies ด้วย `npx playwright install --with-deps chromium`.
+ผลอยู่ใน `test-results/<timestamp>-<suite>/` หรือระบุ `--out <โฟลเดอร์ใหม่>`;
+ไม่เขียนทับผลเก่า มี `summary.json`, stdout/stderr logs, pytest JUnit, coverage XML,
+browser screenshots/Playwright traces และ downloaded JSON สำหรับตรวจค่าจริง.
+เปิด trace ด้วย `npx playwright show-trace <path-to-trace.zip>` จาก `frontend`.
+
+| คำสั่ง | สิ่งที่ตรวจ / เกณฑ์ผ่าน |
+|---|---|
+| `backend` | ruff, format, mypy และ pytest ทั้งชุด; coverage ≥ 85%; concurrent requests, ownership, remembered answers, stale versions, durable jobs และ migration contracts |
+| `frontend` | lint, component/pure-function tests และ production build |
+| `eval` | synthetic baseline ต้องไม่ถอย; multi-sheet, question/knowledge, cold/warm/drift, graph roles และ relationship regression ด้วย scripted providers |
+| `browser` | ใช้ Chromium กับ API/เว็บชั่วคราว: chat drafts, เปลี่ยนหน้า, offline/reconnect, stop, branching, แนบไฟล์บางส่วน; review → reload/back → confirm → download ตรวจ 12 SKU และ VAT ทุกแถว |
+| `renderer` | ใช้ sandbox image ที่ build แล้ว (`--report-image`) ตรวจ 11 กรณี Office/PDF จริง รวมตัวเลขติดลบ/ทศนิยมใหญ่/ภาษาไทย/หน้าว่าง/ข้อมูลไม่ครบ; Docker ไม่มี network |
+| `runtime` | PostgreSQL + Redis/arq + MinIO + sandbox จริง: upload → review → แข่งแก้ข้อมูล → approve → download → restart → backup/restore ไปฐาน/bucket ใหม่; 300 งาน, kill worker ขณะทำจริง, ตรวจจำนวน/ค่า/ไม่มี mapping ซ้ำ; render DOCX/PPTX/PDF และตรวจ activity receipt |
+| `release` | รวมทั้งหมดข้างบน; Docker image build เป็นส่วนหนึ่งของ runtime provisioning |
+
+`runtime` เรียก `renderer` โดยใช้ image ที่เพิ่ง build ของ stack ทดลองให้เอง ไม่ต้องเตรียม image แยก.
+พอร์ต 8081, 19000 และ 19001 ต้องว่างสำหรับ repro; runner จะปฏิเสธเมื่อพอร์ตหรือทรัพยากรไม่พร้อม.
+ชุด runtime นี้ใช้ repro ที่ทำงานพร้อมกัน 2 งาน และ workbook สังเคราะห์ 12 รายการต่อไฟล์
+เพื่อพิสูจน์ queue/recovery และตรวจค่าทุกไฟล์ ไม่ใช่ benchmark 8 workers หรือการคาดเวลา DeepSeek จริง.
+Docker ต้องมี RAM ให้ stack ประมาณ 8 GiB รวมกับพื้นที่สำรอง 1.5 GiB และหน่วยความจำที่ container อื่นใช้อยู่;
+runner ตรวจความพร้อมก่อนสร้าง stack. เครื่อง CI ที่มี RAM 7 GiB ต้องเลือก runner ที่ใหญ่ขึ้น.
+
+### CI และ release pipeline
+
+`.github/workflows/ci.yml` รันทุก PR/push main: backend (รวม Postgres/MinIO แยก), frontend,
+browser, eval, migration/config guards, Docker builds และ renderer จริงแบบไม่มี network.
+Job `quality-gate` จะผ่านต่อเมื่อทุก job ผ่านจริง รวมกรณี dependency ถูก skip ด้วย.
+ตั้ง required status check เป็น `quality-gate` ใน GitHub branch protection เมื่อต้องการบังคับก่อน merge
+(ไฟล์ workflow ไม่สามารถเปิด branch protection ให้เอง).
+
+`.github/workflows/runtime.yml` เป็นชุดหนัก กด **Run workflow** ก่อน release หรือเรียกผ่าน `workflow_call`
+จาก deployment pipeline ได้ เป็น 300 งานเสมอและคืน exit code nonzero เมื่อขาดงาน/ข้อมูลผิด/recovery ไม่ถูกทดสอบ.
+ไม่เปิด schedule หรือ deployment อัตโนมัติ. การรัน local `--jobs` ต่ำกว่า 300 ใช้ debug ได้ แต่ไม่แทน release gate.
+ช่อง `runner` ใน Run workflow / workflow_call เลือก label ของ runner ที่มี Docker และ RAM เพียงพอได้
+(ค่าเริ่มต้น `ubuntu-latest`; ตรวจขนาด runner ตามสิทธิ์ของ repository ก่อนใช้งาน).
+
+### การแยกข้อมูลและค่า API
+
+- Runner ไม่รับ database/storage/provider/key ของ dev จาก environment และสร้าง temp state ใหม่;
+  browser ใช้พอร์ต 18171/15174 ถ้าไม่ว่างจะหยุด ไม่ไปใช้ server ที่มีอยู่.
+- Unit/integration ต้องทดสอบทั้ง mock และการเลือก provider จึงใช้ fake transports ร่วมกับ
+  `FORMA_TEST_BLOCK_EXTERNAL=1`: บล็อก external TCP ผ่าน Python socket ซึ่งเป็นเส้นทาง HTTP ของ LLM;
+  loopback และ Unix socket ใช้สำหรับ test services (ตัว guard นี้ไม่ใช่ firewall ของระบบปฏิบัติการ).
+  Runtime/browser ใช้ mock-only lock ของระบบ ไม่มีการถอดรหัส key หรือเรียกโมเดลจริง.
+- CI Postgres/MinIO เป็น service ชั่วคราว หากส่ง `FORMA_TEST_PG_URL` / `FORMA_TEST_S3_ENDPOINT` ให้ runner เอง
+  ต้องยืนยัน `FORMA_TEST_SERVICES_DISPOSABLE=1`. **ห้ามชี้ฐาน dev/prod**: integration fixture ล้าง public schema.
+  ถ้าไม่กำหนด service URL เทสเหล่านี้จะ skip อย่างชัดเจน; Docker runtime และ CI เป็นด่านตรวจของจริง.
+- Runtime ใช้ repro ownership token/labels และ volume/network แยก `forma-repro-qa-*`; เก็บ log ก่อน destroy แม้เทสล้ม.
+  `--capacity ci` เป็นเพียง resource cap ของ stack ทดลอง ไม่แก้ config dev/server และยังตรวจ RAM ที่เหลือก่อนเริ่ม.
+  หากเครื่องไม่พอให้รันบน CI/server ทดสอบ ไม่ลดจำนวน assertions เพื่อให้ผ่าน.
+- ไม่ใช้ผลโมเดลจำลองยืนยันความสามารถเข้าใจ unknown ERP. Paid live evaluation เดิมยังต้องสั่งแยก
+  ด้วย corpus/schema ที่มีเฉลยตรวจโดยคน ดู EVALUATION.md; ไม่อยู่ใน default CI หรือ release runner นี้.
+
+### Multi-sheet และ upgrade regression
+
+`test_multisheet_contract.py` ตรวจ workbook เดิมเมื่อสลับลำดับชีต เปลี่ยนชื่อชีต เพิ่ม Notes/ชีตว่าง
+จนเป็นสิบชีต และซ่อน Stock: ทุกกรณีตรวจ SKU/ราคา/จำนวนแถว/ความสัมพันธ์คลัง ไม่ใช่แค่ API ตอบ 200.
+**ชีตซ่อนที่อาจจำเป็นต้องมีคำถามให้ตรวจ ไม่ถือว่าใช้ได้เองเสมอ**; เนื้อหาใน Notes ไม่ใช่คำสั่งให้โมเดล.
+กรณี ambiguous joins, stale/cross-round knowledge และ semantic conflicts อยู่ใน regression files ที่ eval gate เรียกด้วย.
+`test_upgrade_preservation.py` เริ่มจาก schema revision ก่อนหน้า ใส่ลูกค้า รอบ ไฟล์ mapping คำถาม/log
+แล้ว upgrade head สองครั้ง ตรวจค่าทุกคอลัมน์เดิมและ byte ของไฟล์ต้นทางยังเหมือนเดิม.
+
+รายงาน PDF/PPTX/DOCX ตรวจเลข ตาราง หน้า และการ render จริงอัตโนมัติได้ แต่ความสวยและความหมายทางธุรกิจ
+ยังต้องมี visual/human review; artifacts เก็บภาพไว้ให้ตรวจ ไม่อ้างว่าคนตรวจแล้วโดยอัตโนมัติ.
 
 ## 1. Layers
 

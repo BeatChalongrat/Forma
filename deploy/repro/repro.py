@@ -35,6 +35,22 @@ LIMITS = {
     "assistant-worker": 768,
     "report-sandbox": 3072,
 }
+CI_LIMITS = LIMITS | {
+    "redis": 128,
+    "minio": 384,
+    "api": 512,
+    "worker": 1024,
+    "sandbox": 2048,
+    "report-sandbox": 2048,
+    "assistant-worker": 512,
+    "migrate": 256,
+}
+
+
+def capacity_limits(capacity: str) -> dict[str, int]:
+    if capacity not in ("standard", "ci"):
+        fail("Unknown repro capacity")
+    return CI_LIMITS if capacity == "ci" else LIMITS
 
 
 def fail(message: str) -> None:
@@ -99,7 +115,9 @@ def build_config(
     passwords: dict[str, str],
     *,
     reports: bool = True,
+    capacity: str = "standard",
 ) -> dict:
+    limits = capacity_limits(capacity)
     project = PREFIX + name
     labels = {OWNER: token}
     env = {
@@ -313,8 +331,8 @@ def build_config(
         service.update(
             {
                 "labels": labels,
-                "mem_limit": f"{LIMITS[key]}m",
-                "memswap_limit": f"{LIMITS[key]}m",
+                "mem_limit": f"{limits[key]}m",
+                "memswap_limit": f"{limits[key]}m",
                 "cpus": 2 if key in ("worker", "sandbox") else 1,
             }
         )
@@ -346,7 +364,7 @@ def digest(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def init(name: str, ports: list[int]) -> None:
+def init(name: str, ports: list[int], capacity: str = "standard") -> None:
     path = instance_dir(name)
     if (path / "owner.json").exists():
         load(name)
@@ -357,7 +375,7 @@ def init(name: str, ports: list[int]) -> None:
         fail("Choose three distinct ports between 1024 and 65535.")
     token = secrets.token_hex(24)
     passwords = {key: secrets.token_hex(24) for key in ("postgres", "minio", "secret")}
-    config = build_config(name, token, ports, passwords)
+    config = build_config(name, token, ports, passwords, capacity=capacity)
     path.mkdir(parents=True, exist_ok=True)
     config_path = path / "compose.json"
     config_path.write_text(json.dumps(config, indent=2), encoding="utf-8")
@@ -372,6 +390,7 @@ def init(name: str, ports: list[int]) -> None:
                 "token": token,
                 "ports": ports,
                 "sha256": digest(config_path),
+                "capacity": capacity,
             },
             indent=2,
         ),
@@ -406,6 +425,7 @@ def load(name: str) -> tuple[Path, dict, dict]:
             "secret": env["FORMA_SECRET_KEY"],
         },
         reports="report-worker" in config["services"],
+        capacity=marker.get("capacity", "standard"),
     )
     legacy = copy.deepcopy(expected)
     legacy["services"]["worker"]["healthcheck"]["test"][-1] = LEGACY_WORKER_CHECK
@@ -523,7 +543,8 @@ def preflight(marker: dict) -> None:
         if (row := json.loads(line))
         and not row["Name"].startswith(marker["project"] + "-")
     )
-    required = sum(LIMITS.values()) * 1024**2 + used + 1536 * 1024**2
+    limit_mb = sum(capacity_limits(marker.get("capacity", "standard")).values())
+    required = limit_mb * 1024**2 + used + 1536 * 1024**2
     if info["MemTotal"] < required:
         fail(
             f"Insufficient Docker RAM: need ~{required / 1024**3:.1f} GiB including current usage and reserve. "
@@ -531,7 +552,7 @@ def preflight(marker: dict) -> None:
         )
     print(
         f"RAM check: Docker {info['MemTotal'] / 1024**3:.1f} GiB; other current usage "
-        f"{used / 1024**3:.1f} GiB; repro cap {sum(LIMITS.values()) / 1024:.2f} GiB + 1.5 GiB reserve."
+        f"{used / 1024**3:.1f} GiB; repro cap {limit_mb / 1024:.2f} GiB + 1.5 GiB reserve."
     )
 
 
@@ -578,6 +599,7 @@ def main() -> None:
         "action", choices=["init", "up", "status", "logs", "stop", "destroy"]
     )
     parser.add_argument("--name", default="local")
+    parser.add_argument("--capacity", choices=["standard", "ci"], default="standard")
     parser.add_argument("--web-port", type=int, default=8081)
     parser.add_argument("--s3-port", type=int, default=19000)
     parser.add_argument("--console-port", type=int, default=19001)
@@ -589,7 +611,11 @@ def main() -> None:
 
 def execute(args: argparse.Namespace) -> None:
     if args.action in ("init", "up"):
-        init(args.name, [args.web_port, args.s3_port, args.console_port])
+        init(
+            args.name,
+            [args.web_port, args.s3_port, args.console_port],
+            getattr(args, "capacity", "standard"),
+        )
     path, marker, config = load(args.name)
     local_daemon()
     owned_resources(marker, config)

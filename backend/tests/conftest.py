@@ -8,7 +8,9 @@ data directory at a throw-away location here; API tests build a fresh isolated c
 from __future__ import annotations
 
 import contextlib
+import ipaddress
 import os
+import socket
 import tempfile
 from collections.abc import Iterator
 from pathlib import Path
@@ -28,6 +30,46 @@ os.environ.setdefault("FORMA_MAPPING_WORKFLOW", "legacy")
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCHEMA_DIR = REPO_ROOT / "target_schema"
 POLICY_DIR = REPO_ROOT / "policies"
+
+
+@pytest.fixture(scope="session", autouse=True)
+def external_network_guard():
+    """Fake-provider tests may exercise provider selection, but cannot contact a paid service.
+
+    Real Postgres, MinIO and browser fixtures use loopback. AF_UNIX is needed by Docker on Linux.
+    This is independent of the application mock-only lock, which has its own contract tests.
+    """
+    if os.environ.get("FORMA_TEST_BLOCK_EXTERNAL") != "1":
+        yield
+        return
+    patch = pytest.MonkeyPatch()
+    connect, connect_ex = socket.socket.connect, socket.socket.connect_ex
+
+    def allowed(sock, address):
+        if sock.family not in (socket.AF_INET, socket.AF_INET6):
+            return
+        host = address[0]
+        try:
+            local = ipaddress.ip_address(host).is_loopback
+        except ValueError:
+            local = host == "localhost"
+        if not local:
+            raise AssertionError(f"Automated test blocked external network: {host}")
+
+    def guarded_connect(sock, address):
+        allowed(sock, address)
+        return connect(sock, address)
+
+    def guarded_connect_ex(sock, address):
+        allowed(sock, address)
+        return connect_ex(sock, address)
+
+    patch.setattr(socket.socket, "connect", guarded_connect)
+    patch.setattr(socket.socket, "connect_ex", guarded_connect_ex)
+    try:
+        yield
+    finally:
+        patch.undo()
 
 
 def clear_forma_caches() -> None:
