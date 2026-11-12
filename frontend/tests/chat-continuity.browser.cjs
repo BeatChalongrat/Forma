@@ -93,7 +93,9 @@ const assert = require('node:assert/strict');
     await page.unroute('**/api/assistant/conversations/*/attachments');
     await page.screenshot({path:require('node:path').join(process.env.FORMA_QA_OUTPUT || require('node:os').tmpdir(),'forma-chat-continuity.png'),fullPage:true});
     assert.deepEqual(errors,[]);
-    console.log(JSON.stringify({passed:['draft reload','background completion after navigation','Markdown table','message actions','feedback reload','clarification draft reload','send clarification','edit branch preserves original','back to original','network reconnect without duplicate request','stop persists after reload','partial attachment upload survives reload without duplicates'],consoleErrors:errors}));
+    const receipt = {passed:['draft reload','background completion after navigation','Markdown table','message actions','feedback reload','clarification draft reload','send clarification','edit branch preserves original','back to original','network reconnect without duplicate request','stop persists after reload','partial attachment upload survives reload without duplicates'],consoleErrors:errors};
+    require('node:fs').writeFileSync(require('node:path').join(out, 'browser-chat.json'), JSON.stringify(receipt, null, 2));
+    console.log(JSON.stringify(receipt));
   } finally {
     await page.screenshot({path:require('node:path').join(out,'chat-last.png'),fullPage:true}).catch(()=>{});
     await context.tracing.stop({path:require('node:path').join(out,'chat-trace.zip')});

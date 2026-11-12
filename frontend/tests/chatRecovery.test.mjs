@@ -1,9 +1,32 @@
-import test from 'node:test'
+import { test } from 'vitest'
 import assert from 'node:assert/strict'
 import { recoverChatTurn, abortableDelay } from '../src/lib/chatRecovery.ts'
 
 const turn = (status, answer = '') => ({ id: 'turn1', request_id: 'same-request', status, reply: { answer } })
 const immediate = async () => {}
+
+test('rate limiting and provider outage back off, cap delay and reset after recovery', async () => {
+  const waits = [], replies = [429, 503, 503, 503, turn('pending'), 503, turn('complete')]
+  const result = await recoverChatTurn(async () => { const next = replies.shift(); if (typeof next === 'number') throw { status: next }; return next }, new AbortController().signal, () => {}, () => {}, async ms => { waits.push(ms) })
+  assert.equal(result.status, 'complete')
+  assert.deepEqual(waits, [2000, 4000, 5000, 5000, 1000, 2000])
+})
+
+test('bad requests are terminal and aborted reads cannot publish a stale snapshot', async () => {
+  const c = new AbortController()
+  let reads = 0, snapshots = 0
+  await assert.rejects(recoverChatTurn(async () => { reads++; throw { status: 400 } }, c.signal, () => {}, () => {}, immediate))
+  assert.equal(reads, 1)
+  await assert.rejects(recoverChatTurn(async () => { c.abort(); return turn('complete') }, c.signal, () => snapshots++, () => {}, immediate), { name: 'AbortError' })
+  assert.equal(snapshots, 0)
+})
+
+test('reconnect delay resolves normally and can be cancelled while sleeping', async () => {
+  await abortableDelay(1, new AbortController().signal)
+  const c = new AbortController(), pending = abortableDelay(10000, c.signal)
+  c.abort()
+  await assert.rejects(pending, { name: 'AbortError' })
+})
 
 test('network recovers by reading same attempt; snapshots replace text and never rerun generation', async () => {
   const states = [], snapshots = [], answers = [new TypeError('offline'), turn('pending', 'hello'), turn('pending', 'hello world'), turn('complete', 'hello world!')]

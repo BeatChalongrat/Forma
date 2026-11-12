@@ -62,8 +62,10 @@ const fs = require('node:fs/promises');
     assert.ok(rows.every(r=>r.prices.every(p=>p.vat_included===false)));
     assert.deepEqual(errors,[]);
     await page.screenshot({path:path.join(out,'review-complete.png'),fullPage:true});
-    console.log(JSON.stringify({passed:['answer false persists','reload','browser Back stays on same file',
-      'list return preserves draft','preview','confirm','download values'],rows:rows.length}));
+    const receipt = {passed:['answer false persists','reload','browser Back stays on same file',
+      'list return preserves draft','preview','confirm','download values'],rows:rows.length};
+    require('node:fs').writeFileSync(require('node:path').join(out, 'browser-review.json'), JSON.stringify(receipt, null, 2));
+    console.log(JSON.stringify(receipt));
   } finally {
     await page.screenshot({path:path.join(out,'review-last.png'),fullPage:true}).catch(()=>{});
     await context.tracing.stop({path:path.join(out,'review-trace.zip')});

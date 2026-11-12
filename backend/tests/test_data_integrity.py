@@ -43,6 +43,40 @@ def edit(identity: str, value: str) -> dict[str, Any]:
     }
 
 
+def test_dataset_mutation_cannot_cross_customer_or_role_boundary(
+    client: TestClient, dataset: tuple[str, str, str]
+) -> None:
+    _, did, _ = dataset
+    before = client.get(f"/api/datasets/{did}").json()
+    rows_before = client.get(f"/api/datasets/{did}/rows").json()
+    for headers in (
+        {"X-Forma-User": "importer"},
+        {"X-Forma-User": "reviewer", "X-Forma-Customers": "different-customer"},
+    ):
+        response = client.post(
+            f"/api/datasets/{did}/changes", json=edit("A001", "Unauthorized"), headers=headers
+        )
+        assert response.status_code == 403, response.text
+    after = client.get(f"/api/datasets/{did}").json()
+    assert after["history"] == before["history"]
+    assert client.get(f"/api/datasets/{did}/rows").json() == rows_before
+
+
+def test_invalid_second_edit_does_not_partially_apply_first(
+    client: TestClient, dataset: tuple[str, str, str]
+) -> None:
+    _, did, _ = dataset
+    before = client.get(f"/api/datasets/{did}").json()
+    rows_before = client.get(f"/api/datasets/{did}/rows").json()
+    operations = edit("A001", "Must not persist")["operations"]
+    operations.append({"kind": "set_cell", "identity": "A002", "target": "/sku", "value": None})
+    response = client.post(f"/api/datasets/{did}/changes", json={"operations": operations})
+    assert response.status_code in (409, 422), response.text
+    after = client.get(f"/api/datasets/{did}").json()
+    assert after["history"] == before["history"]
+    assert client.get(f"/api/datasets/{did}/rows").json() == rows_before
+
+
 def test_commit_failure_never_reports_success(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
     from forma.db.models import Customer
     from forma.db.session import session_scope
