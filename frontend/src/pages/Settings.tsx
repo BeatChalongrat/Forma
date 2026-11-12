@@ -1,3 +1,4 @@
+import { LoadError } from '../components/LoadError'
 import { KnowledgeManager, AuditBrowser } from '../components/KnowledgeManager'
 import { KnowledgeReleases } from '../components/KnowledgeReleases'
 import { Localized } from '../lib/locale'
@@ -67,7 +68,8 @@ const formOf = (ai: AISettings): AIForm => ({ provider: ai.provider, model: ai.m
 function AITab() {
   const qc = useQueryClient()
   const toast = useToast()
-  const { data: ai } = useQuery({ queryKey: ['ai-settings'], queryFn: api.aiSettings })
+  const aiQuery = useQuery({ queryKey: ['ai-settings'], queryFn: api.aiSettings })
+  const ai = aiQuery.data
   const [draft, setDraft] = useState<AIForm | null>(null)
   const [key, setKey] = useState('')
   const f = draft ?? (ai ? formOf(ai) : null)
@@ -79,7 +81,7 @@ function AITab() {
   })
   const removeKey = useMutation({ mutationFn: () => api.saveAiSettings({ api_key: '' }), onSuccess: () => { qc.invalidateQueries(); toast.push({ kind: 'ok', title: 'Saved API key removed' }) } })
   const test = useMutation({ mutationFn: api.testAi, onError: (e: Error) => toast.push({ kind: 'bad', title: 'Test failed', detail: e.message }) })
-  if (!ai || !f) return <div className="p-10 text-center"><Spinner /></div>
+  if (!ai || !f) return aiQuery.isError ? <LoadError error={aiQuery.error} busy={aiQuery.isFetching} retry={() => void aiQuery.refetch()} /> : <div className="p-10 text-center"><Spinner /></div>
   const dirty = draft !== null || key.trim() !== ''
   return (
     <div className="flex flex-col gap-4">
@@ -452,14 +454,15 @@ function CalibrationSection() {
 function PolicyTab() {
   const qc = useQueryClient()
   const toast = useToast()
-  const { data: view } = useQuery({ queryKey: ['policy-settings'], queryFn: api.policySettings })
+  const policyQuery = useQuery({ queryKey: ['policy-settings'], queryFn: api.policySettings })
+  const view = policyQuery.data
   const [draft, setDraft] = useState<Policy | null>(null)
   const [newSem, setNewSem] = useState('')
   const p = draft ?? view?.effective
   const edit = (fn: (x: Policy) => void) => { if (!p) return; const next = structuredClone(p); fn(next); setDraft(next) }
   const save = useMutation({ mutationFn: () => api.savePolicy(draft!), onSuccess: () => { setDraft(null); qc.invalidateQueries(); toast.push({ kind: 'ok', title: 'Policy saved', detail: 'Applies to the next proposal; nothing already decided changes.' }) }, onError: (e: Error) => toast.push({ kind: 'bad', title: 'Policy not saved', detail: problemsOf(e) }) })
   const reset = useMutation({ mutationFn: api.resetPolicy, onSuccess: () => { setDraft(null); qc.invalidateQueries(); toast.push({ kind: 'ok', title: 'Back to approval.yaml' }) } })
-  if (!view || !p) return <div className="p-10 text-center"><Spinner /></div>
+  if (!view || !p) return policyQuery.isError ? <LoadError error={policyQuery.error} busy={policyQuery.isFetching} retry={() => void policyQuery.refetch()} /> : <div className="p-10 text-center"><Spinner /></div>
   const aa = p.auto_approve
   const num = (label: string, value: number, onChange: (v: number) => void, opts: { pct?: boolean; step?: number } = {}) => (
     <label key={label} className="flex items-center justify-between gap-3 py-1.5"><span className="text-ink-2">{label}</span>

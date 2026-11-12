@@ -1,10 +1,62 @@
-import test from 'node:test'
+import { test } from 'vitest'
 import assert from 'node:assert/strict'
 import { ReviewDraftStore, emptyReviewDraft } from '../src/lib/reviewDraft.ts'
 import { reviewReturn, reviewToolUrl, latestReview } from '../src/lib/reviewNavigation.ts'
 
 const defer = () => { let resolve; const promise = new Promise(r => { resolve = r }); return { promise, resolve } }
 const remote = (revision, payload = {}) => ({ mapping_id: 'm1', revision, payload, updated_at: null })
+
+test('failed initial read blocks edits and can be retried without losing the backup', async () => {
+  let reads = 0, backup
+  const payload = { ...emptyReviewDraft(), answers: { vat: false } }
+  const store = new ReviewDraftStore({ read: async () => { if (++reads === 1) throw new Error('Offline'); return remote(2) }, write: async () => { throw new Error('Unexpected write') } }, value => backup = value, { revision: 1, payload })
+  let notifications = 0
+  const unsubscribe = store.subscribe(() => notifications++)
+  await store.load()
+  store.change(emptyReviewDraft())
+  assert.equal(await store.flush(), false)
+  assert.equal(store.snapshot().loading, true)
+  await store.load()
+  assert.deepEqual(store.snapshot().payload, payload)
+  assert.equal(store.snapshot().conflict.revision, 2)
+  assert.equal(await store.flush(), false)
+  store.resolve(false)
+  assert.deepEqual(store.snapshot().payload, emptyReviewDraft())
+  assert.equal(store.snapshot().revision, 2)
+  assert.equal(backup, null)
+  assert.equal(await store.flush(), true)
+  unsubscribe()
+  const before = notifications
+  store.resolve(false)
+  store.clearBackup()
+  assert.equal(notifications, before)
+})
+
+test('concurrent flush is single-flight and conflict read failure keeps unsent data', async () => {
+  const pending = defer()
+  let writes = 0, reads = 0, backup
+  const store = new ReviewDraftStore({ read: async () => { if (++reads > 1) throw new Error('Offline'); return remote(0) }, write: async () => { writes++; await pending.promise; throw Object.assign(new Error('Conflict'), { status: 409 }) } }, value => backup = value)
+  await store.load()
+  store.change({ ...emptyReviewDraft(), answers: { vat: false } })
+  const first = store.flush(), second = store.flush()
+  assert.equal(first, second)
+  pending.resolve()
+  assert.equal(await first, false)
+  assert.equal(writes, 1)
+  assert.equal(store.snapshot().error, 'Conflict')
+  assert.equal(backup.payload.answers.vat, false)
+  assert.equal(store.snapshot().pending, true)
+})
+
+test('identical saved backup is discarded and partial remote payload receives defaults', async () => {
+  const payload = emptyReviewDraft()
+  let backup = 'not cleared'
+  const store = new ReviewDraftStore({ read: async () => remote(2, {}), write: async () => { throw new Error('Unexpected write') } }, value => backup = value, { revision: 1, payload })
+  await store.load()
+  assert.equal(backup, null)
+  assert.deepEqual(store.snapshot().payload, payload)
+  assert.equal(store.snapshot().pending, false)
+})
 
 test('draft restores false, zero, uncertainty, remember, checks and the current step after reload', async () => {
   let saved = remote(0), backup

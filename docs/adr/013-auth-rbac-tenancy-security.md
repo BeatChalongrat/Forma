@@ -21,9 +21,14 @@
    `principal.actor`. Audit rows also keep the subject.
 4. **Tenant scoping** is an optional `customers` claim (`FORMA_AUTH_CUSTOMERS_CLAIM`, or
    `X-Forma-Customers` in dev). Lists are filtered and detail routes answer 403 through `ensure_customer`.
+   An absent/null claim retains unrestricted customer scope (roles still apply). An empty list or
+   blank string grants access to no customers. A non-null claim of another type is rejected as
+   unauthorized; malformed restrictions must not silently become unrestricted access.
 5. **Frontend**: with OIDC on, the SPA does an Authorization Code + PKCE flow against
    `GET /api/auth/config` (issuer, client id, audience) and sends the access token; in dev mode nothing
    changes except an optional user switcher.
+   The callback validates a one-use state against its PKCE transaction, only returns to local paths,
+   rejects malformed/expired tokens and shares an in-flight exchange across duplicate React effects.
 6. **Security pass**
    * uploads are sniffed (`ingestion/sniff.py`): the bytes must be a real xlsx/xls or decodable text,
      whatever the extension says; names are sanitised (`safe_name`) and size-capped (ADR-010);

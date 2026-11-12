@@ -18,6 +18,7 @@ backend\.venv\Scripts\python tools/quality.py backend
 backend\.venv\Scripts\python tools/quality.py frontend
 backend\.venv\Scripts\python tools/quality.py eval
 backend\.venv\Scripts\python tools/quality.py browser
+backend\.venv\Scripts\python tools/quality.py critical
 
 # ต้องเปิด Docker Desktop: สร้างและลบเฉพาะ stack ทดลอง qa-<random>
 backend\.venv\Scripts\python tools/quality.py runtime --jobs 300
@@ -35,8 +36,9 @@ browser screenshots/Playwright traces และ downloaded JSON สำหรั�
 
 | คำสั่ง | สิ่งที่ตรวจ / เกณฑ์ผ่าน |
 |---|---|
-| `backend` | ruff, format, mypy และ pytest ทั้งชุด; coverage ≥ 85%; concurrent requests, ownership, remembered answers, stale versions, durable jobs และ migration contracts |
-| `frontend` | lint, component/pure-function tests และ production build |
+| `backend` | ruff, format, mypy และ pytest ทั้งชุด; line ≥ 85% และ branch ≥ 80% แยกกัน; concurrent requests, ownership, remembered answers, stale versions, durable jobs และ migration contracts |
+| `frontend` | lint, Vitest/V8 (รวมไฟล์ production ที่ยังไม่มีเทส), component/hook/pure-function tests, coverage floors และ production build |
+| `critical` | ชุดความเสี่ยงสำคัญจาก catalogue → frontend coverage → Chromium → ตรวจหลักฐานทุก flow; ไม่มีรายงาน, skipped, failed หรือรายงานซ้ำ ให้ไม่ผ่าน |
 | `eval` | synthetic baseline ต้องไม่ถอย; multi-sheet, question/knowledge, cold/warm/drift, graph roles และ relationship regression ด้วย scripted providers |
 | `browser` | ใช้ Chromium กับ API/เว็บชั่วคราว: chat drafts, เปลี่ยนหน้า, offline/reconnect, stop, branching, แนบไฟล์บางส่วน; review → reload/back → confirm → download ตรวจ 12 SKU และ VAT ทุกแถว |
 | `renderer` | ใช้ sandbox image ที่ build แล้ว (`--report-image`) ตรวจ 11 กรณี Office/PDF จริง รวมตัวเลขติดลบ/ทศนิยมใหญ่/ภาษาไทย/หน้าว่าง/ข้อมูลไม่ครบ; Docker ไม่มี network |
@@ -55,8 +57,62 @@ runner ตรวจความพร้อมก่อนสร้าง stack.
 `.github/workflows/ci.yml` รันทุก PR/push main: backend (รวม Postgres/MinIO แยก), frontend,
 browser, eval, migration/config guards, Docker builds และ renderer จริงแบบไม่มี network.
 Job `quality-gate` จะผ่านต่อเมื่อทุก job ผ่านจริง รวมกรณี dependency ถูก skip ด้วย.
+Job `critical-flows` อ่าน JUnit และ browser receipts จาก artifacts ของ CI run เดียวกัน
+โดยไม่เรียกโมเดลซ้ำ และเป็น dependency ของ `quality-gate`.
 ตั้ง required status check เป็น `quality-gate` ใน GitHub branch protection เมื่อต้องการบังคับก่อน merge
 (ไฟล์ workflow ไม่สามารถเปิด branch protection ให้เอง).
+
+### Coverage และ critical flows: อ่านตัวเลขให้ถูก
+
+ค่าขั้นต่ำอยู่ใน [`quality/coverage-policy.json`](../quality/coverage-policy.json).
+Backend ใช้ coverage.py แบบ branch และตรวจ **line กับ branch แยกกัน** ผ่าน
+`tools/coverage_gate.py`; ค่า combined ของ pytest-cov ใช้แทนสองค่านี้ไม่ได้.
+รายงานมี XML, JSON และ HTML (`backend-coverage/index.html`).
+
+Frontend เปลี่ยนจาก Node test runner เป็น Vitest โดยเก็บ assertion เดิม และเพิ่ม React DOM/hook tests.
+`vitest.config.ts` รวม `src/**/*.ts` และ `src/**/*.tsx` ทั้งหมด ยกเว้น type declaration;
+ไม่ตัด pages ที่ยังไม่มีเทสออกเพื่อทำให้ตัวเลขสูงขึ้น. รายงาน V8 มี JSON, LCOV และ HTML
+(`coverage/index.html`) ส่วน browser E2E แยกหลักฐานออกมา ไม่เอามาบวกเป็นเปอร์เซ็นต์ V8.
+
+Frontend ทั้งระบบยังมีช่องว่าง: floor line 29%, branch 22% เป็น **เกณฑ์กันถอยชั่วคราว**
+ไม่ใช่เป้าหมายความพร้อม production. ส่วน auth, draft store/hook, chat recovery, review navigation,
+value input และ explicit confirmation มี floor รายไฟล์ line 90%, branch 85%.
+หน้า upload, data editor, review journey, delivery และ assistant มี floor แยกรายไฟล์ตาม
+coverage ที่วัดได้จริงใน policy เพื่อไม่ให้เทสหน้าอื่นชดเชยส่วนสำคัญที่ถอยลง.
+เมื่อเพิ่ม coverage ให้ยก floor ตาม ห้ามลด floor เพื่อทำให้ CI เขียว.
+
+### Frontend page journeys
+
+`frontend/tests/*.page.test.tsx` mount หน้าจอ production พร้อม React Query, router,
+draft hooks และองค์ประกอบลูกจริง แล้วจำลองเฉพาะ API boundary. `pageHarness.tsx` ปิดการเรียก
+`fetch` จริงและให้เทสล้มเหลวถ้ามี request หลุดออกมา; ไม่ต้องเปิด dev และไม่อ่านข้อมูล dev.
+เฉพาะ DOM scrolling/viewport ใช้ตัวแทนของ jsdom; pixel/layout และการเชื่อม backend จริง
+ต้องดู browser E2E แยก ไม่ควรอ้างว่า component tests พิสูจน์ server recovery ได้ด้วยตัวเอง.
+
+| ไฟล์เทส | พฤติกรรมที่ต้องรักษา |
+|---|---|
+| `Upload.page.test.tsx` | ไฟล์ไม่รองรับ, วันที่ว่าง, แบ่งชุดส่ง, ป้องกันกดซ้ำ, idempotency หลัง response หาย, เพิ่มต่อรอบเดิม, ปุ่มกลับ |
+| `UploadStatus.page.test.tsx` | จำนวนรับเข้าแยกจากประมวลผล, action ต่อไฟล์, ZIP เฉพาะไฟล์พร้อม, resume งานค้าง, สิทธิ์เลือกลูกค้า |
+| `ReviewJourney.page.test.tsx` | เก็บคำตอบ/ย้อนกลับ/พักแล้วเปิดต่อ, ยังไม่ทราบไม่ใช่อนุมัติ, draft ชนกัน, preview ผิด/ล่ม, สิทธิ์, เปลี่ยนคำตอบต้องตรวจใหม่ |
+| `DataEditor.page.test.tsx` | แก้/วางตัวเลขตาม locale, preview ก่อนบันทึก, validation, retry, 403/เวอร์ชันชน, เก็บ draft ในหน้า, audit note, กลับหน้าตรวจ, published อ่านอย่างเดียว |
+| `ReviewDelivery.page.test.tsx` | ยืนยันข้อมูลก่อน export, reviewer/approver แยกกัน, ข้อมูลผิดห้ามส่งออก, sample โหลดไม่ได้, dataset ใหม่ต้องยืนยันใหม่, retry job เดิม |
+| `Assistant.page.test.tsx` | stream/reconnect/reset, ออกจากหน้าไม่ยกเลิก server job, stop/retry request เดิม, draft ใหม่ไม่ถูกล้าง, attachment ล้มเหลว, archived/403, branching, clarification |
+
+รันเฉพาะหน้าได้จาก `frontend`: `npx vitest run tests/Upload.page.test.tsx`
+หรือรันทุกหน้าและวัดทั้งโปรเจกต์ด้วย `npm run test:coverage`.
+
+[`quality/critical-flows.json`](../quality/critical-flows.json) ผูกความเสี่ยงกับชื่อเทสจริง:
+transaction rollback/commit acknowledgement, concurrent edits, invalid edits, tenant/role isolation,
+OIDC/PKCE, worker kill/restart, provider retry/budget/stop, stale preview, explicit approval,
+draft persistence, browser navigation/reconnect และตรวจค่าของ JSON ที่ดาวน์โหลด.
+`critical-flows.json` ในผลรันทดสอบบอกว่า flow ใดผ่านและอ้างอิง test ใด;
+31/31 หมายถึง **31 flow ที่กำหนดไว้** ไม่ใช่ครอบคลุมความเป็นไปได้ทุกแบบ 100%.
+ตัวตรวจหลักฐานมี regression tests ป้องกันผลเขียวปลอมเมื่อข้อมูลหาย/ซ้ำ/skip/ล้มเหลว.
+
+เพิ่ม feature หรือแก้บั๊ก: เพิ่ม regression ที่ล้มเหลวก่อนแก้ → ผูก flow ใน catalogue ถ้าเป็นความเสี่ยงสำคัญ
+→ รัน `critical` → รัน full suite ของส่วนที่แก้ → แนบ artifacts. ก่อน release ยังคงต้องผ่าน
+`runtime --jobs 300` ใน Docker แยก ซึ่งทดสอบ PostgreSQL/Redis/MinIO, backup/restore และ renderer จริง.
+ชุด critical ไม่ทดแทน load test และโมเดลจำลองไม่ใช่การวัดความแม่นของโมเดลจริง.
 
 `.github/workflows/runtime.yml` เป็นชุดหนัก กด **Run workflow** ก่อน release หรือเรียกผ่าน `workflow_call`
 จาก deployment pipeline ได้ เป็น 300 งานเสมอและคืน exit code nonzero เมื่อขาดงาน/ข้อมูลผิด/recovery ไม่ถูกทดสอบ.
@@ -102,7 +158,7 @@ CI สร้าง MinIO/mc จาก source ทางการที่ pin com
 |---|---|---|---|
 | Static | ruff (lint + format), mypy strict, oxlint, tsc strict | zero errors | `make lint typecheck`, CI |
 | Unit | pytest | pass | `backend/tests/test_thai.py`, `test_engine.py`, `test_dsl.py`, `test_fingerprint.py`, `test_heuristics*.py`, `test_policy.py`, `test_verdict.py`, `test_healing.py`, `test_anomalies.py`, … |
-| API / integration | pytest + FastAPI `TestClient` with `sync=true` jobs on an isolated SQLite + data dir (`isolated_env`) | pass, coverage ≥ 80 % locally, ≥ 85 % in CI | `test_api.py`, `test_batches.py`, `test_workspace.py`, `test_learning.py`, `test_calibration.py`, `test_foresight.py`, `test_schema_gate.py`, `test_sandbox.py`, … |
+| API / integration | pytest + FastAPI `TestClient` with `sync=true` jobs on an isolated SQLite + data dir (`isolated_env`) | pass; quality runner/CI: line ≥ 85%, branch ≥ 80%; direct pytest: combined ≥ 80% | `test_api.py`, `test_batches.py`, `test_workspace.py`, `test_learning.py`, `test_calibration.py`, `test_foresight.py`, `test_schema_gate.py`, `test_sandbox.py`, … |
 | Infrastructure | real Postgres and MinIO in CI (`FORMA_TEST_PG_URL`, `FORMA_TEST_S3_ENDPOINT`) | pass | `test_postgres.py`, `test_minio.py` |
 | Migrations | upgrade/downgrade from scratch; models vs Alembic agree | pass | `test_migrations.py` |
 | Failure injection | dead worker, storage error, DB error, LLM timeout, breaker | nothing partial visible; fallback routes to review | `test_failure_injection.py`, `test_job_recovery.py` |
@@ -111,7 +167,7 @@ CI สร้าง MinIO/mc จาก source ทางการที่ pin com
 | Configuration drift | `.env.production.example` regenerated and compared | identical | CI |
 | Performance | `forma bench --files 6 --rows 2000` in CI; full 300 × 100K locally | reported; the full run is documented in PERFORMANCE.md | CI, `make bench` |
 | Build | both Docker images, compose config | build | CI |
-| Frontend | tsc, oxlint, vite build, `npm test` (navigation rules in `frontend/tests/`) | zero errors (warnings tracked) | `make check`, CI |
+| Frontend | tsc (app + tests), oxlint, vite build, Vitest/V8, React DOM/hook tests | zero errors; coverage floors in `quality/coverage-policy.json` (warnings tracked) | `make qa-frontend`, CI |
 
 ## 2. Conventions
 
@@ -165,3 +221,16 @@ the JSON each should produce and what a person should see.
 `make check` green · `make eval-gate` green · tests added for new behaviour · docs/ADR updated in the same
 commit · `.env.production.example` regenerated when a setting changed · migration shipped when a model
 changed · frontend `tsc` + `oxlint` + `npm test` + `build` green · conventional commit message.
+
+
+### Release qualification และการกู้หน้าเมื่อโหลดไม่สำเร็จ
+
+เรียก `.github/workflows/release.yml` ก่อนปล่อยรุ่นจริง: บังคับ CI + runtime บน commit เดียวกัน
+แล้ว `tools/release_gate.py` ตรวจผล mock ทุกชุด, run/attempt, working tree ที่ไม่เปลี่ยน และบันทึก image IDs
+พร้อม hash หลักฐานใน manifest ไม่มี deploy อัตโนมัติ ดู [checklist](RELEASE_CHECKLIST.md).
+`tools/quality.py` เก็บ source ก่อน–หลังทุกชุด; local dirty checkout ทดสอบได้ แต่ใช้ผ่าน release gate ไม่ได้.
+
+Regression เพิ่ม: initial 403/404/503, rows โหลดไม่ได้ต้องไม่ดูเหมือนไฟล์ว่าง, refetch ล้มแต่ร่างยังอยู่,
+retry ไม่เปลี่ยนหน้า, ปุ่มกลับยังชี้ไฟล์เดิม, account/mapping/round/settings โหลดล้ม และไม่เรียก mutation แทน retry.
+คำสถานะหน้าแก้ข้อมูลแยก “ยังไม่บันทึก”, “ข้อมูลเวอร์ชันที่บันทึกแล้ว”, “อนุมัติแล้ว—พร้อมดาวน์โหลด”.
+`frontend-load-recovery` และ `release-evidence-integrity` อยู่ใน critical catalogue แล้ว.

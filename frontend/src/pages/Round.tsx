@@ -1,3 +1,4 @@
+import { LoadError } from '../components/LoadError'
 import { reviewReturn } from '../lib/reviewNavigation'
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -23,7 +24,8 @@ export function RoundPage() {
   const qc = useQueryClient()
   const toast = useToast()
   const nav = useNavigate()
-  const { data: r, isLoading } = useQuery({ queryKey: ['round', roundId], queryFn: () => api.round(roundId), refetchInterval: (q) => (['uploaded', 'profiled'].includes(q.state.data?.status ?? '') ? 2000 : false) })
+  const roundQuery = useQuery({ queryKey: ['round', roundId], queryFn: () => api.round(roundId), refetchInterval: (q) => (['uploaded', 'profiled'].includes(q.state.data?.status ?? '') ? 2000 : false) })
+  const { data: r, isLoading } = roundQuery
   const [historyOpen, setHistoryOpen] = useState(false)
   const [fileOpen, setFileOpen] = useState<SourceFile | null>(null), [moveRequest, setMoveRequest] = useState(0)
 
@@ -42,7 +44,7 @@ export function RoundPage() {
     onError: (e: Error) => toast.push({ kind: 'bad', title: 'Not exported', detail: e.message }),
   })
 
-  if (isLoading || !r) return <div className="p-10 text-center text-muted"><Spinner /> </div>
+  if (isLoading || !r) return <div className="p-6 space-y-4"><Link className="btn btn-ghost" to={params.has('reviewReturn') ? reviewReturn(params.get('reviewReturn')) : '/imports'}>← {t('Back to files or review', 'กลับไปยังไฟล์หรือหน้าตรวจ')}</Link>{roundQuery.isError ? <LoadError error={roundQuery.error} busy={roundQuery.isFetching} retry={() => void roundQuery.refetch()} /> : <Spinner />}</div>
   const latestMapping = r.mappings?.[0]
   const latestDataset = r.datasets?.[0]
   const drift = r.summary.drift

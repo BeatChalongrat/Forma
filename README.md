@@ -2,14 +2,13 @@
 
 FORMA turns the Excel/CSV exports that ~300 customers send from their own ERPs every two weeks into one
 standard, validated JSON contract, and lets one person in operations review, correct and publish the result
-without writing code. It reads any layout (Thai or English, multi-sheet, CSV in any encoding), decides what
-each file means, states a verdict with evidence, learns from every correction, and keeps every step
-auditable and reversible.
+without writing code. It profiles Excel/CSV layouts (including Thai/English and multi-sheet files), proposes what
+each file means, states a verdict with evidence, reuses approved, scoped corrections, and records versioned decisions for audit and rollback.
 
-> **สรุปภาษาไทย** — FORMA รับไฟล์ Excel/CSV จาก ERP ของลูกค้าได้ทุกรูปแบบ แปลงเป็น JSON ตาม contract ที่กำหนด
-> ตัดสินให้ว่าไฟล์นี้คืออะไร ควรทำอะไรต่อ พร้อมหลักฐาน และเรียนรู้จากทุกครั้งที่ผู้ใช้แก้ ใช้งานคนเดียวบนเครื่องเดียว
-> ทุกการตัดสินใจผ่าน policy ที่ตั้งค่าได้ โค้ดที่ AI เขียนรันได้เฉพาะใน sandbox ของผู้ช่วยและไม่แตะข้อมูลในระบบ
-> ทุกอย่างย้อนกลับได้และมี audit log
+> **สรุปภาษาไทย** — FORMA รับไฟล์ Excel/CSV จาก ERP ของลูกค้าในรูปแบบที่ตัวอ่านรองรับ แปลงเป็น JSON ตาม contract ที่กำหนด
+> ตัดสินให้ว่าไฟล์นี้คืออะไร ควรทำอะไรต่อ พร้อมหลักฐาน และนำคำตอบที่อนุมัติแล้วมาใช้ภายใต้ขอบเขตที่ตรงกัน
+> ทุกการตัดสินใจผ่าน policy ที่ตั้งค่าได้ โค้ดที่ AI เขียนรันได้เฉพาะใน sandbox เพื่อสำรวจและตรวจสำเนาข้อมูล ไม่แก้ข้อมูลจริงโดยตรง
+> การแก้ข้อมูลสร้างเวอร์ชันใหม่และมี audit log การย้อนกลับไม่ลบประวัติ และไม่ย้อนการนำไฟล์ไปใช้ภายนอก
 > เริ่มใช้งานที่ [Quick start](#quick-start) เอกสารสำหรับทีมอยู่ที่ [docs/TEAM_LEAD_HANDBOOK.md](docs/TEAM_LEAD_HANDBOOK.md)
 
 ---
@@ -81,7 +80,7 @@ them in [docs/SYSTEM_ARCHITECTURE.md](docs/SYSTEM_ARCHITECTURE.md).
   **Settings → Target formats**; mapping, validation, AI prompts and exports follow it. Code never names a
   target field: it finds fields by meaning through the schema registry (ADR-001, ADR-017).
 * **AI proposes, the engine executes.** Models only emit a declarative Mapping DSL of whitelisted operations.
-  No generated code runs. The same inputs and the same mapping always produce the same output (ADR-002).
+  Generated Python may inspect copies and test hypotheses in an isolated sandbox. Production transformation executes the validated DSL, not arbitrary model-written code (ADR-002).
 * **Policy decides, not the model.** `policies/approval.yaml` turns confidence, drift, sandbox deltas, data
   checks and anomalies into `auto_approve | review | block` with reasons. A block is an explicit override,
   never a casual approval (ADR-008).
@@ -93,9 +92,17 @@ them in [docs/SYSTEM_ARCHITECTURE.md](docs/SYSTEM_ARCHITECTURE.md).
   cause of a change; every decision carries the rules that fired; every verdict lists what it folded away.
 * **It gets better with use.** Corrections become column aliases and conventions; outcomes calibrate the
   policy; evaluation modes measure the heuristic, the AI and the learning loop side by side.
-* **Measured, not promised.** A 30-variant synthetic ERP corpus with ground truth gates every change
-  (identity 1.00, field accuracy 0.996, critical 1.00, drift 9/9 — no model involved); 500+ tests, 85 %
-  coverage in CI; a 300-file night benchmarked at 17 minutes on one 12-core node.
+* **Evidence has a scope.** Automated tests cover the deterministic engine, mocked-model flows,
+  permissions, version conflicts and recovery. They do not establish real-model accuracy on unseen ERP
+  exports or predict paid-model latency. See [testing strategy](docs/TESTING_STRATEGY.md) and the
+  [release checklist](docs/RELEASE_CHECKLIST.md); use reports tied to the exact candidate commit.
+* **Supported formats are explicit.** Unsupported or damaged files and unresolved external workbook
+  references require investigation. Target schemas are configurable but not every JSON Schema construct
+  is supported: `$ref`, `oneOf`/`allOf`, conditionals and other non-enumerable shapes are rejected
+  (ADR-043). Formula/cache checks do not make FORMA a full Excel calculation engine.
+* **Learning requires approval and scope.** Confirmed knowledge can be reviewed or withdrawn;
+  customer, schema and context compatibility still apply. Production should use strict knowledge policy
+  and import only approved knowledge, not the development database.
 
 ---
 
@@ -261,7 +268,7 @@ backend/                  FastAPI + Polars service (Python 3.12, uv, strict mypy
     synth/                synthetic ERP corpus generator + database seeder
     eval/                 evaluation harness, correction replay
   alembic/                migrations (every model change ships one)
-  tests/                  ~500 tests: unit, API, failure injection, Postgres, MinIO, migrations, eval
+  tests/                  unit, API, failure injection, Postgres, MinIO, migrations, eval
 frontend/                 React 19 + TypeScript + Vite + Tailwind v4; no UI library
   src/pages/              Overview, Upload, Imports, Round, Review, MappingStudio, RelationshipMap, DataEditor,
                           Customers, Settings, Ops, Guide, AuthCallback
@@ -278,11 +285,15 @@ docs/                     architecture, flows, user stories, handbook, DSL, data
 
 ## Quality gates
 
-Before any commit: `make check` (ruff, ruff format, mypy strict, pytest with 80 % coverage locally / 85 % in
-CI) and `make eval-gate` (accuracy on the synthetic corpus must not drop). CI additionally runs the Postgres
+Before any commit: `make check`, `make qa-critical` and `make eval-gate` (accuracy on the synthetic
+corpus must not drop). `make qa-backend` and CI gate backend line coverage at 85% and branch coverage
+at 80% independently; direct pytest keeps an 80% combined floor. `make qa-frontend` measures all
+production TS/TSX, with separate strict floors for critical modules and a documented initial global
+baseline in `quality/coverage-policy.json`. CI additionally runs the Postgres
 and MinIO integration tests, a migration drift guard (models vs Alembic), a configuration drift guard
 (`.env.production.example`), a short benchmark, the frontend lint and build, both Docker images and the
-compose config. Details: [docs/TESTING_STRATEGY.md](docs/TESTING_STRATEGY.md).
+compose config. The required `quality-gate` includes an evidence-backed critical-flows report;
+missing/skipped critical tests cannot pass. Details: [docs/TESTING_STRATEGY.md](docs/TESTING_STRATEGY.md).
 
 ---
 

@@ -9,10 +9,12 @@ export type AuthConfig = { mode: 'dev' | 'oidc'; issuer?: string | null; client_
 const TOKEN_KEY = 'forma.access_token'
 const EXP_KEY = 'forma.token_exp'
 const VERIFIER_KEY = 'forma.pkce_verifier'
+const STATE_KEY = 'forma.oidc_state'
 const USER_KEY = 'forma.dev_user'
 
 let config: AuthConfig | null = null
 let discovery: { authorization_endpoint: string; token_endpoint: string; end_session_endpoint?: string } | null = null
+let callbackInFlight: Promise<string> | null = null
 
 function safeGet(k: string): string | null {
   try {
@@ -43,7 +45,7 @@ export function setDevUser(u: string | null) {
 export function accessToken(): string | null {
   const t = safeGet(TOKEN_KEY)
   const exp = Number(safeGet(EXP_KEY) ?? 0)
-  if (!t || (exp && Date.now() / 1000 > exp - 30)) return null
+  if (!t || !Number.isFinite(exp) || Date.now() / 1000 >= exp - 30) return null
   return t
 }
 
@@ -80,15 +82,23 @@ function b64url(bytes: ArrayBuffer | Uint8Array): string {
   return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
 }
 
+function localReturn(path: string | null): string {
+  if (!path || !path.startsWith('/') || path.startsWith('//') || path.includes('\\') || [...path].some(char => char.charCodeAt(0) <= 32)) return '/'
+  return path
+}
+
 /** Start the PKCE login: redirects the browser to the identity provider. */
 export async function login(returnTo = window.location.pathname): Promise<void> {
   const cfg = await loadAuthConfig()
   if (cfg.mode !== 'oidc' || !cfg.issuer || !cfg.client_id) return
   const d = await loadDiscovery(cfg.issuer)
   const verifier = b64url(crypto.getRandomValues(new Uint8Array(32)))
+  const state = b64url(crypto.getRandomValues(new Uint8Array(32)))
   const challenge = b64url(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier)))
   safeSet(VERIFIER_KEY, verifier)
-  safeSet('forma.return_to', returnTo)
+  safeSet(STATE_KEY, state)
+  if (safeGet(VERIFIER_KEY) !== verifier || safeGet(STATE_KEY) !== state) throw new Error('Login requires browser session storage')
+  safeSet('forma.return_to', localReturn(returnTo))
   const p = new URLSearchParams({
     response_type: 'code',
     client_id: cfg.client_id,
@@ -96,19 +106,33 @@ export async function login(returnTo = window.location.pathname): Promise<void> 
     scope: cfg.scopes ?? 'openid profile email',
     code_challenge: challenge,
     code_challenge_method: 'S256',
-    state: b64url(crypto.getRandomValues(new Uint8Array(12))),
+    state,
   })
   if (cfg.audience) p.set('audience', cfg.audience)
   window.location.assign(`${d.authorization_endpoint}?${p.toString()}`)
 }
 
 /** Finish the PKCE login on /auth/callback; returns the path to continue to. */
-export async function handleCallback(): Promise<string> {
+export function handleCallback(): Promise<string> {
+  // React StrictMode may mount the callback effect twice. Both observers must
+  // await the same exchange instead of navigating away while it is in flight.
+  callbackInFlight ??= finishCallback().finally(() => { callbackInFlight = null })
+  return callbackInFlight
+}
+
+async function finishCallback(): Promise<string> {
   const cfg = await loadAuthConfig()
   const url = new URL(window.location.href)
   const code = url.searchParams.get('code')
   const verifier = safeGet(VERIFIER_KEY)
   if (!code || !verifier || cfg.mode !== 'oidc' || !cfg.issuer || !cfg.client_id) return '/'
+  const expectedState = safeGet(STATE_KEY)
+  if (!expectedState || url.searchParams.get('state') !== expectedState) throw new Error('Login state does not match; please sign in again')
+  // Consume the transaction before awaiting the exchange, including failed exchanges.
+  safeSet(STATE_KEY, null)
+  safeSet(VERIFIER_KEY, null)
+  const back = localReturn(safeGet('forma.return_to'))
+  safeSet('forma.return_to', null)
   const d = await loadDiscovery(cfg.issuer)
   const body = new URLSearchParams({
     grant_type: 'authorization_code',
@@ -120,17 +144,19 @@ export async function handleCallback(): Promise<string> {
   const res = await fetch(d.token_endpoint, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body })
   if (!res.ok) throw new Error(`token exchange failed: ${res.status}`)
   const tok = (await res.json()) as { access_token: string; expires_in?: number }
+  const lifetime = tok.expires_in ?? 3600
+  if (typeof tok.access_token !== 'string' || !tok.access_token.trim() || !Number.isFinite(lifetime) || lifetime <= 0) throw new Error('Identity provider returned an invalid token')
   safeSet(TOKEN_KEY, tok.access_token)
-  safeSet(EXP_KEY, String(Math.floor(Date.now() / 1000) + (tok.expires_in ?? 3600)))
-  safeSet(VERIFIER_KEY, null)
-  const back = safeGet('forma.return_to') ?? '/'
-  safeSet('forma.return_to', null)
+  safeSet(EXP_KEY, String(Math.floor(Date.now() / 1000) + lifetime))
   return back
 }
 
 export function logout() {
   safeSet(TOKEN_KEY, null)
   safeSet(EXP_KEY, null)
+  safeSet(STATE_KEY, null)
+  safeSet(VERIFIER_KEY, null)
+  safeSet('forma.return_to', null)
   const end = discovery?.end_session_endpoint
   if (end) window.location.assign(end)
   else window.location.assign('/')

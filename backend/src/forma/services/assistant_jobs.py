@@ -45,10 +45,12 @@ def accept(
             other = s.scalar(
                 select(Job.id)
                 .join(AssistantRun, AssistantRun.job_id == Job.id)
+                .join(Turn, Turn.id == AssistantRun.turn_id)
                 .where(
                     AssistantRun.conversation_id == chat_id,
                     AssistantRun.turn_id != existing.id,
                     Job.status.in_(("queued", "running")),
+                    Turn.status != "complete",
                 )
                 .limit(1)
             )
@@ -88,7 +90,15 @@ def accept(
     if s.scalar(
         select(Job.id)
         .join(AssistantRun, AssistantRun.job_id == Job.id)
-        .where(AssistantRun.conversation_id == chat_id, Job.status.in_(("queued", "running")))
+        .join(Turn, Turn.id == AssistantRun.turn_id)
+        .where(
+            AssistantRun.conversation_id == chat_id,
+            Job.status.in_(("queued", "running")),
+            # The reply and all its outputs commit before the worker closes its job.
+            # A completed turn cannot execute tools again; checkpoint cleanup must
+            # not temporarily reject the next question.
+            Turn.status != "complete",
+        )
         .limit(1)
     ):
         raise Conflict("A saved reply is still running or recovering")
