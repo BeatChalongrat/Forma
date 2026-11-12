@@ -111,3 +111,13 @@ def test_release_requires_both_workflows_and_same_run_artifacts():
     assert "success" in steps[0]["run"] and "assert" in steps[0]["run"]
     download = next(s for s in steps if s.get("uses", "").startswith("actions/download-artifact"))
     assert "run-id" not in download.get("with", {})  # current workflow only
+
+
+def test_frontend_ci_produces_the_release_summary_it_uploads():
+    ci = yaml.load((ROOT / ".github/workflows/ci.yml").read_text(), Loader=yaml.BaseLoader)
+    steps = ci["jobs"]["frontend"]["steps"]
+    producer = next(s for s in steps if "tools/quality.py frontend" in s.get("run", ""))
+    assert "--out test-results/frontend" in producer["run"]
+    upload = next(s for s in steps if s.get("with", {}).get("name") == "frontend-evidence")
+    assert upload["with"]["path"] == "test-results/frontend/"
+    assert steps.index(producer) < steps.index(upload)
