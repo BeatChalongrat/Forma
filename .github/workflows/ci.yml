@@ -93,16 +93,8 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - working-directory: frontend
         run: npm ci --no-audit --no-fund
-      - working-directory: frontend
-        run: npx oxlint src
-      - working-directory: frontend
-        run: npm run test:typecheck
-      - working-directory: frontend
-        run: npm run test:coverage
-      - name: Frontend line and branch floors, including critical modules
-        run: python tools/coverage_gate.py frontend test-results/frontend/coverage/coverage-summary.json --out test-results/frontend/frontend-coverage-gate.json
-      - working-directory: frontend
-        run: npm run build
+      - name: Frontend gates and same-commit release evidence
+        run: python tools/quality.py frontend --out test-results/frontend
       - uses: actions/upload-artifact@v4
         if: always()
         with:
