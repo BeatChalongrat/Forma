@@ -7,6 +7,7 @@ import { ArrowUp, BookOpen, BookmarkX, Ghost, ListChecks, FolderOpen, Inbox, Pap
 import { api, type ChatTurn, type ChatDetail, type Me } from '../lib/api'
 import { usePreferences } from '../lib/preferences'
 import { Spinner } from './ui'
+import { LoadError } from './LoadError'
 import { AssistantResponse } from './AssistantResponse'
 import { ChatFiles } from './ChatFiles'
 import { ChatQuestion } from './ChatQuestion'
@@ -24,9 +25,14 @@ const IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp']
 const MAX_FILES = 5
 
 export function AssistantPage() {
-  const { data: me } = useQuery({ queryKey: ['me'], queryFn: api.me })
+  const meQuery = useQuery({ queryKey: ['me'], queryFn: api.me })
+  const me = meQuery.data
+  const { t } = usePreferences()
   const [params] = useSearchParams()
-  if (!me) return <div className="p-6"><Spinner /></div>
+  if (!me) return <div className="p-6 space-y-4">
+    <Link className="btn btn-ghost btn-sm" to="/">← {t('Back to home', 'กลับหน้าหลัก')}</Link>
+    {meQuery.isError ? <LoadError error={meQuery.error} busy={meQuery.isFetching} retry={() => void meQuery.refetch()} /> : <div role="status"><Spinner /> {t('Loading your account…', 'กำลังโหลดบัญชีของคุณ…')}</div>}
+  </div>
   return <AssistantChat key={chatIdentity(me) + params.toString()} me={me} chatId={params.get('chat') || undefined} roundId={params.get('round') || undefined} datasetId={params.get('dataset') || undefined} fresh={params.has('new')} artifactId={params.get('artifact') || undefined} />
 }
 

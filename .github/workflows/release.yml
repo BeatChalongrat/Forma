@@ -1,0 +1,48 @@
+name: release-qualification
+
+on:
+  workflow_dispatch:
+    inputs:
+      runner:
+        description: "Runtime runner with Docker and at least 10 GiB available RAM"
+        type: string
+        required: true
+        default: ubuntu-latest
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  ci:
+    uses: ./.github/workflows/ci.yml
+  runtime:
+    uses: ./.github/workflows/runtime.yml
+    with:
+      runner: ${{ inputs.runner }}
+  release-gate:
+    if: always()
+    needs: [ci, runtime]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require complete CI and runtime success
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: python -c 'import json,os; r=json.loads(os.environ["RESULTS"]); assert all(v["result"] == "success" for v in r.values()), r'
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: evidence
+      - name: Seal same-commit evidence
+        run: >-
+          python tools/release_gate.py --evidence evidence --sha "$GITHUB_SHA"
+          --run-id "$GITHUB_RUN_ID" --attempt "$GITHUB_RUN_ATTEMPT"
+          --out release-manifest.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: qualified-release-${{ github.sha }}
+          path: release-manifest.json
+          retention-days: 90

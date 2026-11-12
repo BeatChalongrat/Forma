@@ -43,8 +43,8 @@ test-web:
 
 check: lint typecheck test test-web   ## fast developer checks; qa-release includes browser/runtime
 
-.PHONY: qa-backend qa-frontend qa-eval qa-browser qa-renderer qa-runtime qa-release
-qa-backend qa-frontend qa-eval qa-browser qa-renderer qa-runtime qa-release:
+.PHONY: qa-backend qa-frontend qa-eval qa-browser qa-renderer qa-runtime qa-release qa-critical
+qa-backend qa-frontend qa-eval qa-browser qa-renderer qa-runtime qa-release qa-critical:
 	$(PY) tools/quality.py $(patsubst qa-%,%,$@)
 
 synth:               ## regenerate the synthetic ERP corpus (30 variants, ground truth)

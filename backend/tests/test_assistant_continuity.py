@@ -41,6 +41,44 @@ def stage(client, monkeypatch):
     return cid, tid, jid, p, body
 
 
+def test_terminal_reply_replay_and_unknown_progress_never_start_work(client, monkeypatch):
+    from forma.core.errors import Conflict, NotFound
+    from forma.services import conversations
+
+    cid, tid, _jid, p, body = stage(client, monkeypatch)
+    with session_scope() as s:
+        s.get(AssistantTurn, tid).status = "complete"
+    with session_scope() as s:
+        stopped = conversations.stop(s, p, cid, body["request_id"])
+        assert stopped["status"] == "complete"
+        replay = conversations.send(
+            get_context(), s, p, cid, body["question"], body["request_id"], "en", "UTC"
+        )
+        assert replay["id"] == tid and replay["status"] == "complete"
+    with session_scope() as s, pytest.raises(Conflict, match="another question"):
+        conversations.send(get_context(), s, p, cid, "Different question", body["request_id"], "en", "UTC")
+    with session_scope() as s, pytest.raises(NotFound):
+        conversations.message_progress(s, p, cid, "missing-request")
+    with session_scope() as s:
+        from forma.db.models import AssistantConversation
+
+        s.get(AssistantConversation, cid).archived = True
+    with session_scope() as s, pytest.raises(Conflict, match="Restore"):
+        conversations.send(get_context(), s, p, cid, "Another", "new-request", "en", "UTC")
+
+
+def test_legacy_pending_message_without_job_can_be_stopped(client, monkeypatch):
+    from forma.services import conversations
+
+    cid, tid, _jid, p, body = stage(client, monkeypatch)
+    with session_scope() as s:
+        s.delete(s.get(AssistantRun, tid))
+    with session_scope() as s:
+        assert conversations.stop(s, p, cid, body["request_id"])["status"] == "stopped"
+    with session_scope() as s:
+        assert conversations.stop(s, p, cid, body["request_id"])["status"] == "stopped"
+
+
 def test_worker_crash_replays_receipt_not_output(client, monkeypatch):
     cid, tid, jid, p, body = stage(client, monkeypatch)
     calls, crashed = [], []
@@ -78,6 +116,36 @@ def test_worker_crash_replays_receipt_not_output(client, monkeypatch):
         assert s.scalar(select(func.count()).select_from(AssistantAttachment)) == 1
         assert assistant_jobs.accept(get_context(), s, p, cid, body)["status"] == "complete"
     assert not any(j["id"] == jid for j in client.get("/api/activity/jobs").json()["items"])
+
+
+@pytest.mark.parametrize("status", ["complete", "pending", "failed"])
+def test_next_question_uses_committed_turn_not_worker_cleanup_status(client, monkeypatch, status):
+    from forma.core.errors import Conflict
+    from forma.db.models import AssistantConversation
+
+    cid, tid, jid, p, _ = stage(client, monkeypatch)
+    with session_scope() as s:
+        chat = s.get(AssistantConversation, cid)
+        chat.active_run, chat.busy_until = None, None
+        s.get(AssistantTurn, tid).status = status
+        s.get(Job, jid).status = "running"
+    body = {"question": "Next question", "request_id": "next-after-commit"}
+    if status != "complete":
+        with session_scope() as s, pytest.raises(Conflict):
+            assistant_jobs.accept(get_context(), s, p, cid, body)
+        return
+    with session_scope() as s:
+        next_turn = assistant_jobs.accept(get_context(), s, p, cid, body)
+        assert next_turn["status"] == "pending"
+        assert next_turn["id"] != tid
+    # Duplicate delivery of the completed job cannot repeat tools or clear the new lease.
+    with session_scope() as s:
+        s.get(Job, jid).status = "queued"
+    assert runner.run_job(jid)
+    with session_scope() as s:
+        assert s.get(AssistantTurn, tid).status == "complete"
+        assert s.get(AssistantConversation, cid).active_run != jid
+        assert s.get(AssistantTurn, next_turn["id"]).status == "pending"
 
 
 def test_provider_retry_reuses_tool_and_partial_answer(client, monkeypatch):

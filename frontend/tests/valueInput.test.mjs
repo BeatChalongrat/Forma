@@ -1,4 +1,4 @@
-import { test } from 'node:test'
+import { test } from 'vitest'
 import assert from 'node:assert/strict'
 import { parseValue } from '../src/lib/valueInput.ts'
 const field = (type, extra = {}) => ({ name: 'value', json_type: [type], nullable: false, enum: null, format: null, ...extra })

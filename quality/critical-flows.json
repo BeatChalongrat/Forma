@@ -1,0 +1,821 @@
+{
+  "version": 1,
+  "flows": [
+    {
+      "id": "atomic-save",
+      "area": "data",
+      "checks": [
+        {
+          "kind": "junit",
+          "report": "backend.xml",
+          "class": "tests.test_data_integrity",
+          "name": "test_commit_failure_never_reports_success"
+        },
+        {
+          "kind": "junit",
+          "report": "backend.xml",
+          "class": "tests.test_data_integrity",
+          "name": "test_dataset_commit_failure_removes_only_its_new_object"
+        },
+        {
+          "kind": "junit",
+          "report": "backend.xml",
+          "class": "tests.test_data_integrity",
+          "name": "test_lost_commit_acknowledgement_preserves_committed_object"
+        },
+        {
+          "kind": "junit",
+          "report": "backend.xml",
+          "class": "tests.test_data_integrity",
+          "name": "test_invalid_second_edit_does_not_partially_apply_first"
+        }
+      ]
+    },
+    {
+      "id": "parallel-edit",
+      "area": "data",
+      "checks": [
+        {
+          "kind": "junit",
+          "report": "backend.xml",
+          "class": "tests.test_data_integrity",
+          "name": "test_stale_editor_conflicts_without_duplicate_versions"
+        },
+        {
+          "kind": "junit",
+          "report": "backend.xml",
+          "class": "tests.test_data_integrity",
+          "name": "test_cancel_racing_edit_cannot_reopen_round"
+        }
+      ]
+    },
+    {
+      "id": "cancelled-data",
+      "area": "data",
+      "checks": [
+        {
+          "kind": "junit",
+          "report": "backend.xml",
+          "class": "tests.test_data_integrity",
+          "name": "test_cancelled_round_cannot_be_edited_or_published"
+        }
+      ]
+    },
+    {
+      "id": "backup-validation",
+      "area": "data",
+      "checks": [
+        {
+          "kind": "junit",
+          "report": "backend.xml",
+          "class": "tests.test_data_integrity",
+          "name": "test_restore_validates_everything_before_database_write"
+        }
+      ]
+    },
+    {
+      "id": "storage-failure",
+      "area": "data",
+      "checks": [
+        {
+          "kind": "junit",
+          "report": "backend.xml",
+          "class": "tests.test_failure_injection",
+          "name": "test_storage_write_failure_leaves_no_partial_dataset"
+        },
+        {
+          "kind": "junit",
+          "report": "backend.xml",
+          "class": "tests.test_failure_injection",
+          "name": "test_db_failure_after_object_write_cleans_the_object"
+        }
+      ]
+    },
+    {
+      "id": "worker-kill",
+      "area": "recovery",
+      "checks": [
+        {
+          "kind": "junit",
+          "report": "backend.xml",
+          "class": "tests.test_failure_injection",
+          "name": "test_killed_worker_process_is_recovered"
+        }
+      ]
+    },
+    {
+      "id": "provider-failure",
+      "area": "recovery",
+      "checks": [
+        {
+          "kind": "junit",
+          "report": "backend.xml",
+          "class": "tests.test_failure_injection",
+          "name": "test_llm_timeout_falls_back_and_never_auto_approves"
+        },
+        {
+          "kind": "junit",
+          "report": "backend.xml",
+          "class": "tests.test_failure_injection",
+          "name": "test_breaker_opens_and_probes"
+        }
+      ]
+    },
+    {
+      "id": "queue-reconcile",
+      "area": "recovery",
+      "checks": [
+        {
+          "kind": "junit",
+          "report": "backend.xml",
+          "class": "tests.test_job_recovery",
+          "name": "test_reconciliation_closes_queue_without_new_output"
+        },
+        {
+          "kind": "junit",
+          "report": "backend.xml",
+          "class": "tests.test_job_recovery",
+          "name": "test_reconciliation_requires_evidence_and_leaves_active_work_alone"
+        },
+        {
+          "kind": "junit",
+          "report": "backend.xml",
+          "class": "tests.test_job_recovery",
+          "name": "test_arq_start_restores_unfinished_jobs_only"
+        },
+        {
+          "kind": "junit",
+          "report": "backend.xml",
+          "class": "tests.test_auth_recovery_edges",
+          "name": "test_reconnect_exposes_terminal_job_instead_of_spinning_forever"
+        }
+      ]
+    },
+    {
+      "id": "chat-restart",
+      "area": "recovery",
+      "checks": [
+        {
+          "kind": "junit",
+          "report": "backend.xml",
+          "class": "tests.test_assistant_continuity",
+          "name": "test_worker_crash_replays_receipt_not_output"
+        },
+        {
+          "kind": "junit",
+          "report": "backend.xml",
+          "class": "tests.test_assistant_continuity",
+          "name": "test_real_process_exit_and_restart_retains_single_output"
+        },
+        {
+          "kind": "junit",
+          "report": "backend.xml",
+          "class": "tests.test_assistant_continuity",
+          "name": "test_provider_retry_reuses_tool_and_partial_answer"
+        },
+        {
+          "kind": "junit",
+          "report": "backend.xml",
+          "class": "tests.test_assistant_continuity",
+          "name": "test_next_question_uses_committed_turn_not_worker_cleanup_status"
+        },
+        {
+          "kind": "junit",
+          "report": "backend.xml",
+          "class": "tests.test_assistant_continuity",
+          "name": "test_terminal_reply_replay_and_unknown_progress_never_start_work"
+        },
+        {
+          "kind": "junit",
+          "report": "backend.xml",
+          "class": "tests.test_assistant_continuity",
+          "name": "test_legacy_pending_message_without_job_can_be_stopped"
+        }
+      ]
+    },
+    {
+      "id": "chat-budget-stop",
+      "area": "recovery",
+      "checks": [
+        {
+          "kind": "junit",
+          "report": "backend.xml",
+          "class": "tests.test_assistant_continuity",
+          "name": "test_durable_budget_cannot_reset_on_restart"
+        },
+        {
+          "kind": "junit",
+          "report": "backend.xml",
+          "class": "tests.test_assistant_continuity",
+          "name": "test_stop_before_delivery_prevents_any_model_or_tool"
+        },
+        {
+          "kind": "junit",
+          "report": "backend.xml",
+          "class": "tests.test_assistant_continuity",
+          "name": "test_stop_between_provider_attempts_and_old_retry_cannot_take_new_job"
+        }
+      ]
+    },
+    {
+      "id": "roles-tenant",
+      "area": "permissions",
+      "checks": [
+        {
+          "kind": "junit",
+          "report": "backend.xml",
+          "class": "tests.test_auth",
+          "name": "test_dev_mode_roles_and_actor_recording"
+        },
+        {
+          "kind": "junit",
+          "report": "backend.xml",
+          "class": "tests.test_auth",
+          "name": "test_tenant_scoping"
+        },
+        {
+          "kind": "junit",
+          "report": "backend.xml",
+          "class": "tests.test_auth",
+          "name": "test_an_identity_with_no_forma_role_can_only_ask_who_it_is"
+        },
+        {
+          "kind": "junit",
+          "report": "backend.xml",
+          "class": "tests.test_auth",
+          "name": "test_oidc_mode_requires_bearer"
+        },
+        {
+          "kind": "junit",
+          "report": "backend.xml",
+          "class": "tests.test_auth",
+          "name": "test_prod_refuses_dev_auth"
+        },
+        {
+          "kind": "junit",
+          "report": "backend.xml",
+          "class": "tests.test_auth",
+          "name": "test_oidc_missing_required_claim_never_grants_access"
+        },
+        {
+          "kind": "junit",
+          "report": "backend.xml",
+          "class": "tests.test_auth",
+          "name": "test_oidc_key_outage_and_modified_signature_fail_closed"
+        },
+        {
+          "kind": "junit",
+          "report": "backend.xml",
+          "class": "tests.test_data_integrity",
+          "name": "test_dataset_mutation_cannot_cross_customer_or_role_boundary"
+        },
+        {
+          "kind": "junit",
+          "report": "backend.xml",
+          "class": "tests.test_auth_recovery_edges",
+          "name": "test_signed_claim_shapes_do_not_grant_unknown_roles"
+        },
+        {
+          "kind": "junit",
+          "report": "backend.xml",
+          "class": "tests.test_auth_recovery_edges",
+          "name": "test_oidc_discovery_key_rotation_cache_and_unknown_key"
+        },
+        {
+          "kind": "junit",
+          "report": "backend.xml",
+          "class": "tests.test_auth_recovery_edges",
+          "name": "test_authenticated_bearer_ignores_forged_dev_identity"
+        },
+        {
+          "kind": "junit",
+          "report": "backend.xml",
+          "class": "tests.test_auth_recovery_edges",
+          "name": "test_seeded_restricted_dev_identity_and_expired_rate_window"
+        },
+        {
+          "kind": "junit",
+          "report": "backend.xml",
+          "class": "tests.test_auth_recovery_edges",
+          "name": "test_malformed_customer_scope_cannot_become_unrestricted_access"
+        }
+      ]
+    },
+    {
+      "id": "review-permissions",
+      "area": "permissions",
+      "checks": [
+        {
+          "kind": "junit",
+          "report": "backend.xml",
+          "class": "tests.test_review_journey",
+          "name": "test_draft_is_not_editable_without_reviewer_permission"
+        }
+      ]
+    },
+    {
+      "id": "chat-owner",
+      "area": "permissions",
+      "checks": [
+        {
+          "kind": "junit",
+          "report": "backend.xml",
+          "class": "tests.test_assistant_continuity",
+          "name": "test_drafts_compare_and_swap_across_tabs_and_owner"
+        }
+      ]
+    },
+    {
+      "id": "review-drafts",
+      "area": "review",
+      "checks": [
+        {
+          "kind": "junit",
+          "report": "backend.xml",
+          "class": "tests.test_review_journey",
+          "name": "test_drafts_survive_sessions_and_cannot_overwrite_another_tab"
+        },
+        {
+          "kind": "junit",
+          "report": "backend.xml",
+          "class": "tests.test_review_journey",
+          "name": "test_partial_answers_do_not_approve_and_drafts_are_not_decisions"
+        }
+      ]
+    },
+    {
+      "id": "review-stale-preview",
+      "area": "review",
+      "checks": [
+        {
+          "kind": "junit",
+          "report": "backend.xml",
+          "class": "tests.test_review_journey",
+          "name": "test_new_version_or_changed_policy_requires_a_fresh_preview"
+        },
+        {
+          "kind": "junit",
+          "report": "backend.xml",
+          "class": "tests.test_review_journey",
+          "name": "test_preview_is_stable_and_confirmation_is_idempotent"
+        },
+        {
+          "kind": "junit",
+          "report": "backend.xml",
+          "class": "tests.test_review_journey",
+          "name": "test_finish_job_refuses_to_transform_an_outdated_review"
+        }
+      ]
+    },
+    {
+      "id": "review-export",
+      "area": "review",
+      "checks": [
+        {
+          "kind": "junit",
+          "report": "backend.xml",
+          "class": "tests.test_review_journey",
+          "name": "test_review_through_download_without_remapping"
+        },
+        {
+          "kind": "junit",
+          "report": "backend.xml",
+          "class": "tests.test_review_journey",
+          "name": "test_persistent_corrections_require_checking_actual_output"
+        }
+      ]
+    },
+    {
+      "id": "login-transaction",
+      "area": "frontend",
+      "checks": [
+        {
+          "kind": "junit",
+          "report": "frontend.xml",
+          "class": "tests/auth.test.mjs",
+          "name": "OIDC callback must match the state sent with PKCE, and cannot be replayed"
+        },
+        {
+          "kind": "junit",
+          "report": "frontend.xml",
+          "class": "tests/auth.test.mjs",
+          "name": "concurrent callback effects await the same token exchange without early redirect"
+        },
+        {
+          "kind": "junit",
+          "report": "frontend.xml",
+          "class": "tests/auth.test.mjs",
+          "name": "unmatched callback state different never exchanges a code"
+        }
+      ]
+    },
+    {
+      "id": "client-save-race",
+      "area": "frontend",
+      "checks": [
+        {
+          "kind": "junit",
+          "report": "frontend.xml",
+          "class": "tests/reviewDraft.test.mjs",
+          "name": "a slow save never overwrites edits made while the request is in flight"
+        }
+      ]
+    },
+    {
+      "id": "client-conflict",
+      "area": "frontend",
+      "checks": [
+        {
+          "kind": "junit",
+          "report": "frontend.xml",
+          "class": "tests/reviewDraft.test.mjs",
+          "name": "concurrent flush is single-flight and conflict read failure keeps unsent data"
+        },
+        {
+          "kind": "junit",
+          "report": "frontend.xml",
+          "class": "tests/useReviewDraft.test.tsx",
+          "name": "outbox is scoped to owner and file; read-only view never autosaves on unmount"
+        }
+      ]
+    },
+    {
+      "id": "client-backoff",
+      "area": "frontend",
+      "checks": [
+        {
+          "kind": "junit",
+          "report": "frontend.xml",
+          "class": "tests/chatRecovery.test.mjs",
+          "name": "rate limiting and provider outage back off, cap delay and reset after recovery"
+        }
+      ]
+    },
+    {
+      "id": "human-confirm",
+      "area": "frontend",
+      "checks": [
+        {
+          "kind": "junit",
+          "report": "frontend.xml",
+          "class": "tests/ConfirmAction.test.tsx",
+          "name": "preview and cancel never mutate; explicit confirm sends server digest once"
+        },
+        {
+          "kind": "junit",
+          "report": "frontend.xml",
+          "class": "tests/ConfirmAction.test.tsx",
+          "name": "permission/conflict failure 403 never displays success or auto-retries"
+        },
+        {
+          "kind": "junit",
+          "report": "frontend.xml",
+          "class": "tests/ConfirmAction.test.tsx",
+          "name": "permission/conflict failure 409 never displays success or auto-retries"
+        }
+      ]
+    },
+    {
+      "id": "browser-review",
+      "area": "browser",
+      "checks": [
+        {
+          "kind": "browser",
+          "report": "browser-review.json",
+          "name": "answer false persists"
+        },
+        {
+          "kind": "browser",
+          "report": "browser-review.json",
+          "name": "reload"
+        },
+        {
+          "kind": "browser",
+          "report": "browser-review.json",
+          "name": "browser Back stays on same file"
+        },
+        {
+          "kind": "browser",
+          "report": "browser-review.json",
+          "name": "list return preserves draft"
+        },
+        {
+          "kind": "browser",
+          "report": "browser-review.json",
+          "name": "preview"
+        },
+        {
+          "kind": "browser",
+          "report": "browser-review.json",
+          "name": "confirm"
+        },
+        {
+          "kind": "browser",
+          "report": "browser-review.json",
+          "name": "download values"
+        }
+      ]
+    },
+    {
+      "id": "browser-chat",
+      "area": "browser",
+      "checks": [
+        {
+          "kind": "browser",
+          "report": "browser-chat.json",
+          "name": "draft reload"
+        },
+        {
+          "kind": "browser",
+          "report": "browser-chat.json",
+          "name": "background completion after navigation"
+        },
+        {
+          "kind": "browser",
+          "report": "browser-chat.json",
+          "name": "network reconnect without duplicate request"
+        },
+        {
+          "kind": "browser",
+          "report": "browser-chat.json",
+          "name": "stop persists after reload"
+        },
+        {
+          "kind": "browser",
+          "report": "browser-chat.json",
+          "name": "partial attachment upload survives reload without duplicates"
+        }
+      ]
+    },
+    {
+      "id": "frontend-upload-recovery",
+      "area": "frontend",
+      "checks": [
+        {
+          "kind": "junit",
+          "report": "frontend.xml",
+          "class": "tests/Upload.page.test.tsx",
+          "name": "21 files are sent in bounded chunks, pending blocks duplicate submit, then opens the receipt"
+        },
+        {
+          "kind": "junit",
+          "report": "frontend.xml",
+          "class": "tests/Upload.page.test.tsx",
+          "name": "lost first response reuses the same idempotency key and retains selected files"
+        },
+        {
+          "kind": "junit",
+          "report": "frontend.xml",
+          "class": "tests/Upload.page.test.tsx",
+          "name": "interrupted append continues in the same round without creating a second round"
+        }
+      ]
+    },
+    {
+      "id": "frontend-round-status",
+      "area": "frontend",
+      "checks": [
+        {
+          "kind": "junit",
+          "report": "frontend.xml",
+          "class": "tests/UploadStatus.page.test.tsx",
+          "name": "round separates received, processing and ready files and routes each file to its next action"
+        },
+        {
+          "kind": "junit",
+          "report": "frontend.xml",
+          "class": "tests/UploadStatus.page.test.tsx",
+          "name": "stuck work resumes the existing batch; failed resume remains recoverable"
+        },
+        {
+          "kind": "junit",
+          "report": "frontend.xml",
+          "class": "tests/UploadStatus.page.test.tsx",
+          "name": "unknown file requires explicit file and customer selection; denied assignment does not claim success"
+        }
+      ]
+    },
+    {
+      "id": "frontend-question-journey",
+      "area": "frontend",
+      "checks": [
+        {
+          "kind": "junit",
+          "report": "frontend.xml",
+          "class": "tests/ReviewJourney.page.test.tsx",
+          "name": "answers survive Previous, evidence panel, preview, and leave/resume without confirming"
+        },
+        {
+          "kind": "junit",
+          "report": "frontend.xml",
+          "class": "tests/ReviewJourney.page.test.tsx",
+          "name": "explicit confirmation flushes answers and submits the preview digest exactly once"
+        },
+        {
+          "kind": "junit",
+          "report": "frontend.xml",
+          "class": "tests/ReviewJourney.page.test.tsx",
+          "name": "Not sure removes an answer and learning consent; remaining questions cannot masquerade as approval"
+        },
+        {
+          "kind": "junit",
+          "report": "frontend.xml",
+          "class": "tests/ReviewJourney.page.test.tsx",
+          "name": "conflicting draft displays both versions and blocks writes until the user chooses"
+        },
+        {
+          "kind": "junit",
+          "report": "frontend.xml",
+          "class": "tests/ReviewJourney.page.test.tsx",
+          "name": "read-only user and superseded version cannot submit review decisions"
+        },
+        {
+          "kind": "junit",
+          "report": "frontend.xml",
+          "class": "tests/ReviewJourney.page.test.tsx",
+          "name": "changing an answer invalidates the previous confirmation and uses a fresh preview digest"
+        }
+      ]
+    },
+    {
+      "id": "frontend-data-editor",
+      "area": "frontend",
+      "checks": [
+        {
+          "kind": "junit",
+          "report": "frontend.xml",
+          "class": "tests/DataEditor.page.test.tsx",
+          "name": "cell edit stays local until preview and explicit save; creates a version with audit note and review return"
+        },
+        {
+          "kind": "junit",
+          "report": "frontend.xml",
+          "class": "tests/DataEditor.page.test.tsx",
+          "name": "preview validation errors prevent saving; no partial write occurs"
+        },
+        {
+          "kind": "junit",
+          "report": "frontend.xml",
+          "class": "tests/DataEditor.page.test.tsx",
+          "name": "version conflict keeps staged edits and opens latest version separately without losing review origin"
+        },
+        {
+          "kind": "junit",
+          "report": "frontend.xml",
+          "class": "tests/DataEditor.page.test.tsx",
+          "name": "Back asks before discarding staged edits; cancelling stays on the editor"
+        },
+        {
+          "kind": "junit",
+          "report": "frontend.xml",
+          "class": "tests/DataEditor.page.test.tsx",
+          "name": "failed impact preview shows Retry, keeps edits, and cannot save until the retry passes"
+        },
+        {
+          "kind": "junit",
+          "report": "frontend.xml",
+          "class": "tests/DataEditor.page.test.tsx",
+          "name": "permission-denied save retains the staged edit and never navigates to a false new version"
+        }
+      ]
+    },
+    {
+      "id": "frontend-delivery",
+      "area": "frontend",
+      "checks": [
+        {
+          "kind": "junit",
+          "report": "frontend.xml",
+          "class": "tests/ReviewDelivery.page.test.tsx",
+          "name": "approval waits for inspection, approves before export, and exposes only the returned JSON artifact"
+        },
+        {
+          "kind": "junit",
+          "report": "frontend.xml",
+          "class": "tests/ReviewDelivery.page.test.tsx",
+          "name": "invalid records block approval and download; correction link keeps the exact return step"
+        },
+        {
+          "kind": "junit",
+          "report": "frontend.xml",
+          "class": "tests/ReviewDelivery.page.test.tsx",
+          "name": "reader cannot approve; reviewer can confirm data but cannot export"
+        },
+        {
+          "kind": "junit",
+          "report": "frontend.xml",
+          "class": "tests/ReviewDelivery.page.test.tsx",
+          "name": "a replaced dataset loses the old confirmation; previous versions remain read-only"
+        },
+        {
+          "kind": "junit",
+          "report": "frontend.xml",
+          "class": "tests/ReviewDelivery.page.test.tsx",
+          "name": "a failed sample load cannot be confirmed until Retry retrieves the real sample"
+        }
+      ]
+    },
+    {
+      "id": "frontend-assistant-continuity",
+      "area": "frontend",
+      "checks": [
+        {
+          "kind": "junit",
+          "report": "frontend.xml",
+          "class": "tests/Assistant.page.test.tsx",
+          "name": "stream renders live text and reconnect status, keeps a newer draft, and completes without resending"
+        },
+        {
+          "kind": "junit",
+          "report": "frontend.xml",
+          "class": "tests/Assistant.page.test.tsx",
+          "name": "leaving detaches the stream without cancelling the server job; reopening follows the saved turn"
+        },
+        {
+          "kind": "junit",
+          "report": "frontend.xml",
+          "class": "tests/Assistant.page.test.tsx",
+          "name": "Stop targets the existing request; stop failure is visible and can retry without a new question"
+        },
+        {
+          "kind": "junit",
+          "report": "frontend.xml",
+          "class": "tests/Assistant.page.test.tsx",
+          "name": "failed transport retry reuses the original request id instead of making duplicate work"
+        },
+        {
+          "kind": "junit",
+          "report": "frontend.xml",
+          "class": "tests/Assistant.page.test.tsx",
+          "name": "archived chat prevents sending until explicitly restored"
+        },
+        {
+          "kind": "junit",
+          "report": "frontend.xml",
+          "class": "tests/Assistant.page.test.tsx",
+          "name": "clarification keeps answers across Back and explicitly sends unknown information without approving a file"
+        },
+        {
+          "kind": "junit",
+          "report": "frontend.xml",
+          "class": "tests/Assistant.page.test.tsx",
+          "name": "denied conversation loads no messages or composer and exposes an explicit retry"
+        }
+      ]
+    },
+    {
+      "id": "frontend-load-recovery",
+      "area": "frontend",
+      "checks": [
+        {
+          "kind": "junit",
+          "report": "frontend.xml",
+          "class": "tests/DataEditor.page.test.tsx",
+          "name": "background rows failure preserves edits, blocks save, and retries the same query"
+        },
+        {
+          "kind": "junit",
+          "report": "frontend.xml",
+          "class": "tests/DataEditor.page.test.tsx",
+          "name": "initial rows failure is an error, not an empty file; retry recovers without leaving"
+        },
+        {
+          "kind": "junit",
+          "report": "frontend.xml",
+          "class": "tests/Assistant.page.test.tsx",
+          "name": "account load failure has retry and home link; retry keeps the requested chat"
+        },
+        {
+          "kind": "junit",
+          "report": "frontend.xml",
+          "class": "tests/LoadErrors.page.test.tsx",
+          "name": "round read failure keeps an explicit return to the original review and retries in place"
+        }
+      ]
+    },
+    {
+      "id": "release-evidence-integrity",
+      "area": "release",
+      "checks": [
+        {
+          "kind": "junit",
+          "report": "backend.xml",
+          "class": "tests.test_release_gate",
+          "name": "test_failed_or_unrelated_evidence_blocks_release"
+        },
+        {
+          "kind": "junit",
+          "report": "backend.xml",
+          "class": "tests.test_release_gate",
+          "name": "test_partial_or_ambiguous_release_is_rejected"
+        },
+        {
+          "kind": "junit",
+          "report": "backend.xml",
+          "class": "tests.test_release_gate",
+          "name": "test_release_requires_both_workflows_and_same_run_artifacts"
+        }
+      ]
+    }
+  ]
+}

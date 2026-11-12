@@ -1,4 +1,4 @@
-import test from 'node:test'
+import { test } from 'vitest'
 import assert from 'node:assert/strict'
 import { inspectionHref, inspectionParams, inspectionStatuses, inspectionFilters } from '../src/lib/inspection.ts'
 

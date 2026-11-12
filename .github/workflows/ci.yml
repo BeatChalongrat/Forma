@@ -5,12 +5,13 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
+  workflow_call:
 
 permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -95,9 +96,19 @@ jobs:
       - working-directory: frontend
         run: npx oxlint src
       - working-directory: frontend
-        run: npm test
+        run: npm run test:typecheck
+      - working-directory: frontend
+        run: npm run test:coverage
+      - name: Frontend line and branch floors, including critical modules
+        run: python tools/coverage_gate.py frontend test-results/frontend/coverage/coverage-summary.json --out test-results/frontend/frontend-coverage-gate.json
       - working-directory: frontend
         run: npm run build
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: frontend-evidence
+          path: test-results/frontend/
+          retention-days: 14
 
   browser:
     runs-on: ubuntu-latest
@@ -140,6 +151,8 @@ jobs:
         run: docker run --rm --network none --entrypoint nginx forma-web:ci -t
       - name: Build sandbox image
         run: docker build -f deploy/sandbox/Dockerfile -t forma-sandbox:ci .
+      - name: Record candidate image IDs
+        run: python tools/release_gate.py --record-images --sha "$GITHUB_SHA" --out test-results/images.json
       - uses: astral-sh/setup-uv@v5
         with:
           python-version: "3.12"
@@ -162,9 +175,36 @@ jobs:
           path: test-results/
           retention-days: 14
 
+  critical-flows:
+    if: always()
+    needs: [backend, frontend, browser]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: reports
+          path: evidence/backend
+      - uses: actions/download-artifact@v4
+        with:
+          name: frontend-evidence
+          path: evidence/frontend
+      - uses: actions/download-artifact@v4
+        with:
+          name: browser-evidence
+          path: evidence/browser
+      - name: Verify every critical journey from this run
+        run: python tools/critical_flows.py --evidence evidence --out test-results/critical-flows.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: critical-flows
+          path: test-results/critical-flows.json
+
   quality-gate:
     if: always()
-    needs: [backend, frontend, browser, images]
+    needs: [backend, frontend, browser, images, critical-flows]
     runs-on: ubuntu-latest
     steps:
       - name: Require every gate, including non-skipped dependencies
