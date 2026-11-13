@@ -10,6 +10,16 @@ LABELS = {
     "price.vat_included": "การรวม VAT",
     "stock.qty": "จำนวนสต็อก",
     "sku": "รหัสสินค้า",
+    "identity.sku": "รหัสสินค้า",
+}
+
+
+SHORT_NAMES = {
+    "amount": "ราคา",
+    "currency": "สกุลเงิน",
+    "vat_included": "การรวม VAT",
+    "sell_unit": "หน่วยขาย",
+    "pack_size": "จำนวนชิ้นต่อแพ็ก",
 }
 
 
@@ -18,8 +28,9 @@ def presentation(item: dict[str, Any]) -> dict[str, Any]:
     label = (
         spec.get("description_th")
         or LABELS.get(spec.get("semantic"))
-        or spec.get("description")
+        or SHORT_NAMES.get(spec.get("name"))
         or spec.get("name")
+        or spec.get("description")
         or spec["pointer"]
     )
     semantic = spec.get("semantic")
@@ -28,12 +39,19 @@ def presentation(item: dict[str, Any]) -> dict[str, Any]:
     original = item.get("question")
     prompt = None
     why = "หลักฐานยังไม่พอยืนยันความหมายของข้อมูล กรุณาตรวจตัวอย่างและสอบถามเจ้าของไฟล์หากยังไม่ทราบ"
-    if action == "value_map":
+    if action == "record_value":
+        identity = " · ".join(map(str, item.get("identity", {}).values()))
+        prompt = f"รายการ {identity} ยังไม่มี{label} ค่าที่ถูกต้องคืออะไร?"
+        why = "คำตอบจะเติมเฉพาะรายการนี้ กรุณาดูผลก่อนบันทึก และยังไม่ต้องตอบหากไม่ทราบ"
+    elif action == "value_map":
         prompt = f"ค่า “{item.get('source_value')}” ในไฟล์ หมายถึงอะไรสำหรับ {label}?"
         why = "รหัสนี้ยังไม่มีความหมายที่ยืนยันได้ คำตอบจะเปลี่ยนเฉพาะรหัสนี้และเก็บค่าอื่นตามเดิม"
     elif action == "date_format":
         prompt = f"วันที่ใน {label} เรียงวันกับเดือนอย่างไร?"
         why = "วันที่บางค่าอ่านได้มากกว่าหนึ่งแบบ ต้องยืนยันลำดับวันและเดือนก่อนแปลง"
+    elif semantic == "currency" and action == "constant":
+        prompt = "ราคาในไฟล์ใช้สกุลเงินอะไร?"
+        why = "ไฟล์ยังไม่ระบุสกุลเงิน กรุณาตรวจเงื่อนไขราคาหรือสอบถามเจ้าของไฟล์"
     elif kind == "choice":
         prompt = f"คอลัมน์ไหนใช้เป็น {label}?"
         why = "พบคอลัมน์ที่อาจใช้ได้มากกว่าหนึ่งคอลัมน์ กรุณาเทียบค่าตัวอย่างกับความหมายที่ต้องการ"

@@ -187,3 +187,40 @@ def test_http_providers_with_mocked_transport(monkeypatch: pytest.MonkeyPatch) -
         )
     with pytest.raises(LLMError, match="HTTP 500"):
         AnthropicProvider("key").complete_json(system="s", user="u", schema={}, model="m", temperature=0.0)
+
+
+@pytest.mark.parametrize("always_truncated", [False, True])
+def test_truncation_repair_is_compact_bounded_and_never_accepts_partial(monkeypatch, always_truncated):
+    client = LLMClient(MockProvider(lambda s, u, sc: {}), model="mock", max_retries=1)
+    prompts = []
+
+    def invoke(system, prompt, schema, images):
+        prompts.append(prompt)
+        if len(prompts) == 1 or always_truncated:
+            raise LLMError("AI reply was cut off at max_tokens; no partial mapping was accepted")
+        return '{"ok": true}', Usage(calls=1)
+
+    monkeypatch.setattr(client, "_call_provider", invoke)
+    if always_truncated:
+        with pytest.raises(LLMError, match="cut off"):
+            client.structured(system="s", user="Keep required fields", schema={})
+    else:
+        result = client.structured(system="s", user="Keep required fields", schema={})
+        assert result.data == {"ok": True} and result.attempts == 2
+    assert len(prompts) == 2
+    assert "compact complete JSON" in prompts[1]
+    assert "Keep required fields" in prompts[1]
+
+
+def test_transport_failure_does_not_enter_truncation_repair(monkeypatch):
+    client = LLMClient(MockProvider(lambda s, u, sc: {}), model="mock", max_retries=2)
+    calls = []
+
+    def invoke(*args):
+        calls.append(1)
+        raise LLMError("Authentication failed")
+
+    monkeypatch.setattr(client, "_call_provider", invoke)
+    with pytest.raises(LLMError, match="Authentication"):
+        client.structured(system="s", user="u", schema={})
+    assert len(calls) == 1

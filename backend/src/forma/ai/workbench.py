@@ -54,6 +54,7 @@ class RunReport:
     errors: int = 0
     coverage: dict[str, Any] = field(default_factory=dict)
     complete: bool = True
+    decision_questions: list[dict[str, Any]] = field(default_factory=list)
 
     @property
     def clean(self) -> bool:
@@ -80,7 +81,11 @@ class RunReport:
         }
 
     def to_prompt(self) -> dict[str, Any]:
-        return {**self.to_dict(), "sample_records": self.sample}
+        return {
+            **self.to_dict(),
+            "sample_records": self.sample,
+            "decision_questions": self.decision_questions,
+        }
 
 
 class Workbench(Protocol):
@@ -514,6 +519,7 @@ class FileWorkbench:
                 out.append(keep)
         sample = [_clip(_without_meta(rec), self.max_chars) for rec in res.records[:SAMPLE_RECORDS]]
         from forma.ai.reconciliation import coverage
+        from forma.services.decision_actions import conflicting_records
 
         return RunReport(
             rows_in,
@@ -523,6 +529,9 @@ class FileWorkbench:
             errors=len(res.errors),
             coverage=coverage(res.records, self.schema, res.stats),
             complete=full,
+            # Reuse the same bounded decisions as the human-review service. Sample
+            # conflicts cannot establish that an entire delivery has been inspected.
+            decision_questions=conflicting_records(res.findings)[:12] if full else [],
         )
 
     def verify(self, doc: MappingDocument) -> RunReport:

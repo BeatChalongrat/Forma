@@ -14,10 +14,11 @@ from forma.core.settings import Settings
 
 
 class Bench:
-    def __init__(self, *, complete=True, errors=0):
+    def __init__(self, *, complete=True, errors=0, decisions=None):
         self.complete, self.errors = complete, errors
         self.inspections = []
         self.fail = False
+        self.decisions = decisions or []
 
     def ground(self, doc):
         return []
@@ -29,7 +30,9 @@ class Bench:
     def run(self, doc):
         if self.fail:
             raise RuntimeError("simulated worker crash")
-        return RunReport(12, 12, errors=self.errors, complete=self.complete)
+        return RunReport(
+            12, 12, errors=self.errors, complete=self.complete, decision_questions=self.decisions
+        )
 
     verify = run
 
@@ -58,8 +61,8 @@ def response(review=None):
     return responder
 
 
-def run(tmp_path, schema, *, responder=None, bench=None, **kwargs):
-    client = LLMClient(MockProvider(responder or response()), "test", max_retries=0)
+def run(tmp_path, schema, *, responder=None, bench=None, retries=0, **kwargs):
+    client = LLMClient(MockProvider(responder or response()), "test", max_retries=retries)
     doc, res = run_workflow(
         client,
         profile(),
@@ -249,7 +252,8 @@ def test_role_output_schemas_have_resolvable_references(tmp_path, schema):
     assert res.data["workflow"]["status"] == "verified_proposal"
 
 
-def test_graph_is_used_by_real_upload_profile_propose_api(isolated_env, monkeypatch):
+@pytest.mark.parametrize("malformed_review_first", [False, True])
+def test_graph_is_used_by_real_upload_profile_propose_api(isolated_env, monkeypatch, malformed_review_first):
     from fastapi.testclient import TestClient
     from tests.conftest import clear_forma_caches
     from tests.test_api import _upload, make_workbook
@@ -260,7 +264,20 @@ def test_graph_is_used_by_real_upload_profile_propose_api(isolated_env, monkeypa
     monkeypatch.setenv("FORMA_MAPPING_WORKFLOW", "graph")
     clear_forma_caches()
 
+    reviews = 0
+
     def responder(system, user, output):
+        nonlocal reviews
+        if "Semantic Reviewer" in system:
+            reviews += 1
+            if malformed_review_first and reviews == 1:
+                return {
+                    "review": {
+                        "verdict": "repair",
+                        "checked": ["identity"],
+                        "concerns": [{**concern(), "target": "/sku (record.dedupe)"}],
+                    }
+                }
         if "Evidence Analyst" in system or "Semantic Reviewer" in system:
             return response()(system, user, output)
         return {"mapping": json.loads(user)["draft_mapping"], "clarifications": [], "open_questions": []}
@@ -281,6 +298,8 @@ def test_graph_is_used_by_real_upload_profile_propose_api(isolated_env, monkeypa
         assert mapping["policy"]["verification"]["complete"]
         assert mapping["policy"]["simulation"]["rows_out"] == 12
         assert any(e["agent"] == "mapping_workflow" for e in mapping["agent_log"])
+        assert not mapping["policy"]["checks"]["llm_fallback"]
+        assert reviews == (2 if malformed_review_first else 1)
         # An already approved layout must retain the no-LLM fast path under graph mode.
         assert c.post(f"/api/mappings/{mapping['id']}/approve", json={}).status_code == 200
         calls = len(get_context().llm.provider.calls)
@@ -374,3 +393,206 @@ def test_graph_nodes_honor_the_callers_expired_task_deadline(tmp_path, schema):
     assert client.provider.calls == []
     assert res.data["workflow"]["status"] == "failed"
     assert "deadline" in res.notes[0]
+
+
+def test_reviewer_contract_uses_customer_schema_and_separates_dsl_annotations():
+    from jsonschema import Draft202012Validator, ValidationError
+
+    from forma.ai.mapping_workflow import _review_response_schema
+    from forma.schema_registry import TargetSchema
+
+    contract = TargetSchema(
+        "customer-contract",
+        1,
+        {
+            "type": "object",
+            "properties": {
+                "item_code": {"type": "string"},
+                "balances": {
+                    "type": "array",
+                    "items": {"type": "object", "properties": {"available": {"type": "number"}}},
+                },
+            },
+        },
+    )
+    output = _review_response_schema(contract)
+    validator = Draft202012Validator(output)
+    allowed = output["$defs"]["Concern"]["properties"]["target"]["enum"]
+    assert set(allowed) == {None, *(f.pointer for f in contract.fields(include_system=True))}
+    for pointer in ("/item_code", "/balances/*/available", None):
+        validator.validate(
+            {
+                "review": {
+                    "verdict": "repair",
+                    "checked": ["identity"],
+                    "concerns": [{**concern(), "target": pointer, "issue": "Check record.dedupe"}],
+                }
+            }
+        )
+    for pointer in ("/item_code (record.dedupe)", "record.dedupe", "/sku", "", "/balances/*/unknown"):
+        with pytest.raises(ValidationError):
+            validator.validate(
+                {
+                    "review": {
+                        "verdict": "repair",
+                        "checked": ["identity"],
+                        "concerns": [{**concern(), "target": pointer}],
+                    }
+                }
+            )
+
+
+def test_malformed_reviewer_pointer_repaired_without_rerunning_mapper(tmp_path, schema):
+    reviews = 0
+    question = {
+        "target": "/currency",
+        "question": "Which currency?",
+        "why": "Not supplied",
+        "kind": "text",
+        "action": "constant",
+    }
+
+    def responder(system, user, output):
+        nonlocal reviews
+        if "Semantic Reviewer" not in system:
+            return response()(system, user, output)
+        reviews += 1
+        if reviews == 2:
+            assert "without annotations" in user and "concern" in user.lower()
+        return {
+            "review": {
+                "verdict": "ask",
+                "checked": ["currency"],
+                "concerns": [
+                    {
+                        **concern("missing_business_fact"),
+                        "target": "/currency (record.dedupe)" if reviews == 1 else "/currency",
+                    }
+                ],
+                "clarifications": [question],
+            }
+        }
+
+    client, doc, result = run(tmp_path, schema, responder=responder, retries=1)
+    assert len(client.provider.calls) == 4  # analyst, mapper, bad review, corrected review
+    assert result.usage.calls == result.data["workflow"]["provider_attempts"] == 4
+    assert doc.model_dump(exclude={"meta"}) == _doc().model_dump(exclude={"meta"})
+    assert doc.meta.created_by == "ai"
+    assert not result.notes
+    assert result.data["workflow"]["status"] == "awaiting_human"
+    assert result.data["clarifications"] == [question]
+    assert not result.data["self_check"]["problems_left"]
+
+
+@pytest.mark.parametrize("pointer", ["/sku (record.dedupe)", "/unknown", "", "/prices/*/invented"])
+def test_reviewer_invalid_pointer_is_not_silently_coerced_or_approved(tmp_path, schema, pointer):
+    review = {"verdict": "repair", "checked": ["id"], "concerns": [{**concern(), "target": pointer}]}
+    client, _, result = run(tmp_path, schema, responder=response(review), retries=1)
+    assert len(client.provider.calls) == result.data["workflow"]["provider_attempts"] == 4
+    assert "llm_failed" in result.notes[0]
+    assert result.data["workflow"]["status"] == "failed"
+    assert "Unknown target" in result.notes[0]
+    assert not result.data["workflow"]["review"]
+
+
+def test_whole_mapping_concern_uses_null_and_still_blocks_approval(tmp_path, schema):
+    review = {
+        "verdict": "repair",
+        "checked": ["dedupe"],
+        "concerns": [{**concern(), "target": None, "issue": "record.dedupe loses conflicting rows"}],
+    }
+    _, _, result = run(tmp_path, schema, responder=response(review), mapping_workflow_repairs=0)
+    assert not result.notes
+    assert result.data["workflow"]["status"] == "failed"
+    assert (
+        "semantic review: record.dedupe loses conflicting rows" in result.data["self_check"]["problems_left"]
+    )
+
+
+def row_decision():
+    return {
+        "id": "rows:abc",
+        "target": "/prices/*/amount",
+        "affected_fields": ["/prices/*/amount"],
+        "action": "select_rows",
+        "kind": "enum",
+        "options": ["A", "B"],
+    }
+
+
+def covered_review():
+    return {
+        "verdict": "ask",
+        "checked": ["Prices"],
+        "concerns": [{**concern("missing_business_fact"), "target": "/prices/*/amount"}],
+        "clarifications": [],
+        "covered_questions": ["rows:abc"],
+    }
+
+
+@pytest.mark.parametrize("execution_errors", [0, 1])
+def test_existing_row_decision_does_not_need_invented_numeric_question(tmp_path, schema, execution_errors):
+    client, _, result = run(
+        tmp_path,
+        schema,
+        responder=response(covered_review()),
+        bench=Bench(errors=execution_errors, decisions=[row_decision()]),
+    )
+    assert not result.notes
+    assert result.data["clarifications"] == []
+    assert result.data["workflow"]["review"]["covered_questions"] == ["rows:abc"]
+    prompt = json.loads(client.provider.calls[-1]["user"])
+    assert prompt["execution"]["decision_questions"] == [row_decision()]
+    if execution_errors:
+        assert "Full execution must pass before approval" in result.data["self_check"]["problems_left"]
+    else:
+        assert result.data["workflow"]["status"] == "awaiting_human"
+
+
+@pytest.mark.parametrize("bad", ["id", "target", "sample", "mapping_error"])
+def test_existing_decisions_cannot_waive_uncovered_concerns(tmp_path, schema, bad):
+    review = covered_review()
+    if bad == "id":
+        review["covered_questions"] = ["rows:invented"]
+    if bad == "target":
+        review["concerns"][0]["target"] = "/currency"
+    if bad == "mapping_error":
+        review["concerns"][0]["kind"] = "mapping_error"
+    _, _, result = run(
+        tmp_path,
+        schema,
+        responder=response(review),
+        bench=Bench(complete=bad != "sample", decisions=[row_decision()]),
+    )
+    assert result.notes and result.data["workflow"]["status"] == "failed"
+
+
+def test_numeric_proxy_for_row_choice_rejected_then_existing_question_reused(tmp_path, schema):
+    reviews = 0
+
+    def responder(system, user, output):
+        nonlocal reviews
+        if "Semantic Reviewer" not in system:
+            return response()(system, user, output)
+        reviews += 1
+        review = covered_review()
+        if reviews == 1:
+            review["clarifications"] = [
+                {
+                    "target": "/prices/*/amount",
+                    "question": "1 for A, 2 for B?",
+                    "why": "Conflicting prices",
+                    "kind": "number",
+                    "action": "value_map",
+                    "source_value": "1=A; 2=B",
+                }
+            ]
+        else:
+            assert "numeric proxy" in user
+        return {"review": review}
+
+    _, _, result = run(
+        tmp_path, schema, responder=responder, retries=1, bench=Bench(errors=1, decisions=[row_decision()])
+    )
+    assert reviews == 2 and not result.notes
+    assert not result.data["clarifications"]

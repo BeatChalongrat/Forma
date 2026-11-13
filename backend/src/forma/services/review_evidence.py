@@ -78,8 +78,17 @@ def _validate_answer_results(
         raise ValidationFailed(
             "These answers change record identities or remove records; use the mapping editor"
         )
-    targets = {q["field"]["pointer"] for q in decisions if q.get("action") != "select_rows"}
+    targets = {
+        q["field"]["pointer"] for q in decisions if q.get("action") not in ("select_rows", "record_value")
+    }
     row_choices = [q for q in decisions if q.get("action") == "select_rows"]
+
+    def matches_record(q: dict[str, Any], rec: dict[str, Any]) -> bool:
+        return any(
+            identity and all(_get_pointer(rec, p) == v for p, v in identity.items())
+            for identity in q.get("identities", [q.get("identity", {})])
+        )
+
     for key, rec in old.items():
         # Equal aggregate error counts can hide fixing one row while breaking another.
         old_record_errors = {(e["pointer"], e["validator"]) for e in schema.validate_record(rec)}
@@ -92,13 +101,21 @@ def _validate_answer_results(
         for spec in schema.leaf_fields():
             if spec.pointer in targets:
                 continue
+            if any(
+                q.get("action") == "record_value"
+                and q["field"]["pointer"] == spec.pointer
+                and matches_record(q, rec)
+                and _get_pointer(rec, spec.pointer) is None
+                for q in decisions
+            ):
+                continue
             allowed = any(
                 (
                     spec.pointer.startswith(q["collection"] + "/")
                     if q.get("collection")
                     else spec.pointer in q.get("affected_fields", [q.get("target")])
                 )
-                and all(_get_pointer(rec, p) == v for p, v in q["identity"].items())
+                and matches_record(q, rec)
                 for q in row_choices
             )
             if not allowed and list(values_at(rec, spec.pointer)) != list(values_at(new[key], spec.pointer)):

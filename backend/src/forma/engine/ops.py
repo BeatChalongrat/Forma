@@ -80,8 +80,23 @@ def _as_str(x: pl.Expr) -> pl.Expr:
 
 
 def _as_num(x: pl.Expr) -> pl.Expr:
-    """Numeric view of any expression (strings go through the Thai-aware number parser)."""
-    return pl.when(_as_str(x).is_null()).then(None).otherwise(_parse_number(x)).cast(pl.Float64, strict=False)
+    """Coerce an evaluated batch, without copying its input expression into every parser branch.
+
+    Inlining the text parser here expands an already parsed arithmetic operand many times.
+    Even subtract(parse_number(col), parse_number(col)) could exhaust several GiB on one row.
+    A batch boundary keeps each operand once in the plan; parsing still uses native vector
+    operations, not a Python callback per row. Numeric intermediate values bypass text parsing.
+    """
+    return x.map_batches(_numeric_batch, return_dtype=pl.Float64, is_elementwise=True)
+
+
+def _numeric_batch(values: pl.Series) -> pl.Series:
+    if values.dtype.is_numeric():
+        numeric = values.cast(pl.Float64, strict=False)
+        # The text parser rejects NaN/Infinity too. Keep invalid values visible as nulls.
+        return numeric.set(~numeric.is_finite().fill_null(False), None)
+    # The parser only references this materialised column, never the upstream DSL tree.
+    return values.to_frame("_number").select(_parse_number(pl.col("_number"))).to_series()
 
 
 def _ordered_compare(left: pl.Expr, right: pl.Expr, op: Op) -> pl.Expr:

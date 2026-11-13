@@ -543,7 +543,19 @@ class LLMClient:
                 + "\n\nYour previous answer had these problems, fix them:\n- "
                 + "\n- ".join(errors[:12])
             )
-            text, u = self._call_provider(system, prompt, schema, images)
+            try:
+                text, u = self._call_provider(system, prompt, schema, images)
+            except LLMError as exc:
+                # A truncated response is never parsed or accepted. Retry with a
+                # smaller response within the existing structured attempt budget.
+                if "cut off at max_tokens" not in str(exc) or attempt > self.max_retries:
+                    raise
+                errors = [
+                    "Response exceeded the output limit. Return compact complete JSON. "
+                    "Use declarative filters and expressions instead of enumerating records. "
+                    "Keep evidence brief; omit optional repetition, never required rules or fields."
+                ]
+                continue
             usage.add(u)
             try:
                 data = _parse_json(text)

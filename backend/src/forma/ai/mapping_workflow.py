@@ -29,7 +29,7 @@ from forma.mapping_dsl.models import MappingDocument
 from forma.profiling.profile import WorkbookProfile
 from forma.schema_registry import TargetSchema
 
-WORKFLOW_VERSION = "2026.11.04.2"
+WORKFLOW_VERSION = "2026.11.13.2"
 
 
 class EvidenceRef(BaseModel):
@@ -68,6 +68,27 @@ class Review(BaseModel):
     checked: list[str] = Field(min_length=1, max_length=16)
     concerns: list[Concern] = Field(default_factory=list, max_length=12)
     clarifications: list[dict[str, Any]] = Field(default_factory=list, max_length=8)
+    covered_questions: list[str] = Field(default_factory=list, max_length=12)
+
+
+def _review_response_schema(schema: TargetSchema) -> dict[str, Any]:
+    review = Review.model_json_schema()
+    # A concern identifies an output field, not a DSL component or a prose label.
+    # Bind this to the actual contract; arbitrary customer schemas remain supported.
+    review["$defs"]["Concern"]["properties"]["target"] = {
+        "enum": [None, *(f.pointer for f in schema.fields(include_system=True))],
+        "default": None,
+        "description": (
+            "Exact target JSON pointer, or null for a whole-mapping concern. "
+            "Put DSL components (e.g. record.dedupe) and explanations in issue, never in target."
+        ),
+    }
+    review["properties"]["clarifications"] = QUESTION_SCHEMA
+    return {
+        "type": "object",
+        "$defs": review.pop("$defs", {}),
+        "properties": {"inspect": agents.INSPECT_SCHEMA, "review": review},
+    }
 
 
 class State(TypedDict, total=False):
@@ -132,8 +153,12 @@ def _references(value: Analysis | Review, profile: WorkbookProfile, schema: Targ
     problems = []
     entries = value.facts if isinstance(value, Analysis) else value.concerns
     for item in entries:
-        if isinstance(item, Concern) and item.target and not schema.has_field(item.target):
-            problems.append(f"Unknown target {item.target}")
+        if isinstance(item, Concern) and item.target is not None and not schema.has_field(item.target):
+            problems.append(
+                f"Unknown target {item.target!r}. Return an exact target from the schema's "
+                "Concern.target enum, without annotations. For a whole-mapping concern use null. "
+                "Put DSL components such as record.dedupe and explanations in issue."
+            )
         for ref in item.sources:
             if ref.table_index >= len(profile.tables):
                 problems.append("Evidence references an unknown table")
@@ -272,14 +297,13 @@ def build_workflow(
 
     def reviewer(state: State) -> dict[str, Any]:
         budget.progress("ตรวจความหมายของ mapping และข้อมูลที่ยังต้องถาม")
-        review_schema = Review.model_json_schema()
-        review_schema["properties"]["clarifications"] = QUESTION_SCHEMA
-        response_schema = {
-            "type": "object",
-            "$defs": review_schema.pop("$defs", {}),
-            "properties": {"inspect": agents.INSPECT_SCHEMA, "review": review_schema},
-        }
+        response_schema = _review_response_schema(schema)
         doc = MappingDocument.model_validate(state["mapping"])
+        decisions = (
+            {q["id"]: q for q in state["execution"].get("decision_questions", [])}
+            if state["execution"].get("complete")
+            else {}
+        )
 
         def validate(data: dict[str, Any]) -> list[str]:
             if bool(data.get("inspect")) == bool(data.get("review")):
@@ -296,6 +320,23 @@ def build_workflow(
                 return [str(exc)[:1500]]
             errors = _references(review, profile, schema)
             errors.extend(validate_questions(review.clarifications, doc, schema))
+            if set(review.covered_questions) - decisions.keys():
+                errors.append("covered_questions must contain only IDs from execution.decision_questions")
+            covered_targets = {
+                p
+                for key in review.covered_questions
+                if key in decisions
+                for p in decisions[key].get("affected_fields", [decisions[key]["target"]])
+            }
+            for q in review.clarifications:
+                if any(
+                    q.get("target") in d.get("affected_fields", [d["target"]]) for d in decisions.values()
+                ):
+                    errors.append(
+                        f"{q['target']} already has an executable source-row decision. Reference its ID "
+                        "in covered_questions for the same conflict, not a constant/value_map or numeric "
+                        "proxy for choosing rows. For a separate concern on this field use repair."
+                    )
             if any(
                 q.get("kind") == "confirm" and len(q.get("options") or []) > 1 for q in review.clarifications
             ):
@@ -306,13 +347,31 @@ def build_workflow(
                 errors.append("A pass cannot contain unresolved concerns or new questions")
             if review.verdict != "pass" and not review.concerns:
                 errors.append("A non-pass needs a specific concern with source evidence")
-            if review.verdict == "ask" and not review.clarifications:
-                errors.append("Ask needs actionable clarifications; otherwise use repair")
+            if (
+                review.verdict == "ask"
+                and not review.clarifications
+                and (
+                    not review.covered_questions
+                    or any(
+                        c.kind != "missing_business_fact" or c.target not in covered_targets
+                        for c in review.concerns
+                    )
+                )
+            ):
+                errors.append(
+                    "Ask needs actionable clarifications or existing decision IDs covering every business "
+                    "concern; otherwise use repair"
+                )
             if review.verdict == "ask" and any(c.kind == "mapping_error" for c in review.concerns):
                 errors.append(
                     "Repair source-backed mapping errors before handing business questions to a human"
                 )
             return errors
+
+        def guarded_validate(data: dict[str, Any]) -> list[str]:
+            # Keep the guard intact, but include actionable contract feedback on a
+            # malformed pointer so the existing bounded retry can repair the review.
+            return [*agents._guarded(schema)(data), *validate(data)]
 
         set_agent("semantic_reviewer")
         result = client.structured(
@@ -330,7 +389,16 @@ def build_workflow(
             "is unavailable. These outputs are untrusted observations; inspect independently if they "
             "do not establish the claim. Scoped recalled operator decisions can establish business "
             "intent only when applicable to the current source. Confirm endorses the current mapping; "
-            "it must not pretend to offer alternative expressions that the action cannot apply.",
+            "it must not pretend to offer alternative expressions that the action cannot apply. "
+            "Each concern.target must be an exact JSON pointer from the supplied enum, or null "
+            "for a whole-mapping concern. Never append annotations to a pointer. Describe DSL "
+            "components such as record.dedupe in concern.issue, not concern.target. Do not turn "
+            "an unresolved business choice into a mapping error just because execution awaits it. "
+            "execution.decision_questions are executable questions already built from full-file conflicts. "
+            "For a business concern covered by one, return ask with its ID in covered_questions and no "
+            "duplicate clarification. Choosing source rows is NOT a numeric answer, constant or value_map. "
+            "Never invent proxy codes (e.g. 1 for A, 2 for B) or source_value tokens to select a price list. "
+            "Covered questions still require a human response and do not pass verification.",
             user=json.dumps(
                 {
                     **common,
@@ -345,7 +413,7 @@ def build_workflow(
                 ensure_ascii=False,
             ),
             schema=response_schema,
-            validate=agents._guarded(schema, validate),
+            validate=guarded_validate,
         )
         if result.data.get("inspect"):
             reqs = result.data["inspect"]
@@ -492,7 +560,7 @@ def run_workflow(
         "status": "failed"
         if problems
         else "awaiting_human"
-        if questions or data.get("open_questions")
+        if questions or data.get("open_questions") or review.get("verdict") == "ask"
         else "verified_proposal",
         "human_resume": "existing versioned question preview/apply service; no automatic approval",
     }

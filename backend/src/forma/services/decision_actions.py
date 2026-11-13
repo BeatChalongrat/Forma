@@ -95,8 +95,11 @@ def apply(doc: MappingDocument, q: dict[str, Any], value: Any) -> None:
     if action == "select_rows":
         if value not in q["options"]:
             raise ValidationFailed("Choose one of the source rows shown")
-        selected = q["row_options"][value]
-        excluded = [n for opt, n in q["row_options"].items() if opt != value and n != selected]
+        if "row_exclusions" in q:
+            excluded = q["row_exclusions"][value]
+        else:
+            selected = q["row_options"][value]
+            excluded = [n for opt, n in q["row_options"].items() if opt != value and n != selected]
         container = (
             doc.source(q["source"]).table
             if q.get("source")
@@ -111,7 +114,18 @@ def apply(doc: MappingDocument, q: dict[str, Any], value: Any) -> None:
         return
     if fm is None:
         raise ValidationFailed("The field is no longer mapped")
-    if action == "date_format":
+    if action == "record_value":
+        validate_value(value, q["field"])
+        predicates = [CallExpr(op=Op.IS_NULL, args=[fm.expr])]
+        for pointer, expected in q["identity"].items():
+            key = field_mapping(doc, pointer)
+            if key is None or expected is None:
+                raise ValidationFailed("The record identity is no longer available")
+            predicates.append(CallExpr(op=Op.EQ, args=[key.expr, ConstExpr(value=expected)]))
+        fm.expr = CallExpr(
+            op=Op.CONDITIONAL, args=[CallExpr(op=Op.AND, args=predicates), ConstExpr(value=value), fm.expr]
+        )
+    elif action == "date_format":
         if value not in DATE_ORDERS:
             raise ValidationFailed("Choose DMY, MDY or YMD")
         col = column(fm.expr)
@@ -259,6 +273,10 @@ def conflicting_records(findings: list[Any]) -> list[dict[str, Any]]:
     """Root/lookup conflicts become immutable source-row decisions, never SKU-to-price value maps."""
     questions = []
     for finding in findings:
+        grouped = grouped_records(finding)
+        if grouped:
+            questions.append(grouped)
+            continue
         for choice in finding.details.get("source_choices", []):
             rows = choice["rows"]
             if len(rows) < 2 or any(not isinstance(row["row"], int) for row in rows):
@@ -284,6 +302,103 @@ def conflicting_records(findings: list[Any]) -> list[dict[str, Any]]:
                     },
                     "scope": "record_in_this_delivery",
                     "allow_custom": False,
+                }
+            )
+    return questions
+
+
+def grouped_records(finding: Any) -> dict[str, Any] | None:
+    """Group only a complete, bounded set with one unambiguous common discriminator."""
+    choices = finding.details.get("source_choices", [])
+    if len(choices) < 2 or len(choices) != finding.details.get("conflicting"):
+        return None
+    # Polars group iteration order is not stable between verification and the
+    # persisted review. The same source alternatives must retain the same ID.
+    choices = sorted(({**c, "rows": sorted(c["rows"], key=stable_hash)} for c in choices), key=stable_hash)
+    if len({(c["source"], c["target"]) for c in choices}) != 1:
+        return None
+    columns = set.intersection(*(set(r.get("context", {})) for c in choices for r in c["rows"]))
+    candidates = []
+    for column_name in sorted(columns):
+        sets = [set(r["context"][column_name] for r in c["rows"]) for c in choices]
+        if not 2 <= len(sets[0]) <= 8 or not all(s == sets[0] for s in sets):
+            continue
+        if not all(isinstance(v, str) and v.strip() for v in sets[0]):
+            continue
+        if all(len(c["rows"]) == len(sets[0]) for c in choices):
+            candidates.append((column_name, sorted(sets[0])))
+    if len(candidates) != 1:
+        return None
+    column_name, options = candidates[0]
+    return {
+        "id": "rows:" + stable_hash(choices, 24),
+        "target": choices[0]["target"],
+        "kind": "enum",
+        "action": "select_rows",
+        "source": choices[0]["source"],
+        "question": f"ต้องการใช้ชุดใดในคอลัมน์ {column_name} สำหรับ {len(choices)} รายการที่มีข้อมูลซ้ำ?",
+        "why": "Every conflicting record has exactly one row per offered set. Only these alternatives in this delivery are affected.",
+        "options": options,
+        "option_labels": {v: f"{column_name}: {v} · {len(choices)} รายการ" for v in options},
+        "row_exclusions": {
+            v: sorted({r["row"] for c in choices for r in c["rows"] if r["context"][column_name] != v})
+            for v in options
+        },
+        "scope": "records_in_this_delivery",
+        "allow_custom": False,
+        "affected_records": len(choices),
+        "identities": [c["identity"] for c in choices],
+        "affected_fields": sorted({p for c in choices for r in c["rows"] for p in r["values"]}),
+    }
+
+
+def missing_record_values(
+    doc: MappingDocument, schema: TargetSchema, records: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
+    """Offer record-specific scalar repairs only when other rows provide the field normally."""
+    from forma.ai.clarifications import derived_value
+
+    questions: list[dict[str, Any]] = []
+    keys = schema.identity_keys
+    if not keys or not records:
+        return questions
+    identities = [{k: _get_pointer(r, k) for k in keys} for r in records]
+    hashes = [stable_hash(i) for i in identities]
+    for field in doc.fields:
+        spec = schema.field(field.target)
+        if field.target in keys or not spec.required or spec.nullable or derived_value(field.expr):
+            continue
+        types = set(spec.json_type)
+        if not types <= {"string", "number", "integer", "boolean"}:
+            continue
+        missing = [i for i, r in enumerate(records) if _get_pointer(r, field.target) is None]
+        if not missing or len(missing) == len(records) or len(missing) > 12:
+            continue
+        for i in missing:
+            identity = identities[i]
+            if any(v in (None, "") for v in identity.values()) or hashes.count(hashes[i]) != 1:
+                continue
+            kind = (
+                "boolean"
+                if "boolean" in types
+                else "number"
+                if types & {"number", "integer"}
+                else "enum"
+                if spec.enum
+                else "text"
+            )
+            questions.append(
+                {
+                    "id": "value:" + stable_hash([field.target, identity], 24),
+                    "target": field.target,
+                    "kind": kind,
+                    "action": "record_value",
+                    "identity": identity,
+                    "question": f"รายการ {' · '.join(map(str, identity.values()))} ยังไม่มีค่า {spec.name} ค่าที่ถูกต้องคืออะไร?",
+                    "why": "Only this record is filled, only while its current value is missing. Other records and future deliveries are unchanged.",
+                    "options": list(spec.enum or []),
+                    "scope": "record_in_this_delivery",
+                    "allow_custom": not bool(spec.enum),
                 }
             )
     return questions
