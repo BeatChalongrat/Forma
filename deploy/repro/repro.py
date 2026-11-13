@@ -116,6 +116,7 @@ def build_config(
     *,
     reports: bool = True,
     capacity: str = "standard",
+    pilot: bool = False,
 ) -> dict:
     limits = capacity_limits(capacity)
     project = PREFIX + name
@@ -154,6 +155,10 @@ def build_config(
         "FORMA_CORS_ORIGINS": json.dumps([f"http://127.0.0.1:{ports[0]}"]),
         "FORMA_CODE_SANDBOX_SOCKET": "/run/sandbox/runner.sock",
     }
+
+    if pilot:
+        env["FORMA_PILOT_MODE"] = "true"
+        env["FORMA_RETENTION_INTERVAL_H"] = "0"
 
     def health(test: list[str]) -> dict:
         return {
@@ -364,10 +369,14 @@ def digest(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def init(name: str, ports: list[int], capacity: str = "standard") -> None:
+def init(
+    name: str, ports: list[int], capacity: str = "standard", *, pilot: bool = False
+) -> None:
     path = instance_dir(name)
     if (path / "owner.json").exists():
-        load(name)
+        _, marker, _ = load(name)
+        if pilot and not marker.get("pilot"):
+            fail("This existing instance is not a pilot. Choose a new name.")
         return
     if path.exists() and any(p.name != ".lifecycle.lock" for p in path.iterdir()):
         fail("Unrecognized nonempty instance directory; refusing to overwrite.")
@@ -375,7 +384,9 @@ def init(name: str, ports: list[int], capacity: str = "standard") -> None:
         fail("Choose three distinct ports between 1024 and 65535.")
     token = secrets.token_hex(24)
     passwords = {key: secrets.token_hex(24) for key in ("postgres", "minio", "secret")}
-    config = build_config(name, token, ports, passwords, capacity=capacity)
+    config = build_config(
+        name, token, ports, passwords, capacity=capacity, pilot=pilot, reports=not pilot
+    )
     path.mkdir(parents=True, exist_ok=True)
     config_path = path / "compose.json"
     config_path.write_text(json.dumps(config, indent=2), encoding="utf-8")
@@ -391,6 +402,7 @@ def init(name: str, ports: list[int], capacity: str = "standard") -> None:
                 "ports": ports,
                 "sha256": digest(config_path),
                 "capacity": capacity,
+                "pilot": pilot,
             },
             indent=2,
         ),
@@ -426,6 +438,7 @@ def load(name: str) -> tuple[Path, dict, dict]:
         },
         reports="report-worker" in config["services"],
         capacity=marker.get("capacity", "standard"),
+        pilot=marker.get("pilot", False),
     )
     legacy = copy.deepcopy(expected)
     legacy["services"]["worker"]["healthcheck"]["test"][-1] = LEGACY_WORKER_CHECK
@@ -543,7 +556,10 @@ def preflight(marker: dict) -> None:
         if (row := json.loads(line))
         and not row["Name"].startswith(marker["project"] + "-")
     )
-    limit_mb = sum(capacity_limits(marker.get("capacity", "standard")).values())
+    _, _, config = load(marker["name"])
+    limit_mb = sum(
+        int(s["mem_limit"].removesuffix("m")) for s in config["services"].values()
+    )
     required = limit_mb * 1024**2 + used + 1536 * 1024**2
     if info["MemTotal"] < required:
         fail(
@@ -599,6 +615,11 @@ def main() -> None:
         "action", choices=["init", "up", "status", "logs", "stop", "destroy"]
     )
     parser.add_argument("--name", default="local")
+    parser.add_argument(
+        "--pilot",
+        action="store_true",
+        help="Fresh mock-only pilot with manual export; report services omitted to reserve RAM",
+    )
     parser.add_argument("--capacity", choices=["standard", "ci"], default="standard")
     parser.add_argument("--web-port", type=int, default=8081)
     parser.add_argument("--s3-port", type=int, default=19000)
@@ -615,6 +636,7 @@ def execute(args: argparse.Namespace) -> None:
             args.name,
             [args.web_port, args.s3_port, args.console_port],
             getattr(args, "capacity", "standard"),
+            pilot=getattr(args, "pilot", False),
         )
     path, marker, config = load(args.name)
     local_daemon()

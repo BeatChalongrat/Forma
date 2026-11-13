@@ -266,7 +266,7 @@ export type Job = {
 export type BatchStatus = { batch_id: string; total: number; by_status: Record<string, number>; finished: number; progress: number; done: boolean; jobs: { id: string; round_id: string | null; status: string; progress: number; error: string | null; duration_ms: number | null }[] }
 export type QueueStats = { by_status: Record<string, number>; queued: number; running: number; failed: number; oldest_queued_age_s: number | null; limit: number; backend: string; workers?: number; inflight?: number; nodes?: number; error?: string }
 export type Ready = { status: 'ok' | 'degraded'; checks: Record<string, { ok: boolean; detail?: string }> }
-export type Me = { subject: string; name: string; roles: string[]; effective_roles: string[]; customers: string[] | null; mode: string }
+export type Me = { pilot_mode?: boolean; subject: string; name: string; roles: string[]; effective_roles: string[]; customers: string[] | null; mode: string }
 export type OpsSummary = {
   alerts?: { code: string; severity: 'critical' | 'warning'; message: string; action: string; value: number; href: string }[]
   queue: QueueStats; ready: Ready; review: { open: number; oldest_age_s: number | null }
@@ -345,7 +345,7 @@ export type Preferences = { display_name: string; avatar?: string; language: 'th
 export type MemoryItem = { id: string; topic: string; content: string; origin: 'chat' | 'user'; sensitive: boolean; source_chat_id: string | null; created_at: string; updated_at: string }
 export type MemoryChange = { action: 'save' | 'change' | 'forget'; id: string; topic: string; sensitive?: boolean }
 export type HistoryFilters = { status?: string; customer_id?: string; search?: string; start?: string; end?: string; timezone?: string; offset?: number; limit?: number }
-export type ReviewQuestions = { progress?: ReviewProgress; mapping_id: string; round_id: string; status: string; blocked: boolean; questions: { id: string; field: FieldSpec; kind: 'boolean' | 'number' | 'confirm' | 'choice' | 'text' | 'enum'; question?: string; question_th?: string | null; reason_th?: string; action?: string; source_value?: string | null; source_examples?: { file?: string; sheet?: string; column: string; values: string[]; context_only?: boolean }[]; scope?: string; option_labels?: Record<string, string>; allow_custom?: boolean; options?: string[]; current: Expr; evidence: string[]; note?: string; contested?: boolean }[]; open_questions: string[]; reasons: string[]; sample: Record<string, unknown>[]; context: { customer: { code: string; name: string } | null; round_label: string | null; files: { id: string; name: string }[]; mapping_version: number }; changes: (FieldChange & { field: FieldSpec })[]; comparison_dataset_id: string | null; checks: Record<string, unknown>; impact: PolicyDecision['impact'] | null; fields: FieldSpec[] }
+export type ReviewQuestions = { pilot_mode?: boolean; progress?: ReviewProgress; mapping_id: string; round_id: string; status: string; blocked: boolean; questions: { id: string; field: FieldSpec; kind: 'boolean' | 'number' | 'confirm' | 'choice' | 'text' | 'enum'; question?: string; question_th?: string | null; reason_th?: string; action?: string; source_value?: string | null; source_examples?: { file?: string; sheet?: string; column: string; values: string[]; context_only?: boolean }[]; scope?: string; option_labels?: Record<string, string>; allow_custom?: boolean; options?: string[]; current: Expr; evidence: string[]; note?: string; contested?: boolean }[]; open_questions: string[]; reasons: string[]; sample: Record<string, unknown>[]; context: { customer: { code: string; name: string } | null; round_label: string | null; files: { id: string; name: string }[]; mapping_version: number }; changes: (FieldChange & { field: FieldSpec })[]; comparison_dataset_id: string | null; checks: Record<string, unknown>; impact: PolicyDecision['impact'] | null; fields: FieldSpec[] }
 export type ReviewEvidence = { execution_scope?: string; field: string; sample_limit: number; sample_records: number; constant: boolean; context_only: boolean; unavailable: boolean; examples: { identity: string; item: number | null; value: unknown; source_complete: boolean; cells: { file: string | null; sheet: string | null; row: number | null; column: string | null; header: string; raw: unknown; verified: boolean | null }[] }[] }
 export type EffectCheck = { complete: boolean; passed: boolean; records_checked?: number; remaining_errors?: number; error?: string; checked_at?: string; before_mapping_id?: string; mapping_id?: string; actor?: string }
 export type AuditEvent = { id: string; actor: string; action: string; entity: string; entity_id: string; details: Record<string, unknown>; at: string }
@@ -435,6 +435,8 @@ export const api = {
   forgetLearned: (id: string) => del<void>(`/api/learning/${encodeURIComponent(id)}`),
   verdict: (roundId: string) => get<{ round_id: string; status: string; verdict: Verdict | null }>(`/api/rounds/${roundId}/verdict`),
   acceptVerdict: (roundId: string, b: { digest: string; decisions?: Record<string, boolean | number | string | null>; comment?: string }) => post<VerdictAccepted>(`/api/rounds/${roundId}/verdict/accept`, b),
+  pilotObservations: (id: string) => get<PilotObservations>(`/api/pilot/mappings/${id}/observations`),
+  savePilotObservation: (id: string, body: { question_id: string; category: string; note: string; evidence_location: string }) => post<PilotObservations>(`/api/pilot/mappings/${id}/observations`, body),
   reviewQuestions: (id: string) => get<ReviewQuestions>(`/api/mappings/${id}/questions`),
   reviewDraft: (id: string) => get<ReviewDraft>(`/api/mappings/${id}/review/draft`),
   saveReviewDraft: (id: string, revision: number, payload: ReviewDraftPayload) => put<ReviewDraft>(`/api/mappings/${id}/review/draft`, { revision, payload }),
@@ -590,3 +592,6 @@ export async function waitForJob(jobId: string, onTick?: (j: Job) => void, inter
     await new Promise((r) => setTimeout(r, intervalMs))
   }
 }
+
+export type PilotObservation = { id: string; question_id: string; category: string; note: string; evidence_location: string; actor: string; created_at: string }
+export type PilotObservations = { enabled: boolean; latest: Record<string, PilotObservation>; history: PilotObservation[] }

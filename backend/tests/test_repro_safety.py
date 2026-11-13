@@ -84,6 +84,22 @@ def test_ci_capacity_is_explicit_owned_and_keeps_default(repro):
     assert config["services"]["worker"]["mem_limit"] == f"{repro.LIMITS['worker']}m"
 
 
+def test_pilot_is_fresh_manual_mock_only_and_keeps_other_instances(repro):
+    repro.init("pilot", [8086, 19010, 19011], capacity="ci", pilot=True)
+    _, marker, config = repro.load("pilot")
+    assert marker["pilot"]
+    assert "report-worker" not in config["services"]
+    assert "assistant-worker" in config["services"]
+    for name in ("api", "worker", "assistant-worker"):
+        env = config["services"][name]["environment"]
+        assert env["FORMA_PILOT_MODE"] == "true"
+        assert env["FORMA_LLM_MOCK_ONLY"] == "true"
+        assert env["FORMA_RETENTION_INTERVAL_H"] == "0"
+    repro.init("ordinary", [8087, 19012, 19013])
+    with pytest.raises(RuntimeError, match="not a pilot"):
+        repro.init("ordinary", [8087, 19012, 19013], pilot=True)
+
+
 def test_config_isolated_and_edits_refused(repro):
     repro.init("issue-123", [8081, 19000, 19001])
     path, marker, config = repro.load("issue-123")

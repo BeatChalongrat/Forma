@@ -26,6 +26,11 @@ class Settings(BaseSettings):
 
     model_config = SettingsConfigDict(env_prefix="FORMA_", env_file=".env", extra="ignore")
 
+    pilot_mode: bool = Field(
+        default=False,
+        description="Require explicit human dataset approval before export; enable pilot question feedback.",
+    )
+
     env: str = Field(
         default="dev", description="dev | prod. prod requires migrations and disables create_all."
     )

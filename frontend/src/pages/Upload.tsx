@@ -18,6 +18,8 @@ import { refusedNames, splitReadable, UPLOAD_ACCEPT, UPLOAD_TYPES } from '../lib
 
 /** Upload many files at once: each is matched to its customer by format and becomes one JSON (ADR-027). */
 export function BulkUpload() {
+  const me = useQuery({ queryKey: ['me'], queryFn: api.me })
+  const pilot = !!me.data?.pilot_mode
   const location = useLocation()
   const receipt = useRef<{ files: File[]; options: string; key: string } | null>(null)
   const { t, prefs } = usePreferences()
@@ -55,7 +57,7 @@ export function BulkUpload() {
         const chunk: File[] = []; let bytes = 0
         while (at < files.length && chunk.length < 10 && (!chunk.length || bytes + files[at].size <= 20 * 1024 * 1024)) { const f = files[at++]; chunk.push(f); bytes += f.size }
         if (!id) {
-          const options = { label: label.trim() || t(`Round ${workDate}`, `รอบ ${workDate}`), work_date: workDate, auto_publish: auto }
+          const options = { label: label.trim() || t(`Round ${workDate}`, `รอบ ${workDate}`), work_date: workDate, auto_publish: pilot ? false : auto }
           const signature = JSON.stringify(options)
           if (!receipt.current || receipt.current.options !== signature || receipt.current.files.length !== chunk.length || chunk.some((f, i) => f !== receipt.current!.files[i])) receipt.current = { files: chunk, options: signature, key: crypto.randomUUID() }
           const b = await api.createUpload(chunk, { ...options, upload_key: receipt.current.key })
@@ -116,9 +118,10 @@ export function BulkUpload() {
             </fieldset>
           </Section>
           <Section title="Options">
+            {pilot && <p className="text-sm mb-3" role="status">{t('Pilot: a person must check and approve each result before export.', 'โหมดทดลอง: คนต้องตรวจและอนุมัติผลแต่ละไฟล์ก่อนส่งออก')}</p>}
             <div className="p-4 flex flex-col gap-3">
               <label className="flex items-start gap-2.5 cursor-pointer">
-                <input type="checkbox" className="mt-1 accent-[var(--color-brand-blue)]" disabled={!!batchId || upload.isPending} checked={batchId ? existing.data?.auto_publish ?? false : auto} onChange={(e) => setAuto(e.target.checked)} />
+                <input type="checkbox" className="mt-1 accent-[var(--color-brand-blue)]" disabled={pilot || !!batchId || upload.isPending} checked={pilot ? false : batchId ? existing.data?.auto_publish ?? false : auto} onChange={(e) => setAuto(e.target.checked)} />
                 <span><span className="font-semibold text-navy"><Localized>Approve and export automatically</Localized></span><span className="block hint-th">ถ้าผ่านทุกด่าน (mapping ผ่าน, ทุก record ตรง format, ไม่มีความผิดปกติร้ายแรง) ระบบออก JSON ให้เลย ไม่ผ่านข้อไหนจะรอคนตรวจพร้อมบอกเหตุผล</span></span>
               </label>
               {!!batchId && <p className="text-xs text-muted">{t('Uses the existing round’s approval setting.', 'ใช้การตั้งค่าอนุมัติของรอบเดิม')}</p>}

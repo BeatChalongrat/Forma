@@ -148,7 +148,35 @@ def run(name: str, prepare_only: bool = False) -> dict:
             )
             return result
         endpoint = f"/api/mappings/{mid}/review"
-        payload = {"answers": {vat: False, "/unit/pack_size": 12}, "section": "finish"}
+        pilot = bool(marker.get("pilot"))
+        if pilot:
+            observations = f"/api/pilot/mappings/{mid}/observations"
+            for qid, category, note, location in [
+                (
+                    vat,
+                    "evidence_in_file",
+                    "Synthetic fixture: the header explicitly says VAT included.",
+                    "review-journey.xlsx / สินค้า / G1",
+                ),
+                (
+                    "/unit/pack_size",
+                    "missing_information",
+                    "Synthetic fixture: no pack size column or legend; operator supplies 12 for this test.",
+                    "",
+                ),
+            ]:
+                call(
+                    "POST",
+                    observations,
+                    json={
+                        "question_id": qid,
+                        "category": category,
+                        "note": note,
+                        "evidence_location": location,
+                    },
+                )
+            assert len(call("GET", observations)["latest"]) == 2
+        payload = {"answers": {vat: pilot, "/unit/pack_size": 12}, "section": "finish"}
         saved = call(
             "PUT", endpoint + "/draft", json={"revision": 0, "payload": payload}
         )
@@ -163,7 +191,7 @@ def run(name: str, prepare_only: bool = False) -> dict:
                 )
             )
         assert sorted(x.status_code for x in responses) == [200, 409]
-        assert call("GET", endpoint + "/draft")["payload"]["answers"][vat] is False
+        assert call("GET", endpoint + "/draft")["payload"]["answers"][vat] is pilot
         q = call("GET", f"/api/mappings/{mid}/questions")
         body = {"answers": payload["answers"], "acknowledged": q["open_questions"]}
         proof = call("POST", endpoint + "/preview", json=body)
@@ -183,6 +211,8 @@ def run(name: str, prepare_only: bool = False) -> dict:
         dsid = r["summary"]["dataset_version_id"]
         ds = call("GET", f"/api/datasets/{dsid}")
         assert ds["row_count"] == 12 and ds["invalid_records"] == 0
+        if pilot:
+            assert c.post(f"/api/datasets/{dsid}/export?fmt=json").status_code == 409
         call(
             "POST",
             f"/api/datasets/{dsid}/approve",
@@ -192,7 +222,7 @@ def run(name: str, prepare_only: bool = False) -> dict:
         output = call("GET", f"/api/exports/{art['id']}/download")
         assert len(output) == 12
         assert all(
-            price["vat_included"] is False for row in output for price in row["prices"]
+            price["vat_included"] is pilot for row in output for price in row["prices"]
         )
         result.update(
             dataset_id=dsid,
@@ -201,6 +231,10 @@ def run(name: str, prepare_only: bool = False) -> dict:
             repeated_confirm="same job",
             job=confirmed["job_id"],
             downloaded=True,
+            pilot_manual_export_gate=pilot,
+            pilot_categories_checked=["evidence_in_file", "missing_information"]
+            if pilot
+            else [],
         )
         (path / "review-journey-result.json").write_text(
             json.dumps(result, indent=2), encoding="utf-8"
