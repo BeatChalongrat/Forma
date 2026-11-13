@@ -38,6 +38,31 @@ async function answerBoth(user: ReturnType<typeof mount>['user']) {
   await screen.findByText('SKU-001')
 }
 
+test('a record correction clearly limits its scope, keeps zero, and offers no learning checkbox', async () => {
+  vi.mocked(api.reviewQuestions).mockResolvedValue({ ...questions, questions: [{
+    ...questions.questions[1], id: 'missing-price', action: 'record_value', scope: 'record_in_this_delivery',
+    question: 'What is the price of SKU-001?', field: { ...fields[1], pointer: '/price', json_type: ['number'] },
+  }] } as never)
+  const { user } = mount()
+  await user.type(await screen.findByLabelText('Value for this record only'), '0')
+  expect(screen.queryByRole('checkbox')).toBeNull()
+  await user.click(screen.getByRole('button', { name: 'Save draft & leave' }))
+  await waitFor(() => expect(saved.payload.answers).toEqual({ 'missing-price': 0 }))
+  expect(saved.payload.remember).toEqual([])
+})
+
+test('a grouped source choice displays the actual sets and saves one decision', async () => {
+  vi.mocked(api.reviewQuestions).mockResolvedValue({ ...questions, questions: [{
+    ...questions.questions[1], id: 'price-set', kind: 'enum', action: 'select_rows', scope: 'records_in_this_delivery',
+    options: ['A', 'B'], option_labels: { A: 'List A · 12 records', B: 'List B · 12 records' },
+  }] } as never)
+  const { user } = mount()
+  await user.click(await screen.findByRole('button', { name: 'List B · 12 records' }))
+  expect(screen.queryByRole('checkbox')).toBeNull()
+  await user.click(screen.getByRole('button', { name: 'Save draft & leave' }))
+  await waitFor(() => expect(saved.payload.answers).toEqual({ 'price-set': 'B' }))
+})
+
 test('answers survive Previous, evidence panel, preview, and leave/resume without confirming', async () => {
   const first = mount()
   await answerBoth(first.user)

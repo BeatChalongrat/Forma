@@ -102,11 +102,12 @@ def check(records: list[dict[str, Any]], schema: TargetSchema) -> list[str]:
                 out.append(f"{p}: {nonpos} of {len(vals)} values are zero or negative")
     # identity with almost no distinct values: the wrong column was taken for the item code
     if n >= _IDENTITY_MIN_RECORDS:
-        for key in schema.identity_keys:
-            vals = [v for r in records for v in values_at(r, key) if v not in (None, "")]
-            distinct = len({str(v) for v in vals})
-            if vals and distinct <= max(1, len(vals) // 10):
-                out.append(f"{key}: only {distinct} distinct value(s) across {len(vals)} records")
+        keys = schema.identity_keys
+        vals = [tuple(tuple(values_at(r, key)) for key in keys) for r in records]
+        vals = [v for v in vals if all(part and part[0] not in (None, "") for part in v)]
+        distinct = len({repr(v) for v in vals})
+        if keys and vals and distinct <= max(1, len(vals) // 10):
+            out.append(f"{' + '.join(keys)}: only {distinct} distinct value(s) across {len(vals)} records")
     # a price collection that some records have and others do not: a second price sheet taken for the only one
     for p in sorted(
         {f.in_collection for f in schema.leaf_fields() if f.semantic == "price.amount" and f.in_collection}

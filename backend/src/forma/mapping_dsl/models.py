@@ -369,6 +369,23 @@ class CollectionMapping(Strict):
     """Builds a nested array (``/prices``, ``/promotions``, ``/inventory``) from a source frame."""
 
     target: str = Field(description="Pointer of the array field, e.g. /prices")
+
+    @model_validator(mode="before")
+    @classmethod
+    def qualify_item_fields(cls, value: Any) -> Any:
+        """Accept local item pointers; persist canonical full pointers for execution/audit."""
+        if not isinstance(value, dict) or not isinstance(value.get("target"), str):
+            return value
+        prefix = value["target"] + "/*"
+        fields = []
+        for field in value.get("fields", []):
+            if isinstance(field, dict):
+                pointer = field.get("target", "")
+                if isinstance(pointer, str) and pointer.startswith("/") and "*" not in pointer:
+                    field = {**field, "target": prefix + pointer}
+            fields.append(field)
+        return {**value, "fields": fields}
+
     source: str = Field(description="Source id whose rows become array items")
     link: list[JoinKey] = Field(
         min_length=1,

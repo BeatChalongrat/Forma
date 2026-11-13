@@ -331,6 +331,8 @@ class Gates:
             [
                 "tests/test_multisheet_contract.py",
                 "tests/test_mapping_workflow.py",
+                "tests/test_mapping_metamorphic.py",
+                "tests/test_mapping_review_repairs.py",
                 "tests/test_knowledge_revision.py",
                 "tests/test_format_context.py",
                 "tests/test_knowledge_cross_round.py",

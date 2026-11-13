@@ -44,6 +44,11 @@ def validate(questions: Any, doc: MappingDocument, schema: TargetSchema) -> list
             errors.append(f"Clarification target {target} must identify one mapped field, once")
             continue
         seen.add(target)
+        if q.get("action") == "confirm" and q["kind"] != "confirm":
+            errors.append(
+                f"Clarification {target}: confirm requires kind=confirm. To fill an absent "
+                "boolean/number/string use action=constant with its typed kind, not confirm."
+            )
         types = set(schema.field(target).json_type)
         expected = {
             "boolean": {"boolean"},

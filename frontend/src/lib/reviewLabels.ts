@@ -17,6 +17,7 @@ export function answerLabel(q: Question, value: unknown, t: Translate): string {
 }
 
 export function answerScope(q: Question, remember: boolean, t: Translate): string {
+  if (q.scope === 'record_in_this_delivery' || q.scope === 'records_in_this_delivery') return t('Only the listed records in this upload; not reused for later files', 'เฉพาะรายการที่ระบุในไฟล์ครั้งนี้ ไม่ใช้กับไฟล์ครั้งถัดไป')
   const scope = q.scope === 'source_value' ? t(`Only source code “${q.source_value}”`, `เฉพาะรหัส “${q.source_value}”`)
     : q.scope === 'source_column' || q.kind === 'choice' ? t('The source column', 'คอลัมน์ต้นทางนี้')
     : q.kind === 'confirm' ? t('Confirm this reading', 'ยืนยันการอ่านค่านี้')
