@@ -22,7 +22,7 @@ from forma.mapping_dsl.validate import validate_mapping
 from forma.profiling.profile import WorkbookProfile
 from forma.schema_registry import TargetSchema
 
-PROMPT_VERSION = "2026.11.04.2"
+PROMPT_VERSION = "2026.11.14.1"
 
 SYSTEM_BASE = """You are FORMA's mapping intelligence. FORMA converts messy ERP exports (Excel/CSV, Thai and English,
 multi-sheet) into the target JSON contract supplied for this request. There is no fixed product contract.
@@ -39,11 +39,25 @@ Rules you must follow:
   as relative item pointers. Field expressions convert units first; aggregation then sums per parent
   and group. Map only grouped/summed fields. Do not deduplicate additive lots or sum competing prices.
   Preserve unresolved alternatives and ask for a business decision when no source rule resolves them.
+  Collection fields use FULL target pointers (array target + /* + item path); only aggregate.group_by,
+  aggregate.sum and dedupe_keys use RELATIVE item pointers. For an array /balances with item fields
+  depot and available, field targets are /balances/*/depot and /balances/*/available, while aggregate
+  is {{"group_by":["/depot"],"sum":["/available"]}}. Use the supplied schema's actual paths.
 - Excel formulas without cached results cannot be read as values. Inspect the formula and its inputs;
   map verified input columns with declarative expressions when the formula can be reproduced exactly.
   Unused invalid formula columns do not block usable inputs (set attributes_passthrough=false to avoid
   exporting those unused columns). If an input is missing or external,
   explain the exact file/sheet/cells needed or ask for a recalculated workbook; never invent a value.
+- Explicit operator selection rules (price list, effective dates, status) must be implemented
+  as compact record.filters or source table.filter predicates BEFORE deduplication. Use the
+  supplied as-of date, never today's date. Parse BOTH date operands (including literals)
+  with parse_date_th before ordered comparisons; raw strings are not date predicates. Do not enumerate per-product constants/row choices
+  when one source predicate expresses the rule. Verify boundary dates and excluded rows.
+  Ask about a selection only when the supplied rule and evidence do not resolve it.
+- Keep structured responses compact: short evidence, reusable declarative expressions, no
+  source-row dumps or per-record mappings. Never omit a required field to shorten output.
+- Write user-facing questions in plain Thai with a short business field label and the exact
+  missing fact. Keep technical schema descriptions in evidence, not in the question.
 - Target fields are JSON pointers from the provided field catalogue. Never invent target fields.
   An open object in JSON Schema does not add its undeclared children to the DSL field catalogue.
   For unmapped source attributes, use attributes_passthrough=true and SourceSpec.rename to give source
@@ -65,6 +79,10 @@ Rules you must follow:
   Never ask a global constant question for row-varying values. Conflicting root records and collection
   items are offered by the server as record-scoped source-row choices. Keep alternatives visible with
   record.dedupe.keep=review and an honest join cardinality; describe the conflict in changes_from_draft.
+  If a price list/version must be selected, do NOT create a value_map/enum targeting a numeric price:
+  retain the competing rows with keep=review and let the server offer grounded source-row/set choices.
+  For an absent boolean fact use kind=boolean, action=constant with a null const placeholder;
+  action=confirm is ONLY for accepting an existing reading, never for filling a missing value.
   Do not use value_map with a SKU/identity to answer a price column: value_map matches that column's values.
   Missing optional fields, applied explicit contract defaults, and explicit source tax rates are
   information, not blocking questions: put them in changes_from_draft, not open_questions.

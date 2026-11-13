@@ -340,6 +340,13 @@ class TransformEngine:
             for fm in cm.fields
             for name in _referenced_columns(fm.expr, cm.source)
         }
+        if not mapping.attributes_passthrough:
+            # Unexported source labels (e.g. lot IDs in an additive inventory report)
+            # are not conflicting product values. Keep collection link keys: dropping
+            # differing links could discard children even when root output is identical.
+            link_columns = {f"{root_id}.{k.left}" for cm in mapping.collections for k in cm.link}
+            child_columns |= {c for c in out.columns if not c.startswith("/") and c not in link_columns}
+            child_columns -= link_columns
         # Child-level variation is preserved in collections; root output conflicts still matter.
         out, fnd = self._dedupe(out, identity_cols, mapping.record.dedupe.keep, ignored=child_columns)
         findings.extend(fnd)
@@ -562,14 +569,27 @@ class TransformEngine:
                 if not changed or len(row_columns) != 1 or group.height > 30:
                     continue
                 row_column = row_columns[0]
+                source_prefix = row_column.rsplit(".", 1)[0] + "."
+                context_columns = [
+                    c
+                    for c in group.columns
+                    if c.startswith(source_prefix)
+                    and c != row_column
+                    and group.schema[c] == pl.String
+                    and group[c].n_unique() > 1
+                ][:12]
                 choices.append(
                     {
                         "source": row_column.rsplit(".", 1)[0],
                         "identity": dict(zip(keys, key, strict=True)),
                         "target": changed[0],
                         "rows": [
-                            {"row": item[row_column], "values": {c: item[c] for c in changed}}
-                            for item in group.select([row_column, *changed])
+                            {
+                                "row": item[row_column],
+                                "values": {c: item[c] for c in changed},
+                                "context": {c[len(source_prefix) :]: item[c] for c in context_columns},
+                            }
+                            for item in group.select([row_column, *changed, *context_columns])
                             .unique(maintain_order=True)
                             .to_dicts()
                         ],

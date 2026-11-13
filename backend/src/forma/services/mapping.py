@@ -667,11 +667,12 @@ def propose_for_round(
     )
     if review is not None and previous is not None and source_kind != "memory":
         _inherit_confidence(doc, review, previous)  # a person approved these exact field mappings before
-    from forma.services.decision_actions import conflicting_items, conflicting_records
+    from forma.services.decision_actions import conflicting_items, conflicting_records, missing_record_values
     from forma.services.review_questions import _table_columns, unit_questions
 
     review_decisions = conflicting_items(doc, schema, sim.records if sim else [])
     review_decisions.extend(conflicting_records(sim.findings if sim else []))
+    review_decisions.extend(missing_record_values(doc, schema, sim.records if sim else []))
     review_decisions.extend(
         unit_questions(doc, schema, _table_columns(MappingVersion(round_id=r.id), doc, session))
     )
@@ -1034,7 +1035,12 @@ def _retire_structural_questions(
             semantic = "price.amount"
         if semantic is None:
             continue
-        candidates = [(f, source) for f, source in fields if schema.field(f.target).semantic == semantic]
+        candidates = [
+            (f, source)
+            for f, source in fields
+            if schema.field(f.target).semantic == semantic
+            or (identity and schema.identity_keys == [f.target])
+        ]
         for fm, source in candidates:
             refs = _referenced_columns(fm.expr, source)
             if not refs:
@@ -1055,7 +1061,7 @@ def _retire_structural_questions(
                 continue
             retired.append(question)
             break
-    return [q for q in questions if q not in retired], retired
+    return list(dict.fromkeys(q for q in questions if q not in retired)), retired
 
 
 def _inherit_confidence(doc: MappingDocument, review: dict[str, Any], previous: MappingVersion) -> None:
@@ -1297,11 +1303,12 @@ def save_mapping_edit(
     # Saving a production candidate always verifies the entire input. Preview endpoints may sample.
     sim, problems = simulate(ctx, doc, schema, r.files if r else [], limit=None) if r else (None, [])
     remaining_questions = parent.open_questions if remaining_questions is None else remaining_questions
-    from forma.services.decision_actions import conflicting_items, conflicting_records
+    from forma.services.decision_actions import conflicting_items, conflicting_records, missing_record_values
     from forma.services.review_questions import _table_columns, unit_questions
 
     review_decisions = conflicting_items(doc, schema, sim.records if sim else [])
     review_decisions.extend(conflicting_records(sim.findings if sim else []))
+    review_decisions.extend(missing_record_values(doc, schema, sim.records if sim else []))
     if sim and not sim.errors and not problems:
         remaining_questions, _ = _retire_structural_questions(
             remaining_questions or [], doc, schema, sim.records

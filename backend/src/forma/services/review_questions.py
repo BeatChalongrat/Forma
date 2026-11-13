@@ -270,6 +270,15 @@ def questions(ctx: ServiceContext, m: MappingVersion) -> dict[str, Any]:
             }
         )
     for clarification in (m.policy or {}).get("clarifications", []):
+        original = next((f for f in fields if f.target == clarification["target"]), None)
+        if (
+            clarification.get("action") == "confirm"
+            and clarification.get("kind") == "boolean"
+            and original is not None
+            and isinstance(original.expr, ConstExpr)
+            and original.expr.value is None
+        ):
+            clarification = {**clarification, "action": "constant"}
         clarification = decision_actions.normalize(clarification, schema)
         target = clarification["target"]
         if target not in specs or clarification["question"] not in (m.open_questions or []):
@@ -319,9 +328,16 @@ def questions(ctx: ServiceContext, m: MappingVersion) -> dict[str, Any]:
         related = [
             item
             for item in items
-            if item.get("action") == "value_map"
-            and item["field"]["pointer"] == q["target"]
-            and item.get("source_value") in set(map(str, q.get("identity", {}).values()))
+            if (
+                item.get("action") == "value_map"
+                and item["field"]["pointer"] == q["target"]
+                and item.get("source_value") in set(map(str, q.get("identity", {}).values()))
+            )
+            or (
+                q.get("action") == "record_value"
+                and item["field"]["pointer"] == q["target"]
+                and item.get("action") == "request_source"
+            )
         ]
         items = [item for item in items if item not in related]
         items.append(
@@ -473,7 +489,7 @@ def answer_document(
     if answers.keys() - catalogue.keys():
         raise ValidationFailed("An answer refers to a field that is not awaiting a decision")
     if set(remember or []) - answers.keys() or any(
-        catalogue[k].get("action") == "select_rows" for k in remember or []
+        catalogue[k].get("action") in ("select_rows", "record_value") for k in remember or []
     ):
         raise ValidationFailed(
             "Only answered field rules may be remembered; source-row exceptions are delivery-specific"
