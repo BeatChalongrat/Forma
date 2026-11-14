@@ -41,6 +41,14 @@ def auto_publish(ctx: ServiceContext, session: Session, round_id: str) -> dict[s
     )
     if dv is None:
         return {"decision": "review", "reasons": ["no data has been created yet"]}
+    if ctx.settings.pilot_mode:
+        pilot_result = {
+            "decision": "review",
+            "reasons": ["Pilot: a person must approve and export this dataset."],
+        }
+        r.summary = {**(r.summary or {}), "publish": pilot_result}
+        audit(session, "round.publish_decision", "round", r.id, actor=ACTOR, **pilot_result)
+        return pilot_result
     if dv.status in ("approved", "published"):
         art = latest_export(session, r.id, dataset_version_id=dv.id) or ds.export_dataset(
             ctx, session, dv.id, FORMAT, ACTOR

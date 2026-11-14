@@ -61,6 +61,8 @@ def create_batch(
 ) -> Batch:
     if not files:
         raise ValidationFailed("add at least one file")
+    if ctx.settings.pilot_mode:
+        auto_publish = False
     b = Batch(
         label=(label or "").strip() or f"Upload {dt.date.today().isoformat()}",
         auto_publish=auto_publish,

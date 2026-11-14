@@ -1,10 +1,10 @@
 // @vitest-environment jsdom
-import { deferred, mountPage, stub, toast } from './pageHarness'
+import { deferred, me, mountPage, stub, toast } from './pageHarness'
 import { beforeEach, expect, test } from 'vitest'
 import { fireEvent, screen, waitFor } from '@testing-library/react'
 import { BulkUpload } from '../src/pages/Upload'
 
-beforeEach(() => { stub('uploads', []); stub('upload', { id: 'batch-1', label: 'Existing round', auto_publish: false }) })
+beforeEach(() => { stub('me', me); stub('uploads', []); stub('upload', { id: 'batch-1', label: 'Existing round', auto_publish: false }) })
 function mount(url = '/imports/new') { return mountPage(<BulkUpload />, '/imports/new', url) }
 function add(container: HTMLElement, count = 1) {
   const files = Array.from({ length: count }, (_, i) => new File(['sku,price\nA,10'], `products-${i}.csv`, { type: 'text/csv' }))
@@ -93,4 +93,18 @@ test.each(['/imports/new', '/imports/new?batch=batch-1'])('Back from %s returns 
   await user.click(screen.getByRole('link', { name: url.includes('batch=') ? 'Back to this round' : 'Back to upload history' }))
   expect(router.state.location.pathname).toBe(url.includes('batch=') ? '/uploads/batch-1' : '/imports')
   expect(create).not.toHaveBeenCalled()
+})
+
+
+test('pilot explains the manual gate and disables automatic export', async () => {
+  stub('me', { ...me, pilot_mode: true })
+  const create = stub('createUpload', { id: 'batch-1' })
+  const { container, user } = mount()
+  await screen.findByText('Pilot: a person must check and approve each result before export.')
+  const checkbox = screen.getByRole('checkbox') as HTMLInputElement
+  expect(checkbox.disabled).toBe(true)
+  expect(checkbox.checked).toBe(false)
+  add(container)
+  await user.click(screen.getByRole('button', { name: 'Upload 1 files' }))
+  await waitFor(() => expect(create).toHaveBeenCalledWith(expect.any(Array), expect.objectContaining({ auto_publish: false })))
 })

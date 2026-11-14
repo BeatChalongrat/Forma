@@ -20,6 +20,7 @@ from forma.api.document_routes import router as document_router
 from forma.api.inspection_routes import router as inspection_router
 from forma.api.knowledge_revision_routes import router as knowledge_revision_router
 from forma.api.knowledge_routes import router as knowledge_router
+from forma.api.pilot_routes import router as pilot_router
 from forma.api.review_journey_routes import router as review_journey_router
 from forma.api.routes import api
 from forma.api.workspace_routes import router as workspace_router
@@ -149,6 +150,7 @@ def create_app() -> FastAPI:
     app.include_router(batch_router)
     app.include_router(workspace_router)
     app.include_router(review_journey_router)
+    app.include_router(pilot_router)
     app.dependency_overrides[get_session] = request_session  # committed before the response (ADR-057)
     return app
 

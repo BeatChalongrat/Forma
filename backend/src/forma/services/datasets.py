@@ -743,6 +743,8 @@ def approve_dataset(
 ) -> DatasetVersion:
     dv = _writable_dataset(session, dataset_id)
     _require_valid(dv, "approving")  # the contract is not negotiable: no acknowledgement overrides it
+    if ctx is not None and ctx.settings.pilot_mode and actor in ("policy", "system", "ai"):
+        raise Conflict("Pilot: a person must approve this dataset.")
     acknowledged = None
     if ctx is not None and ctx.policy.policy["anomaly"]["block_approval_on_high"]:
         rep = anomaly_report(ctx, session, dv)
@@ -897,6 +899,20 @@ def export_dataset(
     # exporting publishes: only data a human approved may leave (approved_data → published)
     if dv.status not in ("approved", "published"):
         raise Conflict(f"dataset is {dv.status}; approve it before exporting", details={"status": dv.status})
+    if ctx.settings.pilot_mode:
+        from forma.db.models import AuditLog
+
+        approval = session.scalar(
+            select(AuditLog)
+            .where(
+                AuditLog.action == "dataset.approve",
+                AuditLog.entity_id == dv.id,
+                AuditLog.actor.not_in(["policy", "system", "ai"]),
+            )
+            .limit(1)
+        )
+        if approval is None:
+            raise Conflict("Pilot: this exact dataset version needs a person's approval before export.")
     _require_valid(dv, "exporting")  # also for versions approved before the gate existed
     schema = ctx.registry.get_ref(get_mapping(session, dv.mapping_version_id).target_schema)
     src = ctx.records_path(dv)

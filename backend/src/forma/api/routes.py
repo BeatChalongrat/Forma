@@ -107,8 +107,10 @@ def _dataset_scoped(session: Session, p: Principal, dataset_id: str) -> DatasetV
 # Identity
 # ============================================================================================
 @api.get("/me")
-def me(p: Principal = Depends(authenticated_principal)) -> dict[str, Any]:
-    return p.to_dict()
+def me(
+    p: Principal = Depends(authenticated_principal), ctx: ServiceContext = Depends(ctx_dep)
+) -> dict[str, Any]:
+    return {**p.to_dict(), "pilot_mode": ctx.settings.pilot_mode}
 
 
 @api.get("/auth/config")

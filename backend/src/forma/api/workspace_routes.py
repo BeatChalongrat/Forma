@@ -161,7 +161,11 @@ def questions(
     p: Principal = Depends(require_role("importer")),
 ) -> dict[str, Any]:
     m = _mapping_scoped(session, p, mapping_id)
-    return {**review_questions.questions(ctx, m), **review_evidence.overview(ctx, session, m)}
+    return {
+        **review_questions.questions(ctx, m),
+        **review_evidence.overview(ctx, session, m),
+        "pilot_mode": ctx.settings.pilot_mode,
+    }
 
 
 @router.get("/mappings/{mapping_id}/questions/evidence")
