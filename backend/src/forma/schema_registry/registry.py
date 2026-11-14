@@ -42,7 +42,7 @@ SEMANTICS: dict[str, str] = {
     "category_path": "category (list or path)",
     "unit.sell": "selling unit, normalised (PCS, PACK, CARTON …)",
     "unit.pack_size": "pieces per pack, from 'ลัง(12)', '1x12' …",
-    "currency": "currency code (defaults to the schema default, else THB)",
+    "currency": "currency code from source evidence or an explicit schema default; otherwise ask",
     "status": "active / inactive / discontinued (spelled as the schema enum spells them)",
     "attributes": "unmapped columns, kept as key → value",
     "price.amount": "price; at the root for one price, or inside a prices collection",
@@ -572,6 +572,9 @@ class SchemaRegistry:
             version = max(existing) + 1
         xf["schema_id"], xf["version"] = sid, version
         schema = TargetSchema(sid, version, document, None)
+        from forma.ai.source_evidence import validate_currency_contract
+
+        validate_currency_contract(schema)
         identity = schema.identity_keys
         if not identity or not all(schema.has_field(k) for k in identity):
             raise ValidationFailed(

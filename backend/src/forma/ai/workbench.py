@@ -462,12 +462,32 @@ class FileWorkbench:
             for c in self.profile.tables[ti].columns:
                 if c.name not in taken.get(src, set()) and compatible(fs, c.to_dict()):
                     want(rank + 1, ti, c.name)
+        # Completely unmapped fields must receive evidence too. Numeric shape only
+        # nominates candidates; it never assigns an unclaimed column to a field.
+        from forma.ai.source_evidence import candidates
+
+        discovery = candidates(self.profile, self.schema, doc)
+        missing = [f for f in discovery["fields"] if not f["mapped"]]
+        for depth in range(3):
+            for f in missing:
+                for choice in f["candidates"][depth : depth + 1]:
+                    want(-20 + depth, choice["table_index"], choice["column"])
         wanted.sort(key=lambda w: (w[0], w[1], w[2]))
         reqs = [
             {"table_index": ti, "what": "distinct", "column": col}
             for _, ti, col in wanted[:GROUND_MAX_REQUESTS]
         ]
-        return self.inspect(reqs) if reqs else []
+        answers = self.inspect(reqs) if reqs else []
+        if len(wanted) > len(reqs):
+            answers.append(
+                {
+                    "evidence_scope": "bounded discovery",
+                    "inspected_columns": len(reqs),
+                    "candidate_columns": len(wanted),
+                    "complete": False,
+                }
+            )
+        return answers
 
     # ---- run ----------------------------------------------------------------------------------------
     @observed("verify", arguments=("doc", "full"))
@@ -519,7 +539,26 @@ class FileWorkbench:
                 out.append(keep)
         sample = [_clip(_without_meta(rec), self.max_chars) for rec in res.records[:SAMPLE_RECORDS]]
         from forma.ai.reconciliation import coverage
+        from forma.ai.source_evidence import currency_questions
         from forma.services.decision_actions import conflicting_records
+
+        decisions = conflicting_records(res.findings) if full else []
+        if full:
+            columns = {}
+            for source in doc.sources:
+                ti = self._table_index(source)
+                if ti is not None:
+                    table = self.profile.tables[ti]
+                    columns[source.id] = [
+                        c.to_dict()
+                        | {
+                            "file": table.file_name,
+                            "sheet": table.sheet,
+                            "header_row": table.table.header_row,
+                        }
+                        for c in table.columns
+                    ]
+            decisions.extend(currency_questions(doc, self.schema, columns))
 
         return RunReport(
             rows_in,
@@ -529,9 +568,9 @@ class FileWorkbench:
             errors=len(res.errors),
             coverage=coverage(res.records, self.schema, res.stats),
             complete=full,
-            # Reuse the same bounded decisions as the human-review service. Sample
-            # conflicts cannot establish that an entire delivery has been inspected.
-            decision_questions=conflicting_records(res.findings)[:12] if full else [],
+            # Reuse the human-review decisions. Each currency question labels its
+            # profile-sample scope separately from complete output execution.
+            decision_questions=decisions,
         )
 
     def verify(self, doc: MappingDocument) -> RunReport:

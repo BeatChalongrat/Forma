@@ -181,10 +181,13 @@ def build_workflow(
     previous: dict[str, Any] | None = None,
     examples: list[dict[str, Any]] | None = None,
 ) -> Any:
+    from forma.ai.source_evidence import candidates
+
     common = {
         "workbook_profile": agents._profile_digest(profile),
         "target_json_schema": schema.document,
         "operator_requirements": instructions,
+        "source_candidates": candidates(profile, schema, draft.mapping),
     }
     if learned:
         # Scoped human decisions are independent evidence, unlike the mapper's narrative.
