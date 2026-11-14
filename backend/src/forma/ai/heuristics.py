@@ -624,16 +624,21 @@ def propose_mapping(
         field_scores.append(m.score)
     mapped_targets = {f.target for f in fields}
     if currency is not None and currency.pointer not in mapped_targets:
-        code = str(currency.default or "THB")
+        code = str(currency.default) if currency.default is not None else None
         fields.append(
             FieldMapping(
                 target=currency.pointer,
                 expr=const(code),
-                confidence=0.9,
-                evidence=[f"default currency {code}"],
+                confidence=0.9 if code is not None else 0.0,
+                evidence=[
+                    f"contract default currency {code}"
+                    if code is not None
+                    else "No currency evidence or contract default"
+                ],
             )
         )
-        questions.extend(_currency_doubts(profile.tables, noise, root_idx, currency, code))
+        if code is not None:
+            questions.extend(_currency_doubts(profile.tables, noise, root_idx, currency, code))
     sell, pack = schema.semantic_field("unit.sell"), schema.semantic_field("unit.pack_size")
     if (
         sell is not None

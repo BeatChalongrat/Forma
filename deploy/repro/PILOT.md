@@ -28,6 +28,13 @@ API/worker ล็อก `FORMA_LLM_MOCK_ONLY=true`, `FORMA_PILOT_MODE=true`, ค
 
 ## ลองด้วยโมเดลจำลอง
 
+ชุดรันครบแบบสั่งครั้งเดียวและคู่เทียบกฎกับ mock พร้อมเฉลยดู
+[คู่มือชุดคู่เทียบ](../../docs/PILOT_PAIRED_EVALUATION.md)
+
+```powershell
+backend\.venv\Scripts\python deploy/repro/pilot_qualification.py --name pilot-nov14
+```
+
 ```powershell
 # ตอบคำถาม เก็บร่าง/ชนกันสอง request ยืนยัน สร้างข้อมูล อนุมัติ และดาวน์โหลด
 backend\.venv\Scripts\python deploy/repro/review_smoke.py --name pilot-nov14

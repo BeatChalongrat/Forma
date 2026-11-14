@@ -127,7 +127,12 @@ def score(
 
 
 def run(
-    manifest_path: Path, *, client: Any = None, execute: Any = None, settings: Any = None
+    manifest_path: Path,
+    *,
+    client: Any = None,
+    execute: Any = None,
+    settings: Any = None,
+    include_output: bool = False,
 ) -> dict[str, Any]:
     manifest = _json(manifest_path)
     root = manifest_path.resolve().parent
@@ -212,9 +217,15 @@ def run(
                     workbench=bench,
                 )
                 log = {"mapping": result.to_dict()}
+        if not case.get("mapping"):
+            log["draft_open_questions"] = draft.open_questions
         valid = validate_mapping(doc, schema)
         bindings, problems = bind(doc)
         output = TransformEngine(schema).run(doc, bindings, limit=None) if valid.ok and not problems else None
+        if include_output and output is not None:
+            # Persist deterministic business doubts even when the echo model did
+            # not produce prose about them. Gold is not part of this execution.
+            log["decision_questions"] = bench.verify(doc).decision_questions
         # Read gold after generation. No production memory or previous test outputs enter the prompt.
         expected = _json(root / case["expected"])
         metrics = score(output.records if output else [], expected, schema)
@@ -231,6 +242,8 @@ def run(
             "verification": verification(output, schema, complete=True, binding_problems=problems),
             "mapping": doc.model_dump(mode="json", exclude_none=True),
         }
+        if include_output:
+            report["records"] = output.records if output else []
         if case.get("baseline_output"):
             report["baseline"] = score(_json(root / case["baseline_output"]), expected, schema)
             report["field_accuracy_delta"] = metrics["field_accuracy"] - report["baseline"]["field_accuracy"]

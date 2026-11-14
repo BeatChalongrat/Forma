@@ -1,0 +1,52 @@
+{
+  "title": "Synthetic pilot currency-conflict",
+  "type": "object",
+  "required": [
+    "sku",
+    "price"
+  ],
+  "properties": {
+    "sku": {
+      "type": "string",
+      "description": "รหัสสินค้าคงเลขศูนย์นำหน้า",
+      "x-forma": {
+        "semantic": "sku",
+        "risk": "critical",
+        "synonyms_en": [
+          "SKU",
+          "Item Code"
+        ]
+      }
+    },
+    "price": {
+      "type": "number",
+      "x-forma": {
+        "risk": "critical",
+        "synonyms_en": [
+          "Price",
+          "Unit Price"
+        ]
+      }
+    },
+    "currency": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "ISO currency for Price. The sender supplies both Currency and Invoice Currency as the currency of this price; neither is authoritative. If they disagree, ask which applies. Do not silently prefer one.",
+      "x-forma": {
+        "risk": "critical",
+        "synonyms_en": [
+          "Currency"
+        ]
+      }
+    }
+  },
+  "x-forma": {
+    "schema_id": "pilot-currency-conflict",
+    "version": 1,
+    "identity_keys": [
+      "/sku"
+    ]
+  }
+}

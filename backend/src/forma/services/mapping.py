@@ -676,6 +676,11 @@ def propose_for_round(
     review_decisions.extend(
         unit_questions(doc, schema, _table_columns(MappingVersion(round_id=r.id), doc, session))
     )
+    from forma.ai.source_evidence import currency_questions
+
+    review_decisions.extend(
+        currency_questions(doc, schema, _table_columns(MappingVersion(round_id=r.id), doc, session))
+    )
     open_questions.extend(q["question"] for q in review_decisions if q["question"] not in open_questions)
     decision = ctx.policy.for_customer(r.customer.policy_overrides if r.customer else None).evaluate(
         doc,
@@ -1272,6 +1277,7 @@ def save_mapping_edit(
     *,
     simulate_rows: int | None = None,
     remaining_questions: list[Any] | None = None,
+    evidence_confirmations: list[dict[str, Any]] | None = None,
 ) -> MappingVersion:
     """A human edited the DSL in the Mapping Studio → new proposed version (never mutate in place)."""
     from forma.services import format_context
@@ -1314,6 +1320,15 @@ def save_mapping_edit(
             remaining_questions or [], doc, schema, sim.records
         )
     review_decisions.extend(unit_questions(doc, schema, _table_columns(parent, doc, session)))
+    from forma.ai.source_evidence import currency_questions
+
+    confirmations = [
+        *(parent.policy or {}).get("evidence_confirmations", []),
+        *(evidence_confirmations or []),
+    ]
+    review_decisions.extend(
+        currency_questions(doc, schema, _table_columns(parent, doc, session), confirmations)
+    )
     remaining_questions = list(
         dict.fromkeys([*(remaining_questions or []), *(q["question"] for q in review_decisions)])
     )
@@ -1363,6 +1378,7 @@ def save_mapping_edit(
         policy={
             **decision.to_dict(),
             "source": "human_edit",
+            "evidence_confirmations": confirmations,
             "format_context": format_context.observe(r.files) if r else {},
             "target_schema_hash": stable_hash(schema.document),
             "file_fingerprints": (parent.policy or {}).get("file_fingerprints", {}),

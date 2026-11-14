@@ -105,6 +105,9 @@ Rules you must follow:
   Check sample scope: a sampled key or ratio is not a full-file proof. Inspect join keys explicitly
   before choosing a relationship when headers are ambiguous or item codes repeat across companies.
   Missing business intent must stay unresolved even if two candidate mappings both pass the schema.
+- source_candidates includes wholly unmapped fields, even with unfamiliar headers. It is a shortlist
+  of hypotheses, not evidence that the top candidate is correct. Use the source tools to expand it
+  when candidates_complete is false. Inspect notes and relationships before asking the operator.
 - You may return {{"mapping": null, "candidates": [{{"label": "...", "mapping": DSL}}, ...]}}
   to compare 2–3 alternatives when candidate_turns_left is positive. FORMA returns execution evidence
   for each, never a business verdict. Then submit your chosen final mapping with clarifications.
@@ -738,6 +741,9 @@ def mapping_agent(
         "draft_unmatched_columns": draft.unmatched_columns,
         "operator_requirements": instructions,
     }
+    from forma.ai.source_evidence import candidates
+
+    payload["source_candidates"] = candidates(profile, schema, draft.mapping)
     if schema_analysis:
         payload["schema_analysis"] = schema_analysis
     if examples:

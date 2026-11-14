@@ -85,6 +85,7 @@ def _table_columns(
                 {
                     **c,
                     "file": file.original_name,
+                    "file_sha256": file.sha256,
                     "sheet": tables[0].get("sheet"),
                     "header_row": (tables[0].get("table") or {}).get("header_row"),
                 }
@@ -339,6 +340,10 @@ def questions(ctx: ServiceContext, m: MappingVersion) -> dict[str, Any]:
                 and item.get("action") == "request_source"
             )
         ]
+        if q.get("evidence_key"):
+            related.extend(
+                item for item in items if item["field"]["pointer"] == q["target"] and item not in related
+            )
         items = [item for item in items if item not in related]
         items.append(
             {
@@ -535,7 +540,17 @@ def answer_document(
         elif kind == "choice":
             if not isinstance(value, str) or value not in q["options"]:
                 raise ValidationFailed("Choose one of the offered columns")
-            f.expr = repoint(f.expr, _col_leaves(f.expr)[0], value)
+            source_columns = _col_leaves(f.expr)
+            if not source_columns and q.get("evidence_key"):
+                # A server-generated evidence question can replace an unsupported
+                # constant with a row-preserving source reading.
+                from forma.mapping_dsl.models import ColExpr
+
+                f.expr = ColExpr(name=value)
+            elif len(source_columns) == 1:
+                f.expr = repoint(f.expr, source_columns[0], value)
+            else:
+                raise ValidationFailed("Open the mapping editor to review this multi-column expression")
         elif kind in ("text", "enum"):
             if not isinstance(value, str) or not value.strip() or len(value) > 5000:
                 raise ValidationFailed("Enter a nonempty value of at most 5000 characters")
@@ -702,7 +717,52 @@ def apply_answers(
 
     catalogue = {q["id"]: q for q in questions(ctx, m)["questions"]}
     effect_check = validate_answer_effects(ctx, session, m, document, [catalogue[k] for k in answers])
-    new = ms.save_mapping_edit(ctx, session, m.id, document, actor, remaining_questions=remaining)
+    confirmations = []
+    answered_doc = MappingDocument.model_validate(document)
+    schema = ctx.registry.get_ref(m.target_schema)
+    from forma.ai.source_evidence import currency_questions, is_currency
+
+    # A typed clarification can confirm a contract default before a source evidence question exists.
+    # Record the resulting constant only if the new question has the same scope and needs no source choice.
+    constant_targets = {
+        catalogue[key]["field"]["pointer"]
+        for key in answers
+        if not catalogue[key].get("evidence_key")
+        and catalogue[key].get("action") == "constant"
+        and catalogue[key].get("scope") == "constant_for_this_file"
+        and is_currency(schema.field(catalogue[key]["field"]["pointer"]))
+    }
+    constant_keys = {}
+    if constant_targets:
+        constant_keys = {
+            q["target"]: q["evidence_key"]
+            for q in currency_questions(answered_doc, schema, _table_columns(m, answered_doc, session))
+            if q["target"] in constant_targets and q.get("action") == "constant"
+        }
+    for key in answers:
+        q = catalogue[key]
+        target = q["field"]["pointer"]
+        evidence_key = q.get("evidence_key") or constant_keys.get(target)
+        if evidence_key:
+            fm = decision_actions.field_mapping(answered_doc, target)
+            confirmations.append(
+                {
+                    "evidence_key": evidence_key,
+                    "target": fm.target,
+                    "expression": fm.expr.model_dump(mode="json"),
+                    "actor": actor,
+                    "round_id": m.round_id,
+                }
+            )
+    new = ms.save_mapping_edit(
+        ctx,
+        session,
+        m.id,
+        document,
+        actor,
+        remaining_questions=remaining,
+        evidence_confirmations=confirmations,
+    )
     history = list((m.policy or {}).get("confirmed_decisions", []))
     for key, value in answers.items():
         q = catalogue[key]

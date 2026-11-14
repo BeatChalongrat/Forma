@@ -39,7 +39,10 @@ def presentation(item: dict[str, Any]) -> dict[str, Any]:
     original = item.get("question")
     prompt = None
     why = "หลักฐานยังไม่พอยืนยันความหมายของข้อมูล กรุณาตรวจตัวอย่างและสอบถามเจ้าของไฟล์หากยังไม่ทราบ"
-    if action == "record_value":
+    if item.get("evidence_key"):
+        prompt = original
+        why = item.get("why", why)
+    elif action == "record_value":
         identity = " · ".join(map(str, item.get("identity", {}).values()))
         prompt = f"รายการ {identity} ยังไม่มี{label} ค่าที่ถูกต้องคืออะไร?"
         why = "คำตอบจะเติมเฉพาะรายการนี้ กรุณาดูผลก่อนบันทึก และยังไม่ต้องตอบหากไม่ทราบ"

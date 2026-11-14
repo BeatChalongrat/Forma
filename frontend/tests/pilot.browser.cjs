@@ -20,6 +20,7 @@ const path = require('node:path');
   const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, acceptDownloads: true });
   const page = await context.newPage();
   const errors = [];
+  const started = performance.now();
   page.on('pageerror', e => errors.push(e.message));
   await context.tracing.start({ screenshots: true, snapshots: true });
   async function waitFor(fn) {
@@ -94,9 +95,27 @@ const path = require('node:path');
     const rows = JSON.parse(await fs.readFile(downloaded, 'utf8'));
     assert.equal(rows.length, 12);
     assert.ok(rows.every(row => row.prices.every(price => price.vat_included === true)));
+    assert.equal(new Set(rows.map(row => row.sku)).size, 12);
+    for (let i = 1; i <= 12; i++) {
+      const row = rows.find(item => item.sku === `A${String(i).padStart(3, '0')}`);
+      assert.ok(row, `Missing SKU A${i}`);
+      assert.equal(row.product_name, `สินค้า ${i}`);
+      assert.deepEqual(row.unit, { sell_unit: 'PCS', pack_size: 12 });
+      assert.equal(row.prices.length, 1);
+      assert.equal(row.prices[0].amount, 107 * i);
+      assert.equal(row.currency, 'THB');
+      assert.equal(row.inventory.length, 2);
+      assert.deepEqual(Object.fromEntries(row.inventory.map(item => [item.warehouse_code, item.qty])), { BKK: 3 * i, CNX: i });
+      assert.equal((row.promotions || []).length, i === 1 ? 1 : 0);
+      if (i === 1) assert.deepEqual(row.promotions[0], {
+        type: 'percent_off', discount_percent: 10, start_date: '2026-10-01', end_date: '2026-10-31', promo_code: 'PR1'
+      });
+    }
     assert.deepEqual(errors, []);
     const result = { passed: true, rows: 12, mock_only: true, cost_usd: 0, question_count: qs.questions.length,
-      checks: ['upload auto-export disabled', 'question feedback persisted', 'reload preserves answer', 'browser Back preserves pack size', 'preview', 'export denied before approval', 'human approval', 'download correct JSON'] };
+      automation_seconds: (performance.now() - started) / 1000, human_review_seconds: null,
+      instance: name, round_id: f.round_id,
+      checks: ['upload auto-export disabled', 'question feedback persisted', 'reload preserves answer', 'browser Back preserves pack size', 'preview', 'export denied before approval', 'human approval', 'download correct JSON', 'all 12 identities, prices, units, warehouse joins and promotion dates match independent expectations'] };
     await fs.writeFile(path.join(out, 'result.json'), JSON.stringify(result, null, 2));
     console.log(JSON.stringify(result));
   } finally {
