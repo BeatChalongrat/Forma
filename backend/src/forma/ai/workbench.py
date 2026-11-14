@@ -543,7 +543,7 @@ class FileWorkbench:
         from forma.services.decision_actions import conflicting_records
 
         decisions = conflicting_records(res.findings) if full else []
-        if full:
+        if full and self.profile is not None:
             columns = {}
             for source in doc.sources:
                 ti = self._table_index(source)

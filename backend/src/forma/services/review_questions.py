@@ -719,13 +719,35 @@ def apply_answers(
     effect_check = validate_answer_effects(ctx, session, m, document, [catalogue[k] for k in answers])
     confirmations = []
     answered_doc = MappingDocument.model_validate(document)
+    schema = ctx.registry.get_ref(m.target_schema)
+    from forma.ai.source_evidence import currency_questions, is_currency
+
+    # A typed clarification can confirm a contract default before a source evidence question exists.
+    # Record the resulting constant only if the new question has the same scope and needs no source choice.
+    constant_targets = {
+        catalogue[key]["field"]["pointer"]
+        for key in answers
+        if not catalogue[key].get("evidence_key")
+        and catalogue[key].get("action") == "constant"
+        and catalogue[key].get("scope") == "constant_for_this_file"
+        and is_currency(schema.field(catalogue[key]["field"]["pointer"]))
+    }
+    constant_keys = {}
+    if constant_targets:
+        constant_keys = {
+            q["target"]: q["evidence_key"]
+            for q in currency_questions(answered_doc, schema, _table_columns(m, answered_doc, session))
+            if q["target"] in constant_targets and q.get("action") == "constant"
+        }
     for key in answers:
         q = catalogue[key]
-        if q.get("evidence_key"):
-            fm = decision_actions.field_mapping(answered_doc, q["field"]["pointer"])
+        target = q["field"]["pointer"]
+        evidence_key = q.get("evidence_key") or constant_keys.get(target)
+        if evidence_key:
+            fm = decision_actions.field_mapping(answered_doc, target)
             confirmations.append(
                 {
-                    "evidence_key": q["evidence_key"],
+                    "evidence_key": evidence_key,
                     "target": fm.target,
                     "expression": fm.expr.model_dump(mode="json"),
                     "actor": actor,
