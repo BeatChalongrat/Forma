@@ -206,7 +206,7 @@ def test_backpressure_returns_429_with_retry_after(
 
 
 def test_upload_size_cap(isolated_env: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("FORMA_MAX_UPLOAD_MB", "0")
+    monkeypatch.setenv("FORMA_MAX_UPLOAD_MB", "1")
     from tests.conftest import clear_forma_caches
 
     clear_forma_caches()
@@ -218,10 +218,13 @@ def test_upload_size_cap(isolated_env: Path, monkeypatch: pytest.MonkeyPatch) ->
         xlsx = make_workbook(isolated_env / FILE_NAME)
         r = c.post(
             f"/api/rounds/{rid}/files",
-            files=[("files", (FILE_NAME, xlsx.read_bytes(), "application/octet-stream"))],
+            files=[
+                ("files", (FILE_NAME, xlsx.read_bytes() + b" " * (1024 * 1024), "application/octet-stream"))
+            ],
         )
         assert r.status_code == 413, r.text
-        assert r.json()["error"] == "payload_too_large" and "MB" in r.json()["message"]
+        assert r.json()["error"] == "payload_too_large"
+        assert r.json()["details"]["limit_bytes"] == 1024 * 1024
 
 
 def test_run_pipeline_is_resumable(client: TestClient, isolated_env: Path) -> None:

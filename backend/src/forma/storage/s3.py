@@ -13,6 +13,7 @@ from collections.abc import Iterator
 from pathlib import Path
 from typing import Any, BinaryIO
 
+from forma.core.http import attachment_header
 from forma.storage.base import ObjectInfo, validate_key
 
 
@@ -50,7 +51,9 @@ class S3Storage:
                 aws_secret_access_key=secret_key,
                 config=Config(
                     s3={"addressing_style": "path"} if endpoint else {},
-                    retries={"max_attempts": 5},
+                    connect_timeout=5,
+                    read_timeout=30,
+                    retries={"mode": "standard", "total_max_attempts": 3},
                 ),
             )
 
@@ -88,7 +91,10 @@ class S3Storage:
 
     def get(self, key: str) -> bytes:
         body = self.client.get_object(Bucket=self.bucket, Key=self._k(key))["Body"]
-        return bytes(body.read())
+        try:
+            return bytes(body.read())
+        finally:
+            body.close()
 
     def open(self, key: str) -> BinaryIO:
         return self.client.get_object(Bucket=self.bucket, Key=self._k(key))["Body"]  # type: ignore[no-any-return]
@@ -120,7 +126,7 @@ class S3Storage:
     def url(self, key: str, *, expires_s: int = 900, filename: str | None = None) -> str | None:
         params: dict[str, Any] = {"Bucket": self.bucket, "Key": self._k(key)}
         if filename:
-            params["ResponseContentDisposition"] = f'attachment; filename="{filename}"'
+            params["ResponseContentDisposition"] = attachment_header(filename)
         url = self.public_client.generate_presigned_url(
             "get_object", Params=params, ExpiresIn=expires_s or self.presign_s
         )

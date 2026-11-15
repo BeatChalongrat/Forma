@@ -19,7 +19,7 @@ from typing import Any
 
 import polars as pl
 
-from forma.core.errors import UnsupportedFile
+from forma.core.errors import UnsupportedFile, ValidationFailed
 
 EXCEL_EXT = {".xlsx", ".xlsm", ".xls", ".xlsb"}
 CSV_EXT = {".csv", ".txt", ".tsv"}
@@ -148,6 +148,10 @@ def read_excel_sheet_raw(
     validate_cells: bool = True,
 ) -> pl.DataFrame:
     """Whole sheet as strings, columns named c0..cN, no header interpretation."""
+    reader = _fastexcel_reader(path)
+    present = 0 <= sheet < len(reader.sheet_names) if isinstance(sheet, int) else sheet in reader.sheet_names
+    if not present:
+        raise ValidationFailed("ไม่พบชีตที่เลือก กรุณาโหลดรายการชีตล่าสุดแล้วเลือกอีกครั้ง", details={"sheet": sheet})
     inspected = None
     if path.suffix.lower() in {".xlsx", ".xlsm"}:
         from forma.ingestion.ooxml import inspect_workbook, require_cached_values
@@ -156,7 +160,6 @@ def read_excel_sheet_raw(
         inspected = sheets[sheet] if isinstance(sheet, int) else next(s for s in sheets if s.name == sheet)
         if validate_cells:
             require_cached_values(inspected)
-    reader = _fastexcel_reader(path)
     sh = reader.load_sheet(sheet, header_row=None, n_rows=n_rows, skip_rows=skip_rows, dtypes="string")
     df: pl.DataFrame = sh.to_polars()
     physical = [c.absolute_index for c in sh.selected_columns]

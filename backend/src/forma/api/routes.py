@@ -7,7 +7,8 @@ from typing import Any
 from fastapi import APIRouter, Depends, File, Form, Query, UploadFile
 from fastapi.responses import RedirectResponse, Response, StreamingResponse
 from sqlalchemy import case, func, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, load_only
+from starlette.background import BackgroundTask
 from starlette.concurrency import run_in_threadpool
 
 from forma.ai.agents import copilot_agent, diagnosis_agent
@@ -34,6 +35,7 @@ from forma.api.schemas import (
     SourcePreviewIn,
     WaitIn,
 )
+from forma.api.uploads import read_upload, read_uploads
 from forma.auth import (
     Principal,
     authenticated_principal,
@@ -43,7 +45,8 @@ from forma.auth import (
     llm_rate_limited,
     require_role,
 )
-from forma.core.errors import Forbidden, NotFound, PayloadTooLarge, ValidationFailed
+from forma.core.errors import Forbidden, NotFound
+from forma.core.http import attachment_header
 from forma.db.models import (
     ChangeSet,
     Customer,
@@ -148,14 +151,24 @@ def list_customers(
             )
         ).all()
     )
-    approved = {
-        m.customer_id
-        for m in session.scalars(select(MappingVersion).where(MappingVersion.status == "approved"))
-    }
+    approved = set(
+        session.scalars(
+            _scoped(
+                p,
+                select(MappingVersion.customer_id).where(MappingVersion.status == "approved").distinct(),
+                MappingVersion.customer_id,
+            )
+        )
+    )
     from forma.services import foresight
 
     by_customer: dict[str, list[ImportRound]] = {}
-    for r in session.scalars(select(ImportRound).order_by(ImportRound.created_at)):
+    dates = (
+        _scoped(p, select(ImportRound), ImportRound.customer_id)
+        .options(load_only(ImportRound.customer_id, ImportRound.created_at, raiseload=True))
+        .order_by(ImportRound.created_at)
+    )
+    for r in session.scalars(dates):
         by_customer.setdefault(r.customer_id, []).append(r)
     return [
         ser.customer(
@@ -173,6 +186,7 @@ def list_customers(
 def create_customer(
     body: CustomerIn, session: Session = Depends(get_session), p: Principal = Depends(require_role("admin"))
 ) -> dict[str, Any]:
+    ensure_all_customers(p)
     return ser.customer(rs.create_customer(session, body.code, body.name, body.erp_type, body.notes))
 
 
@@ -249,7 +263,7 @@ def delete_override(
 def list_rounds(
     status: str | None = None,
     customer_id: str | None = None,
-    limit: int = Query(100, le=500),
+    limit: int = Query(100, ge=1, le=500),
     offset: int = Query(0, ge=0),
     session: Session = Depends(get_session),
     p: Principal = Depends(current_principal),
@@ -323,33 +337,6 @@ def get_round(
     return d
 
 
-async def read_upload(up: UploadFile, limit_mb: int) -> bytes:
-    """An uploaded file's bytes, refused past ``FORMA_MAX_UPLOAD_MB`` (checked while reading) or when empty."""
-    limit = limit_mb * 1024 * 1024
-    if up.size is not None and up.size > limit:
-        raise PayloadTooLarge(
-            f"{up.filename} is {up.size / 1024 / 1024:.1f} MB; the limit is {limit_mb} MB",
-            details={"file": up.filename, "size": up.size, "limit_bytes": limit},
-        )
-    chunks: list[bytes] = []
-    size = 0
-    while True:
-        chunk = await up.read(1024 * 1024)
-        if not chunk:
-            break
-        size += len(chunk)
-        if size > limit:
-            raise PayloadTooLarge(
-                f"{up.filename} exceeds the upload limit of {limit_mb} MB",
-                details={"file": up.filename, "limit_bytes": limit},
-            )
-        chunks.append(chunk)
-    data = b"".join(chunks)
-    if not data:
-        raise ValidationFailed(f"{up.filename} is empty")
-    return data
-
-
 @api.post("/rounds/{round_id}/files", status_code=201)
 async def upload_files(
     round_id: str,
@@ -360,9 +347,9 @@ async def upload_files(
 ) -> list[dict[str, Any]]:
     r = _round_scoped(session, p, round_id)
     out = []
-    for up in files:
-        data = await read_upload(up, ctx.settings.max_upload_mb)
-        out.append(ser.source_file(rs.add_file(ctx, session, r, up.filename or "upload.xlsx", data)))
+    for name, data in await read_uploads(files, ctx.settings):
+        source = await run_in_threadpool(rs.add_file, ctx, session, r, name, data)
+        out.append(ser.source_file(source))
     return out
 
 
@@ -384,8 +371,8 @@ def get_file(
 def file_grid(
     round_id: str,
     file_id: str,
-    sheet: int = 0,
-    rows: int = Query(60, le=500),
+    sheet: int = Query(0, ge=0),
+    rows: int = Query(60, ge=1, le=500),
     session: Session = Depends(get_session),
     ctx: ServiceContext = Depends(ctx_dep),
     p: Principal = Depends(current_principal),
@@ -505,9 +492,9 @@ async def replace_round(
 ) -> dict[str, Any]:
     """A corrected delivery takes the old round's place; the old JSON leaves the work round's zip."""
     r = _round_scoped(session, p, round_id)
-    loaded = [(f.filename or "upload.xlsx", await read_upload(f, ctx.settings.max_upload_mb)) for f in files]
+    loaded = await read_uploads(files, ctx.settings)
     await run_in_threadpool(lambda: runner.cancel_round_jobs(round_id, actor=p.actor))
-    new = lifecycle.replace(ctx, session, p, r, loaded, reason, label)
+    new = await run_in_threadpool(lifecycle.replace, ctx, session, p, r, loaded, reason, label)
     payload = {
         "round_id": new.id,
         "actor": p.actor,
@@ -563,8 +550,8 @@ async def replace_file(
 ) -> dict[str, Any]:
     r = _round_scoped(session, p, round_id)
     loaded = (file.filename or "upload.xlsx", await read_upload(file, ctx.settings.max_upload_mb))
-    destination, rerun = file_actions.change(
-        ctx, session, p, r, file_id, "replace", reason, replacement=loaded
+    destination, rerun = await run_in_threadpool(
+        file_actions.change, ctx, session, p, r, file_id, "replace", reason, replacement=loaded
     )
     return await run_in_threadpool(_file_action_result, session, p, destination, rerun, sync)
 
@@ -895,7 +882,7 @@ def answer_question_group(
 def review_queue(
     status: str = "open",
     round_id: str | None = None,
-    limit: int = Query(200, le=1000),
+    limit: int = Query(200, ge=1, le=1000),
     offset: int = Query(0, ge=0),
     session: Session = Depends(get_session),
     p: Principal = Depends(current_principal),
@@ -1146,6 +1133,7 @@ def export_dataset(
 @api.get("/exports/{export_id}/download")
 def download_export(
     export_id: str,
+    proxy: bool = Query(False),
     session: Session = Depends(get_session),
     ctx: ServiceContext = Depends(ctx_dep),
     p: Principal = Depends(current_principal),
@@ -1156,14 +1144,17 @@ def download_export(
         raise NotFound("export not found")
     ensure_customer(p, e.customer_id)
     name = e.storage_key.rsplit("/", 1)[-1]
-    url = ctx.storage.url(e.storage_key, expires_s=ctx.settings.s3_presign_s, filename=name)
-    if url:
+    url = (
+        None if proxy else ctx.storage.url(e.storage_key, expires_s=ctx.settings.s3_presign_s, filename=name)
+    )
+    if url and not proxy:
         return RedirectResponse(url, status_code=307)
     fh = ctx.storage.open(e.storage_key)
     return StreamingResponse(
         iter(lambda: fh.read(1024 * 1024), b""),
         media_type=MEDIA_TYPES[e.fmt],
-        headers={"Content-Disposition": f'attachment; filename="{name}"'},
+        headers={"Content-Disposition": attachment_header(name)},
+        background=BackgroundTask(fh.close),
     )
 
 
@@ -1376,6 +1367,7 @@ def register_schema(
 ) -> dict[str, Any]:
     """A new target format (or a new version of one) is stored in the database, never written into the
     image: every API and worker process loads it on its next config check (ADR-017)."""
+    ensure_all_customers(p)
     s = ctx.registry.prepare(body.document)
     cfg.store_schema(session, s, p.actor)
     session.commit()
@@ -1394,6 +1386,7 @@ def diff_schema(
 def get_policy(
     ctx: ServiceContext = Depends(ctx_dep), p: Principal = Depends(require_role("admin"))
 ) -> dict[str, Any]:
+    ensure_all_customers(p)
     return ctx.policy.policy
 
 
@@ -1522,7 +1515,7 @@ def dashboard(
 def list_jobs(
     status: str | None = None,
     kind: str | None = None,
-    limit: int = Query(100, le=1000),
+    limit: int = Query(100, ge=1, le=1000),
     offset: int = Query(0, ge=0),
     p: Principal = Depends(current_principal),
 ) -> list[dict[str, Any]]:
@@ -1585,7 +1578,7 @@ def ops_summary(
 
 @api.get("/audit")
 def audit_log(
-    limit: int = Query(100, le=1000),
+    limit: int = Query(100, ge=1, le=1000),
     offset: int = Query(0, ge=0),
     entity_id: str | None = None,
     session: Session = Depends(get_session),

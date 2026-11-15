@@ -37,18 +37,29 @@ def workbook(i):
     return content.getvalue()
 
 
-def run(name, count, out):
+def request_with_backpressure(client, method, url, **kwargs):
+    # 429 is rejected before upload side effects. Reuse the exact request, never blindly retry 5xx writes.
+    for attempt in range(13):
+        response = client.request(method, url, **kwargs)
+        if response.status_code != 429 or attempt == 12:
+            response.raise_for_status()
+            return response.json()
+        time.sleep(min(5, max(0.1, float(response.headers.get("Retry-After", "1")))))
+
+
+def run(name, count, out, *, skip_reports=False):
     path, marker, config = repro.load(name)
     assert name.startswith("qa-"), "Only a disposable quality-gate instance is allowed"
+    assert not skip_reports or marker.get("pilot"), (
+        "Report exclusion is only for the small local pilot"
+    )
     repro.local_daemon()
     repro.owned_resources(marker, config)
     base = f"http://127.0.0.1:{marker['ports'][0]}"
     with httpx.Client(base_url=base, timeout=120, trust_env=False) as c:
 
         def call(method, url, **kwargs):
-            r = c.request(method, url, **kwargs)
-            r.raise_for_status()
-            return r.json()
+            return request_with_backpressure(c, method, url, **kwargs)
 
         ai = call("GET", "/api/settings/ai")
         assert ai["mock_only"] and ai["active_provider"] == "mock"
@@ -168,6 +179,8 @@ def run(name, count, out):
             ("report_probe.py", []),
             ("activity_probe.py", [rounds[0]]),
         ):
+            if skip_reports and filename == "report_probe.py":
+                continue
             source = (ROOT / "deploy/repro" / filename).read_text(encoding="utf-8")
             result = repro.compose(
                 path,
@@ -194,7 +207,9 @@ def run(name, count, out):
                     "rows_per_file": 12,
                     "model": "mock",
                     "api_cost_usd": 0,
-                    "report_renderer": "passed",
+                    "report_renderer": "not_run_local_pilot"
+                    if skip_reports
+                    else "passed",
                 },
                 indent=2,
             )
@@ -206,8 +221,13 @@ if __name__ == "__main__":
     p.add_argument("--name", required=True)
     p.add_argument("--jobs", type=int, default=300)
     p.add_argument("--out", type=Path, required=True)
+    p.add_argument(
+        "--skip-reports",
+        action="store_true",
+        help="Local pilot only; not a full release gate",
+    )
     a = p.parse_args()
     if not 1 <= a.jobs <= 300:
         p.error("jobs must be 1..300")
     with repro.instance_lock(a.name):
-        run(a.name, a.jobs, a.out)
+        run(a.name, a.jobs, a.out, skip_reports=a.skip_reports)

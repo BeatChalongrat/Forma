@@ -4,26 +4,31 @@ from __future__ import annotations
 
 import hashlib
 import json
+import tempfile
 from datetime import date
-from typing import Any
+from typing import Any, BinaryIO, cast
 
 from fastapi import APIRouter, Depends, File, Form, Query, UploadFile
-from fastapi.responses import Response
+from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select, text, update
 from sqlalchemy.orm import Session
+from starlette.background import BackgroundTask
 from starlette.concurrency import run_in_threadpool
 
-from forma.api.routes import ctx_dep, read_upload
+from forma.api.routes import ctx_dep
 from forma.api.schemas import BatchAssignIn
+from forma.api.uploads import read_uploads
 from forma.auth import Principal, current_principal, llm_rate_limited, require_role
 from forma.core.errors import Conflict, Forbidden, ValidationFailed
+from forma.core.http import attachment_header
 from forma.db.models import AuditLog, Batch, BatchItem
 from forma.db.session import get_session
 from forma.jobs import runner
 from forma.services import batches as bs
 from forma.services import rounds as rs
 from forma.services.context import ServiceContext
+from forma.storage import safe_name
 
 router = APIRouter(prefix="/api")
 
@@ -85,7 +90,36 @@ async def create_batch(
     _all_customers(p)
     if use_llm:
         llm_rate_limited(p)
-    data = [(up.filename or "upload.xlsx", await read_upload(up, ctx.settings.max_upload_mb)) for up in files]
+    data = await read_uploads(files, ctx.settings)
+    return await run_in_threadpool(
+        _create_batch,
+        session,
+        ctx,
+        p,
+        data,
+        label,
+        work_date,
+        expected_files,
+        auto_publish,
+        use_llm,
+        upload_key,
+        sync,
+    )
+
+
+def _create_batch(
+    session: Session,
+    ctx: ServiceContext,
+    p: Principal,
+    data: list[tuple[str, bytes]],
+    label: str | None,
+    work_date: date | None,
+    expected_files: int | None,
+    auto_publish: bool,
+    use_llm: bool | None,
+    upload_key: str | None,
+    sync: bool,
+) -> dict[str, Any]:
     receipt_id = hashlib.sha256(f"{p.actor}\0{upload_key}".encode()).hexdigest()[:40] if upload_key else None
     digest = hashlib.sha256(
         json.dumps(
@@ -117,7 +151,7 @@ async def create_batch(
             if receipt.details["digest"] != digest:
                 raise Conflict("This upload request changed. Start a new upload request.")
             existing = bs.get_batch(session, receipt.details["batch_id"])
-            return {**bs.batch_view(session, existing), "added": 0, "skipped": len(files), "replayed": True}
+            return {**bs.batch_view(session, existing), "added": 0, "skipped": len(data), "replayed": True}
     b = bs.create_batch(
         ctx,
         session,
@@ -143,12 +177,12 @@ async def create_batch(
         )
     session.commit()
     # off the event loop: the arq backend submits with asyncio.run, which cannot nest in this async handler
-    await run_in_threadpool(_process, jobs, p, sync=sync, use_llm=use_llm)
+    _process(jobs, p, sync=sync, use_llm=use_llm)
     session.expire_all()
     return {
         **bs.batch_view(session, bs.get_batch(session, b.id)),
         "added": added,
-        "skipped": len(files) - added,
+        "skipped": len(data) - added,
         "replayed": False,
     }
 
@@ -167,7 +201,19 @@ async def append_files(
     if use_llm:
         llm_rate_limited(p)
     bs.get_batch(session, batch_id)
-    data = [(up.filename or "upload.xlsx", await read_upload(up, ctx.settings.max_upload_mb)) for up in files]
+    data = await read_uploads(files, ctx.settings)
+    return await run_in_threadpool(_append_files, session, ctx, p, batch_id, data, sync, use_llm)
+
+
+def _append_files(
+    session: Session,
+    ctx: ServiceContext,
+    p: Principal,
+    batch_id: str,
+    data: list[tuple[str, bytes]],
+    sync: bool,
+    use_llm: bool | None,
+) -> dict[str, Any]:
     # Acquire a write lock on both PostgreSQL and SQLite before deduplication.
     session.execute(update(Batch).where(Batch.id == batch_id).values(label=Batch.label))
     session.expire_all()
@@ -177,12 +223,12 @@ async def append_files(
     added = len(b.items) - before
     jobs = _stage(session, todo, p, sync=sync, use_llm=use_llm)
     session.commit()
-    await run_in_threadpool(_process, jobs, p, sync=sync, use_llm=use_llm)
+    _process(jobs, p, sync=sync, use_llm=use_llm)
     session.expire_all()
     return {
         **bs.batch_view(session, bs.get_batch(session, batch_id)),
         "added": added,
-        "skipped": len(files) - added,
+        "skipped": len(data) - added,
     }
 
 
@@ -309,13 +355,21 @@ def download(
     """A zip with one JSON per file whose JSON is ready, named after the file."""
     _all_customers(p)
     b = bs.get_batch(session, batch_id)
-    blob, n = bs.zip_outputs(ctx, session, b)
-    if n == 0:
-        raise Conflict("no JSON is ready yet in this upload")
-    rs.audit(session, "batch.download", "batch", b.id, actor=p.actor, files=n)
-    name = "".join(ch if ch.isalnum() or ch in "-_." else "_" for ch in (b.label or b.id)) or b.id
-    return Response(
-        blob,
-        media_type="application/zip",
-        headers={"Content-Disposition": f'attachment; filename="{name}.zip"'},
-    )
+    archive = tempfile.TemporaryFile(mode="w+b")  # noqa: SIM115  closed after streaming or on build failure
+    try:
+        _, n = bs.zip_outputs(ctx, session, b, output=cast(BinaryIO, archive))
+        if n == 0:
+            raise Conflict("no JSON is ready yet in this upload")
+        rs.audit(session, "batch.download", "batch", b.id, actor=p.actor, files=n)
+        size = archive.tell()
+        archive.seek(0)
+        name = safe_name(b.label or b.id)
+        return StreamingResponse(
+            iter(lambda: archive.read(1024 * 1024), b""),
+            media_type="application/zip",
+            headers={"Content-Disposition": attachment_header(f"{name}.zip"), "Content-Length": str(size)},
+            background=BackgroundTask(archive.close),
+        )
+    except BaseException:
+        archive.close()
+        raise

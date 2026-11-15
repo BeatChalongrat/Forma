@@ -22,7 +22,7 @@ export class ApiError extends Error {
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(path, { ...init, headers: { ...(init?.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }), ...authHeaders(), ...(init?.headers ?? {}) } })
   if (res.status === 401 && !path.startsWith('/api/auth/')) {
-    void login()
+    void login().catch(() => undefined)
   }
   if (!res.ok) {
     let body: { error?: string; message?: string; detail?: unknown; details?: unknown } = {}
@@ -97,7 +97,7 @@ async function chatStream(id: string, body: { clarification_turn_id?: string; qu
 async function openChatStream(id: string, body: { clarification_turn_id?: string; question: string; request_id: string; language: 'th' | 'en'; timezone: string; attachment_ids?: string[]; artifact_id?: string; target?: string }, onEvent: (event: ChatStreamEvent) => void, signal: AbortSignal): Promise<ChatTurn> {
   const opening = new AbortController(), deadline = setTimeout(() => opening.abort(), 30000)
   const response = await fetch(`/api/assistant/conversations/${encodeURIComponent(id)}/messages/stream`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() }, body: JSON.stringify(body), signal: AbortSignal.any([signal, opening.signal]) }).finally(() => clearTimeout(deadline))
-  if (response.status === 401) void login()
+  if (response.status === 401) void login().catch(() => undefined)
   if (!response.ok || !response.body) throw new ApiError(response.status, 'stream_failed', 'Could not start reply')
   const reader = response.body.getReader(), decoder = new TextDecoder()
   let buffer = ''

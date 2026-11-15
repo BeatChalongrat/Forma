@@ -1,3 +1,4 @@
+import { DownloadLink } from '../components/DownloadLink'
 import { WorkRoundProgress } from '../components/WorkRoundDashboard'
 import { UploadBackLink } from '../components/UploadBackLink'
 import { Localized } from '../lib/locale'
@@ -213,7 +214,7 @@ export function UploadPage() {
         title={b.label ?? 'Upload'}
         subtitle={<span className="flex items-center gap-2 flex-wrap"><span>{t('Round date', 'วันที่รอบงาน')}: {b.work_date || t('Not set', 'ยังไม่ได้กำหนด')} · {fmtInt(b.total)} {t('files', 'ไฟล์')} · {t('Created', 'สร้างเมื่อ')} {fmtDate(b.created_at)}</span><Badge tone={b.complete ? 'ok' : 'neutral'}>{b.complete ? t('Received files ready', 'ไฟล์ที่รับมาพร้อมแล้ว') : t('Work remaining', 'ยังมีงานต้องทำ')}</Badge></span>}
         hint="แต่ละไฟล์อยู่ขั้นไหน และต้องทำอะไรต่อ — ไฟล์ที่พร้อมดาวน์โหลด JSON ได้ทันที"
-        actions={<><Link className="btn" to={'/inspection?batch=' + b.id}>ตรวจสอบย้อนหลัง</Link><Link className="btn" to={'/activity?batch=' + b.id}>ห้องทำงาน · ดูกิจกรรม</Link><Link className="btn" to={'/imports/new?batch=' + b.id} state={{ uploadReturnTo: location.pathname + location.search, uploadReturnState: location.state }}><Upload size={15} />{t('Add files to this round', 'เพิ่มไฟล์เข้ารอบนี้')}</Link><a className={cn('btn btn-primary', !ready && 'pointer-events-none')} href={api.uploadDownloadUrl(b.id)} aria-disabled={!ready} tabIndex={ready ? 0 : -1} onClick={e => { if (!ready) e.preventDefault() }}><Download size={15} />{t('Download ready files', 'ดาวน์โหลดไฟล์ที่พร้อม')} ({ready})</a></>}
+        actions={<><Link className="btn" to={'/inspection?batch=' + b.id}>ตรวจสอบย้อนหลัง</Link><Link className="btn" to={'/activity?batch=' + b.id}>ห้องทำงาน · ดูกิจกรรม</Link><Link className="btn" to={'/imports/new?batch=' + b.id} state={{ uploadReturnTo: location.pathname + location.search, uploadReturnState: location.state }}><Upload size={15} />{t('Add files to this round', 'เพิ่มไฟล์เข้ารอบนี้')}</Link><DownloadLink className="btn btn-primary" href={api.uploadDownloadUrl(b.id)} disabled={!ready}><Download size={15} />{t('Download ready files', 'ดาวน์โหลดไฟล์ที่พร้อม')} ({ready})</DownloadLink></>}
       />
 
       <button className="btn btn-sm mb-4" onClick={() => { setRoundLabel(b.label || ''); setRoundDate(b.work_date || dateInZone(prefs.timezone)); edit.reset(); setEditing(true) }}>{t('Edit round name / date', 'แก้ชื่อ / วันที่รอบงาน')}</button>
@@ -278,7 +279,7 @@ function ItemRow({ i }: { i: BatchItem }) {
   const stage = i.state === "ready" ? 3 : ["needs_review", "needs_data_check"].includes(i.state) || i.step >= 3 ? 2 : 1
   const stages = [t("Upload", "อัปโหลด"), t("Answer & check", "ตอบคำถามและตรวจปัญหา"), t("Download", "ดาวน์โหลด")]
   const st = STATE[i.state]
-  const action = i.state === 'ready' && i.export_id ? <a className="btn btn-outline btn-sm" title={i.json_name} href={api.downloadUrl(i.export_id)}><Download size={13} /> JSON</a>
+  const action = i.state === 'ready' && i.export_id ? <DownloadLink className="btn btn-outline btn-sm" title={i.json_name} href={api.downloadUrl(i.export_id)}><Download size={13} /> JSON</DownloadLink>
     : i.state === 'needs_review' && i.round_id && i.mapping_version_id ? <Link className="btn btn-sm" to={`/review?round=${i.round_id}`}>{t("Answer questions", "ตอบคำถาม")} <ArrowRight size={13} /></Link>
       : i.state === 'needs_data_check' && i.dataset_version_id ? <Link className="btn btn-sm" to={`/datasets/${i.dataset_version_id}`}>{t("Check results", "ตรวจผลลัพธ์")} <ArrowRight size={13} /></Link>
         : i.round_id ? <Link className="btn btn-ghost btn-sm" to={`/rounds/${i.round_id}`}><Localized>Open round</Localized></Link> : null

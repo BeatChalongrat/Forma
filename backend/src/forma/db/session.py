@@ -74,9 +74,11 @@ def _fence_job_commit(session: Session) -> None:
 @lru_cache
 def get_engine() -> Engine:
     url = get_settings().sqlalchemy_url
-    kwargs: dict[str, object] = {"future": True}
+    kwargs: dict[str, object] = {"future": True, "pool_pre_ping": True}
     if url.startswith("sqlite"):
         kwargs["connect_args"] = {"check_same_thread": False, "timeout": 30}
+    elif url.startswith("postgresql"):
+        kwargs["connect_args"] = {"connect_timeout": 5}
     engine = create_engine(url, **kwargs)  # type: ignore[arg-type]
     if url.startswith("sqlite"):
 

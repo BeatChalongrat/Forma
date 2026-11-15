@@ -16,7 +16,8 @@ from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 
 from forma.api import serialize as ser
-from forma.api.routes import _mapping_scoped, _round_scoped, ctx_dep, read_upload
+from forma.api.routes import _mapping_scoped, _round_scoped, ctx_dep
+from forma.api.uploads import read_upload
 from forma.auth import Principal, ensure_all_customers, ensure_customer, llm_rate_limited, require_role
 from forma.core.errors import FormaError, NotFound, ValidationFailed
 from forma.db.models import AssistantAttachment

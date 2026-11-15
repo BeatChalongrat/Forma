@@ -207,7 +207,14 @@ class Settings(BaseSettings):
     redis_url: str = Field(
         default="redis://localhost:6379/0", description="Redis URL for the arq backend (secret)."
     )
-    max_upload_mb: int = Field(default=200, description="Largest accepted upload per file, in MB.")
+    max_upload_mb: int = Field(default=200, ge=1, description="Largest accepted upload per file, in MiB.")
+    max_upload_request_mb: int = Field(
+        default=200, ge=1, description="Maximum combined file bytes per upload request, in MiB."
+    )
+    max_upload_files: int = Field(default=300, ge=1, le=1000, description="Maximum files per upload request.")
+    upload_concurrency: int = Field(
+        default=1, ge=1, le=16, description="Concurrent multipart upload requests per API process."
+    )
 
     retention_interval_h: float = Field(
         default=0.0, description="Hours between scheduled retention runs (0 = off)."

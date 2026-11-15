@@ -1,3 +1,4 @@
+import { downloadFile } from '../lib/download'
 import { LoadError } from '../components/LoadError'
 import { reviewReturn } from '../lib/reviewNavigation'
 import { useState } from 'react'
@@ -40,7 +41,7 @@ export function RoundPage() {
 
   const doExport = useMutation({
     mutationFn: (v: { id: string; fmt: string }) => api.exportDataset(v.id, v.fmt),
-    onSuccess: (a) => { qc.invalidateQueries(); window.open(api.downloadUrl(a.id), '_blank'); toast.push({ kind: 'ok', title: `Exported ${fmtInt(a.row_count)} records as ${a.fmt.toUpperCase()}` }) },
+    onSuccess: (a) => { qc.invalidateQueries(); void downloadFile(api.downloadUrl(a.id)).catch((error: Error) => toast.push({ kind: 'bad', title: t('Download failed — try again', 'ดาวน์โหลดไม่สำเร็จ ลองอีกครั้ง'), detail: error.message })); toast.push({ kind: 'ok', title: `Exported ${fmtInt(a.row_count)} records as ${a.fmt.toUpperCase()}` }) },
     onError: (e: Error) => toast.push({ kind: 'bad', title: 'Not exported', detail: e.message }),
   })
 

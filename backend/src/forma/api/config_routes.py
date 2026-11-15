@@ -24,7 +24,7 @@ from forma.api.schemas import (
     PolicyIn,
     SchemaIn,
 )
-from forma.auth import Principal, current_principal, llm_rate_limited, require_role
+from forma.auth import Principal, current_principal, ensure_all_customers, llm_rate_limited, require_role
 from forma.core.errors import ValidationFailed
 from forma.db.models import LLMCall
 from forma.db.session import get_session
@@ -45,6 +45,12 @@ def offline_ai_lock(request: Request, ctx: ServiceContext = Depends(ctx_dep)) ->
 router = APIRouter(prefix="/api", dependencies=[Depends(offline_ai_lock)])
 
 
+def global_admin(p: Principal = Depends(require_role("admin"))) -> Principal:
+    """Provider credentials and policy apply to the whole installation, not one customer."""
+    ensure_all_customers(p)
+    return p
+
+
 # --------------------------------------------------------------------------------------------
 # AI provider
 # --------------------------------------------------------------------------------------------
@@ -52,7 +58,7 @@ router = APIRouter(prefix="/api", dependencies=[Depends(offline_ai_lock)])
 def get_ai(
     session: Session = Depends(get_session),
     ctx: ServiceContext = Depends(ctx_dep),
-    p: Principal = Depends(require_role("admin")),
+    p: Principal = Depends(global_admin),
 ) -> dict[str, Any]:
     return cfg.ai_view(session, ctx.settings)
 
@@ -62,7 +68,7 @@ def put_ai(
     body: AISettingsIn,
     session: Session = Depends(get_session),
     ctx: ServiceContext = Depends(ctx_dep),
-    p: Principal = Depends(require_role("admin")),
+    p: Principal = Depends(global_admin),
 ) -> dict[str, Any]:
     patch = {k: getattr(body, k) for k in body.model_fields_set}
     cfg.update_ai(session, ctx.settings, patch, p.actor)
@@ -76,7 +82,7 @@ def connect_ai(
     body: ConnectAIIn,
     session: Session = Depends(get_session),
     ctx: ServiceContext = Depends(ctx_dep),
-    p: Principal = Depends(require_role("admin")),
+    p: Principal = Depends(global_admin),
     _rl: Principal = Depends(llm_rate_limited),
 ) -> dict[str, Any]:
     """Paste a key and go: the provider is recognised from the key, a model is chosen, the key is tried
@@ -94,7 +100,7 @@ def discover_models(
     body: DiscoverModelsIn,
     session: Session = Depends(get_session),
     ctx: ServiceContext = Depends(ctx_dep),
-    p: Principal = Depends(require_role("admin")),
+    p: Principal = Depends(global_admin),
     _rl: Principal = Depends(llm_rate_limited),
 ) -> dict[str, Any]:
     from forma.services.model_discovery import discover
@@ -106,7 +112,7 @@ def discover_models(
 def test_ai(
     session: Session = Depends(get_session),
     ctx: ServiceContext = Depends(ctx_dep),
-    p: Principal = Depends(require_role("admin")),
+    p: Principal = Depends(global_admin),
     _rl: Principal = Depends(llm_rate_limited),
 ) -> dict[str, Any]:
     """One tiny call with the saved settings — the primary and every backup key (``backups``); the
@@ -133,7 +139,7 @@ def test_ai(
 def test_vision(
     session: Session = Depends(get_session),
     ctx: ServiceContext = Depends(ctx_dep),
-    p: Principal = Depends(require_role("admin")),
+    p: Principal = Depends(global_admin),
     _rl: Principal = Depends(llm_rate_limited),
 ) -> dict[str, Any]:
     """Which connected models can read images: each is shown one small test picture (ADR-049)."""
@@ -148,7 +154,7 @@ def add_backup(
     body: BackupKeyIn,
     session: Session = Depends(get_session),
     ctx: ServiceContext = Depends(ctx_dep),
-    p: Principal = Depends(require_role("admin")),
+    p: Principal = Depends(global_admin),
     _rl: Principal = Depends(llm_rate_limited),
 ) -> dict[str, Any]:
     """Add a backup key (ADR-025): tried with one tiny call, saved encrypted only when it works, and used
@@ -173,7 +179,7 @@ def update_backup(
     body: BackupKeyPatchIn,
     session: Session = Depends(get_session),
     ctx: ServiceContext = Depends(ctx_dep),
-    p: Principal = Depends(require_role("admin")),
+    p: Principal = Depends(global_admin),
 ) -> dict[str, Any]:
     cfg.update_backup(session, backup_id, {k: getattr(body, k) for k in body.model_fields_set}, p.actor)
     session.commit()
@@ -186,7 +192,7 @@ def remove_backup(
     backup_id: str,
     session: Session = Depends(get_session),
     ctx: ServiceContext = Depends(ctx_dep),
-    p: Principal = Depends(require_role("admin")),
+    p: Principal = Depends(global_admin),
 ) -> dict[str, Any]:
     cfg.remove_backup(session, backup_id, p.actor)
     session.commit()
@@ -199,7 +205,7 @@ def order_backups(
     body: BackupOrderIn,
     session: Session = Depends(get_session),
     ctx: ServiceContext = Depends(ctx_dep),
-    p: Principal = Depends(require_role("admin")),
+    p: Principal = Depends(global_admin),
 ) -> dict[str, Any]:
     cfg.order_backups(session, body.ids, p.actor)
     session.commit()
@@ -214,7 +220,7 @@ def order_backups(
 def get_policy(
     session: Session = Depends(get_session),
     ctx: ServiceContext = Depends(ctx_dep),
-    p: Principal = Depends(require_role("admin")),
+    p: Principal = Depends(global_admin),
 ) -> dict[str, Any]:
     return cfg.policy_view(session, ctx.settings)
 
@@ -224,7 +230,7 @@ def put_policy(
     body: PolicyIn,
     session: Session = Depends(get_session),
     ctx: ServiceContext = Depends(ctx_dep),
-    p: Principal = Depends(require_role("admin")),
+    p: Principal = Depends(global_admin),
 ) -> dict[str, Any]:
     cfg.update_policy(session, ctx.settings, body.policy, p.actor)
     session.commit()
@@ -236,7 +242,7 @@ def put_policy(
 def reset_policy(
     session: Session = Depends(get_session),
     ctx: ServiceContext = Depends(ctx_dep),
-    p: Principal = Depends(require_role("admin")),
+    p: Principal = Depends(global_admin),
 ) -> dict[str, Any]:
     """Back to ``policies/approval.yaml``."""
     cfg.reset_policy(session, ctx.settings, p.actor)
@@ -281,7 +287,7 @@ def put_default_format(
     body: DefaultFormatIn,
     session: Session = Depends(get_session),
     ctx: ServiceContext = Depends(ctx_dep),
-    p: Principal = Depends(require_role("admin")),
+    p: Principal = Depends(global_admin),
 ) -> dict[str, Any]:
     """The target format new rounds use when neither the request nor the customer names one."""
     cfg.set_default_target_schema(session, ctx.registry, body.target_schema, p.actor)

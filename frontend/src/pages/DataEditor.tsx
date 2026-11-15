@@ -1,3 +1,4 @@
+import { downloadFile } from '../lib/download'
 import { reviewReturn, reviewToolUrl } from '../lib/reviewNavigation'
 import { parseValue, type NumberStyle } from '../lib/valueInput'
 import { setPointerLocal } from '../lib/jsonPointer'
@@ -220,7 +221,7 @@ export function DataEditor() {
     // records that break the target format are never approved — no acknowledgement overrides it (ADR-026)
     onError: (e: Error) => { const d = e instanceof ApiError ? (e.details as { high?: number; headline?: string; invalid_records?: number } | undefined) : undefined; if (d?.invalid_records) { setRightTab('findings'); toast.push({ kind: 'bad', title: 'Not approved', detail: e.message }) } else if (d?.high) { setAck({ high: d.high, headline: d.headline ?? '' }); setRightTab('diff') } else toast.push({ kind: 'bad', title: 'Approve failed', detail: e.message }) },
   })
-  const doExport = useMutation({ mutationFn: (fmt: string) => api.exportDataset(datasetId, fmt), onSuccess: (a) => { qc.invalidateQueries(); window.open(api.downloadUrl(a.id), '_blank'); toast.push({ kind: 'ok', title: `Exported ${a.row_count} rows as ${a.fmt.toUpperCase()}` }) }, onError: (e: Error) => { setRightTab('findings'); toast.push({ kind: 'bad', title: 'Not exported', detail: e.message }) } })
+  const doExport = useMutation({ mutationFn: (fmt: string) => api.exportDataset(datasetId, fmt), onSuccess: (a) => { qc.invalidateQueries(); void downloadFile(api.downloadUrl(a.id)).catch((error: Error) => toast.push({ kind: 'bad', title: t('Download failed — try again', 'ดาวน์โหลดไม่สำเร็จ ลองอีกครั้ง'), detail: error.message })); toast.push({ kind: 'ok', title: `Exported ${a.row_count} rows as ${a.fmt.toUpperCase()}` }) }, onError: (e: Error) => { setRightTab('findings'); toast.push({ kind: 'bad', title: 'Not exported', detail: e.message }) } })
   const question = useMutation({ mutationFn: () => api.ask(datasetId, copilot), onSuccess: (a) => { setAnswer(a); setRightTab('copilot'); setCopilot('') }, onError: (e: Error) => toast.push({ kind: 'bad', title: 'Could not answer', detail: e.message }) })
   const submitCopilot = () => { if (!copilot.trim()) return; if (isQuestion(copilot)) question.mutate(); else ask.mutate() }
   const ask = useMutation({
