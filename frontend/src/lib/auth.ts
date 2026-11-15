@@ -15,6 +15,7 @@ const USER_KEY = 'forma.dev_user'
 let config: AuthConfig | null = null
 let discovery: { authorization_endpoint: string; token_endpoint: string; end_session_endpoint?: string } | null = null
 let callbackInFlight: Promise<string> | null = null
+let loginInFlight: Promise<void> | null = null
 
 function safeGet(k: string): string | null {
   try {
@@ -59,18 +60,18 @@ export function authHeaders(): Record<string, string> {
 
 export async function loadAuthConfig(): Promise<AuthConfig> {
   if (config) return config
-  try {
-    const res = await fetch('/api/auth/config')
-    config = res.ok ? ((await res.json()) as AuthConfig) : { mode: 'dev' }
-  } catch {
-    config = { mode: 'dev' }
-  }
+  const res = await fetch('/api/auth/config')
+  if (!res.ok) throw new Error(`Could not load sign-in settings (${res.status}). Please retry.`)
+  const value = await res.json() as AuthConfig
+  if (value.mode !== 'dev' && value.mode !== 'oidc') throw new Error('Invalid sign-in settings. Please retry.')
+  config = value
   return config
 }
 
 async function loadDiscovery(issuer: string) {
   if (discovery) return discovery
   const res = await fetch(issuer.replace(/\/$/, '') + '/.well-known/openid-configuration')
+  if (!res.ok) throw new Error(`Identity provider unavailable (${res.status}). Please retry.`)
   discovery = (await res.json()) as typeof discovery
   return discovery!
 }
@@ -88,7 +89,13 @@ function localReturn(path: string | null): string {
 }
 
 /** Start the PKCE login: redirects the browser to the identity provider. */
-export async function login(returnTo = window.location.pathname): Promise<void> {
+export function login(returnTo = window.location.pathname + (window.location.search || '') + (window.location.hash || '')): Promise<void> {
+  // Several queries may receive 401 together. Keep one PKCE state until navigation.
+  loginInFlight ??= startLogin(returnTo).catch(error => { loginInFlight = null; throw error })
+  return loginInFlight
+}
+
+async function startLogin(returnTo: string): Promise<void> {
   const cfg = await loadAuthConfig()
   if (cfg.mode !== 'oidc' || !cfg.issuer || !cfg.client_id) return
   const d = await loadDiscovery(cfg.issuer)
@@ -116,7 +123,7 @@ export async function login(returnTo = window.location.pathname): Promise<void> 
 export function handleCallback(): Promise<string> {
   // React StrictMode may mount the callback effect twice. Both observers must
   // await the same exchange instead of navigating away while it is in flight.
-  callbackInFlight ??= finishCallback().finally(() => { callbackInFlight = null })
+  callbackInFlight ??= finishCallback().finally(() => { callbackInFlight = null; loginInFlight = null })
   return callbackInFlight
 }
 

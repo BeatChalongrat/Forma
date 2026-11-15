@@ -23,6 +23,7 @@ from forma.api.knowledge_routes import router as knowledge_router
 from forma.api.pilot_routes import router as pilot_router
 from forma.api.review_journey_routes import router as review_journey_router
 from forma.api.routes import api
+from forma.api.uploads import UploadAdmission
 from forma.api.workspace_routes import router as workspace_router
 from forma.auth import ensure_auth_is_safe
 from forma.core import metrics, telemetry
@@ -63,11 +64,12 @@ def create_app() -> FastAPI:
         openapi_url="/api/openapi.json",
     )
     app.include_router(document_router)
+    app.add_middleware(UploadAdmission)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=s.cors_origins,
         allow_credentials=True,
-        allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
         allow_headers=[
             "Authorization",
             "Content-Type",
@@ -107,7 +109,8 @@ def create_app() -> FastAPI:
         finally:
             structlog.contextvars.unbind_contextvars("request_id", "path")
         response.headers["X-Request-Id"] = rid
-        route = getattr(request.scope.get("route"), "path", None) or request.url.path
+        # Arbitrary 404 paths must not create one permanent Prometheus series per URL.
+        route = getattr(request.scope.get("route"), "path", None) or "unmatched"
         if not route.startswith(("/metrics", "/health", "/ready")):
             metrics.HTTP_REQUESTS.labels(
                 method=request.method, route=route, status=str(response.status_code)

@@ -4,10 +4,14 @@ import { beforeEach, expect, test, vi } from 'vitest'
 import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { DataEditor } from '../src/pages/DataEditor'
 import { api, ApiError } from '../src/lib/api'
+import { downloadFile } from '../src/lib/download'
+
+vi.mock('../src/lib/download', () => ({ downloadFile: vi.fn(async () => {}) }))
 
 const impact = { rows_affected: 1, cells_changed: 1, rows_deleted: 0, fields: ['/price'], sample: [{ identity: 'SKU-001', target: '/price', before: 100, after: 125 }] }
 const preview = { impact, rows_after: 2, validation_errors: [], invalid_before: 0, invalid_after: 0 }
 beforeEach(() => {
+  vi.mocked(downloadFile).mockClear()
   // Give the real virtualizer a viewport; jsdom has no layout engine.
   vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(640)
   vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockReturnValue(1000)
@@ -95,14 +99,13 @@ test('Back asks before discarding staged edits; cancelling stays on the editor',
 test('published data cannot be edited or deleted; denied export never opens a download', async () => {
   stub('dataset', { ...dataset, status: 'published' })
   stub('exportDataset', {}).mockRejectedValue(new Error('403: export denied'))
-  const open = vi.spyOn(window, 'open').mockImplementation(() => null)
   const { user } = mount()
   await user.dblClick(await screen.findByText('100'))
   expect(screen.queryByRole('button', { name: 'Review 1 change' })).toBeNull()
   expect((screen.getByRole('button', { name: 'Delete record SKU-001' }) as HTMLButtonElement).disabled).toBe(true)
   await user.click(screen.getByRole('button', { name: 'JSON' }))
   await waitFor(() => expect(toast.push).toHaveBeenCalledWith(expect.objectContaining({ kind: 'bad', title: 'Not exported' })))
-  expect(open).not.toHaveBeenCalled()
+  expect(downloadFile).not.toHaveBeenCalled()
 })
 
 test('schema-invalid dataset disables approval; corrected approved dataset exports the requested format', async () => {
@@ -114,10 +117,9 @@ test('schema-invalid dataset disables approval; corrected approved dataset expor
   first.unmount()
   stub('dataset', { ...dataset, status: 'approved' })
   stub('exportDataset', { id: 'export-1', fmt: 'json', row_count: 2 })
-  const open = vi.spyOn(window, 'open').mockImplementation(() => null)
   const { user } = mount()
   await user.click(await screen.findByRole('button', { name: 'JSON' }))
-  await waitFor(() => expect(open).toHaveBeenCalledWith(expect.stringContaining('export-1'), '_blank'))
+  await waitFor(() => expect(downloadFile).toHaveBeenCalledWith(expect.stringContaining('export-1')))
   expect(api.exportDataset).toHaveBeenCalledExactlyOnceWith('d1', 'json')
 })
 

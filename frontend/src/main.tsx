@@ -58,8 +58,9 @@ const router = createBrowserRouter([
   { path: '/auth/callback', element: <AuthCallback /> },
 ])
 
-void ensureAuthenticated().finally(() => {
-  createRoot(document.getElementById('root')!).render(
+const root = createRoot(document.getElementById('root')!)
+function start() {
+  void ensureAuthenticated().then(() => root.render(
     <StrictMode>
       <QueryClientProvider client={qc}>
         <ToastProvider>
@@ -67,5 +68,12 @@ void ensureAuthenticated().finally(() => {
         </ToastProvider>
       </QueryClientProvider>
     </StrictMode>,
-  )
-})
+  )).catch(() => root.render(
+    <main className="min-h-screen grid place-items-center p-6"><div role="alert" className="card p-6 max-w-md space-y-4">
+      <h1 className="text-xl font-semibold">เชื่อมต่อระบบเข้าสู่ระบบไม่สำเร็จ</h1>
+      <p>กรุณาตรวจการเชื่อมต่อแล้วลองอีกครั้ง / Could not connect to sign-in. Please retry.</p>
+      <button className="btn btn-primary" onClick={start}>ลองอีกครั้ง / Retry</button>
+    </div></main>,
+  ))
+}
+start()

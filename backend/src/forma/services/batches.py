@@ -27,7 +27,7 @@ import json
 import re
 import zipfile
 from pathlib import Path
-from typing import Any
+from typing import Any, BinaryIO
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
@@ -521,9 +521,11 @@ def list_batches(
     return out
 
 
-def zip_outputs(ctx: ServiceContext, session: Session, b: Batch) -> tuple[bytes, int]:
+def zip_outputs(
+    ctx: ServiceContext, session: Session, b: Batch, *, output: BinaryIO | None = None
+) -> tuple[bytes, int]:
     """One JSON per file, named after the file, for every file whose JSON is ready."""
-    buf = io.BytesIO()
+    buf = output if output is not None else io.BytesIO()
     used: set[str] = set()
     n = 0
     entries: list[dict[str, Any]] = []
@@ -567,10 +569,13 @@ def zip_outputs(ctx: ServiceContext, session: Session, b: Batch) -> tuple[bytes,
             while name in used:
                 name, k = f"{Path(it.file_name).stem} ({k}).json", k + 1
             used.add(name)
-            content = ctx.storage.local_path(art.storage_key).read_bytes()
-            if hashlib.sha256(content).hexdigest() != art.sha256:
+            checksum = hashlib.sha256()
+            with ctx.storage.open(art.storage_key) as source, z.open(name, "w", force_zip64=True) as member:
+                while chunk := source.read(1024 * 1024):
+                    checksum.update(chunk)
+                    member.write(chunk)
+            if checksum.hexdigest() != art.sha256:
                 raise ValidationFailed("Export checksum mismatch; regenerate this file before downloading")
-            z.writestr(name, content)
             entry.update(
                 included=True,
                 reason=None,
@@ -598,4 +603,4 @@ def zip_outputs(ctx: ServiceContext, session: Session, b: Batch) -> tuple[bytes,
             "files": entries,
         }
         z.writestr("_forma/manifest.json", json.dumps(manifest, ensure_ascii=False, indent=2))
-    return buf.getvalue(), n
+    return buf.getvalue() if isinstance(buf, io.BytesIO) and output is None else b"", n

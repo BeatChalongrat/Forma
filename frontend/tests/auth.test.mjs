@@ -7,7 +7,7 @@ const store = () => {
 }
 const location = href => {
   const url = new URL(href)
-  vi.stubGlobal('window', { location: { href, origin: url.origin, pathname: url.pathname, assign } })
+  vi.stubGlobal('window', { location: { href, origin: url.origin, pathname: url.pathname, search: url.search, hash: url.hash, assign } })
 }
 beforeEach(async () => {
   vi.resetModules()
@@ -117,5 +117,29 @@ test('startup skips callback, accepts valid token, otherwise starts login', asyn
   expect(assign).not.toHaveBeenCalled()
   sessionStorage.removeItem('forma.access_token')
   await auth.ensureAuthenticated()
+  expect(assign).toHaveBeenCalledTimes(1)
+})
+
+test('temporary auth configuration outage is retryable and never cached as dev', async () => {
+  fetcher.mockImplementationOnce(async () => ({ ok: false, status: 503 }))
+  await expect(auth.loadAuthConfig()).rejects.toThrow()
+  expect((await auth.loadAuthConfig()).mode).toBe('oidc')
+})
+
+test('simultaneous unauthorized requests create one login transaction and keep the exact page', async () => {
+  location('https://forma.example/review?round=one&mapping=two#answer')
+  await Promise.all([auth.login(), auth.login(), auth.login()])
+  expect(assign).toHaveBeenCalledTimes(1)
+  const state = new URL(assign.mock.calls[0][0]).searchParams.get('state')
+  expect(sessionStorage.getItem('forma.oidc_state')).toBe(state)
+  location(`https://forma.example/auth/callback?code=one&state=${state}`)
+  expect(await auth.handleCallback()).toBe('/review?round=one&mapping=two#answer')
+})
+
+test('failed discovery can retry login without poisoning the cache', async () => {
+  await auth.loadAuthConfig()
+  fetcher.mockImplementationOnce(async () => ({ ok: false, status: 503 }))
+  await expect(auth.login()).rejects.toThrow()
+  await auth.login()
   expect(assign).toHaveBeenCalledTimes(1)
 })
