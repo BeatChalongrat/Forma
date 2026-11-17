@@ -284,6 +284,10 @@ export type OpsSummary = {
 export type FieldSpec = { pointer: string; name: string; json_type: string[]; semantic: string | null; risk: 'critical' | 'high' | 'medium' | 'low'; required: boolean; nullable: boolean; enum: unknown[] | null; format: string | null; synonyms_en: string[]; synonyms_th: string[]; description: string | null; description_th: string | null; in_collection: string | null; is_collection: boolean; system: boolean; default: unknown }
 export type SchemaSummary = { schema_id: string; version: number; ref: string; entity: string; status: string; title: string; description: string; identity_keys: string[]; field_count: number; fields?: FieldSpec[]; document?: unknown; source?: 'ui' | 'file'; is_latest?: boolean; is_default?: boolean }
 export type SchemaPreview = SchemaSummary & { fields: FieldSpec[]; findings: { level: 'warning' | 'info'; pointer: string; message: string }[]; previous: string | null; diff: { added: string[]; removed: string[]; changed: { pointer: string; changes: Record<string, unknown> }[] } | null }
+export type CsvTemplateInput = { content: string; delimiter: 'auto' | ',' | ';' | '\t' | '|' }
+export type CsvTemplateAnalysis = { delimiter: CsvTemplateInput['delimiter']; row_count: number; columns: { name: string; suggested_type: CsvColumnChoice['data_type']; reason: string; examples: string[]; blank_count: number }[] }
+export type CsvColumnChoice = { name: string; data_type: 'string' | 'integer' | 'number' | 'boolean' | 'date'; required: boolean; identity: boolean; semantic: string; description: string; aliases?: string[]; confirmed: boolean; fixed_value?: string | null }
+export type CsvContractInput = CsvTemplateInput & { schema_id: string; title: string; columns: CsvColumnChoice[] }
 export type BackupKey = {
   vision: boolean | null
   id: string; provider: string; model: string; base_url: string | null; api_key_hint: string | null
@@ -558,6 +562,8 @@ export const api = {
   schema: (ref: string) => get<SchemaSummary>(`/api/schemas/${ref}`),
   policy: () => get<Record<string, unknown>>('/api/policy'),
   previewSchema: (document: unknown) => post<SchemaPreview>('/api/schemas/preview', { document }),
+  analyzeCsvTemplate: (body: CsvTemplateInput) => post<CsvTemplateAnalysis>('/api/schemas/csv/analyze', body),
+  prepareCsvTemplate: (body: CsvContractInput) => post<{ document: Record<string, unknown> }>('/api/schemas/csv/prepare', body),
   registerSchema: (document: unknown) => post<SchemaSummary>('/api/schemas', { document }),
   semantics: () => get<Record<string, string>>('/api/settings/semantics'),
   setDefaultFormat: (target_schema: string) => put<{ target_schema: string }>('/api/settings/default-format', { target_schema }),

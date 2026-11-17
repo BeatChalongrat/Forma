@@ -676,11 +676,13 @@ def propose_for_round(
     review_decisions.extend(
         unit_questions(doc, schema, _table_columns(MappingVersion(round_id=r.id), doc, session))
     )
-    from forma.ai.source_evidence import currency_questions
+    from forma.ai.source_evidence import currency_memory_receipts, currency_questions
 
-    review_decisions.extend(
-        currency_questions(doc, schema, _table_columns(MappingVersion(round_id=r.id), doc, session))
-    )
+    currency_columns = _table_columns(MappingVersion(round_id=r.id), doc, session)
+    currency_receipts = currency_memory_receipts(doc, schema, currency_columns, recalled)
+    review_decisions.extend(currency_questions(doc, schema, currency_columns, currency_receipts))
+    if currency_receipts:
+        agent_log.append({"agent": "currency_evidence", "confirmations": currency_receipts})
     open_questions.extend(q["question"] for q in review_decisions if q["question"] not in open_questions)
     decision = ctx.policy.for_customer(r.customer.policy_overrides if r.customer else None).evaluate(
         doc,
@@ -747,6 +749,7 @@ def propose_for_round(
             "verification": verified,
             "review_decisions": review_decisions,
             "confirmed_decisions": recalled,
+            "evidence_confirmations": currency_receipts,
             "clarifications": [
                 q for entry in agent_log for q in (entry.get("data") or {}).get("clarifications", [])
             ],

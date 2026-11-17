@@ -624,7 +624,9 @@ def propose_mapping(
         field_scores.append(m.score)
     mapped_targets = {f.target for f in fields}
     if currency is not None and currency.pointer not in mapped_targets:
-        code = str(currency.default) if currency.default is not None else None
+        from forma.ai.source_evidence import confirmed_currency_value
+
+        code = confirmed_currency_value(currency)
         fields.append(
             FieldMapping(
                 target=currency.pointer,

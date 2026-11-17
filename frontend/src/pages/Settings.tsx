@@ -1,10 +1,11 @@
+import { CsvFormatBuilder } from '../components/CsvFormatBuilder'
 import { LoadError } from '../components/LoadError'
 import { KnowledgeManager, AuditBrowser } from '../components/KnowledgeManager'
 import { KnowledgeReleases } from '../components/KnowledgeReleases'
 import { Localized } from '../lib/locale'
 import { usePreferences } from '../lib/preferences'
 import { providerName } from '../lib/providerName'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowDown, ArrowUp, Brain, Check, CodeXml, FileJson, FlaskConical, ImagePlus, KeyRound, Monitor, Plug, Plus, RotateCcw, Save, Scale, ScrollText, Star, Trash2, Upload, Wifi, type LucideIcon } from 'lucide-react'
@@ -18,7 +19,7 @@ type Tab = (typeof TABS)[number]
 
 const SECTIONS: { id: Tab; label: string; hint: string; icon: LucideIcon }[] = [
   { id: 'ai', label: 'AI', hint: 'เชื่อม AI, key สำรอง, เลือก model', icon: Plug },
-  { id: 'formats', label: 'Target formats', hint: 'อัป Target JSON และตั้งค่าเริ่มต้น', icon: FileJson },
+  { id: 'formats', label: 'Target formats', hint: 'กำหนดรูปแบบปลายทางด้วย JSON หรือ CSV', icon: FileJson },
   { id: 'policy', label: 'Approval policy', hint: 'เกณฑ์ approve อัตโนมัติ และเกณฑ์ความผิดปกติ', icon: Scale },
   { id: 'learning', label: 'What FORMA learned', hint: 'สิ่งที่ระบบเรียนจากการแก้ของคุณ และแนวโน้มการแก้ต่อรอบ', icon: Brain },
   { id: 'releases', label: 'ย้ายความรู้', hint: 'ตรวจแหล่งที่มา เลือกส่งต่อ และถอนความรู้สำหรับระบบจริง', icon: Upload },
@@ -339,7 +340,7 @@ function FormatsTab() {
             <div className="text-[12px] text-muted">{s.field_count} fields · {s.source === 'ui' ? 'added here' : 'built-in file'}{s.is_latest ? '' : ' · older version'}</div>
           </button></li>
         ))}</ul>
-        <div className="p-4 text-[12px] text-muted leading-relaxed">A format is a JSON Schema with an <span className="mono">x-forma</span> block (identity key, semantics, synonyms). Mapping, validation, AI prompts and exports all follow it — no code change. ★ = used for customers that have no format of their own.</div>
+        <div className="p-4 text-[12px] text-muted leading-relaxed">เพิ่มรูปแบบด้วย JSON Schema หรือ CSV ตัวอย่าง ทั้งสองแบบใช้กฎจับคู่และตรวจข้อมูลชุดเดียวกัน ★ = รูปแบบเริ่มต้นของลูกค้าที่ยังไม่ได้เลือกเอง</div>
       </Section>
       {schema && sel && (
         <Section title={`${schema.title ?? schema.schema_id} — ${schema.ref}`} actions={<div className="flex items-center gap-2"><span className="text-[12px] text-muted">identity: {schema.identity_keys.join(', ')}</span>{!sel.is_default && <button className="btn btn-sm" disabled={makeDefault.isPending} onClick={() => makeDefault.mutate(sel.is_latest ? sel.schema_id : sel.ref)}><Star size={13} /> Make default</button>}</div>}>
@@ -347,7 +348,7 @@ function FormatsTab() {
           <FieldTable fields={schema.fields?.filter((f) => !f.system) ?? []} />
         </Section>
       )}
-      <NewFormatModal open={open} onClose={() => setOpen(false)} onRegistered={(r) => { setRef(r); setOpen(false) }} />
+      {open && <NewFormatModal open={open} onClose={() => setOpen(false)} onRegistered={(r) => { setRef(r); setOpen(false) }} />}
     </div>
   )
 }
@@ -373,14 +374,16 @@ function FieldTable({ fields }: { fields: NonNullable<SchemaPreview['fields']> }
 function NewFormatModal({ open, onClose, onRegistered }: { open: boolean; onClose: () => void; onRegistered: (ref: string) => void }) {
   const qc = useQueryClient()
   const toast = useToast()
+  const [mode, setMode] = useState<'json' | 'csv'>('json')
+  const fileRevision = useRef(0)
   const [text, setText] = useState('')
   const [checked, setChecked] = useState<{ text: string; preview: SchemaPreview } | null>(null)
   const [error, setError] = useState<string | null>(null)
   const { data: semantics } = useQuery({ queryKey: ['semantics'], queryFn: api.semantics, enabled: open })
   const parse = (): unknown => { try { return JSON.parse(text) } catch (e) { setError(`Not valid JSON: ${(e as Error).message}`); return undefined } }
   const check = useMutation({
-    mutationFn: (doc: unknown) => api.previewSchema(doc),
-    onSuccess: (p) => { setChecked({ text, preview: p }); setError(null) },
+    mutationFn: (input: { document: unknown; text: string }) => api.previewSchema(input.document),
+    onSuccess: (p, input) => { setChecked({ text: input.text, preview: p }); setError(null) },
     onError: (e: Error) => { setChecked(null); setError(e.message) },
   })
   const register = useMutation({
@@ -389,17 +392,29 @@ function NewFormatModal({ open, onClose, onRegistered }: { open: boolean; onClos
     onError: (e: Error) => setError(e.message),
   })
   const preview = checked && checked.text === text ? checked.preview : null
-  const onFile = async (file: File | undefined) => { if (file) { setText(await file.text()); setChecked(null); setError(null) } }
+  const onFile = async (file: File | undefined) => {
+    const revision = ++fileRevision.current
+    setChecked(null); setText(''); setError(null)
+    if (!file) return
+    try { const value = await file.text(); if (revision === fileRevision.current) setText(value) }
+    catch (e) { if (revision === fileRevision.current) setError((e as Error).message) }
+  }
   return (
     <Modal open={open} onClose={onClose} title="New target format" width="max-w-5xl" footer={<>
       <button className="btn" onClick={onClose}><Localized>Cancel</Localized></button>
-      <button className="btn" disabled={!text.trim() || check.isPending} onClick={() => { const d = parse(); if (d !== undefined) check.mutate(d) }}><Check size={14} /> Check</button>
-      <button className="btn btn-primary" disabled={!preview || register.isPending} onClick={() => { const d = parse(); if (d !== undefined) register.mutate(d) }}><FileJson size={14} /> Register {preview?.ref}</button>
+      {mode === 'json' && <button className="btn" disabled={!text.trim() || check.isPending || register.isPending} onClick={() => { const d = parse(); if (d !== undefined) check.mutate({ document: d, text }) }}><Check size={14} /> ตรวจรูปแบบ</button>}
+      <button className="btn btn-primary" disabled={!preview || check.isPending || register.isPending} onClick={() => { const d = parse(); if (d !== undefined) register.mutate(d) }}><FileJson size={14} /> บันทึกรูปแบบ {preview?.ref}</button>
     </>}>
-      <div className="grid lg:grid-cols-[1fr_260px] gap-4 text-[13px]">
+      <div className="flex gap-2 mb-4" role="group" aria-label="ชนิดแม่แบบปลายทาง">
+        {(['json', 'csv'] as const).map(value => <button key={value} className={cn('btn', mode === value && 'btn-primary')} aria-pressed={mode === value} disabled={check.isPending || register.isPending} onClick={() => { fileRevision.current++; setMode(value); setText(''); setChecked(null); setError(null) }}>{value === 'json' ? 'JSON Schema' : 'CSV ตัวอย่าง'}</button>)}
+      </div>
+      <div className={cn('grid gap-4 text-[13px]', mode === 'json' && 'lg:grid-cols-[1fr_260px]')}>
         <div className="flex flex-col gap-3">
+          {mode === 'csv' && <CsvFormatBuilder disabled={check.isPending || register.isPending} semantics={semantics ?? {}} onInvalidate={() => { setText(''); setChecked(null); setError(null) }} onPrepared={document => { const next = JSON.stringify(document, null, 2); setText(next); setChecked(null); check.mutate({ document, text: next }) }} />}
+          {mode === 'json' && <>
           <div className="flex items-center gap-2"><label className="btn btn-sm cursor-pointer"><Upload size={13} /> Load .json file<input type="file" accept=".json,application/json" className="hidden" onChange={(e) => void onFile(e.target.files?.[0])} /></label><span className="text-muted text-[12px]">or paste the JSON Schema the downstream team gave you</span></div>
-          <textarea className="input mono h-56 py-2 text-[12px]" spellCheck={false} value={text} onChange={(e) => setText(e.target.value)} placeholder={'{\n  "type": "object",\n  "properties": { "item_code": { "type": "string", "x-forma": { "semantic": "sku", "synonyms_th": ["รหัสสินค้า"] } } },\n  "x-forma": { "schema_id": "catalog", "identity_keys": ["/item_code"] }\n}'} />
+          <textarea className="input mono h-56 py-2 text-[12px]" spellCheck={false} value={text} onChange={(e) => { fileRevision.current++; setText(e.target.value); setChecked(null) }} placeholder={'{\n  "type": "object",\n  "properties": { "item_code": { "type": "string", "x-forma": { "semantic": "sku", "synonyms_th": ["รหัสสินค้า"] } } },\n  "x-forma": { "schema_id": "catalog", "identity_keys": ["/item_code"] }\n}'} />
+          </>}
           {error && <div className="rounded-[var(--radius-md)] bg-bad-soft text-bad px-3 py-2 text-[12.5px]">{error}</div>}
           {preview && (
             <div className="flex flex-col gap-3">
@@ -409,11 +424,11 @@ function NewFormatModal({ open, onClose, onRegistered }: { open: boolean; onClos
             </div>
           )}
         </div>
-        <div className="text-[12px]">
+        {mode === 'json' && <div className="text-[12px]">
           <div className="font-medium mb-1">Semantics FORMA understands</div>
           <div className="text-muted mb-2">Tag each field with <span className="mono">x-forma.semantic</span> so Thai dates, prices, VAT, units, stock and promotions are handled for it.</div>
           <ul className="max-h-[420px] overflow-auto flex flex-col gap-1">{Object.entries(semantics ?? {}).map(([k, v]) => <li key={k}><span className="mono text-ink">{k}</span> <span className="text-muted">— {v}</span></li>)}</ul>
-        </div>
+        </div>}
       </div>
     </Modal>
   )
