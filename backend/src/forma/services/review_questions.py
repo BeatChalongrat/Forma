@@ -344,6 +344,21 @@ def questions(ctx: ServiceContext, m: MappingVersion) -> dict[str, Any]:
             related.extend(
                 item for item in items if item["field"]["pointer"] == q["target"] and item not in related
             )
+        if q.get("action") == "request_source" and q.get("source_key_columns"):
+            # A model may describe the same missing source key in its own words.
+            # Match the actual observed column, not a vocabulary of lot/header names.
+            related.extend(
+                item
+                for item in items
+                if item not in related
+                and item.get("action") == "request_source"
+                and item["field"]["pointer"] == q["target"]
+                and any(
+                    name.casefold()
+                    in (str(item.get("question", "")) + " " + str(item.get("note", ""))).casefold()
+                    for name in q["source_key_columns"]
+                )
+            )
         items = [item for item in items if item not in related]
         items.append(
             {
@@ -393,6 +408,12 @@ def questions(ctx: ServiceContext, m: MappingVersion) -> dict[str, Any]:
             continue
         examples = []
         references = column_refs(mapped.expr, source_of.get(pointer, doc.record.root_source))
+        if item.get("action") == "source_identity":
+            collection = next(c for c in doc.collections if c.target == item["collection"])
+            references = [f"{collection.source}.{name}" for name in item["available_columns"]]
+        elif item.get("source_key_columns"):
+            collection = next(c for c in doc.collections if c.target == item["collection"])
+            references = [f"{collection.source}.{name}" for name in item["source_key_columns"]]
         context_only = not references
         if not references and item["field"].get("semantic") in ("price.vat_included", "unit.pack_size"):
             spec = specs[pointer]
@@ -405,7 +426,7 @@ def questions(ctx: ServiceContext, m: MappingVersion) -> dict[str, Any]:
                 references = column_refs(
                     related_mapping.expr, source_of.get(related_spec.pointer, doc.record.root_source)
                 )
-        for ref in references[:3]:
+        for ref in references[: 8 if item.get("action") == "source_identity" else 3]:
             source, _, name = ref.partition(".")
             observed = next(
                 (
@@ -494,7 +515,8 @@ def answer_document(
     if answers.keys() - catalogue.keys():
         raise ValidationFailed("An answer refers to a field that is not awaiting a decision")
     if set(remember or []) - answers.keys() or any(
-        catalogue[k].get("action") in ("select_rows", "record_value") for k in remember or []
+        catalogue[k].get("action") in ("select_rows", "record_value", "source_identity")
+        for k in remember or []
     ):
         raise ValidationFailed(
             "Only answered field rules may be remembered; source-row exceptions are delivery-specific"

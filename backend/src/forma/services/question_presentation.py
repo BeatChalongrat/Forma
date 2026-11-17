@@ -37,6 +37,12 @@ def presentation(item: dict[str, Any]) -> dict[str, Any]:
     action = item.get("action")
     kind = item["kind"]
     original = item.get("question")
+    if item.get("id", "").startswith("source-identity:"):
+        return {
+            "question_th": original,
+            "reason_th": item.get("why") or item.get("note"),
+            "evidence_scope": "ตรวจทุกแถวต้นทางแล้ว ตัวเลือกและรายละเอียดแสดงแบบจำกัดจำนวน",
+        }
     prompt = None
     why = "หลักฐานยังไม่พอยืนยันความหมายของข้อมูล กรุณาตรวจตัวอย่างและสอบถามเจ้าของไฟล์หากยังไม่ทราบ"
     if item.get("evidence_key"):

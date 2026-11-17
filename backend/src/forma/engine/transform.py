@@ -17,6 +17,7 @@ import polars as pl
 from forma.engine.ops import CompileContext, compile_expr, python_value
 from forma.ingestion.readers import read_raw
 from forma.mapping_dsl.models import (
+    CallExpr,
     CollectionMapping,
     Expr,
     JoinSpec,
@@ -114,6 +115,7 @@ def load_source_frame(
     limit: int | None = None,
     expected_columns: set[str] | None = None,
     verify_all_columns: bool = False,
+    apply_filter: bool = True,
 ) -> pl.DataFrame:
     sheet = resolve_sheet(spec, bound)
     raw = read_raw(
@@ -167,7 +169,7 @@ def load_source_frame(
         }
         require_cached_values(info, columns=columns)
     frame = frame.with_row_index(ROW_COL)
-    if spec.table.filter is not None:
+    if apply_filter and spec.table.filter is not None:
         ctx = CompileContext(default_source=spec.id, columns=set(_prefixed(frame, spec.id).columns))
         pf = _prefixed(frame, spec.id)
         pf = pf.filter(compile_expr(spec.table.filter, ctx).cast(pl.Boolean, strict=False).fill_null(False))
@@ -219,6 +221,8 @@ class TransformEngine:
         t0 = time.perf_counter()
         findings: list[Finding] = []
         frames: dict[str, pl.DataFrame] = {}
+        raw_collections: dict[str, pl.DataFrame] = {}
+        collection_sources = {c.source for c in mapping.collections}
         used_sources = (
             {mapping.record.root_source}
             | {c.source for c in mapping.collections}
@@ -274,9 +278,18 @@ class TransformEngine:
                         expected_columns=_source_columns(mapping, spec.id),
                         verify_all_columns=mapping.attributes_passthrough
                         and spec.id == mapping.record.root_source,
+                        apply_filter=spec.id not in collection_sources,
                     ),
                     spec.id,
                 )
+                if spec.id in collection_sources and spec.table.filter is not None:
+                    raw_collections[spec.id] = frames[spec.id]
+                    filter_ctx = CompileContext(default_source=spec.id, columns=set(frames[spec.id].columns))
+                    frames[spec.id] = frames[spec.id].filter(
+                        compile_expr(spec.table.filter, filter_ctx)
+                        .cast(pl.Boolean, strict=False)
+                        .fill_null(False)
+                    )
             except Exception as e:
                 sev = "error" if spec.id in used_sources else "warning"
                 findings.append(
@@ -298,6 +311,11 @@ class TransformEngine:
                 # join into a non-root frame (e.g. pricing ← price list names) : apply to that frame
                 frames[j.left], fnd = self._join(frames[j.left], frames[j.right], j)
                 findings.extend(fnd)
+                if j.left in raw_collections:
+                    raw_collections[j.left], raw_findings = self._join(
+                        raw_collections[j.left], frames[j.right], j
+                    )
+                    findings.extend(raw_findings)
                 continue
             root, fnd = self._join(root, frames[j.right], j)
             findings.extend(fnd)
@@ -360,7 +378,19 @@ class TransformEngine:
                 )
                 continue
             try:
-                items, fnd = self._collection(frames[cm.source], cm, out, root_id)
+                effective_cm = cm
+                if cm.source in raw_collections:
+                    filters = [mapping.source(cm.source).table.filter]
+                    if cm.filter is not None:
+                        filters.append(cm.filter)
+                    effective_cm = cm.model_copy(
+                        update={
+                            "filter": filters[0] if len(filters) == 1 else CallExpr(op="and", args=filters)
+                        }
+                    )
+                items, fnd = self._collection(
+                    raw_collections.get(cm.source, frames[cm.source]), effective_cm, out, root_id
+                )
                 findings.extend(fnd)
                 if items.width:  # a collection that cannot be linked is left out; its finding says why
                     collections[cm.target] = items
@@ -629,8 +659,6 @@ class TransformEngine:
         findings: list[Finding] = []
         ctx = CompileContext(default_source=cm.source, columns=set(src.columns))
         frame = src
-        if cm.filter is not None:
-            frame = frame.filter(compile_expr(cm.filter, ctx).cast(pl.Boolean, strict=False).fill_null(False))
         item_exprs = []
         rel_names = []
         for fm in cm.fields:
@@ -672,10 +700,40 @@ class TransformEngine:
                 coerce.append(c.cast(pl.String, strict=False).alias(rel))
         if coerce:
             items = items.with_columns(coerce)
+        dedupe_keys = [k.lstrip("/") for k in cm.dedupe_keys if k.lstrip("/") in rel_names]
+        if not dedupe_keys:
+            declared = [k.lstrip("/") for k in self.schema.collection_identity_keys(cm.target)]
+            dedupe_keys = [k for k in declared if k in rel_names] or list(rel_names)
+        from forma.engine.source_identity import check_source_identity, validate_selection
+
+        # Stock balances are additive by business grain, unlike competing prices.
+        # This is target-contract semantics, never ERP/header/fixture-name inference.
+        require_grain = any(
+            (self.schema.field(f.target).semantic or "").startswith("stock.") for f in cm.fields
+        )
+        selection_findings = []
+        if cm.filter is not None:
+            _, before_selection = check_source_identity(
+                items, cm, rel_names, dedupe_keys, require_grain=require_grain
+            )
+            original = items
+            items = items.filter(compile_expr(cm.filter, ctx).cast(pl.Boolean, strict=False).fill_null(False))
+            selection_findings = validate_selection(original, items, before_selection, cm)
+        items, identity_findings = check_source_identity(
+            items, cm, rel_names, dedupe_keys, require_grain=require_grain
+        )
+        # Keep the original evidence once when a filter leaves the same issue unresolved.
+        original_issues = {(f.target, f.details.get("reason")) for f in selection_findings}
+        identity_findings = selection_findings + [
+            f for f in identity_findings if (f.target, f.details.get("reason")) not in original_issues
+        ]
+        findings.extend(identity_findings)
         if cm.aggregate:
             groups = [p.lstrip("/") for p in cm.aggregate.group_by]
             sums = [p.lstrip("/") for p in cm.aggregate.sum]
-            # Identical lots are still additive. Aggregate BEFORE exact-duplicate removal.
+            # Deduplicate by verified source grain, never by projected quantities.
+            if any(f.severity == "error" for f in identity_findings):
+                items = items.with_columns([pl.lit(None, dtype=items.schema[p]).alias(p) for p in sums])
             # Unknown quantities must never be silently converted to zero or a partial total.
             items = items.group_by(["__link__", *groups], maintain_order=True).agg(
                 pl.col("__src_row__"),
@@ -695,11 +753,6 @@ class TransformEngine:
                         details={"incomplete_groups": incomplete},
                     )
                 )
-        dedupe_keys = [k.lstrip("/") for k in cm.dedupe_keys if k.lstrip("/") in rel_names]
-        if not dedupe_keys:
-            # default: schema-declared item identity if fully mapped, else every mapped item field
-            declared = [k.lstrip("/") for k in self.schema.collection_identity_keys(cm.target)]
-            dedupe_keys = [k for k in declared if k in rel_names] or list(rel_names)
         before = items.height
         # Drop exact duplicates only. Conflicting alternatives must survive for a person to resolve.
         items = items.unique(subset=["__link__", *rel_names], keep="first", maintain_order=True)
@@ -1095,6 +1148,8 @@ def _source_columns(mapping: MappingDocument, source_id: str) -> set[str]:
             exprs.append((c.filter, c.source))
         if c.source == source_id:
             cols |= {k.right for k in c.link}
+            if c.source_identity:
+                cols.update(c.source_identity.keys)
         if default == source_id:
             cols |= {k.left for k in c.link}
     for j in mapping.joins:

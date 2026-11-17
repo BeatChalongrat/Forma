@@ -55,6 +55,8 @@ class RunReport:
     coverage: dict[str, Any] = field(default_factory=dict)
     complete: bool = True
     decision_questions: list[dict[str, Any]] = field(default_factory=list)
+    source_decision_pending: bool = False
+    source_identity_checks: list[dict[str, Any]] = field(default_factory=list)
 
     @property
     def clean(self) -> bool:
@@ -78,6 +80,8 @@ class RunReport:
             "errors": self.errors,
             "coverage": self.coverage,
             "complete": self.complete,
+            "source_decision_pending": self.source_decision_pending,
+            "source_identity_checks": self.source_identity_checks,
         }
 
     def to_prompt(self) -> dict[str, Any]:
@@ -540,9 +544,25 @@ class FileWorkbench:
         sample = [_clip(_without_meta(rec), self.max_chars) for rec in res.records[:SAMPLE_RECORDS]]
         from forma.ai.reconciliation import coverage
         from forma.ai.source_evidence import currency_questions
-        from forma.services.decision_actions import conflicting_records
+        from forma.services.decision_actions import (
+            conflicting_items,
+            conflicting_records,
+            source_identity_questions,
+        )
 
-        decisions = conflicting_records(res.findings) if full else []
+        decisions = (
+            conflicting_records(res.findings)
+            + conflicting_items(doc, self.schema, res.records, res.findings)
+            + source_identity_questions(res.findings)
+            if full
+            else []
+        )
+        source_decision_pending = full and any(
+            f.kind == "source_identity"
+            and f.severity == "error"
+            and f.details.get("reason") in {"conflicting_values", "blank_key"}
+            for f in res.findings
+        )
         if full and self.profile is not None:
             columns = {}
             for source in doc.sources:
@@ -571,6 +591,12 @@ class FileWorkbench:
             # Reuse the human-review decisions. Each currency question labels its
             # profile-sample scope separately from complete output execution.
             decision_questions=decisions,
+            source_decision_pending=source_decision_pending,
+            source_identity_checks=[
+                {"severity": f.severity, "message": f.message, **f.details}
+                for f in res.findings
+                if f.kind == "source_identity"
+            ][:20],
         )
 
     def verify(self, doc: MappingDocument) -> RunReport:

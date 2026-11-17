@@ -667,11 +667,17 @@ def propose_for_round(
     )
     if review is not None and previous is not None and source_kind != "memory":
         _inherit_confidence(doc, review, previous)  # a person approved these exact field mappings before
-    from forma.services.decision_actions import conflicting_items, conflicting_records, missing_record_values
+    from forma.services.decision_actions import (
+        conflicting_items,
+        conflicting_records,
+        missing_record_values,
+        source_identity_questions,
+    )
     from forma.services.review_questions import _table_columns, unit_questions
 
-    review_decisions = conflicting_items(doc, schema, sim.records if sim else [])
+    review_decisions = conflicting_items(doc, schema, sim.records if sim else [], sim.findings if sim else [])
     review_decisions.extend(conflicting_records(sim.findings if sim else []))
+    review_decisions.extend(source_identity_questions(sim.findings if sim else []))
     review_decisions.extend(missing_record_values(doc, schema, sim.records if sim else []))
     review_decisions.extend(
         unit_questions(doc, schema, _table_columns(MappingVersion(round_id=r.id), doc, session))
@@ -1312,11 +1318,25 @@ def save_mapping_edit(
     # Saving a production candidate always verifies the entire input. Preview endpoints may sample.
     sim, problems = simulate(ctx, doc, schema, r.files if r else [], limit=None) if r else (None, [])
     remaining_questions = parent.open_questions if remaining_questions is None else remaining_questions
-    from forma.services.decision_actions import conflicting_items, conflicting_records, missing_record_values
+    # Source-grain findings are regenerated against every row below. Do not leave
+    # an earlier wording as a second, unanswerable question after a key repair.
+    prior_grain_prompts = {
+        q["question"]
+        for q in (parent.policy or {}).get("review_decisions", [])
+        if q.get("id", "").startswith("source-identity:")
+    }
+    remaining_questions = [q for q in remaining_questions or [] if q not in prior_grain_prompts]
+    from forma.services.decision_actions import (
+        conflicting_items,
+        conflicting_records,
+        missing_record_values,
+        source_identity_questions,
+    )
     from forma.services.review_questions import _table_columns, unit_questions
 
-    review_decisions = conflicting_items(doc, schema, sim.records if sim else [])
+    review_decisions = conflicting_items(doc, schema, sim.records if sim else [], sim.findings if sim else [])
     review_decisions.extend(conflicting_records(sim.findings if sim else []))
+    review_decisions.extend(source_identity_questions(sim.findings if sim else []))
     review_decisions.extend(missing_record_values(doc, schema, sim.records if sim else []))
     if sim and not sim.errors and not problems:
         remaining_questions, _ = _retire_structural_questions(

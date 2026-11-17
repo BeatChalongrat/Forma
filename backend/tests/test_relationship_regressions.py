@@ -189,6 +189,10 @@ def test_aggregate_converts_each_lot_then_sums_without_dropping_identical_lots(s
     cm = CollectionMapping(
         target="/inventory",
         source="lots",
+        source_identity={
+            "keys": ["warehouse", "line_id"],
+            "evidence": ["ERP line identifier separates additive lots"],
+        },
         link=[JoinKey(left="id", right="id")],
         fields=[
             FieldMapping(target="/inventory/*/warehouse_code", expr=col("warehouse")),
@@ -200,6 +204,7 @@ def test_aggregate_converts_each_lot_then_sums_without_dropping_identical_lots(s
         {
             "lots.id": ["001"] * 3,
             "lots.warehouse": ["A"] * 3,
+            "lots.line_id": ["L1", "L2", "L3"],
             "lots.qty": [2, 2, 3],
             "lots.factor": [12, 12, 1],
             f"lots.{ROW_COL}": [0, 1, 2],
@@ -240,8 +245,8 @@ def test_aggregate_full_workbook_preserves_one_group_per_output_item(tmp_path, s
     wb.active.append(["รหัสสินค้า", "ชื่อสินค้า"])
     wb.active.append(["0001", "Tea"])
     ws = wb.create_sheet("Lots")
-    ws.append(["id", "warehouse", "qty"])
-    for row in [("0001", "A", 2), ("0001", "A", 2), ("0001", "B", 3)]:
+    ws.append(["id", "warehouse", "qty", "line_id"])
+    for row in [("0001", "A", 2, "L1"), ("0001", "A", 2, "L2"), ("0001", "B", 3, "L3")]:
         ws.append(row)
     wb.save(path)
     doc = _doc()
@@ -251,6 +256,10 @@ def test_aggregate_full_workbook_preserves_one_group_per_output_item(tmp_path, s
         CollectionMapping(
             target="/inventory",
             source="lots",
+            source_identity={
+                "keys": ["warehouse", "line_id"],
+                "evidence": ["ERP line identifier separates additive lots"],
+            },
             link=[JoinKey(left="รหัสสินค้า", right="id")],
             fields=[
                 FieldMapping(target="/inventory/*/warehouse_code", expr=col("warehouse")),

@@ -37,8 +37,25 @@ Rules you must follow:
 - Use ONLY the whitelisted operations: {ops}.
 - For additive rows (such as stock lots), use CollectionMapping.aggregate with group_by and sum
   as relative item pointers. Field expressions convert units first; aggregation then sums per parent
-  and group. Map only grouped/summed fields. Do not deduplicate additive lots or sum competing prices.
+  and group. Map only grouped/summed fields. Never sum competing prices.
+  Before aggregation declare collection.source_identity with source column keys and evidence
+  establishing the business grain (e.g. lot plus warehouse/bin/status, or authoritative line ID).
+  Uniqueness alone does not establish meaning; never use generated row numbers as identity.
+  Execution removes identical raw repeats by that key BEFORE summing. Distinct keys with equal
+  quantities remain additive. Missing keys, null keys or conflicting values block approval.
+  Inspect all source dimensions and ask when the grain is unclear; do not guess from column names.
   Preserve unresolved alternatives and ask for a business decision when no source rule resolves them.
+  Keep an evidence-backed source_identity and aggregate even when a key cell is blank or a source
+  identity has conflicting quantities. FORMA builds executable questions from these findings;
+  do NOT remove the key/aggregate, add quantity to the key, filter an alternative, or replace the
+  collection quantity with a scalar clarification to make execution pass. Preserve every other
+  source identity. A business decision pending is not a mapping error to repair.
+  source_identity already collapses exact raw repeats before aggregation. dedupe_keys describes
+  output item pointers, NOT raw column names. When source identity is unresolved the engine
+  intentionally withholds the aggregate total, so missing qty/aggregate validation errors are
+  consequences of that block. Do not bypass it to make a preview look complete.
+  action=request_source and action=confirm use kind=confirm (the UI control), even for numeric
+  targets. Never offer numeric proxy choices for selecting source rows or filling a missing lot ID.
   Collection fields use FULL target pointers (array target + /* + item path); only aggregate.group_by,
   aggregate.sum and dedupe_keys use RELATIVE item pointers. For an array /balances with item fields
   depot and available, field targets are /balances/*/depot and /balances/*/available, while aggregate
@@ -535,6 +552,8 @@ def _agent_loop(
     verify = getattr(workbench, "verify", None)
     if ground is not None and callable(verify):
         baseline = verify(ground)
+        if baseline.complete and baseline.decision_questions:
+            payload = {**payload, "engine_review_decisions": baseline.decision_questions}
         if baseline.complete and baseline.errors == 0 and baseline.rows_out > 0:
             baseline_coverage = baseline.coverage
     best: tuple[tuple[int, int, int], MappingDocument, dict[str, Any], RunReport] | None = None
@@ -588,8 +607,10 @@ def _agent_loop(
                 return ["mapping is required (an object, not null)"]
             errors = validate_doc(d)
             if not errors and d.get("clarifications"):
+                from forma.ai.clarifications import normalize_controls
                 from forma.ai.clarifications import validate as validate_clarifications
 
+                normalize_controls(d["clarifications"])
                 errors.extend(
                     validate_clarifications(
                         d["clarifications"], MappingDocument.model_validate(d["mapping"]), schema
@@ -681,6 +702,11 @@ def _agent_loop(
         )
         if best is None or report.score < best[0]:
             best = (report.score, doc, d, report)
+        if report.source_decision_pending:
+            # The full-file engine has an executable source decision. Keep this
+            # mapping/key, rather than incentivizing removal of the conflicting rows.
+            best = (report.score, doc, d, report)
+            break
         if report.clean or checks >= check_rounds:
             break
         checks += 1

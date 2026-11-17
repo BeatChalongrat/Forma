@@ -11,12 +11,15 @@ export function answerLabel(q: Question, value: unknown, t: Translate): string {
     ? value ? t('VAT included', 'รวม VAT แล้ว') : t('VAT excluded', 'ยังไม่รวม VAT')
     : value ? t('Yes', 'ใช่') : t('No', 'ไม่ใช่')
   const text = String(value)
+  if (q.action === 'source_identity') { try { const keys: unknown = JSON.parse(text); if (Array.isArray(keys) && keys.every(k => typeof k === 'string')) return keys.join(' + ') } catch { /* Keep unparsed draft visible. */ } }
   if (q.option_labels?.[text]) return q.option_labels[text]
   if (q.field.semantic === 'unit.sell' && units[text]) return t(text, `${units[text]} (${text})`)
   return text
 }
 
 export function answerScope(q: Question, remember: boolean, t: Translate): string {
+  if (q.action === 'request_source') return t('Source information is required; this cannot be resolved by confirming or remembering an answer', 'ต้องเติมข้อมูลต้นทางก่อน ข้อนี้ใช้การยืนยันหรือจำคำตอบแทนไม่ได้')
+  if (q.action === 'source_identity') return t('Verify the source record key for this file before combining quantities', 'ตรวจคีย์แยกรายการของไฟล์นี้ก่อนรวมยอด')
   if (q.scope === 'record_in_this_delivery' || q.scope === 'records_in_this_delivery') return t('Only the listed records in this upload; not reused for later files', 'เฉพาะรายการที่ระบุในไฟล์ครั้งนี้ ไม่ใช้กับไฟล์ครั้งถัดไป')
   const scope = q.scope === 'source_value' ? t(`Only source code “${q.source_value}”`, `เฉพาะรหัส “${q.source_value}”`)
     : q.scope === 'source_column' || q.kind === 'choice' ? t('The source column', 'คอลัมน์ต้นทางนี้')

@@ -60,7 +60,17 @@ def _validate_answer_results(
             details={"findings": [f.to_dict() for f in after.errors]},
         )
     old_findings = {(f.kind, f.target, f.message) for f in before.errors}
-    introduced = [f.to_dict() for f in after.errors if (f.kind, f.target, f.message) not in old_findings]
+    grain_targets = {q["target"] for q in decisions if q.get("action") == "source_identity"}
+    introduced = [
+        f.to_dict()
+        for f in after.errors
+        if (f.kind, f.target, f.message) not in old_findings
+        and not (
+            f.kind == "source_identity"
+            and f.target in grain_targets
+            and any(old.kind == "source_identity" and old.target == f.target for old in before.errors)
+        )
+    ]
     if introduced:
         raise ValidationFailed(
             "These answers introduce new validation errors", details={"findings": introduced}
@@ -81,9 +91,22 @@ def _validate_answer_results(
     targets = {
         q["field"]["pointer"] for q in decisions if q.get("action") not in ("select_rows", "record_value")
     }
+    targets.update(
+        spec.pointer
+        for spec in schema.leaf_fields()
+        if any(
+            q.get("action") == "source_identity" and spec.pointer.startswith(q["collection"] + "/")
+            for q in decisions
+        )
+    )
     row_choices = [q for q in decisions if q.get("action") == "select_rows"]
 
     def matches_record(q: dict[str, Any], rec: dict[str, Any]) -> bool:
+        if q.get("source_rows") and q.get("collection"):
+            lineage = rec.get(PROVENANCE_KEY, {}).get("lineage", {})
+            rows = list(lineage.get("items", {}).get(q["collection"], []))
+            rows.extend(r for group in lineage.get("item_groups", {}).get(q["collection"], []) for r in group)
+            return bool(set(rows) & set(q["source_rows"]))
         return any(
             identity and all(_get_pointer(rec, p) == v for p, v in identity.items())
             for identity in q.get("identities", [q.get("identity", {})])
@@ -100,6 +123,19 @@ def _validate_answer_results(
             )
         for spec in schema.leaf_fields():
             if spec.pointer in targets:
+                continue
+            # Validation can stop before filling optional defaults on an invalid
+            # record. Repairing a quantity may expose those contract defaults.
+            # Only absent, non-collection values becoming the exact schema default
+            # are exempt; an existing value or an arbitrary status remains protected.
+            if (
+                old_record_errors
+                and not new_record_errors
+                and "*" not in spec.pointer
+                and spec.default is not None
+                and not list(values_at(rec, spec.pointer))
+                and list(values_at(new[key], spec.pointer)) == [spec.default]
+            ):
                 continue
             if any(
                 q.get("action") == "record_value"
@@ -167,7 +203,9 @@ def overview(ctx: ServiceContext, session: Session, m: MappingVersion) -> dict[s
     }
 
 
-def evidence(ctx: ServiceContext, session: Session, m: MappingVersion, pointer: str) -> dict[str, Any]:
+def evidence(
+    ctx: ServiceContext, session: Session, m: MappingVersion, pointer: str, question: str | None = None
+) -> dict[str, Any]:
     """Read actual mapped outputs and the cells identified by engine provenance, on demand."""
     doc = MappingDocument.model_validate(m.document)
     schema = ctx.registry.get_ref(m.target_schema)
@@ -199,6 +237,60 @@ def evidence(ctx: ServiceContext, session: Session, m: MappingVersion, pointer: 
         return result
     bindings, _ = mapping.bind_sources(doc, r.files, resolve=ctx.storage.local_path)
     sources = _Sources(doc, bindings)
+    if question is not None:
+        from forma.services.review_questions import questions
+
+        item = next((q for q in questions(ctx, m)["questions"] if q["id"] == question), None)
+        if item is None or item["field"]["pointer"] != pointer:
+            raise ValidationFailed("This question is not available for this field in this version")
+        if item.get("action") == "request_source" and item.get("source_key_columns"):
+            # Recompute findings against immutable source data. Do not show a quantity
+            # column or a representative non-empty sample as evidence of a blank key.
+            result.update(source_issue=True, constant=False, examples=[], unavailable=True)
+            for finding in sim.errors:
+                detail = finding.details
+                if not (
+                    finding.kind == "source_identity"
+                    and detail.get("reason") == "blank_key"
+                    and detail.get("collection") == item.get("collection")
+                ):
+                    continue
+                sid = detail["source"]
+                source = next(s for s in doc.sources if s.id == sid)
+                frame = load_source_frame(
+                    source, bindings[sid], limit=None, expected_columns=_source_columns(doc, sid)
+                )
+                loc = sources.get(sid)
+                if loc is None:
+                    continue
+                for row in detail["rows"]:
+                    extracted = frame.filter(frame[ROW_COL] == row)
+                    if extracted.height != 1:
+                        continue
+                    cells = []
+                    for name in detail["blank_columns"]:
+                        col = sources._column(loc, name)
+                        cell = sources.cell(sid, row, name)
+                        if (
+                            cell is not None
+                            and col in extracted.columns
+                            and cell["raw"] == extracted[col][0]
+                            and cell.get("verified") is not False
+                            and (cell["raw"] is None or not str(cell["raw"]).strip())
+                        ):
+                            cells.append(cell)
+                    if cells:
+                        result["examples"].append(
+                            {
+                                "identity": "",
+                                "item": None,
+                                "value": None,
+                                "cells": cells,
+                                "source_complete": True,
+                            }
+                        )
+            result["unavailable"] = not result["examples"]
+            return result
     expr = fm.expr.model_dump(mode="json", exclude_none=True)
     cols = _expr_columns(expr, default)
     # A constant VAT flag has no source cell. Show price cells as context, never as VAT proof.
@@ -321,7 +413,10 @@ def answer_impact(
             "before_records": len(old_result.records) if old_result is not None else 0,
             "after_records": len(new_result.records) if new_result is not None else 0,
             "scope": "complete_delivery",
-            "reliable": bool(before.get("ok") and after.get("ok")),
+            # A complete baseline may contain the very errors the answer repairs.
+            # Execution failure is different from a completed result with findings.
+            # Corrected output and the full identity/side-effect check remain mandatory.
+            "reliable": bool(old_result is not None and new_result is not None),
             "confirmed_fields": list(answers),
         },
     }

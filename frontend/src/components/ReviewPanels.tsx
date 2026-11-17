@@ -6,12 +6,17 @@ import { api, type AnswerPreview, type ReviewQuestions } from '../lib/api'
 import { reviewToolUrl } from '../lib/reviewNavigation'
 import { Badge, Spinner } from './ui'
 import { fieldName, rule, valueLabel, text, editor, type T } from '../lib/reviewPresentation'
-export function Evidence({ id, field, semantic, t }: { id: string; field: string; semantic: string | null; t: T }) {
-  const query = useQuery({ queryKey: ['question-evidence', id, field], queryFn: () => api.reviewEvidence(id, field), staleTime: 60000, retry: false })
+export function Evidence({ id, field, semantic, t, question }: { question?: string; id: string; field: string; semantic: string | null; t: T }) {
+  const query = useQuery({ queryKey: ['question-evidence', id, field, question], queryFn: () => api.reviewEvidence(id, field, question), staleTime: 60000, retry: false })
   const [location, setLocation] = useState<number | null>(null)
   if (query.isPending) return <div className="p-5 flex gap-3 text-sm"><Spinner />{t('Reading actual source rows…', 'กำลังอ่านแถวจริงจากไฟล์ต้นทาง…')}</div>
   if (query.isError) return <div role="alert" className="bg-warn-soft p-4 rounded-xl text-sm">{t('Source evidence could not be loaded. Do not confirm without checking the file.', 'โหลดหลักฐานต้นทางไม่ได้ อย่ายืนยันโดยยังไม่ได้ตรวจไฟล์')}<button className="btn btn-sm ml-2" onClick={() => void query.refetch()}>{t('Retry', 'ลองใหม่')}</button></div>
   const d = query.data
+  if (d.source_issue) return <section className="space-y-3">
+    <h3 className="font-semibold">{t('Missing information in the source', 'ช่องที่ขาดข้อมูลในไฟล์ต้นทาง')}</h3>
+    <p className="text-sm text-muted">{t('Fill these cells in the source file, then upload the corrected file. Confirming a reading cannot supply the missing key.', 'เติมข้อมูลช่องเหล่านี้ในไฟล์ต้นทาง แล้วอัปโหลดไฟล์ที่แก้แล้ว การยืนยันว่าอ่านถูกต้องไม่สามารถทดแทนข้อมูลที่ขาดได้')}</p>
+    {d.unavailable || !d.examples.length ? <p role="alert">{t('Could not verify the source location. Check the original file.', 'ยังยืนยันตำแหน่งช่องว่างไม่ได้ กรุณาตรวจไฟล์ต้นฉบับ')}</p> : <div className="overflow-x-auto border border-line rounded-xl"><table className="table text-sm"><thead><tr><th>{t('File / sheet', 'ไฟล์ / ชีต')}</th><th>{t('Cell / row', 'เซลล์ / แถว')}</th><th>{t('Column', 'คอลัมน์')}</th><th>{t('Source value', 'ค่าในไฟล์')}</th></tr></thead><tbody>{d.examples.flatMap(x => x.cells).map((c, i) => <tr key={i}><td>{c.file}<small className="block text-muted">{c.sheet || 'CSV'}</small></td><td>{c.column && c.row ? `${c.column}${c.row}` : '—'}{c.row && <small className="block text-muted">{t('Row', 'แถว')} {c.row}</small>}</td><td>{c.header}</td><td className="text-warn font-medium">{t('Blank', 'ว่าง — ยังไม่มีข้อมูล')}</td></tr>)}</tbody></table></div>}
+  </section>
   return <div className="space-y-3"><h3 className="font-semibold">{t('Actual source → system result', 'ข้อมูลจริงในไฟล์ → สิ่งที่ระบบอ่านได้')}</h3>
     <p className="text-xs text-muted">{t(`Showing ${d.examples.length} examples calculated from complete source data. Check the source evidence before confirming.`, `แสดง ${d.examples.length} ตัวอย่างที่คำนวณจากข้อมูลต้นทางครบทุกแถว ตรวจหลักฐานต้นทางก่อนยืนยัน`)}</p>
     {d.constant && <p className="text-sm bg-warn-soft rounded-lg p-3">{d.context_only ? t('Prices below are context only. The VAT flag is an assumption, not a value read from a VAT cell.', 'ราคาด้านล่างเป็นข้อมูลประกอบเท่านั้น ค่า VAT เป็นค่าที่ตั้งไว้ ไม่ได้อ่านจากช่อง VAT ในไฟล์') : t('This is a fixed value in the rule, not a value read from a source cell.', 'ค่านี้ถูกกำหนดไว้ในกฎ ไม่ได้อ่านจากเซลล์ต้นทาง')}</p>}
