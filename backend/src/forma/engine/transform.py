@@ -22,6 +22,7 @@ from forma.mapping_dsl.models import (
     Expr,
     JoinSpec,
     MappingDocument,
+    Op,
     QualityRule,
     SourceSpec,
 )
@@ -380,12 +381,14 @@ class TransformEngine:
             try:
                 effective_cm = cm
                 if cm.source in raw_collections:
-                    filters = [mapping.source(cm.source).table.filter]
+                    source_filter = mapping.source(cm.source).table.filter
+                    assert source_filter is not None  # raw_collections stores filtered sources only
+                    filters: list[Expr] = [source_filter]
                     if cm.filter is not None:
                         filters.append(cm.filter)
                     effective_cm = cm.model_copy(
                         update={
-                            "filter": filters[0] if len(filters) == 1 else CallExpr(op="and", args=filters)
+                            "filter": filters[0] if len(filters) == 1 else CallExpr(op=Op.AND, args=filters)
                         }
                     )
                 items, fnd = self._collection(

@@ -257,14 +257,14 @@ def evidence(
                     continue
                 sid = detail["source"]
                 source = next(s for s in doc.sources if s.id == sid)
-                frame = load_source_frame(
+                issue_frame = load_source_frame(
                     source, bindings[sid], limit=None, expected_columns=_source_columns(doc, sid)
                 )
                 loc = sources.get(sid)
                 if loc is None:
                     continue
                 for row in detail["rows"]:
-                    extracted = frame.filter(frame[ROW_COL] == row)
+                    extracted = issue_frame.filter(issue_frame[ROW_COL] == row)
                     if extracted.height != 1:
                         continue
                     cells = []
