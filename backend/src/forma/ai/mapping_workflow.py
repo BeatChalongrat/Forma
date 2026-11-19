@@ -29,7 +29,7 @@ from forma.mapping_dsl.models import MappingDocument
 from forma.profiling.profile import WorkbookProfile
 from forma.schema_registry import TargetSchema
 
-WORKFLOW_VERSION = "2026.11.13.2"
+WORKFLOW_VERSION = "2026.11.17.3"
 
 
 class EvidenceRef(BaseModel):
@@ -318,6 +318,9 @@ def build_workflow(
                     else ["Return review now; no inspection turns remain"]
                 )
             try:
+                from forma.ai.clarifications import normalize_controls
+
+                normalize_controls(data["review"].get("clarifications", []))
                 review = Review.model_validate(data["review"])
             except ValueError as exc:
                 return [str(exc)[:1500]]
@@ -330,6 +333,11 @@ def build_workflow(
                 for key in review.covered_questions
                 if key in decisions
                 for p in decisions[key].get("affected_fields", [decisions[key]["target"]])
+            }
+            source_decision_targets = {
+                decisions[key]["target"]
+                for key in review.covered_questions
+                if key in decisions and decisions[key].get("action") in {"request_source", "select_rows"}
             }
             for q in review.clarifications:
                 if any(
@@ -356,14 +364,24 @@ def build_workflow(
                 and (
                     not review.covered_questions
                     or any(
-                        c.kind != "missing_business_fact" or c.target not in covered_targets
+                        (
+                            c.kind != "missing_business_fact"
+                            and not (c.kind == "source_problem" and c.target in source_decision_targets)
+                        )
+                        or c.target not in covered_targets
                         for c in review.concerns
                     )
                 )
             ):
                 errors.append(
                     "Ask needs actionable clarifications or existing decision IDs covering every business "
-                    "concern; otherwise use repair"
+                    "concern; otherwise use repair. "
+                    f"Received concerns={[(c.target, c.kind) for c in review.concerns]}, "
+                    f"covered_questions={review.covered_questions}. "
+                    "Available source decisions="
+                    f"{[(k, d['target'], d.get('action')) for k, d in decisions.items()]}. "
+                    "For an existing question use its exact ID and target; missing_business_fact or "
+                    "source_problem describes a pending source decision, mapping_error requires repair."
                 )
             if review.verdict == "ask" and any(c.kind == "mapping_error" for c in review.concerns):
                 errors.append(
@@ -401,7 +419,20 @@ def build_workflow(
             "For a business concern covered by one, return ask with its ID in covered_questions and no "
             "duplicate clarification. Choosing source rows is NOT a numeric answer, constant or value_map. "
             "Never invent proxy codes (e.g. 1 for A, 2 for B) or source_value tokens to select a price list. "
-            "Covered questions still require a human response and do not pass verification.",
+            "Covered questions still require a human response and do not pass verification. "
+            "Execution semantics: source_identity compares ALL raw source columns and collapses exact "
+            "repeats BEFORE aggregation; execution.source_identity_checks contains the measured "
+            "input/retained/dropped counts and source key diagnostics. Collection dedupe_keys describe "
+            "OUTPUT item pointers, not source column names; do not ask to put raw headers there. "
+            "When a source identity is blank or has conflicting quantities, the engine deliberately "
+            "withholds the aggregate total (null/absent qty) until the existing source decision is "
+            "resolved. The resulting aggregate/required-qty validation errors are consequences of "
+            "that safety block, not evidence that the quantity expression is unmapped or lost. "
+            "Check the source expression and diagnostics together; never repair by bypassing this block. "
+            "An absent source key can be reported as source_problem with ask and the existing "
+            "request_source decision ID; conflicting source values can likewise use source_problem "
+            "with the existing select_rows decision ID. "
+            "Independently supported mapping mistakes still need repair.",
             user=json.dumps(
                 {
                     **common,
@@ -560,7 +591,11 @@ def run_workflow(
         "repairs": state.get("repairs", 0),
         "provider_attempts": used,
         "usage_unknown_attempts": max(0, used - usage.calls),
-        "status": "failed"
+        "status": "awaiting_human"
+        if execution.get("source_decision_pending")
+        and not state.get("failure")
+        and review.get("verdict") in {"ask", "pass"}
+        else "failed"
         if problems
         else "awaiting_human"
         if questions or data.get("open_questions") or review.get("verdict") == "ask"

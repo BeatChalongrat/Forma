@@ -86,6 +86,27 @@ def validate_value(value: Any, spec: dict[str, Any]) -> None:
 
 def apply(doc: MappingDocument, q: dict[str, Any], value: Any) -> None:
     action = q["action"]
+    if action == "source_identity":
+        import json
+
+        from forma.mapping_dsl.models import SourceIdentity
+
+        try:
+            keys = json.loads(value)
+        except (ValueError, TypeError) as exc:
+            raise ValidationFailed("Select the columns that identify one source record") from exc
+        if (
+            not isinstance(keys, list)
+            or not keys
+            or any(not isinstance(k, str) or k not in q["available_columns"] for k in keys)
+            or len(set(keys)) != len(keys)
+        ):
+            raise ValidationFailed("Choose distinct columns present in this source")
+        cm = next(c for c in doc.collections if c.target == q["collection"])
+        cm.source_identity = SourceIdentity(
+            keys=keys, evidence=["Operator selected source identity columns during review of this delivery"]
+        )
+        return
     if action == "request_source":
         raise ValidationFailed(
             "Provide or repair the source file, then run mapping again; this request cannot be answered by confirming a value"
@@ -93,6 +114,18 @@ def apply(doc: MappingDocument, q: dict[str, Any], value: Any) -> None:
     target = q.get("target") or q["field"]["pointer"]
     fm = field_mapping(doc, target)
     if action == "select_rows":
+        collection = next((c for c in doc.collections if c.target == q.get("collection")), None)
+        if (
+            collection is not None
+            and (
+                collection.aggregate is not None
+                or (q.get("field", {}).get("semantic") or "").startswith("stock.")
+            )
+            and (collection.source_identity is None or "row_exclusions" not in q)
+        ):
+            raise ValidationFailed(
+                "This older row choice does not identify one source record. Recheck the mapping and source keys before selecting a quantity."
+            )
         if value not in q["options"]:
             raise ValidationFailed("Choose one of the source rows shown")
         if "row_exclusions" in q:
@@ -205,11 +238,26 @@ def apply(doc: MappingDocument, q: dict[str, Any], value: Any) -> None:
 
 
 def conflicting_items(
-    doc: MappingDocument, schema: TargetSchema, records: list[dict[str, Any]]
+    doc: MappingDocument,
+    schema: TargetSchema,
+    records: list[dict[str, Any]],
+    findings: list[Any] | None = None,
 ) -> list[dict[str, Any]]:
     """Source-row choices are scoped to this immutable delivery and can never become format memory."""
     questions = []
+    unresolved = {
+        f.details.get("collection")
+        for f in findings or []
+        if f.kind == "source_identity" and f.severity == "error"
+    }
     for cm in doc.collections:
+        # Projected warehouse identities are not source lot identities. Never
+        # offer mutually exclusive quantities before the source grain is known.
+        if cm.target in unresolved or (
+            cm.source_identity is None
+            and any((schema.field(f.target).semantic or "").startswith("stock.") for f in cm.fields)
+        ):
+            continue
         keys = schema.collection_identity_keys(cm.target)
         if not keys:
             continue
@@ -304,6 +352,59 @@ def conflicting_records(findings: list[Any]) -> list[dict[str, Any]]:
                     "allow_custom": False,
                 }
             )
+    return questions
+
+
+def source_identity_questions(findings: list[Any]) -> list[dict[str, Any]]:
+    """Actionable source-grain questions; acknowledgement alone cannot waive them."""
+    questions = []
+    for f in findings:
+        if f.kind != "source_identity" or f.severity != "error":
+            continue
+        d = f.details
+        q = {
+            "id": "source-identity:" + stable_hash([d["collection"], d["reason"], d.get("identity")], 24),
+            "target": d["target"],
+            "collection": d["collection"],
+            "question": f.message,
+            "why": "ตรวจทุกแถวก่อนรวมยอด แถวที่คีย์และข้อมูลเหมือนกันนับครั้งเดียว คนละคีย์ต้องเก็บไว้ ข้อมูลไม่ชัดยังส่งออกไม่ได้",
+            "scope": "source_identity_in_this_delivery",
+            "kind": "confirm",
+            "action": "request_source",
+            "allow_custom": False,
+            "options": [],
+        }
+        if d["reason"] in ("missing_key", "missing_columns", "incomplete_key"):
+            q.update(
+                kind="text",
+                action="source_identity",
+                allow_custom=True,
+                available_columns=d["available_columns"],
+            )
+        elif d["reason"] == "blank_key":
+            q.update(source_key_columns=d["blank_columns"], source_row_indices=d["rows"])
+        elif d["reason"] == "conflicting_values":
+            variants = d["variants"]
+            options = {str(v["rows"][0]): v for v in variants}
+            q.update(
+                question="รายการ "
+                + " · ".join(f"{k}: {v}" for k, v in d["identity"].items())
+                + " มียอดต่างกัน ให้ใช้ค่าใด? รายการและล็อตอื่นจะยังเก็บไว้",
+                kind="enum",
+                action="select_rows",
+                scope="record_in_this_delivery",
+                options=list(options),
+                row_exclusions={
+                    k: [r for other, v in options.items() if other != k for r in v["rows"]] for k in options
+                },
+                option_labels={
+                    k: " · ".join(f"{name}: {value}" for name, value in v["values"].items())
+                    for k, v in options.items()
+                },
+                source_identity_values=d["identity"],
+                source_rows=[r for v in variants for r in v["rows"]],
+            )
+        questions.append(q)
     return questions
 
 

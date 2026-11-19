@@ -173,11 +173,12 @@ def questions(
 def question_evidence(
     mapping_id: str,
     field: str = Query(min_length=1, max_length=500),
+    question: str | None = Query(default=None, min_length=1, max_length=1000),
     session: Session = Depends(get_session),
     ctx: ServiceContext = Depends(ctx_dep),
     p: Principal = Depends(require_role("importer")),
 ) -> dict[str, Any]:
-    return review_evidence.evidence(ctx, session, _mapping_scoped(session, p, mapping_id), field)
+    return review_evidence.evidence(ctx, session, _mapping_scoped(session, p, mapping_id), field, question)
 
 
 @router.get("/rounds/{round_id}/verdict")

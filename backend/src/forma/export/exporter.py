@@ -126,6 +126,31 @@ def flatten_record(
 
 def _iter_csv(records: Callable[[], Iterable[dict[str, Any]]], schema: TargetSchema) -> Iterator[bytes]:
     variant = schema.output_variants.get("csv", {})
+    if variant.get("columns"):
+        # A confirmed flat template fixes every column, including empty optional fields / no rows.
+        # Do not discover or sort columns from record key order.
+        from forma.schema_registry.csv_template import validate_csv_contract
+
+        validate_csv_contract(schema.document)
+        columns_spec = variant["columns"]
+        buf = io.StringIO()
+        writer = csv.writer(buf, delimiter=variant.get("delimiter", ","))
+        writer.writerow([c["header"] for c in columns_spec])
+        yield (BOM + buf.getvalue()).encode("utf-8")
+        buf.seek(0)
+        buf.truncate(0)
+        for n, rec in enumerate(records(), start=1):
+            values = [rec.get(c["field"]) for c in columns_spec]
+            writer.writerow(
+                ["" if v is None else str(v).lower() if isinstance(v, bool) else v for v in values]
+            )
+            if n % 2000 == 0:
+                yield buf.getvalue().encode("utf-8")
+                buf.seek(0)
+                buf.truncate(0)
+        if buf.tell():
+            yield buf.getvalue().encode("utf-8")
+        return
     explode = variant.get("explode")
     join = variant.get("array_join", "|")
     # pass 1: column order = first-seen order across all rows (identical to the old in-memory output)

@@ -310,6 +310,14 @@ def invalid_records(dv: DatasetVersion) -> int:
 
 
 def _require_valid(dv: DatasetVersion, action: str) -> None:
+    unresolved_identity = [
+        f for f in dv.findings or [] if f.get("kind") == "source_identity" and f.get("severity") == "error"
+    ]
+    if unresolved_identity:
+        raise Conflict(
+            "Resolve source record keys or conflicting quantities and transform again before " + action,
+            details={"source_identity": unresolved_identity[:8]},
+        )
     bad = invalid_records(dv)
     if bad:
         sample = [

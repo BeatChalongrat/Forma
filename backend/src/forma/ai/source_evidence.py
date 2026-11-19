@@ -109,6 +109,64 @@ def validate_currency_contract(schema: TargetSchema) -> None:
             raise ValidationFailed("The authoritative currency column must be in columns")
 
 
+def confirmed_currency_value(spec: FieldSpec) -> str | None:
+    """Read explicit registered contract values, never descriptions or model claims.
+
+    const/singleton enum constrain every record; default is the existing fallback
+    contract. Source conflicts must still be checked by currency_questions.
+    """
+    value = (
+        spec.constant
+        if spec.has_constant
+        else spec.enum[0]
+        if spec.enum is not None and len(spec.enum) == 1
+        else spec.default
+    )
+    return value if isinstance(value, str) and value.strip() else None
+
+
+def currency_memory_receipts(
+    doc: MappingDocument,
+    schema: TargetSchema,
+    columns: dict[str, list[dict[str, Any]]],
+    recalled: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Rebind server-validated decision memory to this input's evidence scope.
+
+    Caller must use decision_memory.recall or an eligible approved format. A
+    remembered constant may settle missing evidence, never competing sources.
+    Never accept model-written evidence strings or copy an old file hash receipt.
+    """
+    fields = {f.target: f for f in [*doc.fields, *(f for c in doc.collections for f in c.fields)]}
+    receipts = []
+    for q in currency_questions(doc, schema, columns):
+        if q.get("action") != "constant" or q.get("scope") != "constant_for_this_file":
+            continue
+        fm = fields[q["target"]]
+        expression = fm.expr.model_dump(mode="json")
+        for decision in recalled:
+            if (
+                decision.get("target") == fm.target
+                and decision.get("action") == "constant"
+                and decision.get("remember") is True
+                and decision.get("scope") == "constant_for_this_file"
+                and (decision.get("knowledge_id") or decision.get("knowledge_mapping_id"))
+                and decision.get("after") == expression
+            ):
+                receipts.append(
+                    {
+                        "target": fm.target,
+                        "evidence_key": q["evidence_key"],
+                        "expression": expression,
+                        "basis": "scoped approved decision memory",
+                        "knowledge_id": decision.get("knowledge_id"),
+                        "knowledge_mapping_id": decision.get("knowledge_mapping_id"),
+                    }
+                )
+                break
+    return receipts
+
+
 def currency_questions(
     doc: MappingDocument,
     schema: TargetSchema,
@@ -174,9 +232,10 @@ def currency_questions(
             continue
         distinct = {tuple(c["values"]) for c in eligible}
         literal = getattr(fm.expr, "value", None)
-        contract_default = spec.default is not None and literal == spec.default
+        contract_value = confirmed_currency_value(spec)
+        contract_default = contract_value is not None and literal == contract_value
         # Model-written constants and confidence are not evidence. Only a contract
-        # default or a server-recorded human confirmation can justify a constant.
+        # value or a server-recorded human confirmation can justify a constant.
         missing = not selected and not contract_default
         # Identical sets with more than one value do not establish row-aligned agreement.
         ambiguous = len(eligible) > 1 and (len(distinct) > 1 or any(len(c["values"]) > 1 for c in eligible))

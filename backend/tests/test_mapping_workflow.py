@@ -111,6 +111,76 @@ def test_reviewer_repair_is_bounded_and_unresolved_blocks(tmp_path, schema):
     assert any("semantic review" in p for p in res.data["self_check"]["problems_left"])
 
 
+@pytest.mark.parametrize(
+    "concern_kind,decision_action",
+    [
+        ("missing_business_fact", "request_source"),
+        ("source_problem", "request_source"),
+        ("source_problem", "select_rows"),
+    ],
+)
+def test_executable_source_decision_stops_mapping_repairs_but_never_approves(
+    tmp_path, schema, concern_kind, decision_action
+):
+    decision = {
+        "id": "source-identity:example",
+        "target": "/prices/*/amount",
+        "action": decision_action,
+        "question": "Supply the missing source identity",
+        "kind": "confirm",
+    }
+
+    class SourceBench(Bench):
+        def run(self, doc):
+            return RunReport(
+                12,
+                12,
+                problems=["Source identity missing"],
+                errors=1,
+                complete=True,
+                decision_questions=[decision],
+                source_decision_pending=True,
+            )
+
+        verify = run
+
+    review = {
+        "verdict": "ask",
+        "checked": ["source identity"],
+        "concerns": [{**concern(concern_kind), "target": "/prices/*/amount"}],
+        "clarifications": [],
+        "covered_questions": [decision["id"]],
+    }
+    client, _, res = run(tmp_path, schema, bench=SourceBench(), responder=response(review))
+    assert len(client.provider.calls) == 3
+    assert res.data["workflow"]["status"] == "awaiting_human"
+    assert res.data["self_check"]["errors"] > 0
+    assert res.data["self_check"]["problems_left"]
+    mapper_prompt = json.loads(client.provider.calls[1]["user"])
+    assert mapper_prompt["engine_review_decisions"] == [decision]
+
+
+def test_reviewer_request_source_with_target_type_is_not_a_fallback(tmp_path, schema):
+    question = {
+        "target": "/prices/*/amount",
+        "action": "request_source",
+        "kind": "number",
+        "question": "Please supply the original balance",
+        "why": "Value unavailable",
+    }
+    review = {
+        "verdict": "ask",
+        "checked": ["amount"],
+        "concerns": [{**concern("missing_business_fact"), "target": "/prices/*/amount"}],
+        "clarifications": [question],
+    }
+    client, _, res = run(tmp_path, schema, responder=response(review))
+    assert len(client.provider.calls) == 3
+    assert res.data["workflow"]["status"] == "awaiting_human"
+    assert res.data["clarifications"][0]["kind"] == "confirm"
+    assert res.data["clarifications"][0]["action"] == "request_source"
+
+
 def test_reviewer_asks_actionable_question_without_approval(tmp_path, schema):
     question = {
         "target": "/currency",

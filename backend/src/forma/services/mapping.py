@@ -667,20 +667,28 @@ def propose_for_round(
     )
     if review is not None and previous is not None and source_kind != "memory":
         _inherit_confidence(doc, review, previous)  # a person approved these exact field mappings before
-    from forma.services.decision_actions import conflicting_items, conflicting_records, missing_record_values
+    from forma.services.decision_actions import (
+        conflicting_items,
+        conflicting_records,
+        missing_record_values,
+        source_identity_questions,
+    )
     from forma.services.review_questions import _table_columns, unit_questions
 
-    review_decisions = conflicting_items(doc, schema, sim.records if sim else [])
+    review_decisions = conflicting_items(doc, schema, sim.records if sim else [], sim.findings if sim else [])
     review_decisions.extend(conflicting_records(sim.findings if sim else []))
+    review_decisions.extend(source_identity_questions(sim.findings if sim else []))
     review_decisions.extend(missing_record_values(doc, schema, sim.records if sim else []))
     review_decisions.extend(
         unit_questions(doc, schema, _table_columns(MappingVersion(round_id=r.id), doc, session))
     )
-    from forma.ai.source_evidence import currency_questions
+    from forma.ai.source_evidence import currency_memory_receipts, currency_questions
 
-    review_decisions.extend(
-        currency_questions(doc, schema, _table_columns(MappingVersion(round_id=r.id), doc, session))
-    )
+    currency_columns = _table_columns(MappingVersion(round_id=r.id), doc, session)
+    currency_receipts = currency_memory_receipts(doc, schema, currency_columns, recalled)
+    review_decisions.extend(currency_questions(doc, schema, currency_columns, currency_receipts))
+    if currency_receipts:
+        agent_log.append({"agent": "currency_evidence", "confirmations": currency_receipts})
     open_questions.extend(q["question"] for q in review_decisions if q["question"] not in open_questions)
     decision = ctx.policy.for_customer(r.customer.policy_overrides if r.customer else None).evaluate(
         doc,
@@ -747,6 +755,7 @@ def propose_for_round(
             "verification": verified,
             "review_decisions": review_decisions,
             "confirmed_decisions": recalled,
+            "evidence_confirmations": currency_receipts,
             "clarifications": [
                 q for entry in agent_log for q in (entry.get("data") or {}).get("clarifications", [])
             ],
@@ -1309,11 +1318,25 @@ def save_mapping_edit(
     # Saving a production candidate always verifies the entire input. Preview endpoints may sample.
     sim, problems = simulate(ctx, doc, schema, r.files if r else [], limit=None) if r else (None, [])
     remaining_questions = parent.open_questions if remaining_questions is None else remaining_questions
-    from forma.services.decision_actions import conflicting_items, conflicting_records, missing_record_values
+    # Source-grain findings are regenerated against every row below. Do not leave
+    # an earlier wording as a second, unanswerable question after a key repair.
+    prior_grain_prompts = {
+        q["question"]
+        for q in (parent.policy or {}).get("review_decisions", [])
+        if q.get("id", "").startswith("source-identity:")
+    }
+    remaining_questions = [q for q in remaining_questions or [] if q not in prior_grain_prompts]
+    from forma.services.decision_actions import (
+        conflicting_items,
+        conflicting_records,
+        missing_record_values,
+        source_identity_questions,
+    )
     from forma.services.review_questions import _table_columns, unit_questions
 
-    review_decisions = conflicting_items(doc, schema, sim.records if sim else [])
+    review_decisions = conflicting_items(doc, schema, sim.records if sim else [], sim.findings if sim else [])
     review_decisions.extend(conflicting_records(sim.findings if sim else []))
+    review_decisions.extend(source_identity_questions(sim.findings if sim else []))
     review_decisions.extend(missing_record_values(doc, schema, sim.records if sim else []))
     if sim and not sim.errors and not problems:
         remaining_questions, _ = _retire_structural_questions(

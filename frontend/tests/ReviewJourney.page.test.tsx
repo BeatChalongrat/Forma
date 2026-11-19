@@ -63,6 +63,29 @@ test('a grouped source choice displays the actual sets and saves one decision', 
   await waitFor(() => expect(saved.payload.answers).toEqual({ 'price-set': 'B' }))
 })
 
+test('source identity uses column checkboxes and saves the key without changing quantities', async () => {
+  vi.mocked(api.reviewQuestions).mockResolvedValue({ ...questions, questions: [{
+    ...questions.questions[1], id: 'grain', kind: 'text', action: 'source_identity', scope: 'source_identity_in_this_delivery',
+    available_columns: ['Warehouse', 'Lot', 'Bin'], allow_custom: true,
+  }] } as never)
+  const { user } = mount()
+  await user.click(await screen.findByRole('checkbox', { name: 'Warehouse' }))
+  await user.click(screen.getByRole('checkbox', { name: 'Lot' }))
+  await user.click(screen.getByRole('button', { name: 'Save draft & leave' }))
+  await waitFor(() => expect(saved.payload.answers).toEqual({ grain: '["Warehouse","Lot"]' }))
+  expect(saved.payload.remember).toEqual([])
+  expect(api.confirmReview).not.toHaveBeenCalled()
+})
+
+test('unresolved source requests do not offer a confirmation that could waive the block', async () => {
+  vi.mocked(api.reviewQuestions).mockResolvedValue({ ...questions, questions: [{
+    ...questions.questions[1], id: 'missing-key', kind: 'confirm', action: 'request_source', scope: 'source_identity_in_this_delivery',
+  }] } as never)
+  mount()
+  await screen.findByRole('button', { name: 'Review source and mapping' })
+  expect(screen.queryByRole('button', { name: 'I checked: the result is correct' })).toBeNull()
+})
+
 test('answers survive Previous, evidence panel, preview, and leave/resume without confirming', async () => {
   const first = mount()
   await answerBoth(first.user)
@@ -171,4 +194,40 @@ test('changing an answer invalidates the previous confirmation and uses a fresh 
   await user.click(screen.getByLabelText('I checked the source, answers, and result. They are correct.'))
   await user.click(screen.getByRole('button', { name: 'Confirm & prepare file' }))
   await waitFor(() => expect(api.confirmReview).toHaveBeenCalledWith('m1', expect.objectContaining({ digest: 'digest-2', answers: { vat: false, pack: 12 } })))
+})
+
+
+test('missing key evidence shows the exact blank cell and does not suggest learning a confirmation', async () => {
+  vi.mocked(api.reviewQuestions).mockResolvedValue({ ...questions, questions: [{
+    ...questions.questions[1], id: 'blank-grain', kind: 'confirm', action: 'request_source',
+    scope: 'source_identity_in_this_delivery', question: 'Fill the missing Lot Number',
+  }] } as never)
+  vi.mocked(api.reviewEvidence).mockResolvedValue({ source_issue: true, unavailable: false, examples: [{
+    identity: '', item: null, value: null, source_complete: true,
+    cells: [{ file: 'stock.csv', sheet: null, column: 'C', row: 2, header: 'Lot Number', raw: null, verified: null }],
+  }] } as never)
+  mount()
+  await screen.findByRole('heading', { name: 'Missing information in the source' })
+  expect(screen.getByRole('cell', { name: 'Lot Number' })).toBeTruthy()
+  expect(screen.getByRole('cell', { name: /C2.*Row 2/ })).toBeTruthy()
+  expect(screen.getByRole('cell', { name: 'Blank' })).toBeTruthy()
+  expect(screen.getByText('Source information is required; this cannot be resolved by confirming or remembering an answer')).toBeTruthy()
+  expect(screen.queryByText(/Reuse after approval/)).toBeNull()
+  expect(api.reviewEvidence).toHaveBeenCalledWith('m1', '/pack', 'blank-grain')
+  expect(api.confirmReview).not.toHaveBeenCalled()
+})
+
+
+test('repaired preview replaces the old verification block but still requires explicit final review', async () => {
+  vi.mocked(api.reviewQuestions).mockResolvedValue({ ...questions,
+    checks: { verification: { complete: true, passed: false } },
+  } as never)
+  const { user, onSaved } = mount()
+  await answerBoth(user)
+  const button = screen.getByRole('button', { name: 'Confirm & prepare file' }) as HTMLButtonElement
+  expect(button.disabled).toBe(true)
+  expect(screen.queryByText('Some problems still need attention. Saving answers will not approve this file.')).toBeNull()
+  await user.click(screen.getByLabelText('I checked the source, answers, and result. They are correct.'))
+  await user.click(button)
+  await waitFor(() => expect(onSaved).toHaveBeenCalledWith('m2', 'ready', 'job-2'))
 })

@@ -227,6 +227,8 @@ class FieldSpec:
     system: bool = False
     default: Any = None
     examples: tuple[Any, ...] = field(default_factory=tuple)
+    constant: Any = None
+    has_constant: bool = False
 
     @property
     def is_leaf(self) -> bool:
@@ -252,6 +254,7 @@ class FieldSpec:
             "system": self.system,
             "default": self.default,
             "examples": list(self.examples),
+            **({"const": self.constant} if self.has_constant else {}),
         }
 
 
@@ -468,6 +471,8 @@ def _walk(
             system=system or bool(xf.get("system", False)),
             default=sub.get("default"),
             examples=tuple(sub.get("examples", xf.get("examples", []))),
+            constant=sub.get("const"),
+            has_constant="const" in sub,
         )
         yield spec
         if is_arr_of_obj:
@@ -541,6 +546,9 @@ class SchemaRegistry:
         (the web app previews it first). The caller's document is never modified."""
         document = copy.deepcopy(document)
         Draft202012Validator.check_schema(document)
+        from forma.schema_registry.csv_template import validate_csv_contract
+
+        validate_csv_contract(document)
         from forma.ai.contract_checks import validate_checks
 
         if check_errors := validate_checks(document):

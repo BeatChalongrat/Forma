@@ -30,6 +30,20 @@ QUESTION_SCHEMA = {
 }
 
 
+def normalize_controls(questions: Any) -> None:
+    """UI control type follows an explicit non-value action, not the target's JSON type.
+
+    Never reinterpret alternatives as confirmation or manufacture a business answer.
+    """
+    if not isinstance(questions, list):
+        return
+    for q in questions:
+        if not isinstance(q, dict):
+            continue
+        if q.get("action") in {"request_source", "confirm"} and not q.get("options"):
+            q["kind"] = "confirm"
+
+
 def validate(questions: Any, doc: MappingDocument, schema: TargetSchema) -> list[str]:
     from jsonschema import Draft202012Validator
 

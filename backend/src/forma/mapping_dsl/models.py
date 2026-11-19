@@ -354,6 +354,31 @@ class FieldMapping(Strict):
     note: str | None = None
 
 
+class SourceIdentity(Strict):
+    """Business grain of a source record, independent of the output schema."""
+
+    keys: list[str] = Field(
+        min_length=1,
+        description="Source columns identifying one lot/line, including warehouse, bin or status; "
+        "never generated row numbers",
+    )
+    evidence: list[str] = Field(
+        min_length=1,
+        description="File/sheet/header or operator evidence establishing this business grain, "
+        "not uniqueness alone",
+    )
+
+    @model_validator(mode="after")
+    def valid_keys(self) -> SourceIdentity:
+        if len(set(self.keys)) != len(self.keys) or any(
+            not k.strip() or k.startswith("__") for k in self.keys
+        ):
+            raise ValueError("Source identity needs distinct business columns, not internal row identifiers")
+        if not any(e.strip() for e in self.evidence):
+            raise ValueError("Source identity needs business evidence")
+        return self
+
+
 class CollectionAggregate(Strict):
     """Sum additive rows after field expressions and unit conversion, never before."""
 
@@ -397,6 +422,11 @@ class CollectionMapping(Strict):
         default_factory=list, description="Target item pointers (relative, e.g. /price_list)"
     )
     normalize_keys: list[NormalizeKeyOp] = Field(default_factory=_default_normalize_keys)
+    source_identity: SourceIdentity | None = Field(
+        default=None,
+        description="Evidence-backed source business key. Remove exact source repeats before aggregation; "
+        "conflicting or incomplete keys block approval.",
+    )
     aggregate: CollectionAggregate | None = Field(
         default=None,
         description=(

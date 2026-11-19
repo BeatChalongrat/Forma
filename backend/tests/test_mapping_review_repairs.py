@@ -108,6 +108,10 @@ def test_collection_local_paths_execute_full_aggregation(tmp_path):
                     },
                 ],
                 "aggregate": {"group_by": ["/depot"], "sum": ["/available"]},
+                "source_identity": {
+                    "keys": ["Depot", "Lot"],
+                    "evidence": ["One source balance per code, depot and lot"],
+                },
             }
         ],
         "attributes_passthrough": False,

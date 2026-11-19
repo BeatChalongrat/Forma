@@ -93,6 +93,10 @@ def delivery(tmp_path, monkeypatch):
                         },
                     ],
                     "aggregate": {"group_by": ["/warehouse"], "sum": ["/qty"]},
+                    "source_identity": {
+                        "keys": ["Warehouse", "Lot"],
+                        "evidence": ["One balance per SKU, warehouse and lot"],
+                    },
                 }
             ],
             "attributes_passthrough": False,

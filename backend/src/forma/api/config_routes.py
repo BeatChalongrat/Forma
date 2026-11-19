@@ -29,6 +29,7 @@ from forma.core.errors import ValidationFailed
 from forma.db.models import LLMCall
 from forma.db.session import get_session
 from forma.schema_registry import SEMANTICS, SchemaRegistry, schema_findings
+from forma.schema_registry.csv_template import CsvContractIn, CsvTemplateIn, analyze_csv, build_csv_contract
 from forma.services import config as cfg
 from forma.services.context import ServiceContext
 
@@ -254,6 +255,29 @@ def reset_policy(
 # --------------------------------------------------------------------------------------------
 # target formats
 # --------------------------------------------------------------------------------------------
+@router.post("/schemas/csv/analyze")
+def analyze_csv_template(
+    body: CsvTemplateIn,
+    p: Principal = Depends(require_role("approver")),
+) -> dict[str, Any]:
+    """Read a bounded template without storing it or calling a model."""
+    ensure_all_customers(p)
+    return analyze_csv(body)
+
+
+@router.post("/schemas/csv/prepare")
+def prepare_csv_template(
+    body: CsvContractIn,
+    ctx: ServiceContext = Depends(ctx_dep),
+    p: Principal = Depends(require_role("approver")),
+) -> dict[str, Any]:
+    """Confirm the CSV decisions, then use the same registry checks as JSON Schema."""
+    ensure_all_customers(p)
+    document = build_csv_contract(body)
+    ctx.registry.prepare(document)
+    return {"document": document}
+
+
 @router.get("/settings/semantics")
 def semantics(p: Principal = Depends(current_principal)) -> dict[str, str]:
     """The x-forma.semantic vocabulary, for writing a new target format."""
