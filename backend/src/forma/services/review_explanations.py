@@ -51,6 +51,20 @@ def explain(ctx: ServiceContext, reasons: list[str], target: str | None) -> list
                 f"{en}: {match[1]}% of {match[2]} matched items changed. Open the questions to compare old and new values.",
                 f"{th}: {match[1]}% ของ {match[2]} รายการที่เทียบได้มีค่าเปลี่ยนไป เปิดคำถามเพื่อเทียบค่าเดิมกับค่าครั้งนี้",
             )
+        elif match := re.search(
+            r"total on sheet row (\d+) says (.+) = ([-\d.,]+) but .* add up to ([-\d.,]+)", reason
+        ):
+            pair = (
+                f"The total on sheet row {match[1]} says {match[2]} is {match[3]}, but the rows FORMA read add up to {match[4]}. Rows may be missing, or a number was read differently. Open the file and compare before approving.",
+                f"แถวรวมที่แถว {match[1]} ของชีตระบุ {match[2]} เป็น {match[3]} แต่แถวที่ระบบอ่านได้รวมเป็น {match[4]} อาจมีแถวที่อ่านไม่ครบหรืออ่านตัวเลขต่างจากไฟล์ เปิดไฟล์เทียบก่อนอนุมัติ",
+            )
+        elif match := re.search(
+            r"(\d+) rows that look like data follow a blank gap \(from sheet row (\d+)\)", reason
+        ):
+            pair = (
+                f"{match[1]} rows that look like data come after a blank gap, starting at sheet row {match[2]}, and were not read. Confirm the table really ends before them.",
+                f"มี {match[1]} แถวที่ดูเหมือนข้อมูลอยู่หลังช่วงแถวว่าง เริ่มที่แถว {match[2]} ของชีต และระบบไม่ได้อ่าน ตรวจว่าตารางจบก่อนแถวเหล่านี้จริงหรือไม่",
+            )
         elif "low confidence on" in reason:
             pair = (
                 f"{en}: the suggested interpretation is not confirmed. Check source examples before answering.",

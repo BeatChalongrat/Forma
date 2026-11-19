@@ -14,6 +14,7 @@ from typing import Any, Literal
 
 import polars as pl
 
+from forma.engine import accounting
 from forma.engine.ops import CompileContext, compile_expr, python_value
 from forma.ingestion.readers import read_raw
 from forma.mapping_dsl.models import (
@@ -117,6 +118,7 @@ def load_source_frame(
     expected_columns: set[str] | None = None,
     verify_all_columns: bool = False,
     apply_filter: bool = True,
+    audit: dict[str, Any] | None = None,
 ) -> pl.DataFrame:
     sheet = resolve_sheet(spec, bound)
     raw = read_raw(
@@ -128,7 +130,7 @@ def load_source_frame(
         validate_cells=expected_columns is None,
     )
     positions: dict[str, int] = {}
-    frame = extract_table(raw, spec.table, rename=spec.rename, positions=positions)
+    frame = extract_table(raw, spec.table, rename=spec.rename, positions=positions, audit=audit)
     if expected_columns and spec.table.header_row != "auto":
         have = {_norm_col(c) for c in frame.columns}
         want = {_norm_col(c) for c in expected_columns}
@@ -151,7 +153,7 @@ def load_source_frame(
                     }
                 )
                 positions.clear()
-                frame = extract_table(raw, alt, rename=spec.rename, positions=positions)
+                frame = extract_table(raw, alt, rename=spec.rename, positions=positions, audit=audit)
     if expected_columns is not None and bound.path.suffix.lower() in {".xlsx", ".xlsm"}:
         from forma.ingestion.ooxml import inspect_workbook, require_cached_values
 
@@ -170,10 +172,14 @@ def load_source_frame(
         }
         require_cached_values(info, columns=columns)
     frame = frame.with_row_index(ROW_COL)
+    if audit is not None:
+        audit["rows"] = frame.height  # after unpivot: what the mapping sees before any filter
     if apply_filter and spec.table.filter is not None:
         ctx = CompileContext(default_source=spec.id, columns=set(_prefixed(frame, spec.id).columns))
         pf = _prefixed(frame, spec.id)
         pf = pf.filter(compile_expr(spec.table.filter, ctx).cast(pl.Boolean, strict=False).fill_null(False))
+        if audit is not None:
+            audit["filtered"] = frame.height - pf.height
         frame = _unprefixed(pf, spec.id)
     if limit is not None:
         frame = frame.head(limit)
@@ -223,6 +229,7 @@ class TransformEngine:
         findings: list[Finding] = []
         frames: dict[str, pl.DataFrame] = {}
         raw_collections: dict[str, pl.DataFrame] = {}
+        audits: dict[str, dict[str, Any]] = {}  # row accounting per source (engine.accounting)
         collection_sources = {c.source for c in mapping.collections}
         used_sources = (
             {mapping.record.root_source}
@@ -280,6 +287,7 @@ class TransformEngine:
                         verify_all_columns=mapping.attributes_passthrough
                         and spec.id == mapping.record.root_source,
                         apply_filter=spec.id not in collection_sources,
+                        audit=audits.setdefault(spec.id, {}),
                     ),
                     spec.id,
                 )
@@ -290,6 +298,13 @@ class TransformEngine:
                         compile_expr(spec.table.filter, filter_ctx)
                         .cast(pl.Boolean, strict=False)
                         .fill_null(False)
+                    )
+                    audits[spec.id]["filtered"] = raw_collections[spec.id].height - frames[spec.id].height
+                if spec.id in used_sources:
+                    # facts about the file, not the mapping: reuse of an approved mapping cannot clear them
+                    findings.extend(
+                        Finding("source_review", "warning", **item)
+                        for item in accounting.source_findings(spec.id, audits[spec.id])
                     )
             except Exception as e:
                 sev = "error" if spec.id in used_sources else "warning"
@@ -307,6 +322,7 @@ class TransformEngine:
 
         # joins (left side must already be reachable from root; applied in declared order)
         joined_ids = {root_id}
+        join_added = join_dropped = 0
         for j in mapping.joins:
             if j.left not in joined_ids and j.left in frames:
                 # join into a non-root frame (e.g. pricing ← price list names) : apply to that frame
@@ -318,7 +334,10 @@ class TransformEngine:
                     )
                     findings.extend(raw_findings)
                 continue
+            before_join = root.height
             root, fnd = self._join(root, frames[j.right], j)
+            join_added += max(0, root.height - before_join)
+            join_dropped += max(0, before_join - root.height)
             findings.extend(fnd)
             joined_ids.add(j.right)
 
@@ -341,8 +360,10 @@ class TransformEngine:
         out = self._coerce_types(out, [fm.target for fm in mapping.fields])
 
         # record filters
+        before_filters = out.height
         for flt in mapping.record.filters:
             out = out.filter(compile_expr(flt, ctx).cast(pl.Boolean, strict=False).fill_null(False))
+        record_filtered = before_filters - out.height
 
         # identity + dedupe
         from forma.engine.semantic_checks import identity_warnings
@@ -367,10 +388,18 @@ class TransformEngine:
             child_columns |= {c for c in out.columns if not c.startswith("/") and c not in link_columns}
             child_columns -= link_columns
         # Child-level variation is preserved in collections; root output conflicts still matter.
+        before_dedupe = out.height
+        null_identity = (
+            out.filter(pl.any_horizontal([pl.col(k).is_null() for k in identity_cols])).height
+            if identity_cols
+            else 0
+        )
         out, fnd = self._dedupe(out, identity_cols, mapping.record.dedupe.keep, ignored=child_columns)
         findings.extend(fnd)
+        duplicate_identity = before_dedupe - out.height - null_identity
 
         # collections
+        collection_ledger: dict[str, dict[str, Any]] = {}
         collections: dict[str, pl.DataFrame] = {}
         for cm in mapping.collections:
             if cm.source not in frames:
@@ -392,7 +421,11 @@ class TransformEngine:
                         }
                     )
                 items, fnd = self._collection(
-                    raw_collections.get(cm.source, frames[cm.source]), effective_cm, out, root_id
+                    raw_collections.get(cm.source, frames[cm.source]),
+                    effective_cm,
+                    out,
+                    root_id,
+                    audit=collection_ledger.setdefault(cm.target, {"source": cm.source}),
                 )
                 findings.extend(fnd)
                 if items.width:  # a collection that cannot be linked is left out; its finding says why
@@ -440,7 +473,17 @@ class TransformEngine:
             for item in evaluate_contract_checks(records, self.schema.document)
         )
 
-        stats = {
+        root_ledger = accounting.root_ledger(
+            source=root_id,
+            rows_in=rows_in,
+            join_added=join_added,
+            join_dropped=join_dropped,
+            filtered=record_filtered,
+            duplicate_identity=duplicate_identity,
+            null_identity=null_identity,
+            rows_out=len(records),
+        )
+        stats: dict[str, Any] = {
             "rows_in": rows_in,
             "rows_out": len(records),
             "sources": {k: v.height for k, v in frames.items()},
@@ -448,7 +491,25 @@ class TransformEngine:
             "duration_ms": round((time.perf_counter() - t0) * 1000, 1),
             "identity_keys": identity_cols,
             "invalid_records": invalid,  # records that do not match the target schema (ADR-026)
+            # where every source row went; counts of a sample run describe the sample only
+            "accounting": {
+                "version": accounting.VERSION,
+                "complete": limit is None,
+                "root": root_ledger,
+                "sources": audits,
+                "collections": collection_ledger,
+            },
         }
+        if not root_ledger["balanced"]:
+            # an engine defect, not a property of the file: records exist that no step explains
+            findings.append(
+                Finding(
+                    "accounting",
+                    "error",
+                    f"row accounting does not balance for {root_id}: {root_ledger}",
+                    details=root_ledger,
+                )
+            )
         _observe_engine(
             rows_in,
             len(records),
@@ -657,9 +718,17 @@ class TransformEngine:
         return out, findings
 
     def _collection(
-        self, src: pl.DataFrame, cm: CollectionMapping, root: pl.DataFrame, root_id: str
+        self,
+        src: pl.DataFrame,
+        cm: CollectionMapping,
+        root: pl.DataFrame,
+        root_id: str,
+        *,
+        audit: dict[str, Any] | None = None,
     ) -> tuple[pl.DataFrame, list[Finding]]:
         findings: list[Finding] = []
+        ledger: dict[str, Any] = audit if audit is not None else {}
+        ledger["source_rows"] = src.height
         ctx = CompileContext(default_source=cm.source, columns=set(src.columns))
         frame = src
         item_exprs = []
@@ -721,6 +790,7 @@ class TransformEngine:
             )
             original = items
             items = items.filter(compile_expr(cm.filter, ctx).cast(pl.Boolean, strict=False).fill_null(False))
+            ledger["filtered"] = original.height - items.height
             selection_findings = validate_selection(original, items, before_selection, cm)
         items, identity_findings = check_source_identity(
             items, cm, rel_names, dedupe_keys, require_grain=require_grain
@@ -731,6 +801,7 @@ class TransformEngine:
             f for f in identity_findings if (f.target, f.details.get("reason")) not in original_issues
         ]
         findings.extend(identity_findings)
+        before_aggregate = items.height
         if cm.aggregate:
             groups = [p.lstrip("/") for p in cm.aggregate.group_by]
             sums = [p.lstrip("/") for p in cm.aggregate.sum]
@@ -757,8 +828,12 @@ class TransformEngine:
                     )
                 )
         before = items.height
+        ledger["summed_into_groups"] = before_aggregate - before  # rows an aggregate folded together
         # Drop exact duplicates only. Conflicting alternatives must survive for a person to resolve.
         items = items.unique(subset=["__link__", *rel_names], keep="first", maintain_order=True)
+        ledger["duplicate_items"] = before - items.height
+        ledger["items"] = items.height
+        ledger["orphans"] = 0
         conflicts = items.group_by(["__link__", *dedupe_keys]).len().filter(pl.col("len") > 1)
         if conflicts.height:
             findings.append(
@@ -789,6 +864,7 @@ class TransformEngine:
                 ).alias("__link__")
             ).unique()
             orphans = items.join(root_keys, on="__link__", how="anti").height
+            ledger["orphans"] = orphans
             if orphans:
                 findings.append(
                     Finding(

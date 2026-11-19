@@ -355,6 +355,7 @@ def dedupe_names(names: list[str]) -> list[str]:
 # Extraction
 # --------------------------------------------------------------------------------------------
 SHEET_ROW = "__sheet_row__"  # 0-based row of the raw grid a data row came from (lineage only)
+AUDIT_ROW = "__audit_row__"  # the same, while ``audit`` counts what extraction drops; never returned
 PAGE_HEADER_MATCH = 0.8  # share of a header's cells a row must repeat to be that header printed again
 
 
@@ -393,11 +394,14 @@ def extract_table(
     rename: dict[str, str] | None = None,
     row_numbers: bool = False,
     positions: dict[str, int] | None = None,
+    audit: dict[str, Any] | None = None,
 ) -> pl.DataFrame:
     """Turn a raw grid into a header-named frame according to ``spec`` (all columns stay strings).
 
     For lineage, ``row_numbers`` adds a ``__sheet_row__`` column (the raw grid row each data row came
-    from) and ``positions`` is filled with header → raw grid column. Without them the output is unchanged.
+    from) and ``positions`` is filled with header → raw grid column. ``audit`` is filled with what each
+    step dropped and whether the file's total rows agree with the rows kept (``engine.accounting``).
+    Without them the output is unchanged.
     """
     if df.height == 0:
         return pl.DataFrame()
@@ -445,6 +449,7 @@ def extract_table(
             rename=rename,
             row_numbers=row_numbers,
             positions=positions,
+            audit=audit,
         )
     headers = merge_header_rows(header_rows)
     data_start = spec.data_start if spec.data_start is not None else header_row + spec.header_rows
@@ -455,10 +460,18 @@ def extract_table(
         positions.update({(rename or {}).get(h, h): c0 + i for i, h in enumerate(headers)})
     if row_numbers:
         body = body.with_columns(pl.int_range(data_start, data_start + body.height).alias(SHEET_ROW))
-    data = [c for c in body.columns if c != SHEET_ROW]  # every column unless lineage asked for rows
+    dropped: dict[str, int] = {}
+    if audit is not None:
+        audit.clear()
+        audit.update({"grid_rows": body.height, "dropped": dropped})
+        body = body.with_columns(pl.int_range(data_start, data_start + body.height).alias(AUDIT_ROW))
+    # every column unless lineage or the audit asked for rows
+    data = [c for c in body.columns if c not in (SHEET_ROW, AUDIT_ROW)]
     # before the blank-row stop: the blanks between two pages must not end the table
     if spec.drop_repeated_headers and body.height:
+        before = body.height
         body = _drop_page_breaks(body, data, header_rows)
+        dropped["page_break"] = before - body.height
 
     # stop at N consecutive blank rows
     if spec.stop_at_blank_rows and body.height:
@@ -470,12 +483,22 @@ def extract_table(
             if run >= spec.stop_at_blank_rows:
                 cut = i - run + 1
                 break
+        if audit is not None and cut < len(blank) and data:
+            from forma.engine.accounting import after_stop
+
+            dropped["after_blank_stop"] = len(blank) - cut
+            audit["after_blank_stop"] = after_stop(
+                body.slice(cut), body.head(cut), data, AUDIT_ROW, TOTAL_LABEL_RE
+            )
         body = body.head(cut)
     # drop fully blank rows
     if body.height:
+        before = body.height
         body = body.filter(~pl.all_horizontal(pl.col(data).is_null()))
+        dropped["blank"] = before - body.height
     # section headings: one text cell on a row of its own becomes a column, filled down (ADR-058)
     if spec.section_column and body.height and data:
+        before = body.height
         filled = pl.sum_horizontal([pl.col(c).is_not_null().cast(pl.Int32) for c in data])
         first = pl.coalesce([pl.col(c) for c in data]).str.strip_chars()
         heading = (
@@ -490,6 +513,7 @@ def extract_table(
             .with_columns(pl.col(spec.section_column).fill_null(strategy="forward"))
             .filter(~heading)
         )
+        dropped["section_heading"] = before - body.height
     # drop total rows: a total label in the first non-null cell and nothing but numbers beside it
     if spec.drop_total_rows and body.height and data:
         first_text = pl.coalesce([pl.col(c) for c in data]).str.to_lowercase().str.strip_chars()
@@ -502,7 +526,17 @@ def extract_table(
             ]
         )
         cond = first_text.str.contains(TOTAL_LABEL_RE).fill_null(False) & (words <= 1)
+        if audit is not None:
+            from forma.engine.accounting import check_totals
+
+            totals = body.filter(cond)
+            dropped["total_row"] = totals.height
+            audit["totals"] = check_totals(body.filter(~cond), totals, data, AUDIT_ROW)
         body = body.filter(~cond)
+    if audit is not None:
+        audit["dropped"] = {k: v for k, v in dropped.items() if v}
+        audit["table_rows"] = body.height
+        body = body.drop(AUDIT_ROW)
     # fill down (merged cells)
     for c in spec.fill_down:
         if c in body.columns:

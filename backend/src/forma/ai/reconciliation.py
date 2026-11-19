@@ -26,6 +26,37 @@ def coverage(records: list[dict[str, Any]], schema: TargetSchema, stats: dict[st
     }
 
 
+def row_accounting(stats: dict[str, Any]) -> dict[str, Any] | None:
+    """The engine's ledger in the size a report keeps: where the root rows went and what the file's own
+    total rows said. The per-source detail stays in the simulation statistics."""
+    ledger = stats.get("accounting")
+    if not ledger:
+        return None
+    totals = {"rows": 0, "confirmed": 0, "unchecked": 0, "contradicted": 0}
+    dropped: dict[str, int] = {}
+    unread = 0
+    for audit in (ledger.get("sources") or {}).values():
+        found = audit.get("totals") or {}
+        for key in ("rows", "confirmed", "unchecked"):
+            totals[key] += int(found.get(key) or 0)
+        totals["contradicted"] += len(found.get("contradicted") or [])
+        for reason, count in (audit.get("dropped") or {}).items():
+            dropped[reason] = dropped.get(reason, 0) + int(count)
+        unread += int((audit.get("after_blank_stop") or {}).get("data_like") or 0)
+    return {
+        "complete": bool(ledger.get("complete")),
+        "root": ledger.get("root"),
+        "dropped_before_mapping": dropped,
+        "data_like_rows_not_read": unread,
+        "totals": totals,
+        "collections": ledger.get("collections") or {},
+        "limitation": (
+            "A total that agrees shows the table was read whole. It does not show that a column "
+            "means what the mapping says."
+        ),
+    }
+
+
 def regressions(before: dict[str, Any], after: dict[str, Any]) -> list[str]:
     """A valid earlier candidate must not lose data just to silence a diagnostic.
 
@@ -88,6 +119,7 @@ def verification(
         "rows_checked": result.stats.get("rows_in", 0),
         "rows_out": len(result.records),
         "coverage": evidence,
+        "row_accounting": row_accounting(result.stats),
         "semantic_checks": {
             "contract_rules": [c.get("id") for c in schema.document.get("x-forma", {}).get("checks", [])],
             "source_identity_warnings": [f.to_dict() for f in result.findings if f.kind == "semantic"],

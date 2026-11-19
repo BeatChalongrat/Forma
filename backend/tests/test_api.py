@@ -36,7 +36,8 @@ def make_workbook(path: Path, *, rename_qty: bool = False, n_products: int = 12)
                 "ขาย" if i % 5 else "เลิกขาย",
             ]
         )
-    ws.append(["รวม", None, None, None, None, None, "9,999.00", None])
+    # the true sum: a total that disagrees with its rows is a source finding of its own (ADR-072)
+    ws.append(["รวม", None, None, None, None, None, f"{107 * n_products * (n_products + 1) // 2:,}.00", None])
     st = wb.create_sheet("Stock")
     st.append(["รหัสสินค้า", "คลัง", "จำนวนคงเหลือ" if rename_qty else "ยอดคงเหลือ"])
     for i in range(1, n_products + 1):
