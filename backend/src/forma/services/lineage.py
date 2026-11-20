@@ -22,7 +22,7 @@ from sqlalchemy.orm import Session
 from forma.db.models import ChangeSet, DatasetVersion, ImportRound
 from forma.engine.ops import CompileContext, compile_expr
 from forma.engine.transform import BoundSource, _get_pointer, resolve_sheet
-from forma.ingestion.readers import file_kind, read_raw
+from forma.ingestion.readers import file_kind, read_raw, vertical_merges
 from forma.mapping_dsl.models import FieldMapping, MappingDocument, SourceSpec
 from forma.profiling.tables import SHEET_ROW, extract_table
 from forma.schema_registry import PROVENANCE_KEY, TargetSchema
@@ -114,7 +114,10 @@ class _Sources:
                 csv_quote_char=spec.csv.quote_char,
             )
             positions: dict[str, int] = {}
-            frame = extract_table(raw, spec.table, rename=spec.rename, row_numbers=True, positions=positions)
+            merges = vertical_merges(bound.path, sheet) if spec.table.fill_merged else None
+            frame = extract_table(
+                raw, spec.table, rename=spec.rename, row_numbers=True, positions=positions, merges=merges
+            )
         except Exception:
             return None
         excel = file_kind(bound.path) == "excel"

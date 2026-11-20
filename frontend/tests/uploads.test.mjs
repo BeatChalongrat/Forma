@@ -5,8 +5,8 @@ import { isReadable, refusedNames, splitReadable, UPLOAD_ACCEPT } from '../src/l
 const file = (name) => ({ name })
 
 test('every kind of file the backend reads can be picked, in any case', () => {
-  for (const name of ['a.xlsx', 'a.xlsm', 'a.xls', 'a.xlsb', 'a.csv', 'a.txt', 'a.tsv', 'A.XLS', 'สินค้า.Xlsb']) assert.equal(isReadable(name), true, name)
-  assert.equal(UPLOAD_ACCEPT, '.xlsx,.xlsm,.xls,.xlsb,.csv,.txt,.tsv')
+  for (const name of ['a.xlsx', 'a.xlsm', 'a.xls', 'a.xlsb', 'a.mhtml', 'a.mht', 'a.csv', 'a.txt', 'a.tsv', 'A.XLS', 'สินค้า.Xlsb', 'ALV.MHTML']) assert.equal(isReadable(name), true, name)
+  assert.equal(UPLOAD_ACCEPT, '.xlsx,.xlsm,.xls,.xlsb,.mhtml,.mht,.csv,.txt,.tsv')
 })
 
 test('a file FORMA cannot read is refused, not lost', () => {

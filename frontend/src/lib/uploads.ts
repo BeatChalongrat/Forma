@@ -1,5 +1,5 @@
-/** What FORMA reads: `EXCEL_EXT` and `CSV_EXT` in backend `ingestion/readers.py`. */
-export const UPLOAD_TYPES = ['.xlsx', '.xlsm', '.xls', '.xlsb', '.csv', '.txt', '.tsv']
+/** What FORMA reads: `EXCEL_EXT`, `MARKUP_EXT` and `CSV_EXT` in backend `ingestion/readers.py`. */
+export const UPLOAD_TYPES = ['.xlsx', '.xlsm', '.xls', '.xlsb', '.mhtml', '.mht', '.csv', '.txt', '.tsv']
 export const UPLOAD_ACCEPT = UPLOAD_TYPES.join(',')
 
 const MAX_NAMES = 3

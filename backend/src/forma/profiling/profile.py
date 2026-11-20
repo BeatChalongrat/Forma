@@ -10,8 +10,14 @@ from typing import Any
 import polars as pl
 
 from forma.engine.thai import THAI_DIGITS, looks_like_thai_date, parse_number_th_py
-from forma.ingestion.readers import WorkbookMeta, read_meta, read_raw
-from forma.profiling.tables import SECTION_COLUMN, TableCandidate, detect_tables, extract_table
+from forma.ingestion.readers import WorkbookMeta, read_meta, read_raw, vertical_merges
+from forma.profiling.tables import (
+    SECTION_COLUMN,
+    TableCandidate,
+    detect_tables,
+    extract_table,
+    merges_in_data,
+)
 from forma.profiling.value_evidence import column_observations, spread_indices, table_observations
 
 _THAI_RE = re.compile(r"[฀-๿]")
@@ -236,8 +242,12 @@ def profile_column(s: pl.Series, position: int, *, sample_n: int = 8) -> ColumnP
         if inferred == "string" or inferred == "int":
             if sum(bool(_BARCODE_RE.match(str(v))) for v in vals) / total > 0.8:
                 hints.append("barcode_like")
-            elif uniques / nn > 0.95 and sum(bool(_SKU_RE.match(str(v))) for v in vals) / total > 0.8:
-                hints.append("sku_like")
+            elif sum(bool(_SKU_RE.match(str(v))) for v in vals) / total > 0.8:
+                if uniques / nn > 0.95:
+                    hints.append("sku_like")
+                elif sum(any(ch.isdigit() for ch in str(v)) for v in vals) / total > 0.8:
+                    # codes that repeat: a table with several rows per product (one per warehouse)
+                    hints.append("code_like")
         if kinds["date"] and kinds["date"] / total > 0.6:
             inferred = "date"
             if any(re.search(r"25[0-9]{2}|/[0-9]{2}$", str(v)) for v in vals):
@@ -314,10 +324,13 @@ def profile_workbook(path: Path, *, max_rows_per_table: int = 50_000) -> Workboo
         raw = read_raw(path, sh.index if meta.kind == "excel" else None, validate_cells=False)
         if raw.height == 0:
             continue
+        merges = vertical_merges(path, sh.index) if meta.kind == "excel" else []
         for cand in detect_tables(raw):
+            # a value the file merges down several data rows belongs to each of them (ADR-075)
+            cand.fill_merged = merges_in_data(merges, cand)
             spec = cand.to_spec()
             try:
-                frame = extract_table(raw, spec)
+                frame = extract_table(raw, spec, merges=merges)
             except Exception:  # pragma: no cover - defensive: a bad candidate must not kill profiling
                 continue
             if frame.width == 0 or frame.height == 0:

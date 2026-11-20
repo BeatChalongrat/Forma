@@ -20,7 +20,10 @@ def check_source_identity(
     output_keys: list[str],
     *,
     require_grain: bool = False,
+    elsewhere: set[str] | None = None,
 ) -> tuple[pl.DataFrame, list[Any]]:
+    """``elsewhere``: columns of this source that another collection of the same source exports and this
+    one does not read. Rows that differ only there do not lose a dimension here: it leaves with the other."""
     from forma.engine.ops import python_value
     from forma.engine.transform import Finding, _referenced_columns
 
@@ -46,15 +49,14 @@ def check_source_identity(
             return items, [issue("missing_key", "ยังไม่ทราบว่าคอลัมน์ใดใช้แยกแต่ละล็อตหรือรายการ จึงยังรวมยอดไม่ได้")]
         # Same output identity but distinct source rows: projection would erase
         # a dimension (e.g. lot/bin), even if the quantities happen to be equal.
-        groups = items.group_by(["__link__", *output_keys]).agg(
-            pl.struct(columns).n_unique().alias("variants")
-        )
+        own = [c for c in columns if c not in (elsewhere or set())] or columns
+        groups = items.group_by(["__link__", *output_keys]).agg(pl.struct(own).n_unique().alias("variants"))
         ambiguous = groups.filter(pl.col("variants") > 1)
         if ambiguous.height:
             # Existing conflicting-item questions already cover visibly different
             # output values. Add the grain question for silent projection losses.
             projected = items.group_by(["__link__", *rel_names]).agg(
-                pl.struct(columns).n_unique().alias("variants")
+                pl.struct(own).n_unique().alias("variants")
             )
             if require_grain or projected.filter(pl.col("variants") > 1).height:
                 return items, [

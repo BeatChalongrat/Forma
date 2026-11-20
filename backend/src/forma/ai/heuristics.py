@@ -69,7 +69,13 @@ ROLE_SIGNALS: dict[str, list[str]] = {
 HINT_BOOST: dict[str, dict[str, float]] = {
     "sku": {"sku_like": 0.25, "barcode_like": -0.3, "long_text": -0.5},
     "barcode": {"barcode_like": 0.4, "sku_like": -0.1},
-    "product_name": {"thai_text": 0.05, "long_text": 0.05, "sku_like": -0.4, "barcode_like": -0.5},
+    "product_name": {
+        "thai_text": 0.05,
+        "long_text": 0.05,
+        "sku_like": -0.4,
+        "code_like": -0.4,
+        "barcode_like": -0.5,
+    },
     "description": {"long_text": 0.25},
     "price.amount": {"price_like": 0.2, "percent": -0.4},
     "discount.percent": {"percent": 0.3},
@@ -524,6 +530,40 @@ def _contract_constant(
     )
 
 
+# A header that names the row of a system, not the product: NetSuite's "Internal ID", a row number.
+SURROGATE_ID_RE = re.compile(
+    r"^(?:(?:internal|external|record|row|line|system|database|db|object) )?id$"
+    r"|^(?:no|#|seq|sequence|row|row no|line no|running no|ลำดับ|ลำดับที่|ที่)$"
+)
+RIVAL_CONFIDENCE = 0.6  # below every bar a critical field must clear: a person settles which column it is
+
+
+def _identity_rivals(root: TableProfile, chosen: ColumnProfile, used: set[str]) -> list[ColumnProfile]:
+    """Other columns that could be the product code: one code per row, and no field has taken them."""
+    return [
+        c
+        for c in root.columns
+        if c.name != chosen.name
+        and c.name not in used
+        and c.name in root.key_candidates
+        and "sku_like" in c.hints
+    ]
+
+
+def _row_dimension(root: TableProfile, key: ColumnProfile, used: set[str]) -> ColumnProfile | None:
+    """In a table with several rows per product, the column that tells those rows apart: with the product
+    code it identifies a row (``composite_key_candidates``), alone it does not."""
+    partners = [
+        b if a == key.name else a
+        for a, b in root.observations.get("composite_key_candidates", [])
+        if key.name in (a, b)
+    ]
+    found = [c for c in root.columns if c.name in partners and c.name not in used]
+    # the dimension has few values (two warehouses), not one per row (a line number)
+    found = [c for c in found if c.unique_count < key.unique_count and c.inferred_type in ("string", "int")]
+    return found[0] if len(found) == 1 else None
+
+
 VAT_ASSUMED_TEXT = "no VAT marker in headers; assumed VAT-inclusive (Thai retail convention) — confirm"
 VAT_ASSUMED_QUESTION_RE = re.compile(r"(?:Price column|Pricing table) '.+': " + re.escape(VAT_ASSUMED_TEXT))
 
@@ -605,6 +645,73 @@ def propose_mapping(
         sku_col = next(c for c in root.columns if c.name == key)
         root_matches.append(Match(sku_col, identity, 0.4, [f"fallback: key candidate '{key}'"]))
         sku_match = root_matches[-1]
+    else:
+        # one code per row does not make a column the product's code: a system's record id is one too
+        taken = {m.column.name for m in root_matches}
+        # a price or a quantity is one number per row too: a number a collection's field names is not a code
+        amounts = [
+            f
+            for f in schema.leaf_fields()
+            if f.in_collection is not None and {"number", "integer"} & set(f.json_type)
+        ]
+        numeric = {c.name for c in root.columns if c.inferred_type in ("int", "float")}
+        taken |= {
+            m.column.name
+            for m in match_columns(_subset(root, exclude=taken), amounts, learned)
+            if m.column.name in numeric
+        }
+        rivals = _identity_rivals(root, sku_match.column, taken)
+        exact = any("==" in e or "→" in e for e in sku_match.evidence)
+        surrogate = bool(SURROGATE_ID_RE.fullmatch(norm(sku_match.column.name)))
+        named = [c for c in rivals if score_header(c.name, sku_match.field)[0] >= 1.0]
+        if not exact and len(named) == 1:
+            # two headers scored alike once the hints were added; one of them is the code's own name
+            was, now = sku_match.column.name, named[0]
+            root_matches.remove(sku_match)
+            sku_match = Match(
+                now,
+                sku_match.field,
+                1.0,
+                [f"header '{now.name}' is a name of the code; '{was}' only resembles one"],
+            )
+            root_matches.append(sku_match)
+        elif rivals and surrogate and len(rivals) == 1:
+            was, now = sku_match.column.name, rivals[0]
+            root_matches.remove(sku_match)
+            sku_match = Match(
+                now,
+                sku_match.field,
+                RIVAL_CONFIDENCE,
+                [f"'{was}' reads as a system record id; '{now.name}' also holds one code per row"],
+            )
+            root_matches.append(sku_match)
+            questions.append(
+                f"'{now.name}' is used as the product code and '{was}' is taken for a system record id — confirm"
+            )
+        elif rivals and (surrogate or not exact):
+            names = ", ".join(f"'{c.name}'" for c in rivals[:3])
+            sku_match.score = min(sku_match.score, RIVAL_CONFIDENCE)
+            sku_match.evidence = [*sku_match.evidence, f"{names} also holds one code per row"]
+            questions.append(
+                f"'{sku_match.column.name}' is used as the product code, and {names} could be it too — confirm"
+            )
+
+    # The code's header a second time means a second table beside the first, one blank column away. A row
+    # of the sheet is then not one product: what stands beside the second header belongs to its code.
+    root_last_column: int | None = None
+    twin = next(
+        (h for h in root.table.headers if re.fullmatch(re.escape(sku_match.column.name) + r"_\d+", h)), None
+    )
+    if twin is not None:
+        at = root.table.headers.index(twin)
+        beside = set(root.table.headers[at:])
+        root_last_column = root.table.first_column + at
+        root = _subset(root, exclude=beside)
+        root_matches = [m for m in root_matches if m.column.name not in beside]
+        questions.append(
+            f"Sheet '{root.sheet}' has the header '{sku_match.column.name}' twice: a second table may stand "
+            f"beside the first, and its columns ({', '.join(sorted(beside - {twin})[:4])}) were not read — confirm"
+        )
 
     def src_id(i: int) -> str:
         role = roles[i][0]
@@ -628,6 +735,8 @@ def propose_mapping(
         spec = t.table.to_spec().model_copy(
             update={"data_end": None, "data_start": None}
         )  # row counts change every round
+        if i == root_idx and root_last_column is not None:
+            spec = spec.model_copy(update={"last_column": root_last_column})
         fm = FileMatch(
             name_pattern=file_name_pattern(t.file_name) if t.file_name else None,
             sheet_names_any=[] if is_csv else [profile.meta.sheets[t.sheet_index].name],
@@ -995,6 +1104,58 @@ def propose_mapping(
             f"table '{t.sheet}' → {target} linked on '{link_col.name}' ↔ root '{sku_match.column.name}'"
         )
 
+    # stock on the product rows → the inventory collection, fed from the root source. Only when no stock
+    # table was found: a file that has one keeps it as the single source of the collection.
+    stock_ptr = colls.get("inventory")
+    if stock_ptr is not None and not any(c.target == stock_ptr for c in collections):
+        stock_fields = [f for f in schema.leaf_fields() if f.in_collection == stock_ptr]
+        root_stock = match_columns(_subset(root, exclude=used_root_cols), stock_fields, learned)
+        qty = next((m for m in root_stock if m.field.semantic == "stock.qty"), None)
+        wh = item("inventory", "stock.warehouse")
+        if qty is not None:
+            items = [
+                FieldMapping(
+                    target=m.field.pointer,
+                    expr=_expr_for(m.column, m.field, day_first=day_first),
+                    confidence=round(m.score, 2),
+                    evidence=m.evidence,
+                )
+                for m in root_stock
+            ]
+            taken = used_root_cols | {m.column.name for m in root_stock}
+            if wh is not None and wh.pointer not in {f.target for f in items}:
+                per = _row_dimension(root, sku_match.column, taken)
+                if per is not None:
+                    # the rows of one product differ by this column, and the quantity is given per row
+                    items.append(
+                        FieldMapping(
+                            target=wh.pointer,
+                            expr=_expr_for(per, wh, day_first=day_first),
+                            confidence=0.6,
+                            evidence=[
+                                f"'{sku_match.column.name}' repeats; with '{per.name}' it identifies a row"
+                            ],
+                        )
+                    )
+                    taken.add(per.name)
+                    questions.append(
+                        f"Stock in '{qty.column.name}' is given per '{per.name}': it is used as the warehouse — confirm"
+                    )
+                elif fixed := _contract_constant(wh, "stock on the product rows, no warehouse column", 0.7):
+                    items.append(fixed)
+            if not missing_required(stock_ptr, items):
+                used_root_cols = taken
+                collections.append(
+                    CollectionMapping(
+                        target=stock_ptr,
+                        source=root_sid,
+                        link=[JoinKey(left=sku_match.column.name, right=sku_match.column.name)],
+                        fields=items,
+                    )
+                )
+                evidence.append(f"stock column '{qty.column.name}' on the product rows → {stock_ptr}")
+                field_scores.append(qty.score)
+
     rest_root = [c.name for c in root.columns if c.name not in used_root_cols]
     if rest_root:
         unmatched[root_sid] = rest_root
@@ -1054,6 +1215,7 @@ def _subset(t: TableProfile, exclude: set[str]) -> TableProfile:
         t.n_rows,
         t.duplicate_key_candidates,
         t.key_candidates,
+        observations=t.observations,
     )
 
 

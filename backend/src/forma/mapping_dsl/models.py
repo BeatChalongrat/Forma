@@ -292,6 +292,11 @@ class TableSpec(Strict):
     fill_down: list[str] = Field(
         default_factory=list, description="Columns whose blanks inherit the value above (merged cells)"
     )
+    fill_merged: bool = Field(
+        default=False,
+        description="A value merged down several rows is read on each of them. Exact: only the cells the"
+        " file itself records as merged are filled (xlsx, XML Spreadsheet, HTML rowspan); other blanks stay",
+    )
     section_column: str | None = Field(
         default=None,
         description="Rows with a single text cell under the header are section headings: their text fills"

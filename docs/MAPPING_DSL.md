@@ -22,7 +22,8 @@ sources:                      # one per table that is read
       stop_at_blank_rows: 2
       drop_repeated_headers: true   # a header printed again on each page, and the one-cell lines above it
       drop_total_rows: true   # label "รวม"/"Total:"/"ยอดรวม…" with only numbers beside it ("SUM-01", "รวมมิตร" stay)
-      fill_down: ["หมวด"]     # merged-cell groups
+      fill_down: ["หมวด"]     # every blank below a value takes it
+      fill_merged: true       # only cells the file records as merged down take the value above (ADR-075)
       section_column: section # one-cell heading rows ("เครื่องดื่ม") become this column, filled down, and leave the data
       unpivot: { id_columns: ["Item Code"], value_columns_regex: "^[A-Z][a-z]{2}-\\d{2}$", variable_name: period, value_name: value }
     csv: { encoding: auto, delimiter: auto }

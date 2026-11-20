@@ -16,10 +16,18 @@ def sniff_kind(data: bytes, name: str) -> str:
     """Return ``excel`` or ``csv`` when the content matches the claimed extension; raise otherwise."""
     from pathlib import Path
 
+    from forma.ingestion import markup
     from forma.ingestion.readers import CSV_EXT, EXCEL_EXT
 
     ext = Path(name).suffix.lower()
     head = data[:8]
+    if ext in markup.MARKUP_EXT:
+        if markup.container_of(data) in ("mhtml", "html"):
+            return "excel"
+        raise UnsupportedFile(
+            f"{name}: content is not a web archive of a spreadsheet (extension says {ext})",
+            details={"file": name},
+        )
     if ext in EXCEL_EXT:
         if head.startswith(_ZIP):
             try:
@@ -34,6 +42,18 @@ def sniff_kind(data: bytes, name: str) -> str:
             return "excel"
         if head.startswith(_OLE):
             return "excel"
+        if ext == ".xls":
+            # "Export to Excel" in NetSuite, SAP and Oracle writes text and names it .xls (ADR-074)
+            inside = markup.container_of(data)
+            if inside == "xmlss" and markup.declares_dtd(data):
+                raise UnsupportedFile(
+                    f"{name}: the XML spreadsheet declares a DTD or entities; export it again",
+                    details={"file": name},
+                )
+            if inside in ("xmlss", "mhtml", "html"):
+                return "excel"
+            if inside == "text" and markup.looks_tabular(data):
+                return "csv"
         raise UnsupportedFile(
             f"{name}: content is not an Excel workbook (extension says {ext})", details={"file": name}
         )

@@ -41,6 +41,7 @@ class SheetInspection:
     display_format_warnings: list[str] = field(default_factory=list)
     replacements: list[tuple[int, int, str]] = field(default_factory=list)
     invalid_columns: dict[int, list[str]] = field(default_factory=dict)
+    merged_down: list[tuple[int, int, int]] = field(default_factory=list)  # column, first row, last row
 
 
 def inspect_workbook(path: Path) -> tuple[SheetInspection, ...]:
@@ -145,8 +146,17 @@ def _scan_sheet(z: ZipFile, member: str, info: SheetInspection, formats: list[st
                     sheet_data.clear()
             elif tag == "col" and node.get("hidden") in ("1", "true"):
                 info.hidden_columns += int(node.get("max", "1")) - int(node.get("min", "1")) + 1
-            elif tag == "mergeCell" and len(info.merged_ranges) < 200:
-                info.merged_ranges.append(node.get("ref", ""))
+            elif tag == "mergeCell":
+                ref = node.get("ref", "")
+                if len(info.merged_ranges) < 200:
+                    info.merged_ranges.append(ref)
+                first, _, last = ref.partition(":")
+                top, bottom = CELL.fullmatch(first), CELL.fullmatch(last)
+                if top and bottom and int(bottom[2]) > int(top[2]):
+                    col = 0
+                    for char in top[1]:
+                        col = col * 26 + ord(char) - ord("A") + 1
+                    info.merged_down.append((col - 1, int(top[2]) - 1, int(bottom[2]) - 1))
 
 
 @lru_cache(maxsize=8)

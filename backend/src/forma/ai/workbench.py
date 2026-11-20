@@ -194,7 +194,7 @@ class FileWorkbench:
     def _frame(self, table_index: int) -> pl.DataFrame:
         if table_index in self._frames:
             return self._frames[table_index]
-        from forma.ingestion.readers import read_raw
+        from forma.ingestion.readers import read_raw, vertical_merges
         from forma.profiling.tables import extract_table
 
         t = self.profile.tables[table_index]
@@ -202,7 +202,9 @@ class FileWorkbench:
         path = self.resolve(f.storage_key)
         is_csv = f.kind == "csv" or path.suffix.lower() in {".csv", ".txt", ".tsv"}
         raw = read_raw(path, None if is_csv else t.sheet, validate_cells=False)
-        frame = extract_table(raw, t.table.to_spec())
+        spec = t.table.to_spec()
+        merges = vertical_merges(path, None if is_csv else t.sheet) if spec.fill_merged else None
+        frame = extract_table(raw, spec, merges=merges)
         self._frames[table_index] = frame
         return frame
 
@@ -335,7 +337,7 @@ class FileWorkbench:
         raise ValueError(f"what must be one of {list(INSPECT_KINDS)}")
 
     def _raw(self, r: dict[str, Any]) -> dict[str, Any]:
-        from forma.ingestion.readers import read_raw
+        from forma.ingestion.readers import read_raw, vertical_merges
         from forma.mapping_dsl.models import TableSpec
         from forma.profiling.tables import extract_table
 
@@ -359,7 +361,12 @@ class FileWorkbench:
             }
         if r["what"] == "trial_table":
             spec = TableSpec.model_validate(r.get("table") or {})
-            trial = extract_table(raw, spec)
+            merges = (
+                vertical_merges(self.resolve(f.storage_key), None if f.kind == "csv" else t.sheet)
+                if spec.fill_merged
+                else None
+            )
+            trial = extract_table(raw, spec, merges=merges)
             return {
                 "table": spec.model_dump(mode="json"),
                 "rows": trial.height,

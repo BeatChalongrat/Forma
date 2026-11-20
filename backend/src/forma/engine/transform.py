@@ -16,7 +16,8 @@ import polars as pl
 
 from forma.engine import accounting
 from forma.engine.ops import CompileContext, compile_expr, python_value
-from forma.ingestion.readers import read_raw
+from forma.ingestion import markup
+from forma.ingestion.readers import read_raw, vertical_merges
 from forma.mapping_dsl.models import (
     CallExpr,
     CollectionMapping,
@@ -130,7 +131,10 @@ def load_source_frame(
         validate_cells=expected_columns is None,
     )
     positions: dict[str, int] = {}
-    frame = extract_table(raw, spec.table, rename=spec.rename, positions=positions, audit=audit)
+    merges = vertical_merges(bound.path, sheet) if spec.table.fill_merged else None
+    frame = extract_table(
+        raw, spec.table, rename=spec.rename, positions=positions, audit=audit, merges=merges
+    )
     if expected_columns and spec.table.header_row != "auto":
         have = {_norm_col(c) for c in frame.columns}
         want = {_norm_col(c) for c in expected_columns}
@@ -147,22 +151,31 @@ def load_source_frame(
                 alt = best_cand.to_spec().model_copy(
                     update={
                         "fill_down": spec.table.fill_down,
+                        "fill_merged": spec.table.fill_merged,
                         "unpivot": spec.table.unpivot,
                         "drop_total_rows": spec.table.drop_total_rows,
                         "drop_repeated_headers": spec.table.drop_repeated_headers,
                     }
                 )
                 positions.clear()
-                frame = extract_table(raw, alt, rename=spec.rename, positions=positions, audit=audit)
-    if expected_columns is not None and bound.path.suffix.lower() in {".xlsx", ".xlsm"}:
+                frame = extract_table(
+                    raw, alt, rename=spec.rename, positions=positions, audit=audit, merges=merges
+                )
+    as_markup = markup.kind(bound.path) == "markup"
+    if expected_columns is not None and (as_markup or bound.path.suffix.lower() in {".xlsx", ".xlsm"}):
         from forma.ingestion.ooxml import inspect_workbook, require_cached_values
 
-        checked = inspect_workbook(bound.path)
-        info = (
-            checked[sheet or 0]
-            if sheet is None or isinstance(sheet, int)
-            else next(s for s in checked if s.name == sheet)
-        )
+        if as_markup:
+            from forma.ingestion.readers import markup_inspection
+
+            info = markup_inspection(bound.path, sheet or 0)
+        else:
+            checked = inspect_workbook(bound.path)
+            info = (
+                checked[sheet or 0]
+                if sheet is None or isinstance(sheet, int)
+                else next(s for s in checked if s.name == sheet)
+            )
         wanted = {_norm_col(n) for n in expected_columns | set(spec.table.fill_down)}
         # Unpivot consumes multiple input columns; conservatively verify all selected columns.
         columns = {
@@ -244,16 +257,24 @@ class TransformEngine:
                     findings.append(Finding("compile", "error", f"source {spec.id!r} is not bound to a file"))
                 continue
             try:
-                if spec.id in used_sources and b.path.suffix.lower() in {".xlsx", ".xlsm"}:
-                    from forma.ingestion.ooxml import inspect_workbook
-
+                written_as = markup.kind(b.path)  # an "Excel" export that is text inside (ADR-074)
+                if spec.id in used_sources and (
+                    written_as == "markup" or b.path.suffix.lower() in {".xlsx", ".xlsm"}
+                ):
                     selected = resolve_sheet(spec, b)
-                    checked = inspect_workbook(b.path)
-                    sheet_info = (
-                        checked[selected or 0]
-                        if selected is None or isinstance(selected, int)
-                        else next(s for s in checked if s.name == selected)
-                    )
+                    if written_as == "markup":
+                        from forma.ingestion.readers import markup_inspection
+
+                        sheet_info = markup_inspection(b.path, selected or 0)
+                    else:
+                        from forma.ingestion.ooxml import inspect_workbook
+
+                        checked = inspect_workbook(b.path)
+                        sheet_info = (
+                            checked[selected or 0]
+                            if selected is None or isinstance(selected, int)
+                            else next(s for s in checked if s.name == selected)
+                        )
                     notices = []
                     if sheet_info.formula_cells:
                         notices.append(
@@ -270,7 +291,11 @@ class TransformEngine:
                         )
                     for notice in notices:
                         findings.append(Finding("source_review", "warning", f"{spec.id}: {notice}"))
-                elif spec.id in used_sources and b.path.suffix.lower() in {".xls", ".xlsb"}:
+                elif (
+                    spec.id in used_sources
+                    and written_as is None
+                    and b.path.suffix.lower() in {".xls", ".xlsb"}
+                ):
                     findings.append(
                         Finding(
                             "source_review",
@@ -420,12 +445,24 @@ class TransformEngine:
                             "filter": filters[0] if len(filters) == 1 else CallExpr(op=Op.AND, args=filters)
                         }
                     )
+                # What another collection of the same source reads is exported there. Rows that
+                # differ only in it (a product's row per warehouse) repeat this collection's item.
+                own = {name for fm in cm.fields for name in _referenced_columns(fm.expr, cm.source)}
+                own |= {f"{cm.source}.{k.right}" for k in cm.link}
+                elsewhere = {
+                    name
+                    for other in mapping.collections
+                    if other is not cm and other.source == cm.source
+                    for fm in other.fields
+                    for name in _referenced_columns(fm.expr, other.source)
+                } - own
                 items, fnd = self._collection(
                     raw_collections.get(cm.source, frames[cm.source]),
                     effective_cm,
                     out,
                     root_id,
                     audit=collection_ledger.setdefault(cm.target, {"source": cm.source}),
+                    elsewhere=elsewhere,
                 )
                 findings.extend(fnd)
                 if items.width:  # a collection that cannot be linked is left out; its finding says why
@@ -725,6 +762,7 @@ class TransformEngine:
         root_id: str,
         *,
         audit: dict[str, Any] | None = None,
+        elsewhere: set[str] | None = None,
     ) -> tuple[pl.DataFrame, list[Finding]]:
         findings: list[Finding] = []
         ledger: dict[str, Any] = audit if audit is not None else {}
@@ -786,14 +824,14 @@ class TransformEngine:
         selection_findings = []
         if cm.filter is not None:
             _, before_selection = check_source_identity(
-                items, cm, rel_names, dedupe_keys, require_grain=require_grain
+                items, cm, rel_names, dedupe_keys, require_grain=require_grain, elsewhere=elsewhere
             )
             original = items
             items = items.filter(compile_expr(cm.filter, ctx).cast(pl.Boolean, strict=False).fill_null(False))
             ledger["filtered"] = original.height - items.height
             selection_findings = validate_selection(original, items, before_selection, cm)
         items, identity_findings = check_source_identity(
-            items, cm, rel_names, dedupe_keys, require_grain=require_grain
+            items, cm, rel_names, dedupe_keys, require_grain=require_grain, elsewhere=elsewhere
         )
         # Keep the original evidence once when a filter leaves the same issue unresolved.
         original_issues = {(f.target, f.details.get("reason")) for f in selection_findings}

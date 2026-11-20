@@ -52,6 +52,7 @@ class TableCandidate:
     title: str | None = None
     notes: list[str] = field(default_factory=list)
     section_rows: int = 0  # one-cell heading rows inside the data (ADR-058)
+    fill_merged: bool = False  # the file merges cells down the data rows (ADR-075)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -68,6 +69,7 @@ class TableCandidate:
             "title": self.title,
             "notes": self.notes,
             "section_rows": self.section_rows,
+            "fill_merged": self.fill_merged,
         }
 
     def to_spec(self) -> TableSpec:
@@ -79,6 +81,7 @@ class TableCandidate:
             first_column=self.first_column,
             last_column=self.last_column,
             section_column=SECTION_COLUMN if self.section_rows >= SECTION_MIN_ROWS else None,
+            fill_merged=self.fill_merged,
         )
 
 
@@ -387,6 +390,36 @@ def _drop_page_breaks(
     return body.with_row_index("__i__").filter(~pl.col("__i__").is_in(sorted(drop))).drop("__i__")
 
 
+def merges_in_data(merges: list[tuple[int, int, int]], cand: TableCandidate) -> bool:
+    """Does the file merge a cell down this table's data rows? A merge in the title or header is not one."""
+    return any(
+        cand.data_start <= top and bottom < cand.data_end and cand.first_column <= col < cand.last_column
+        for col, top, bottom in merges
+    )
+
+
+def _fill_merged(
+    df: pl.DataFrame, merges: list[tuple[int, int, int]], data_start: int, data_end: int
+) -> pl.DataFrame:
+    """Write a merged cell's value on every row it covers. Rows above the data are left as they are."""
+    by_column: dict[int, list[tuple[int, int]]] = {}
+    for col, top, bottom in merges:
+        if 0 <= col < df.width and data_start <= top < bottom < data_end:
+            by_column.setdefault(col, []).append((top, bottom))
+    patched = []
+    for col, spans in by_column.items():
+        name = df.columns[col]
+        values = df[name].to_list()
+        for top, bottom in spans:
+            if values[top] is None:
+                continue
+            for row in range(top + 1, bottom + 1):
+                if values[row] is None:
+                    values[row] = values[top]
+        patched.append(pl.Series(name, values, dtype=pl.String))
+    return df.with_columns(patched) if patched else df
+
+
 def extract_table(
     df: pl.DataFrame,
     spec: TableSpec,
@@ -395,16 +428,22 @@ def extract_table(
     row_numbers: bool = False,
     positions: dict[str, int] | None = None,
     audit: dict[str, Any] | None = None,
+    merges: list[tuple[int, int, int]] | None = None,
 ) -> pl.DataFrame:
     """Turn a raw grid into a header-named frame according to ``spec`` (all columns stay strings).
 
     For lineage, ``row_numbers`` adds a ``__sheet_row__`` column (the raw grid row each data row came
     from) and ``positions`` is filled with header → raw grid column. ``audit`` is filled with what each
     step dropped and whether the file's total rows agree with the rows kept (``engine.accounting``).
-    Without them the output is unchanged.
+    Without them the output is unchanged. ``merges`` are the sheet's cells merged down rows
+    (``readers.vertical_merges``); a spec with ``fill_merged`` cannot be read without them.
     """
     if df.height == 0:
         return pl.DataFrame()
+    if spec.fill_merged and merges is None:
+        raise ValueError(
+            "fill_merged needs the sheet's merged ranges: pass merges=vertical_merges(path, sheet)"
+        )
     if spec.header_row == "auto":
         cands = detect_tables(df)
         if not cands:
@@ -440,6 +479,7 @@ def extract_table(
             .model_copy(
                 update={
                     "fill_down": spec.fill_down,
+                    "fill_merged": spec.fill_merged,
                     "unpivot": spec.unpivot,
                     "drop_total_rows": spec.drop_total_rows,
                     "drop_repeated_headers": spec.drop_repeated_headers,
@@ -450,10 +490,13 @@ def extract_table(
             row_numbers=row_numbers,
             positions=positions,
             audit=audit,
+            merges=merges,
         )
     headers = merge_header_rows(header_rows)
     data_start = spec.data_start if spec.data_start is not None else header_row + spec.header_rows
     data_end = spec.data_end if spec.data_end is not None else df.height
+    if spec.fill_merged and merges:
+        df = _fill_merged(df, merges, data_start, min(data_end, df.height))
     body = df.slice(data_start, max(0, data_end - data_start)).select(cols)
     body.columns = headers
     if positions is not None:

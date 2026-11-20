@@ -92,6 +92,8 @@ Tests: `test_tenant_scope.py`, `test_auth.py`, `test_workspace.py`,
 ## 5. Input security
 
 * Uploads are sniffed by content; names are sanitised; sizes are capped (`FORMA_MAX_UPLOAD_MB`, 413).
+  A `.xls` that is XML Spreadsheet, an HTML table or tab-separated text is read as text: nothing in it is
+  executed or fetched, and XML that declares a DTD or entities is refused (ADR-074).
 * CSV decoding is strict (BOMs honoured, malformed quoting and invalid declared encodings fail, no silent
   replacement characters).
 * xlsx is streamed fully; formulas are read as cached values and never recalculated; macros, external

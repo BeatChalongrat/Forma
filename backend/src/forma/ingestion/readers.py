@@ -5,6 +5,9 @@ Two engines on purpose (ADR-003):
   that parsing is explicit, deterministic and Thai-aware (done by DSL ops, not by Excel heuristics).
 * Streaming **OOXML** inspection checks all rows for formulas/errors and preserves simple numeric
   identifier/percentage formats. Formulas are never calculated; missing cached results fail closed.
+
+A third reader, ``ingestion.markup``, takes the "Excel" exports that are text inside: XML Spreadsheet 2003
+and HTML tables, with or without a MIME wrapper (ADR-074). What the bytes are decides, not the file name.
 """
 
 from __future__ import annotations
@@ -20,6 +23,8 @@ from typing import Any
 import polars as pl
 
 from forma.core.errors import UnsupportedFile, ValidationFailed
+from forma.ingestion import markup
+from forma.ingestion.markup import MARKUP_EXT
 
 EXCEL_EXT = {".xlsx", ".xlsm", ".xls", ".xlsb"}
 CSV_EXT = {".csv", ".txt", ".tsv"}
@@ -89,8 +94,11 @@ class WorkbookMeta:
 
 def file_kind(path: Path) -> str:
     ext = path.suffix.lower()
-    if ext in EXCEL_EXT:
+    if ext in MARKUP_EXT:
         return "excel"
+    if ext in EXCEL_EXT:
+        # SAP's "Text with Tabs" list saved as .xls is delimited text, and is read as such
+        return "csv" if markup.kind(path) == "text" else "excel"
     if ext in CSV_EXT:
         return "csv"
     raise UnsupportedFile(f"Unsupported file type {ext!r}", details={"file": path.name})
@@ -111,7 +119,76 @@ def _fastexcel_reader(path: Path) -> Any:
         ) from e
 
 
+def _markup_frame(
+    sheet: markup.MarkupSheet, *, n_rows: int | None = None, skip_rows: int = 0
+) -> pl.DataFrame:
+    rows = sheet.rows[skip_rows : None if n_rows is None else skip_rows + n_rows]
+    width = sheet.width
+    if not rows or not width:
+        return pl.DataFrame()
+    data = {f"c{j}": [(r[j] if j < len(r) else None) for r in rows] for j in range(width)}
+    return _clean_strings(pl.DataFrame(data, schema={f"c{j}": pl.String for j in range(width)}))
+
+
+def _markup_sheet(path: Path, sheet: int | str) -> markup.MarkupSheet:
+    sheets = markup.read_sheets(path)
+    if isinstance(sheet, int):
+        if 0 <= sheet < len(sheets):
+            return sheets[sheet]
+    else:
+        for found in sheets:
+            if found.name == sheet:
+                return found
+    raise ValidationFailed("ไม่พบชีตที่เลือก กรุณาโหลดรายการชีตล่าสุดแล้วเลือกอีกครั้ง", details={"sheet": sheet})
+
+
+def markup_inspection(path: Path, sheet: int | str) -> Any:
+    """What the OOXML scan reports for an .xlsx sheet, for a sheet of a markup export."""
+    from forma.ingestion.ooxml import SheetInspection
+
+    found = _markup_sheet(path, sheet)
+    return SheetInspection(
+        name=found.name,
+        hidden=found.hidden,
+        merged_ranges=list(found.merged_ranges),
+        formula_cells=found.formula_cells,
+        formula_without_cache=found.formula_without_cache,
+        error_cells=found.error_cells,
+        formula_locations=list(found.formula_locations),
+        error_locations=list(found.error_locations),
+        hidden_rows=found.hidden_rows,
+        hidden_columns=found.hidden_columns,
+        invalid_columns={col: list(cells) for col, cells in found.invalid_columns.items()},
+    )
+
+
+def _markup_meta(path: Path) -> WorkbookMeta:
+    sheets = []
+    for i, found in enumerate(markup.read_sheets(path)):
+        sheets.append(
+            SheetMeta(
+                name=found.name,
+                index=i,
+                hidden=found.hidden,
+                n_rows=len(found.rows),
+                n_cols=found.width,
+                merged_ranges=list(found.merged_ranges),
+                formula_cells=found.formula_cells,
+                formula_without_cache=found.formula_without_cache,
+                error_cells=found.error_cells,
+                formula_locations=list(found.formula_locations),
+                error_locations=list(found.error_locations),
+                hidden_rows=found.hidden_rows,
+                hidden_columns=found.hidden_columns,
+                structure_scan_complete=True,
+            )
+        )
+    return WorkbookMeta(path=path, kind="excel", sheets=sheets)
+
+
 def read_excel_meta(path: Path) -> WorkbookMeta:
+    if markup.kind(path) == "markup":
+        return _markup_meta(path)
     reader = _fastexcel_reader(path)
     sheets: list[SheetMeta] = []
     for i, name in enumerate(reader.sheet_names):
@@ -134,7 +211,7 @@ def _scan_structure_openpyxl(path: Path, sheets: list[SheetMeta]) -> None:
         meta = by_name.get(inspected.name)
         if meta is not None:
             for name, value in vars(inspected).items():
-                if name not in ("name", "replacements", "invalid_columns"):
+                if name not in ("name", "replacements", "invalid_columns", "merged_down"):
                     setattr(meta, name, value.copy() if isinstance(value, list) else value)
             meta.structure_scan_complete = True
 
@@ -148,6 +225,12 @@ def read_excel_sheet_raw(
     validate_cells: bool = True,
 ) -> pl.DataFrame:
     """Whole sheet as strings, columns named c0..cN, no header interpretation."""
+    if markup.kind(path) == "markup":
+        if validate_cells:
+            from forma.ingestion.ooxml import require_cached_values
+
+            require_cached_values(markup_inspection(path, sheet))
+        return _markup_frame(_markup_sheet(path, sheet), n_rows=n_rows, skip_rows=skip_rows)
     reader = _fastexcel_reader(path)
     present = 0 <= sheet < len(reader.sheet_names) if isinstance(sheet, int) else sheet in reader.sheet_names
     if not present:
@@ -265,6 +348,8 @@ def read_csv_raw(
         for i, row in enumerate(reader):
             if n_rows is not None and i >= n_rows:
                 break
+            if _is_rule(row):
+                row = []  # a line drawn across a printed list: it keeps its place and holds nothing
             rows.append(row)
             width = max(width, len(row))
     except csv.Error as e:
@@ -304,6 +389,30 @@ def read_raw(
     return read_csv_raw(
         path, encoding=csv_encoding, delimiter=csv_delimiter, n_rows=n_rows, quote_char=csv_quote_char
     )
+
+
+_RULE_RE = re.compile(r"[-=+_]{3,}")
+
+
+def _is_rule(row: list[str]) -> bool:
+    """A line of dashes, as SAP's "Unconverted" list and other printed reports draw between rows."""
+    cells = [c.strip() for c in row if c and c.strip()]
+    return bool(cells) and all(_RULE_RE.fullmatch(c) for c in cells)
+
+
+def vertical_merges(path: Path, sheet: int | str | None) -> list[tuple[int, int, int]]:
+    """Cells merged down several rows, as (column, first row, last row), 0-based on the raw grid. A file
+    that records no merges (CSV, legacy .xls, .xlsb) has none."""
+    if markup.kind(path) == "markup":
+        return list(_markup_sheet(path, sheet or 0).merged_down)
+    if path.suffix.lower() in {".xlsx", ".xlsm"}:
+        from forma.ingestion.ooxml import inspect_workbook
+
+        sheets = inspect_workbook(path)
+        if sheet is None or isinstance(sheet, int):
+            return list(sheets[sheet or 0].merged_down) if 0 <= (sheet or 0) < len(sheets) else []
+        return next((list(s.merged_down) for s in sheets if s.name == sheet), [])
+    return []
 
 
 _WS_RE = re.compile(r"[​‌‍﻿ ]")

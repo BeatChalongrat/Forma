@@ -48,6 +48,7 @@ def _where(source: Any, files: list[Any] | None) -> dict[str, Any]:
         "unpivot": table.unpivot.model_dump(mode="json") if table.unpivot else None,
         "filter": table.filter.model_dump(mode="json", exclude_none=True) if table.filter else None,
         "fill_down": list(table.fill_down),
+        "fill_merged": table.fill_merged,
         "rename": dict(source.rename),
     }
 
