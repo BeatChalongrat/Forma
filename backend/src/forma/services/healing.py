@@ -9,6 +9,7 @@ anything else → the meaning changed. The policy turns risky checks into review
 from __future__ import annotations
 
 import statistics
+from collections.abc import Callable
 from typing import Any
 
 from forma.engine.thai import VAT_RATE
@@ -21,6 +22,11 @@ SAME_SHARE = 0.9  # this share of equal values = same meaning
 STEADY_SHARE = 0.8  # this share of ratios within 1 % of the median = one consistent factor
 RISKY = ("vat_added", "vat_removed", "scaled", "different")
 STEADY = ("vat_added", "vat_removed", "scaled")  # one factor on every SKU: the file changed, not the data
+MIN_VALUES = 5  # amounts on each side before their typical value is compared
+TYPICAL_FACTOR = 5.0  # the typical amount moved this much with no SKU in common: a unit, not a price list
+# The amount a reused mapping must have compared: the base price is on nearly every record. Promotion
+# prices, discounts and stock are sparse or move every round, so requiring them would stop automation.
+REUSE_AMOUNT_SEMANTICS = ("price.amount",)
 
 
 # --------------------------------------------------------------------------------------------
@@ -184,6 +190,47 @@ def data_check(
     }
 
 
+def amounts(records: list[dict[str, Any]], pointer: str) -> list[float]:
+    """Every positive number at ``pointer``, across collections."""
+    return [n for r in records for v in _values(r, pointer) if (n := _num(v)) is not None and n > 0]
+
+
+def typical_check(before: list[float], after: list[float], pairs: int) -> dict[str, Any]:
+    """An amount whose values cannot be paired by SKU. The typical value of each round still can be compared:
+    it shows a change of unit, pack or currency, and it cannot show a 7 % VAT change. ``amount`` marks the
+    check for the policy: a reused mapping is not approved automatically on a ``no_data`` amount."""
+    base = {"pairs": pairs, "amount": True}
+    if len(before) < MIN_VALUES or len(after) < MIN_VALUES:
+        return {
+            **base,
+            "verdict": "no_data",
+            "basis": "none",
+            "summary": "no published values from an earlier round to compare these with",
+        }
+    ratio = statistics.median(after) / statistics.median(before)
+    if ratio >= TYPICAL_FACTOR or ratio <= 1 / TYPICAL_FACTOR:
+        return {
+            **base,
+            "verdict": "scaled",
+            "basis": "typical_value",
+            "ratio": round(ratio, 4),
+            "summary": (
+                f"too few SKUs in common with last round; the typical value is ×{ratio:.3g} of "
+                "last round's — unit, pack or currency?"
+            ),
+        }
+    return {
+        **base,
+        "verdict": "no_data",
+        "basis": "typical_value",
+        "typical_ratio": round(ratio, 4),
+        "summary": (
+            f"too few SKUs in common with last round to compare values; the typical value is ×{ratio:.3g} "
+            "of last round's, which cannot rule out a VAT change"
+        ),
+    }
+
+
 def review(
     schema: TargetSchema,
     old: MappingDocument,
@@ -193,8 +240,14 @@ def review(
     *,
     risk_of: Any = None,
     check_unchanged: bool = False,
+    is_amount: Callable[[str], bool] | None = None,
+    before_amounts: dict[str, list[float]] | None = None,
 ) -> dict[str, Any]:
     """Every changed field with its data check; ``checks`` is what the policy reads.
+
+    With ``is_amount`` a critical or high amount that could not be paired with last round's values by SKU is
+    never left without a check: ``before_amounts`` (every amount of the published round, not only the paired
+    SKUs) gives a typical value to compare, and with nothing published the check says so.
 
     With ``check_unchanged`` the critical and high fields the mapping did not touch are checked too (ADR-056):
     a layout that did not move can still carry prices with the VAT taken out or in satang. Values that merely
@@ -218,6 +271,24 @@ def review(
             c["check"] = check
         else:
             c["check"] = None
+        wanted = c["status"] in ("changed", "added") or (check_unchanged and c["status"] == "unchanged")
+        fixed = ((c.get("after") or {}).get("expr") or {}).get("op") == "const"
+        if (
+            wanted
+            and after
+            and not fixed
+            and is_amount is not None
+            and is_amount(c["pointer"])
+            and c.get("risk") in ("critical", "high")
+        ):
+            if c["check"] is None or c["check"]["verdict"] == "no_data":
+                c["check"] = typical_check(
+                    (before_amounts or {}).get(c["pointer"], []),
+                    amounts(after, c["pointer"]),
+                    int((c["check"] or {}).get("pairs") or 0),
+                )
+            else:
+                c["check"] = {**c["check"], "amount": True}
     risky = [
         c
         for c in changes

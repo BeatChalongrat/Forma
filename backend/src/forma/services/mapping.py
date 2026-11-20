@@ -218,10 +218,21 @@ def _field_review(
 
     after = (after or [])[:FIELD_REVIEW_ROWS]
     before: list[dict[str, Any]] = []
+    amount_pointers = {
+        f.pointer for f in schema.leaf_fields() if f.semantic in healing.REUSE_AMOUNT_SEMANTICS
+    }
+    # every amount of the published round, not only the paired SKUs: a file with none of last round's SKUs
+    # still has a typical price to compare (ADR-073)
+    before_amounts: dict[str, list[float]] = {p: [] for p in amount_pointers}
     prev = previous_published(session, customer_id, round_id or "")
     if prev is not None and after:
         wanted = {sandbox._identity(r, schema) for r in after}
-        before = [r for r in iter_records(ctx.records_path(prev)) if sandbox._identity(r, schema) in wanted]
+        for rec in iter_records(ctx.records_path(prev)):
+            if sandbox._identity(rec, schema) in wanted:
+                before.append(rec)
+            for pointer, seen in before_amounts.items():
+                if len(seen) < FIELD_REVIEW_ROWS:
+                    seen.extend(healing.amounts([rec], pointer))
     out = healing.review(
         schema,
         MappingDocument.model_validate(baseline.document),
@@ -230,6 +241,8 @@ def _field_review(
         after,
         risk_of=lambda p: ctx.policy.risk_of(schema, p),
         check_unchanged=check_unchanged,
+        is_amount=amount_pointers.__contains__,
+        before_amounts=before_amounts,
     )
     out.update(
         baseline_id=baseline.id,

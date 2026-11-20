@@ -46,6 +46,9 @@ DEFAULT_POLICY: dict[str, Any] = {
         "allowed_drift": ["identical", "header_moved", "columns_added"],
         "require_previous_approval_for_auto": True,
         "max_row_change_ratio": 0.3,
+        # ADR-073: a reused mapping is approved by itself only when its amounts were compared with a
+        # published round's values; with nothing to compare, a person looks
+        "require_value_comparison_for_reuse": True,
     },
     "review": {
         "priority_weights": {
@@ -143,7 +146,7 @@ def validate_policy(policy: dict[str, Any]) -> list[str]:
     mwf = aa.get("max_warning_findings")
     if isinstance(mwf, bool) or not isinstance(mwf, int) or mwf < 0:
         problems.append("auto_approve.max_warning_findings must be a whole number ≥ 0")
-    for k in ("allow_errors", "require_previous_approval_for_auto"):
+    for k in ("allow_errors", "require_previous_approval_for_auto", "require_value_comparison_for_reuse"):
         if not isinstance(aa.get(k), bool):
             problems.append(f"auto_approve.{k} must be true or false")
     drift = aa.get("allowed_drift")
@@ -227,6 +230,15 @@ def _data_identical(checks: list[dict[str, Any]] | None, *, min_pairs: int = 3) 
     return bool(important) and all(
         c.get("verdict") == "same" and int(c.get("pairs") or 0) >= min_pairs for c in important
     )
+
+
+def _unverified_amounts(checks: list[dict[str, Any]] | None) -> list[dict[str, Any]]:
+    """Critical or high amounts whose values could not be compared with any published round (ADR-073)."""
+    return [
+        c
+        for c in checks or []
+        if c.get("amount") and c.get("verdict") == "no_data" and c.get("risk") in ("critical", "high")
+    ]
 
 
 def _meaning_doubts(checks: list[dict[str, Any]] | None) -> list[dict[str, Any]]:
@@ -517,6 +529,14 @@ class PolicyEngine:
             reasons.append(f"data check: {c['pointer']}: {c['summary']}")
             priority += w["critical_field_low_confidence"]
             risk += 0.3
+        unverified = _unverified_amounts(field_checks) if reused_approved else []
+        checks["unverified_amounts"] = [c["pointer"] for c in unverified]
+        if unverified and aa.get("require_value_comparison_for_reuse", True):
+            # the layout is the one a person approved; nothing shows the amounts still mean the same
+            for c in unverified[:3]:
+                reasons.append(f"data check: {c['pointer']}: {c['summary']}; confirm the reused mapping")
+            priority += w["critical_field_low_confidence"] // 2
+            risk += 0.2
         if changed.get("override_conflicts"):
             reasons.append(
                 f"sandbox: {changed['override_conflicts']} persistent override(s) collide with the new mapping"

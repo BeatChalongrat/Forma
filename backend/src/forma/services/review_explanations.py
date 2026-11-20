@@ -65,6 +65,16 @@ def explain(ctx: ServiceContext, reasons: list[str], target: str | None) -> list
                 f"{match[1]} rows that look like data come after a blank gap, starting at sheet row {match[2]}, and were not read. Confirm the table really ends before them.",
                 f"มี {match[1]} แถวที่ดูเหมือนข้อมูลอยู่หลังช่วงแถวว่าง เริ่มที่แถว {match[2]} ของชีต และระบบไม่ได้อ่าน ตรวจว่าตารางจบก่อนแถวเหล่านี้จริงหรือไม่",
             )
+        elif "no published values from an earlier round" in reason:
+            pair = (
+                f"{en}: this file uses a mapping approved before, but no published round exists to compare its values with. Check a few values against the file, then approve.",
+                f"{th}: ไฟล์นี้ใช้การจับคู่ที่เคยอนุมัติ แต่ยังไม่มีข้อมูลรอบก่อนที่เผยแพร่แล้วให้เทียบค่า ตรวจค่าบางรายการกับไฟล์แล้วจึงอนุมัติ",
+            )
+        elif match := re.search(r"too few SKUs in common .* typical value is ×([\d.e+-]+) of", reason):
+            pair = (
+                f"{en}: too few items match last round to compare value by value. The typical value is ×{match[1]} of last round's. That cannot rule out a VAT change; check a few values against the file.",
+                f"{th}: มีรายการที่ตรงกับรอบก่อนน้อยเกินกว่าจะเทียบทีละค่า ค่าทั่วไปของรอบนี้เป็น ×{match[1]} ของรอบก่อน ซึ่งยังบอกไม่ได้ว่า VAT เปลี่ยนหรือไม่ ตรวจค่าบางรายการกับไฟล์",
+            )
         elif "low confidence on" in reason:
             pair = (
                 f"{en}: the suggested interpretation is not confirmed. Check source examples before answering.",

@@ -367,9 +367,9 @@ def _expr_for(c: ColumnProfile, f: FieldSpec, source: str | None = None, *, day_
                     "n": "active",
                     "false": "active",
                     "0": "active",
-                    "": "active",
                 },
-                default="active",
+                keep_unmapped=True,  # a code FORMA does not know stays as written and fails the enum
+                blank="active",  # the flag is not set
             )
         return _map_values(
             f,
@@ -485,7 +485,43 @@ def _map_values(f: FieldSpec, src: Any, mapping: dict[str, str], **params: Any) 
         mapping = {k: fit(v) for k, v in mapping.items()}
         if isinstance(params.get("default"), str):
             params["default"] = fit(params["default"])
-    return call("map_values", src, mapping=mapping, **params)
+        if isinstance(params.get("blank"), str):
+            params["blank"] = fit(params["blank"])
+    # ``blank`` fills an empty cell only; ``default`` would also swallow every value the map does not know
+    blank = params.pop("blank", None)
+    mapped = call("map_values", src, mapping=mapping, **params)
+    return call("default", mapped, value=blank) if blank is not None else mapped
+
+
+def _contract_constant(
+    f: FieldSpec, what: str, confidence: float, *, inferred: str | None = None
+) -> FieldMapping | None:
+    """A field no column feeds. The contract's own default is a rule someone wrote down; without one FORMA
+    has nothing to go on, so a required field is left empty for a person to answer and an optional one is
+    left out. ``inferred`` is a value the columns present point to (a discount column → a discount type).
+    FORMA does not make up a warehouse, a price list or a promotion type (ADR-073)."""
+    if inferred is not None:
+        expr = (
+            _map_values(f, const(inferred), {inferred: inferred}, default=inferred)
+            if f.enum
+            else const(inferred)
+        )
+        return FieldMapping(target=f.pointer, expr=expr, confidence=confidence, evidence=[what])
+    if f.default is not None:
+        return FieldMapping(
+            target=f.pointer,
+            expr=const(f.default),
+            confidence=confidence,
+            evidence=[f"{what}; contract default {f.default!r}"],
+        )
+    if not f.required:
+        return None
+    return FieldMapping(
+        target=f.pointer,
+        expr=const(None),
+        confidence=0.0,
+        evidence=[f"{what} and the contract declares no default: a person names the value"],
+    )
 
 
 VAT_ASSUMED_TEXT = "no VAT marker in headers; assumed VAT-inclusive (Thai retail convention) — confirm"
@@ -706,15 +742,10 @@ def propose_mapping(
             vat_inc, why = _vat_included_guess([amount.column.name])
             items: list[FieldMapping] = []
             plist, vat = item("pricing", "price.list_name"), item("pricing", "price.vat_included")
-            if plist is not None:
-                items.append(
-                    FieldMapping(
-                        target=plist.pointer,
-                        expr=const(str(plist.default or "standard")),
-                        confidence=0.8,
-                        evidence=["single price column → 'standard' list"],
-                    )
-                )
+            if plist is not None and (
+                fixed := _contract_constant(plist, "single price column, no price-list column", 0.8)
+            ):
+                items.append(fixed)
             items.append(
                 FieldMapping(
                     target=amount.field.pointer,
@@ -807,15 +838,10 @@ def propose_mapping(
             items = []
             plist, vat = item("pricing", "price.list_name"), item("pricing", "price.vat_included")
             eff = item("pricing", "price.effective_from")
-            if plist is not None:
-                items.append(
-                    FieldMapping(
-                        target=plist.pointer,
-                        expr=const(str(plist.default or "standard")),
-                        confidence=0.7,
-                        evidence=["crosstab price grid → 'standard'"],
-                    )
-                )
+            if plist is not None and (
+                fixed := _contract_constant(plist, "crosstab price grid, no price-list column", 0.7)
+            ):
+                items.append(fixed)
             items.append(
                 FieldMapping(
                     target=p_amount.pointer,
@@ -873,15 +899,12 @@ def propose_mapping(
                 questions.append(f"Pricing table '{t.sheet}' has no recognisable amount column")
                 continue
             plist, vat = item("pricing", "price.list_name"), item("pricing", "price.vat_included")
-            if plist is not None and plist.pointer not in got:
-                items.append(
-                    FieldMapping(
-                        target=plist.pointer,
-                        expr=const(str(plist.default or "standard")),
-                        confidence=0.7,
-                        evidence=["no price-list column; 'standard'"],
-                    )
-                )
+            if (
+                plist is not None
+                and plist.pointer not in got
+                and (fixed := _contract_constant(plist, "no price-list column", 0.7))
+            ):
+                items.append(fixed)
             if vat is not None and vat.pointer not in got:
                 vat_inc, why = _vat_included_guess([c.name for c in t.columns])
                 items.append(
@@ -895,15 +918,12 @@ def propose_mapping(
                 questions.append(f"Inventory table '{t.sheet}' has no recognisable quantity column")
                 continue
             wh = item("inventory", "stock.warehouse")
-            if wh is not None and wh.pointer not in got:
-                items.append(
-                    FieldMapping(
-                        target=wh.pointer,
-                        expr=const(str(wh.default or "MAIN")),
-                        confidence=0.7,
-                        evidence=["single warehouse assumed → MAIN"],
-                    )
-                )
+            if (
+                wh is not None
+                and wh.pointer not in got
+                and (fixed := _contract_constant(wh, "no warehouse column", 0.7))
+            ):
+                items.append(fixed)
         if role == "promotions":
             promo_code = item("promotions", "promo.code")
             if promo_code is not None and promo_code.pointer not in got:
@@ -932,6 +952,7 @@ def propose_mapping(
                     )
             ptype = item("promotions", "promo.type")
             if ptype is not None and ptype.pointer not in got:
+                # a column that is there says what kind of promotion this is; with none, nothing does
                 guess = (
                     "buy_x_get_y"
                     if "promo.get_qty" in sems
@@ -939,18 +960,18 @@ def propose_mapping(
                     if "discount.percent" in sems
                     else "amount_off"
                     if "discount.amount" in sems
-                    else "percent_off"
+                    else None
                 )
-                items.append(
-                    FieldMapping(
-                        target=ptype.pointer,
-                        expr=_map_values(ptype, const(guess), {guess: guess}, default=guess)
-                        if ptype.enum
-                        else const(guess),
-                        confidence=0.6,
-                        evidence=[f"type inferred from present columns → {guess}"],
-                    )
+                fixed = _contract_constant(
+                    ptype,
+                    f"type inferred from present columns → {guess}"
+                    if guess
+                    else "no promotion-type column and no discount column to infer it from",
+                    0.6,
+                    inferred=guess,
                 )
+                if fixed:
+                    items.append(fixed)
         if not items:
             unmatched[sid] = [c.name for c in t.columns]
             continue

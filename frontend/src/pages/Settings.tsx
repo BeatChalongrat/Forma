@@ -507,6 +507,7 @@ function PolicyTab() {
           {num('Warnings at most', aa.max_warning_findings, (v) => edit((x) => { x.auto_approve.max_warning_findings = Math.round(v) }))}
           {num('Row count change at most', aa.max_row_change_ratio, (v) => edit((x) => { x.auto_approve.max_row_change_ratio = v }), { pct: true })}
           {flag('Customer must have an approved mapping already', aa.require_previous_approval_for_auto, (v) => edit((x) => { x.auto_approve.require_previous_approval_for_auto = v }))}
+          {flag('A reused mapping needs prices compared with an approved round', aa.require_value_comparison_for_reuse ?? true, (v) => edit((x) => { x.auto_approve.require_value_comparison_for_reuse = v }))}
           {flag('Allow engine errors', aa.allow_errors, (v) => edit((x) => { x.auto_approve.allow_errors = v }))}
           <div className="text-muted mt-2 mb-1">Format changes that may still pass automatically</div>
           <div className="grid grid-cols-2">{DRIFT.map((d) => flag(d.replace(/_/g, ' '), aa.allowed_drift.includes(d), (v) => edit((x) => { x.auto_approve.allowed_drift = v ? [...x.auto_approve.allowed_drift, d] : x.auto_approve.allowed_drift.filter((y) => y !== d) })))}</div>

@@ -273,6 +273,11 @@ def test_an_automatic_approval_can_be_spot_checked(client: TestClient, isolated_
     _upload(c, r1, make_workbook(isolated_env / "au1.xlsx"))
     mv = _run(c, r1)["result"]["mapping_version_id"]
     assert c.post(f"/api/mappings/{mv}/approve", json={}).status_code == 200
+    # a reused mapping is automatic only when its prices can be compared with an approved round (ADR-073)
+    job = c.post(f"/api/rounds/{r1}/transform", params={"sync": "true"}).json()
+    assert c.get(f"/api/jobs/{job['job_id']}").json()["status"] == "done"
+    ds1 = c.get(f"/api/rounds/{r1}").json()["datasets"][0]["id"]
+    assert c.post(f"/api/datasets/{ds1}/approve", json={"acknowledge_anomalies": True}).status_code == 200
     r2 = c.post("/api/rounds", json={"customer_id": cust}).json()["id"]
     _upload(c, r2, make_workbook(isolated_env / "au1_r2.xlsx"))
     _run(c, r2)

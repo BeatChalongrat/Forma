@@ -305,7 +305,7 @@ export type AISettings = {
 export type AiProbe = { ok: boolean; offline?: boolean; message: string; model?: string; provider?: string; latency_ms?: number }
 export type AISettingsPatch = Partial<{ provider: string | null; model: string | null; base_url: string | null; timeout_s: number | null; max_retries: number | null; api_key: string | null }>
 export type Policy = {
-  auto_approve: { min_mapping_confidence: number; min_field_confidence_critical: number; min_field_confidence_high: number; max_warning_findings: number; allow_errors: boolean; allowed_drift: string[]; require_previous_approval_for_auto: boolean; max_row_change_ratio: number }
+  auto_approve: { min_mapping_confidence: number; min_field_confidence_critical: number; min_field_confidence_high: number; max_warning_findings: number; allow_errors: boolean; allowed_drift: string[]; require_previous_approval_for_auto: boolean; max_row_change_ratio: number; require_value_comparison_for_reuse?: boolean }
   review: { priority_weights: Record<string, number>; high_impact_ratio?: number }
   block: Record<string, boolean>
   risk_overrides: Record<string, string>
