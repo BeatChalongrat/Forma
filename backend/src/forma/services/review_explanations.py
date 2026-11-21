@@ -113,10 +113,41 @@ def explain(ctx: ServiceContext, reasons: list[str], target: str | None) -> list
                 "AI wrote this mapping, but its own review step did not finish. Nothing has checked what the columns mean yet, so check the mapping against the file before approving.",
                 "AI ทำการจับคู่นี้แล้ว แต่ขั้นตรวจทานของ AI ไม่สำเร็จ ยังไม่มีการตรวจความหมายของคอลัมน์ ตรวจการจับคู่กับไฟล์ก่อนอนุมัติ",
             )
-        elif "heuristic draft used" in reason:
+        elif match := re.search(
+            r"AI retry (\d+) of (\d+) .* did not succeed; FORMA (will try|stopped)", reason
+        ):
             pair = (
-                "AI could not produce a mapping, so the one shown comes from FORMA's fixed rules. Check it against the file before approving.",
-                "AI ทำการจับคู่ไม่สำเร็จ การจับคู่ที่เห็นมาจากกฎตายตัวของระบบ ตรวจกับไฟล์ก่อนอนุมัติ",
+                (
+                    f"FORMA sent this file back to the AI after it came back ({match[1]} of {match[2]} tries) and the AI still did not produce a mapping. FORMA will try again later; you can also check the mapping below now."
+                    if match[3] == "will try"
+                    else f"FORMA sent this file back to the AI {match[2]} times and the AI did not produce a mapping. FORMA stopped trying: check the mapping from FORMA's fixed rules against the file yourself."
+                ),
+                (
+                    f"ระบบส่งไฟล์นี้กลับไปให้ AI อ่านใหม่แล้ว (ครั้งที่ {match[1]} จาก {match[2]}) แต่ AI ยังทำการจับคู่ไม่สำเร็จ ระบบจะลองอีกครั้งภายหลัง หรือตรวจการจับคู่ด้านล่างได้เลย"
+                    if match[3] == "will try"
+                    else f"ระบบส่งไฟล์นี้ให้ AI อ่านใหม่ครบ {match[2]} ครั้งแล้ว AI ยังทำการจับคู่ไม่สำเร็จ ระบบหยุดส่งซ้ำแล้ว ตรวจการจับคู่จากกฎตายตัวกับไฟล์ด้วยตนเอง"
+                ),
+            )
+        elif "heuristic draft used" in reason:
+            settings = getattr(ctx, "settings", None)
+            retries = (
+                bool(getattr(settings, "ai_retry_enabled", False))
+                and int(getattr(settings, "ai_retry_max_attempts", 0)) > 0
+                and not any("FORMA stopped retrying" in r for r in reasons)
+            )
+            pair = (
+                "AI could not produce a mapping, so the one shown comes from FORMA's fixed rules. Check it against the file before approving."
+                + (
+                    " FORMA sends the file back to the AI by itself once the AI answers again, unless you answer, edit or approve this card first."
+                    if retries
+                    else ""
+                ),
+                "AI ทำการจับคู่ไม่สำเร็จ การจับคู่ที่เห็นมาจากกฎตายตัวของระบบ ตรวจกับไฟล์ก่อนอนุมัติ"
+                + (
+                    " เมื่อ AI กลับมาใช้งานได้ ระบบจะส่งไฟล์นี้กลับไปให้ AI อ่านใหม่เอง ถ้าคุณตอบ แก้ หรืออนุมัติการ์ดนี้ก่อน ระบบจะใช้สิ่งที่คุณทำและไม่ส่งซ้ำ"
+                    if retries
+                    else ""
+                ),
             )
         elif "first time" in reason:
             pair = (

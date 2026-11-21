@@ -230,3 +230,56 @@ def test_transport_failure_does_not_enter_truncation_repair(monkeypatch):
     with pytest.raises(LLMError, match="Authentication"):
         client.structured(system="s", user="u", schema={})
     assert len(calls) == 1
+
+
+@pytest.mark.parametrize("effort", [None, "low"])
+def test_reasoning_effort_is_sent_only_when_set_and_reasoning_tokens_are_recorded(
+    monkeypatch: pytest.MonkeyPatch, effort: str | None
+) -> None:
+    from tests.test_chat_images import _Http
+
+    from forma.ai import llm
+    from forma.core.settings import get_settings
+
+    if effort:
+        monkeypatch.setenv("FORMA_LLM_REASONING_EFFORT", effort)
+    else:
+        monkeypatch.delenv("FORMA_LLM_REASONING_EFFORT", raising=False)
+    get_settings.cache_clear()
+    reply = {
+        "choices": [{"message": {"content": "{}"}}],
+        "usage": {
+            "prompt_tokens": 900,
+            "completion_tokens": 600,
+            "completion_tokens_details": {"reasoning_tokens": 450},
+        },
+    }
+    monkeypatch.setattr(llm.httpx, "AsyncClient", lambda **kw: _Http(reply))
+    try:
+        _, usage = OpenAICompatibleProvider("k").complete_json(
+            system="s", user="u", schema={}, model="deepseek-flash", temperature=0.0
+        )
+    finally:
+        get_settings.cache_clear()
+    assert _Http.sent.get("reasoning_effort") == effort
+    assert usage.output_tokens == 600 and usage.reasoning_tokens == 450
+    assert usage.to_dict()["reasoning_tokens"] == 450
+    assert "reasoning_tokens" not in Usage(1, 2, 1, 1.0, "m").to_dict()  # nothing reported: nothing written
+
+
+def test_the_attempt_ledger_reads_rows_written_before_reasoning_tokens(tmp_path: Any) -> None:
+    from forma.ai.workflow_store import workflow_storage
+
+    settings = Settings(database_url="sqlite://", data_dir=tmp_path, mapping_workflow="graph")
+    with workflow_storage(settings, "old-rows") as (_, ledger):
+        ledger.conn.execute(
+            "INSERT INTO forma_mapping_calls (thread_id, attempt, usage_json) VALUES (?, ?, ?)",
+            (
+                "old-rows",
+                1,
+                json.dumps(
+                    {"model": "m", "calls": 1, "input_tokens": 5, "output_tokens": 7, "latency_ms": 1.0}
+                ),
+            ),
+        )
+        assert ledger.usage().output_tokens == 7 and ledger.usage().reasoning_tokens == 0

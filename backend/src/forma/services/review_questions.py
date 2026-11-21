@@ -727,9 +727,15 @@ def apply_answers(
     remember: list[str] | None = None,
     acknowledged: list[str] | None = None,
 ) -> MappingVersion:
+    from forma.services import ai_retry
+
+    # before waiting for the lock: the AI reading this file again holds it for minutes (ADR-077)
+    ai_retry.refuse_while_running(session, m.round_id)
     # Serialize edits per round on Postgres, then re-read status after acquiring the lock.
     session.scalar(select(ImportRound).where(ImportRound.id == m.round_id).with_for_update())
     session.refresh(m)
+    if m.status == "superseded":
+        raise Conflict("A newer proposal replaced this card. Reload to answer the current one.")
     document, remaining, expected = answer_document(
         ctx, m, answers, actor, remember=remember, acknowledged=acknowledged
     )

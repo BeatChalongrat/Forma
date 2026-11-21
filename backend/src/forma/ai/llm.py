@@ -63,6 +63,8 @@ class Usage:
     calls: int = 0
     latency_ms: float = 0.0
     model: str = ""
+    # the part of output_tokens a thinking model spent reasoning, when the provider reports it (ADR-077)
+    reasoning_tokens: int = 0
 
     @property
     def cost_usd(self) -> float:
@@ -75,9 +77,10 @@ class Usage:
         self.calls += other.calls
         self.latency_ms += other.latency_ms
         self.model = self.model or other.model
+        self.reasoning_tokens += other.reasoning_tokens
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        out: dict[str, Any] = {
             "model": self.model,
             "calls": self.calls,
             "input_tokens": self.input_tokens,
@@ -85,6 +88,9 @@ class Usage:
             "latency_ms": round(self.latency_ms, 1),
             "cost_usd": self.cost_usd,
         }
+        if self.reasoning_tokens:
+            out["reasoning_tokens"] = self.reasoning_tokens
+        return out
 
 
 @dataclass
@@ -228,7 +234,7 @@ class OpenAICompatibleProvider:
         headers = {"Content-Type": "application/json"}
         if self.api_key:
             headers["Authorization"] = f"Bearer {self.api_key}"
-        body = {
+        body: dict[str, Any] = {
             "model": model,
             "max_tokens": get_settings().llm_max_output_tokens,
             "temperature": temperature,
@@ -238,6 +244,9 @@ class OpenAICompatibleProvider:
                 {"role": "user", "content": _openai_content(user, images)},
             ],
         }
+        effort = get_settings().llm_reasoning_effort
+        if effort:  # unset: the provider's own default (DeepSeek thinks at "high" by default)
+            body["reasoning_effort"] = effort
         t0 = time.perf_counter()
         data = _post_json(f"{self.base_url}/chat/completions", headers, body, self.timeout)
         choices = data.get("choices")
@@ -260,6 +269,9 @@ class OpenAICompatibleProvider:
             (time.perf_counter() - t0) * 1000,
             model,
         )
+        details = u.get("completion_tokens_details")
+        if isinstance(details, dict) and isinstance(details.get("reasoning_tokens"), int):
+            usage.reasoning_tokens = max(0, details["reasoning_tokens"])
         return text, usage
 
 

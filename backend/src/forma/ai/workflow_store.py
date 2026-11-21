@@ -65,7 +65,8 @@ class AttemptLedger:
             f"SELECT usage_json FROM forma_mapping_calls WHERE thread_id = {mark}", (self.thread_id,)
         ).fetchall():
             value = json.loads(row["usage_json"] if isinstance(row, dict) else row[0])
-            total.add(Usage(**{k: value[k] for k in Usage.__dataclass_fields__}))
+            # rows written before a field existed (reasoning_tokens) keep its default
+            total.add(Usage(**{k: value[k] for k in Usage.__dataclass_fields__ if k in value}))
         return total
 
     def used(self) -> int:

@@ -719,7 +719,10 @@ def edit_mapping(
     ctx: ServiceContext = Depends(ctx_dep),
     p: Principal = Depends(require_role("reviewer")),
 ) -> dict[str, Any]:
-    _mapping_scoped(session, p, mapping_id)
+    from forma.services import ai_retry
+
+    m = _mapping_scoped(session, p, mapping_id)
+    ai_retry.refuse_while_running(session, m.round_id)
     return ser.mapping_version(ms.save_mapping_edit(ctx, session, mapping_id, body.document, p.actor))
 
 

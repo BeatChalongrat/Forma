@@ -211,6 +211,32 @@ def run_pipeline(ctx: ServiceContext, payload: dict[str, Any], prog: JobProgress
     return out
 
 
+@handler("retry_ai_mapping")
+def retry_ai_mapping(ctx: ServiceContext, payload: dict[str, Any], prog: JobProgress) -> dict[str, Any]:
+    """A round that got FORMA's own draft while the AI was down, sent back to the AI (ADR-077)."""
+    from forma.jobs import runner
+    from forma.services import ai_retry
+
+    if prog.done("retry"):
+        return dict(prog.stages["retry"]["result"])
+    prog.update(10, "sending the file back to the AI")
+    try:
+        with (
+            span("stage.ai_retry", round_id=payload["round_id"]),
+            task_budget(ctx.settings.llm_task_budget_s, _ai_progress(ctx, prog, 15)),
+            session_scope() as s,
+        ):
+            result = ai_retry.run(ctx, s, payload, prog.job_id)
+            prog.mark_in(s, "retry", result=result)
+    except ai_retry.Overtaken as e:
+        with session_scope() as s:
+            result = ai_retry.release(s, payload["round_id"], prog.job_id, str(e))
+            prog.mark_in(s, "retry", result=result)
+    if result.get("follow_up_job"):
+        runner.deliver_jobs([result["follow_up_job"]])
+    return result
+
+
 @handler("process_batch_item")
 def process_batch_item(ctx: ServiceContext, payload: dict[str, Any], prog: JobProgress) -> dict[str, Any]:
     """One file of a bulk upload (ADR-027): identify its customer by format, make it a round, run the

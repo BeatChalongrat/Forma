@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -67,6 +67,11 @@ class Settings(BaseSettings):
     llm_max_output_tokens: int = Field(
         default=16000, ge=256, description="Maximum output tokens per structured provider response."
     )
+    llm_reasoning_effort: Literal["none", "low", "high", "max"] | None = Field(
+        default=None,
+        description="reasoning_effort sent to an OpenAI-compatible provider. Unset keeps the provider's "
+        "default (DeepSeek: thinking at high). Lower is faster; measure quality before changing (ADR-077).",
+    )
     llm_max_retries: int = Field(default=2, description="Structured-output retries on invalid JSON.")
     llm_transport_retries: int = Field(default=3, description="Attempts per provider call on timeouts/5xx.")
     llm_backoff_s: float = Field(default=1.0, description="Base backoff between transport retries (doubles).")
@@ -75,6 +80,35 @@ class Settings(BaseSettings):
     )
     llm_breaker_reset_s: float = Field(
         default=120.0, description="Seconds the circuit stays open before a probe."
+    )
+    ai_retry_enabled: bool = Field(
+        default=True,
+        description="Send a round that got FORMA's own draft because the AI failed back to the AI once it "
+        "answers again, while nobody has acted on its card (ADR-077).",
+    )
+    ai_retry_max_attempts: int = Field(
+        default=3,
+        ge=0,
+        description="Automatic AI retries per round after an outage; an answer FORMA rejected gets one.",
+    )
+    ai_retry_after_s: float = Field(
+        default=300.0,
+        gt=0,
+        description="Wait after a fallback before its first automatic AI retry; each next waits 3x longer.",
+    )
+    ai_retry_interval_s: float = Field(
+        default=60.0,
+        gt=0,
+        description="Seconds between checks for rounds to send back to the AI. A check that finds one "
+        "asks the provider once (a few tokens) before sending anything.",
+    )
+    ai_retry_window_h: float = Field(
+        default=72.0, gt=0, description="Only fallbacks younger than this are retried automatically."
+    )
+    ai_retry_parallel: int = Field(
+        default=2,
+        ge=1,
+        description="Automatic AI retries running at once. They start only when no new upload waits.",
     )
     llm_rate_limit_per_min: int = Field(
         default=30, description="Max LLM-calling API requests per actor per minute."

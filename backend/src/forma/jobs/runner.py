@@ -369,6 +369,12 @@ def _recovery_loop() -> None:
             dispatch_pending()
         except Exception:
             log.exception("job recovery temporarily unavailable; will retry")
+        try:  # files that got FORMA's own draft while the AI was down go back to it (ADR-077)
+            from forma.services import ai_retry
+
+            ai_retry.maybe_sweep(get_context())
+        except Exception:
+            log.exception("ai retry sweep failed; will retry")
 
 
 def _start_recovery_scheduler() -> None:

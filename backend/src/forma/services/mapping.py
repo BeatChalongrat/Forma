@@ -1600,6 +1600,9 @@ def approve_mapping(
         )
     if blocked and not (comment or "").strip():
         raise ValidationFailed("overriding a policy block needs a comment explaining why")
+    from forma.services import ai_retry
+
+    ai_retry.refuse_while_running(session, m.round_id)  # the AI is reading this file again (ADR-077)
     m.status = "approved"
     m.approved_by = actor
     m.approved_at = dt.datetime.now(dt.UTC)
@@ -1641,6 +1644,11 @@ def reject_mapping(
     session: Session, mapping_id: str, actor: str, comment: str | None = None
 ) -> MappingVersion:
     m = get_mapping(session, mapping_id)
+    from forma.services import ai_retry
+
+    ai_retry.refuse_while_running(session, m.round_id)
+    if m.status == "superseded":
+        raise Conflict("A newer proposal replaced this one; reject the current proposal instead")
     m.status = "rejected"
     m.comment = comment
     for t in session.scalars(
