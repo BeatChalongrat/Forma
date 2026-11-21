@@ -433,6 +433,11 @@ class FileWorkbench:
                 candidates = exact
         return candidates[0][0] if len(candidates) == 1 else None
 
+    def profile_columns(self, spec: Any) -> list[dict[str, Any]] | None:
+        """The profiled columns of the table a DSL source reads, or None when it cannot be told."""
+        ti = self._table_index(spec)
+        return None if ti is None else [c.to_dict() for c in self.profile.tables[ti].columns]
+
     def ground(self, doc: MappingDocument) -> list[dict[str, Any]]:
         """Look at the file before mapping: bounded distinct-value evidence for each column
         a low-confidence draft field reads, and of the unused columns of the same table that could hold that

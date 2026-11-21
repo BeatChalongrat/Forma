@@ -75,6 +75,42 @@ def test_expired_owner_cannot_commit_business_output_or_progress(broker):
         assert s.get(Job, jid).result is None
 
 
+def test_sqlite_owner_keeps_its_output_when_the_lease_ran_out_under_its_own_write_lock(broker):
+    """A model thinks for minutes while the mapping transaction holds SQLite's one write lock: the heartbeat
+    cannot renew, and nobody else can take the job. The row still carries this worker's token at commit."""
+    jid = job()
+    _, _, token = runner._claim(jid)
+    expired(jid)  # no renewal got through, and no recovery ran: taking the job is a write too
+    scope = current.set(Execution(jid, token, time.monotonic() + 60))
+    try:
+        with session_scope() as s:
+            s.add(AuditLog(action="finished-mapping", entity="test", entity_id=jid))
+    finally:
+        current.reset(scope)
+    with session_scope() as s:
+        assert s.scalar(select(func.count()).select_from(AuditLog)) == 1
+        j = s.get(Job, jid)
+        assert j.status == "running" and j.lease_token == token
+        assert runner._aware(j.lease_expires_at) > dt.datetime.now(dt.UTC)  # renewed with the output
+    assert runner.recover_stale() == []
+
+
+def test_a_database_with_row_locks_keeps_the_strict_lease_rule():
+    """There the heartbeat is never blocked by the business transaction: an expired lease is a dead one."""
+    from types import SimpleNamespace
+
+    from forma.jobs.execution import _renew_as_only_writer
+
+    class Postgres:
+        def get_bind(self):
+            return SimpleNamespace(dialect=SimpleNamespace(name="postgresql"))
+
+        def execute(self, statement):
+            raise AssertionError("must not renew")
+
+    assert _renew_as_only_writer(Postgres(), Execution("job", "token", time.monotonic() + 60)) is False
+
+
 def test_duplicate_delivery_does_not_expire_the_actual_owner(broker):
     jid = job()
     assert runner._claim(jid, 0, "owner")

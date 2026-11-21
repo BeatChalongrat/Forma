@@ -4,8 +4,46 @@ from __future__ import annotations
 
 from typing import Any
 
-from forma.mapping_dsl.models import CallExpr, Expr, MappingDocument
+from forma.mapping_dsl.models import CallExpr, ConstExpr, Expr, MappingDocument
 from forma.schema_registry import TargetSchema
+
+
+def pending_answers(doc: MappingDocument, clarifications: Any) -> set[str]:
+    """Fields a mapping leaves empty for a person: a constant with no value and a question that fills it
+    (ADR-073). A null constant nobody asks about is a null, not a pending answer."""
+    asked = {
+        q.get("target")
+        for q in (clarifications if isinstance(clarifications, list) else [])
+        if isinstance(q, dict) and q.get("action", "constant") == "constant"
+    }
+    return {
+        fm.target
+        for fm in [*doc.fields, *(f for c in doc.collections for f in c.fields)]
+        if isinstance(fm.expr, ConstExpr) and fm.expr.value is None and fm.target in asked
+    }
+
+
+def answered_for_trial(doc: MappingDocument, schema: TargetSchema, pending: set[str]) -> MappingDocument:
+    """The same mapping with every pending answer filled by some value of the field's type. Never stored:
+    it tells an error caused by the missing answer from one that would remain once a person answers, so a
+    model is not sent round again to "fix" a question it was right to ask (ADR-076)."""
+    trial = doc.model_copy(deep=True)
+    for fm in [*trial.fields, *(f for c in trial.collections for f in c.fields)]:
+        if fm.target not in pending or not schema.has_field(fm.target):
+            continue
+        spec = schema.field(fm.target)
+        kinds = set(spec.json_type)
+        fm.expr = ConstExpr(
+            value=spec.enum[0]
+            if spec.enum
+            else True
+            if "boolean" in kinds
+            else 1
+            if kinds & {"integer", "number"}
+            else "?"
+        )
+    return trial
+
 
 QUESTION_SCHEMA = {
     "type": "array",

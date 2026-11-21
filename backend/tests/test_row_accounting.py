@@ -17,6 +17,7 @@ from forma.mapping_dsl.models import TableSpec, call, col, const
 from forma.profiling.profile import profile_workbook
 from forma.profiling.tables import AUDIT_ROW, extract_table
 from forma.schema_registry import SchemaRegistry, TargetSchema
+from forma.services.mapping import release_row_bounds
 from forma.services.review_explanations import explain
 
 CONTRACT = {
@@ -147,6 +148,72 @@ def test_a_note_or_a_total_after_the_blank_stop_is_not_data() -> None:
     assert audit["after_blank_stop"]["data_like"] == 0 and source_findings("items", audit) == []
 
 
+def test_rows_past_the_last_row_a_mapping_fixed_are_reported() -> None:
+    rows = [
+        ["SKU", "Name", "Qty"],
+        ["A", "tea", "1"],
+        ["B", "milk", "2"],
+        ["C", "rice", "3"],
+        ["D", "oil", "4"],
+    ]
+    frame, audit = _audit(rows, data_end=3)  # written when the file had two products
+    assert frame.height == 2
+    assert audit["after_data_end"] == {"rows": 2, "data_like": 2, "first_sheet_row": 4}
+    (finding,) = source_findings("items", audit)
+    assert "2 rows that look like data follow the last row this mapping reads" in finding["message"]
+    assert finding["details"]["check"] == "rows_after_data_end"
+    assert audit["grid_rows"] - sum(audit["dropped"].values()) == audit["table_rows"]
+
+
+def test_a_total_or_a_note_past_the_fixed_last_row_is_not_data() -> None:
+    rows = [["SKU", "Name", "Qty"], ["A", "tea", "1"], ["B", "milk", "2"], ["Total", None, "3"], ["Printed"]]
+    _, audit = _audit(rows, data_end=3)
+    assert audit["after_data_end"]["data_like"] == 0 and source_findings("items", audit) == []
+
+
+def test_the_end_of_a_table_found_in_this_file_is_not_a_fixed_limit() -> None:
+    rows = [["SKU", "Name", "Qty"], ["A", "tea", "1"], ["B", "milk", "2"], ["C", "rice", "3"]]
+    audit: dict[str, Any] = {}
+    extract_table(_grid(rows), TableSpec(header_row=0, data_end=3), audit=audit, detected=True)
+    assert "after_data_end" not in audit
+    _, free = _audit(rows)
+    assert "after_data_end" not in free
+
+
+def test_a_row_limit_that_changes_nothing_is_released_and_one_that_cuts_stays(tmp_path: Path) -> None:
+    schema = SchemaRegistry(tmp_path / "schemas").prepare(CONTRACT)
+    path = tmp_path / "items.csv"
+    path.write_text(f"{HEADER}\n001,tea,10\n002,milk,20\n003,rice,30\n", encoding="utf-8")
+    mapping = propose_mapping(profile_workbook(path), schema).mapping
+    bindings = {s.id: BoundSource(path) for s in mapping.sources}
+    (source,) = mapping.sources
+    source.table = source.table.model_copy(update={"header_row": 0, "data_start": 1, "data_end": 4})
+    assert release_row_bounds(mapping, bindings) == [f"{source.id}.data_end", f"{source.id}.data_start"]
+    assert source.table.data_end is None and source.table.data_start is None
+
+    # next month's longer file is read whole
+    path.write_text(f"{HEADER}\n001,tea,10\n002,milk,20\n003,rice,30\n004,oil,40\n", encoding="utf-8")
+    assert len(TransformEngine(schema).run(mapping, bindings).records) == 4
+
+    source.table = source.table.model_copy(update={"data_end": 3})  # cuts two rows: a decision, kept
+    assert release_row_bounds(mapping, bindings) == []
+    held = TransformEngine(schema).run(mapping, bindings)
+    assert len(held.records) == 2
+    (notice,) = [f for f in held.findings if f.kind == "source_review"]
+    assert notice.details["check"] == "rows_after_data_end" and notice.details["data_like"] == 2
+    decision = PolicyEngine().evaluate(
+        mapping=mapping,
+        schema=schema,
+        findings=[f.to_dict() for f in held.findings],
+        rows_out=len(held.records),
+        drift="identical",
+        has_previous_approval=True,
+        reused_approved=True,
+    )
+    assert decision.decision == "review" and decision.checks["source_review_required"] is True
+    assert verification(held, schema, complete=True)["row_accounting"]["data_like_rows_not_read"] == 2
+
+
 def test_engine_ledger_names_the_fate_of_every_root_row(tmp_path: Path) -> None:
     schema, result = _run(tmp_path, "001,tea,10\n001,tea,10\n002,milk,20\n,ghost,5\nTotal,,35\n")
     root = result.stats["accounting"]["root"]
@@ -214,7 +281,9 @@ def test_new_reasons_are_explained_in_thai() -> None:
     reasons = [
         "items: total on sheet row 4 says Qty = 40 but the rows read add up to 15; rows may be missing",
         "items: 2 rows that look like data follow a blank gap (from sheet row 9) and were not read; confirm",
+        "items: 6 rows that look like data follow the last row this mapping reads (from sheet row 11) and",
     ]
-    first, second = explain(None, reasons, None)  # type: ignore[arg-type]
+    first, second, third = explain(None, reasons, None)  # type: ignore[arg-type]
     assert "แถวรวมที่แถว 4" in first["th"] and "40" in first["th"] and "15" in first["th"]
     assert "2 แถว" in second["th"] and "แถว 9" in second["th"]
+    assert "6 แถว" in third["th"] and "แถว 11" in third["th"] and "แถวสุดท้าย" in third["th"]

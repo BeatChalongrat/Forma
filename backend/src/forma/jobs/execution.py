@@ -63,15 +63,35 @@ def guard_commit(session: Session) -> None:
     expiry = row[2] if row else None
     if expiry is not None and expiry.tzinfo is None:
         expiry = expiry.replace(tzinfo=dt.UTC)
-    if (
-        not row
-        or row[0] != "running"
-        or row[1] != execution.token
-        or not expiry
-        or expiry <= dt.datetime.now(dt.UTC)
-    ):
+    owned = row is not None and row[0] == "running" and row[1] == execution.token
+    if owned and (not expiry or expiry <= dt.datetime.now(dt.UTC)):
+        owned = _renew_as_only_writer(session, execution)
+    if not owned:
         execution.stopped.set()
         raise JobStopped("Worker lease lost; discarded uncommitted output")
+
+
+def _renew_as_only_writer(session: Session, execution: Execution) -> bool:
+    """SQLite has one write lock for the whole file. A transaction that has written holds it until it
+    commits, so for as long as a model thinks the heartbeat cannot renew the lease, and no other worker can
+    take the job either: taking it is a write. The lease then runs out with nobody else able to own the
+    job, and the finished mapping used to be thrown away. This update takes or already holds that lock; if
+    the row still carries this worker's token nobody took the job, and the lease is renewed in the same
+    transaction as the output. A database with row locks (Postgres) keeps the strict rule: there the
+    heartbeat is never blocked by the business transaction, so an expired lease means a dead heartbeat."""
+    from sqlalchemy import update
+
+    from forma.core.settings import get_settings
+
+    if session.get_bind().dialect.name != "sqlite":
+        return False
+    now = dt.datetime.now(dt.UTC)
+    renewed = session.execute(
+        update(Job)
+        .where(Job.id == execution.job_id, Job.status == "running", Job.lease_token == execution.token)
+        .values(heartbeat_at=now, lease_expires_at=now + dt.timedelta(seconds=get_settings().job_lease_s))
+    )
+    return getattr(renewed, "rowcount", 0) == 1
 
 
 def interruptible_sleep(seconds: float) -> None:

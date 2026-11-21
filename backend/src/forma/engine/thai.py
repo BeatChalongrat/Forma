@@ -249,8 +249,19 @@ def _safe_date(y: int, m: int, d: int) -> dt.date | None:
         return None
 
 
+def is_open_ended_date(value: object) -> bool:
+    """SAP's 31.12.9999 and its kind: written as a date, read as "no end date" (null). It is still a date
+    to whoever profiles the column, and its 31 settles whether the file writes the day first."""
+    m = _DATE_SEP_RE.match(str(value).strip().translate(THAI_DIGITS))
+    if m is None:
+        return False
+    a, b, c = int(m.group(1)), int(m.group(2)), int(m.group(3))
+    year, parts = (a, (b, c)) if a > 31 else (c, (a, b))
+    return year >= OPEN_ENDED_YEAR and min(parts) >= 1 and min(parts) <= 12 and max(parts) <= 31
+
+
 def looks_like_thai_date(s: str) -> bool:
-    return parse_date_th_py(s) is not None and not _NUM_RE.match(s.strip())
+    return (parse_date_th_py(s) is not None or is_open_ended_date(s)) and not _NUM_RE.match(s.strip())
 
 
 # --------------------------------------------------------------------------------------------

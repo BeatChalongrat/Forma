@@ -515,7 +515,9 @@ def test_an_open_vat_assumption_always_has_a_control_to_answer_it(
 ) -> None:
     """The heuristic asks "assumed VAT-inclusive — confirm". A model's confidence no longer retires it (ADR-060),
     so the card must still offer the yes/no control, however sure the model was; otherwise the question can
-    never be answered and the round never leaves review."""
+    never be answered and the round never leaves review. Since ADR-076 the model's ``true`` is also taken
+    back when nothing in the file, the requirements or remembered decisions states it: the flag is empty and
+    the sentence says that nothing is assumed."""
     doc, draft_questions = _heuristic_doc(client, isolated_env, "VATQ1", _no_vat_marker)
     assert any("VAT" in q and "confirm" in q for q in draft_questions), draft_questions
     for f in doc["fields"] + [f for coll in doc["collections"] for f in coll["fields"]]:
@@ -526,8 +528,10 @@ def test_an_open_vat_assumption_always_has_a_control_to_answer_it(
     answer = {"mapping": doc, "confidence": 0.95, "open_questions": [], "changes_from_draft": []}
     r = _ai_round(client, isolated_env, "VATQ1", [answer, answer, answer], _no_vat_marker)
     m = _mapping(client, r)
-    open_vat = [q for q in m["open_questions"] if "VAT" in q and "confirm" in q]
-    assert open_vat, m["open_questions"]  # the heuristic's assumption is still open
+    open_vat = [q for q in m["open_questions"] if "no VAT marker" in q]
+    assert len(open_vat) == 1, m["open_questions"]  # the question is still open, once
+    assert "nothing is assumed" in open_vat[0] and "assumed VAT-inclusive" not in open_vat[0]
+    assert _field(m["document"], "/vat_included")["expr"] == {"op": "const"}  # no value: a person's to give
     qs = client.get(f"/api/mappings/{m['id']}/questions").json()["questions"]
     controls = [q for q in qs if q["field"]["semantic"] == "price.vat_included" and q["kind"] == "boolean"]
     assert controls, [q["id"] for q in qs]  # a person can answer it on the card
@@ -535,7 +539,7 @@ def test_an_open_vat_assumption_always_has_a_control_to_answer_it(
         f"/api/mappings/{m['id']}/answers/preview", json={"answers": {controls[0]["id"]: True}}
     )
     assert preview.status_code == 200 and not [
-        q for q in preview.json()["remaining_questions"] if "VAT" in q and "confirm" in q
+        q for q in preview.json()["remaining_questions"] if "no VAT marker" in q
     ]
 
 

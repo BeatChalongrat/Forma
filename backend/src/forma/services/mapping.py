@@ -9,6 +9,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+import polars as pl
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -314,6 +315,8 @@ def propose_for_round(
     confidence_basis: dict[str, Any] | None = None
     open_questions: list[str] = []
     llm_fallback = False
+    ai_review_failed = False
+    reading_questions: list[dict[str, Any]] = []
     learning_note: dict[str, Any] | None = None
     example_dependencies: set[str] = set()
     prior_decisions: list[dict[str, Any]] = []
@@ -503,19 +506,77 @@ def propose_for_round(
                     source_kind = "ai"
                 _record_llm(session, r.id, res)
                 agent_log.append(res.to_dict())
+                model_made = not any(n.startswith("llm_failed") for n in res.notes)
+                bound_now = bind_sources(doc, r.files, resolve=ctx.storage.local_path)[0]
+                released = release_row_bounds(
+                    doc,
+                    bound_now,
+                    matcher=(
+                        draft.mapping,
+                        bind_sources(draft.mapping, r.files, resolve=ctx.storage.local_path)[0],
+                    )
+                    if model_made and draft is not None
+                    else None,
+                )
+                if released:
+                    agent_log.append({"agent": "row_bounds", "released": released})
+                reopened = (
+                    leave_unproven_vat_open(
+                        doc,
+                        schema,
+                        draft,
+                        bound_now,
+                        notes=r.notes,
+                        decided={d["target"] for d in prior_decisions},
+                    )
+                    if model_made and previous is None and draft is not None
+                    else []
+                )
+                if reopened:
+                    agent_log.append(
+                        {
+                            "agent": "vat_evidence",
+                            "reopened": reopened,
+                            "basis": "no VAT marker in the sources, the requirements or remembered decisions",
+                        }
+                    )
                 if not any(n.startswith("llm_failed") for n in res.notes):
                     # two readers of the same file: where FORMA's matcher and the model agree is a free
                     # consistency signal, where they differ is the natural choice question (ADR-059)
                     agreement = _agreement(draft.mapping, doc, r.files)
+                    reading_questions = compare_readings(
+                        draft.mapping, doc, schema, agreement, workbench.profile_columns
+                    )
                     agent_log.append({"agent": "agreement", **{k: len(v) for k, v in agreement.items()}})
+                    if reading_questions:
+                        agent_log.append(
+                            {
+                                "agent": "value_comparison",
+                                "questions": [(q["target"], q["source_value"]) for q in reading_questions],
+                            }
+                        )
                 open_questions = _without_settled(open_questions, doc, schema)
                 open_questions.extend(
                     res.data.get("open_questions", []) if isinstance(res.data, dict) else []
                 )
                 open_questions.extend(q["question"] for q in res.data.get("clarifications", []))
+                if model_made:
+                    open_questions, merged = one_question_per_decision(
+                        open_questions, doc, schema, res.data.get("clarifications", [])
+                    )
+                    if merged:
+                        agent_log.append(
+                            {
+                                "agent": "question_reconciliation",
+                                "merged": merged,
+                                "basis": "a structured question on the card asks about the same field",
+                            }
+                        )
                 if any(n.startswith("llm_failed") for n in res.notes):
                     llm_fallback = True
                     source_kind = "heuristic"
+                # the model's mapping is in use; only its own review step did not finish
+                ai_review_failed = any(n.startswith("review_failed") for n in res.notes)
             except LLMError as e:
                 agent_log.append({"agent": "llm", "error": str(e)[:500], "fallback": "heuristic"})
                 llm_fallback = True
@@ -695,6 +756,8 @@ def propose_for_round(
     review_decisions.extend(
         unit_questions(doc, schema, _table_columns(MappingVersion(round_id=r.id), doc, session))
     )
+    mapped_now = {f.target for f in [*doc.fields, *(f for c in doc.collections for f in c.fields)]}
+    review_decisions.extend(q for q in reading_questions if q["target"] in mapped_now)
     from forma.ai.source_evidence import currency_memory_receipts, currency_questions
 
     currency_columns = _table_columns(MappingVersion(round_id=r.id), doc, session)
@@ -714,6 +777,7 @@ def propose_for_round(
         reused_approved=(source_kind == "memory"),
         row_change_ratio=row_change_ratio,
         llm_fallback=llm_fallback,
+        ai_review_failed=ai_review_failed,
         sandbox=sandbox_report,
         field_checks=review["checks"] if review else None,
         open_questions=open_questions,
@@ -872,6 +936,312 @@ def _col_names(expr: Any) -> list[str]:
         for v in expr:
             out.extend(_col_names(v))
     return out
+
+
+def release_row_bounds(
+    doc: MappingDocument,
+    bindings: dict[str, BoundSource],
+    *,
+    matcher: tuple[MappingDocument, dict[str, BoundSource]] | None = None,
+) -> list[str]:
+    """Drop the first/last data row a model wrote down when it changes nothing in this file (ADR-076).
+
+    A model reads a table of six products and writes ``data_end=10``. The mapping is then reused on next
+    month's twelve products and reads six. A row limit is kept only when it does something here: the table
+    is read with and without it, and a limit that leaves every cell the same is removed, so the table ends
+    where its rows end. One that does cut rows stays, and the engine reports data-like rows past it.
+
+    Columns are not released: a note typed beside the table next month must stay outside it. But a model
+    and the matcher can spell one range two ways (SAP's "Text with Tabs" starts every line with a tab, and
+    the model starts the table at column 1 where the matcher says 0 and drops the empty column). With
+    ``matcher`` given, a column range that reads the same cells as the matcher's for the same sheet takes
+    the matcher's spelling, so the two readings are compared by what they read."""
+    from forma.engine.transform import resolve_sheet
+    from forma.ingestion.readers import read_raw, vertical_merges
+    from forma.profiling.tables import extract_table
+
+    released: list[str] = []
+    for spec in doc.sources:
+        table = spec.table
+        bound = bindings.get(spec.id)
+        if bound is None:
+            continue
+        try:
+            sheet = resolve_sheet(spec, bound)
+            twin = None
+            if matcher is not None:
+                twin = next(
+                    (
+                        other.table
+                        for other in matcher[0].sources
+                        if (there := matcher[1].get(other.id)) is not None
+                        and there.path == bound.path
+                        and resolve_sheet(other, there) == sheet
+                    ),
+                    None,
+                )
+            columns = (
+                None if twin is None else {"first_column": twin.first_column, "last_column": twin.last_column}
+            )
+            if columns == {"first_column": table.first_column, "last_column": table.last_column}:
+                columns = None
+            if table.data_end is None and table.data_start is None and columns is None:
+                continue
+            raw = read_raw(
+                bound.path,
+                sheet,
+                csv_encoding=spec.csv.encoding,
+                csv_delimiter=spec.csv.delimiter,
+                csv_quote_char=spec.csv.quote_char,
+            )
+            merges = vertical_merges(bound.path, sheet) if table.fill_merged else None
+            changes: list[tuple[str, dict[str, Any]]] = [
+                (name, {name: None})
+                for name in ("data_end", "data_start")
+                if getattr(table, name) is not None
+            ]
+            if columns is not None:
+                changes.append(("columns", columns))
+            for name, update in changes:
+                other = table.model_copy(update=update)
+                if extract_table(raw, other, merges=merges).equals(extract_table(raw, table, merges=merges)):
+                    table = other
+                    released.append(f"{spec.id}.{name}")
+        except Exception:  # an unreadable source is the engine's finding to make, not this step's
+            continue
+        spec.table = table
+    return released
+
+
+_VAT_WORD_RE = r"(?i)vat|\btax|ภาษี|มูลค่าเพิ่ม"
+
+
+def leave_unproven_vat_open(
+    doc: MappingDocument,
+    schema: TargetSchema,
+    draft: HeuristicProposal,
+    bindings: dict[str, BoundSource],
+    *,
+    notes: str | None,
+    decided: set[str],
+) -> list[str]:
+    """Take back a VAT flag a model wrote when nothing could have told it (ADR-060, ADR-073, ADR-076).
+
+    The model is told to leave the flag empty and ask. On one SAP export it did so four times and wrote
+    ``true`` twice. A constant is reopened only when every source of an answer is ruled out: the matcher
+    found no VAT marker in the headers and no rule a person taught, the operator's requirements do not
+    mention VAT, no remembered decision covers the field, and no cell of the sources says VAT or tax.
+    The records then fail the contract until a person answers, the same way for every file of the kind."""
+    from forma.ai.heuristics import VAT_ASSUMED_QUESTION_RE
+    from forma.engine.transform import resolve_sheet
+    from forma.ingestion.readers import read_raw
+
+    flags = [
+        fm
+        for fm in [*doc.fields, *(f for c in doc.collections for f in c.fields)]
+        if schema.has_field(fm.target)
+        and schema.field(fm.target).semantic == "price.vat_included"
+        and isinstance(fm.expr, ConstExpr)
+        and isinstance(fm.expr.value, bool)
+        and fm.target not in decided
+    ]
+    if (
+        not flags
+        or not any(VAT_ASSUMED_QUESTION_RE.fullmatch(q) for q in draft.open_questions)
+        or re.search(_VAT_WORD_RE, notes or "")
+    ):
+        return []
+    for spec in doc.sources:
+        bound = bindings.get(spec.id)
+        if bound is None:
+            return []  # cannot rule the file out: leave the mapping as the model wrote it
+        try:
+            raw = read_raw(
+                bound.path,
+                resolve_sheet(spec, bound),
+                csv_encoding=spec.csv.encoding,
+                csv_delimiter=spec.csv.delimiter,
+                csv_quote_char=spec.csv.quote_char,
+            )
+        except Exception:
+            return []
+        said = pl.any_horizontal(pl.all().cast(pl.String, strict=False).str.contains(_VAT_WORD_RE))
+        if raw.width and raw.select(said.fill_null(False).any()).item():
+            return []
+    for fm in flags:
+        wrote = fm.expr.value if isinstance(fm.expr, ConstExpr) else None
+        fm.evidence = [
+            *fm.evidence,
+            f"the model wrote {str(wrote).lower()}; the file never mentions VAT and no one has "
+            "answered, so the flag is left empty for a person",
+        ]
+        fm.expr = ConstExpr()
+        fm.confidence = min(fm.confidence if fm.confidence is not None else 0.5, 0.5)
+    return [fm.target for fm in flags]
+
+
+def one_question_per_decision(
+    questions: list[str], doc: MappingDocument, schema: TargetSchema, clarifications: list[dict[str, Any]]
+) -> tuple[list[str], list[str]]:
+    """One prompt for one decision (ADR-076). Returns the questions to keep and the ones merged away.
+
+    FORMA's matcher writes its doubts as sentences; the model then asks about the same field with an answer
+    control. Two prompts for one decision make a person answer twice, and the sentence can describe a
+    mapping that is no longer the one on the card ("assumed VAT-inclusive" beside a flag left empty).
+    A matcher sentence is merged only into a structured question that reaches the card for the same
+    field, so the decision is still asked, once. One that stays is reworded when it no longer fits."""
+    from forma.ai.heuristics import (
+        VAT_ASSUMED_QUESTION_RE,
+        VAT_ASSUMED_TEXT,
+        VAT_OPEN_TEXT,
+        WAREHOUSE_QUESTION_RE,
+    )
+    from forma.ai.workbench import _col_leaves
+
+    fields = {fm.target: fm for fm in [*doc.fields, *(f for c in doc.collections for f in c.fields)]}
+    asked = {c["target"] for c in clarifications if c.get("question") in questions}
+    vat = {p for p in schema.semantic_pointers("price.vat_included") if p in fields}
+    warehouses = {p for p in schema.semantic_pointers("stock.warehouse") if p in fields and p in asked}
+
+    def empty(pointer: str) -> bool:
+        expr = fields[pointer].expr
+        return isinstance(expr, ConstExpr) and expr.value is None
+
+    kept: list[str] = []
+    merged: list[str] = []
+    for q in questions:
+        if not isinstance(q, str):
+            kept.append(q)
+        elif VAT_ASSUMED_QUESTION_RE.fullmatch(q):
+            if vat and vat <= asked:
+                merged.append(q)
+            elif vat and all(empty(p) for p in vat):
+                kept.append(q.replace(VAT_ASSUMED_TEXT, VAT_OPEN_TEXT))
+            else:
+                kept.append(q)
+        elif (hit := WAREHOUSE_QUESTION_RE.fullmatch(q)) and any(
+            hit[1] in _col_leaves(fields[p].expr) for p in warehouses
+        ):
+            merged.append(q)  # the model asks to confirm the same column as the warehouse
+        else:
+            kept.append(q)
+    return kept, merged
+
+
+def _reads(doc: MappingDocument, target: str) -> tuple[Any, str] | None:
+    """A field's mapping and the source it reads from."""
+    for fm in doc.fields:
+        if fm.target == target:
+            return fm, doc.record.root_source
+    for cm in doc.collections:
+        for fm in cm.fields:
+            if fm.target == target:
+                return fm, cm.source
+    return None
+
+
+def _outputs(expr: Any, source: str, column: str, values: list[str]) -> list[str | None] | None:
+    """What an expression writes for each of a column's values, as text. None when it cannot be run alone
+    (a lookup, a second column)."""
+    from forma.engine.ops import CompileContext, compile_expr
+
+    name = f"{source}.{column}"
+    frame = pl.DataFrame({name: values}, schema={name: pl.String})
+    try:
+        ctx = CompileContext(default_source=source, columns={name})
+        written = frame.with_columns(compile_expr(expr, ctx).cast(pl.String, strict=False).alias("__v__"))
+        if ctx.missing:
+            return None
+        return written["__v__"].to_list()
+    except Exception:
+        return None
+
+
+def compare_readings(
+    draft: MappingDocument,
+    doc: MappingDocument,
+    schema: TargetSchema,
+    agreement: dict[str, Any],
+    columns_of: Callable[[SourceSpec], list[dict[str, Any]] | None],
+) -> list[dict[str, Any]]:
+    """Compare what the matcher and the model would write, value by value, where a field is read from one
+    column through a value map or a constant (ADR-076).
+
+    Comparing which cells two readers read misses both ways. The matcher maps SAP's ``ZPR0`` to "standard";
+    a model that passes the cell through writes "ZPR0": the same cells, different output, and nobody was
+    asked. A model that writes the constant "standard" where the matcher reads that column through its map
+    writes the same thing for every row, and the card asked a person to choose a column. Every distinct
+    value of the column is run through both readings, when the profile holds them all:
+
+    * a disagreement whose outputs are equal on every value moves to ``resolved_by_evidence``;
+    * an agreement whose outputs differ on a value becomes one question about that value, with both outputs
+      as the choices. The mapping is not changed."""
+    from forma.ai.workbench import _col_leaves
+
+    sources_a = {s.id: s for s in draft.sources}
+    sources_b = {s.id: s for s in doc.sources}
+    questions: list[dict[str, Any]] = []
+    disagree = agreement.get("disagree") or {}
+    for target in [*disagree, *(agreement.get("agree") or [])]:
+        if not schema.has_field(target):
+            continue
+        spec = schema.field(target)
+        if "string" not in spec.json_type or spec.fmt or "array" in spec.json_type:
+            continue  # text only: numbers and dates are converted after the expression
+        a, b = _reads(draft, target), _reads(doc, target)
+        if a is None or b is None:
+            continue
+        (fa, src_a), (fb, src_b) = a, b
+        cols_a, cols_b = _col_leaves(fa.expr), _col_leaves(fb.expr)
+        dumped = json.dumps([fa.expr.model_dump(mode="json"), fb.expr.model_dump(mode="json")])
+        if '"map_values"' not in dumped and cols_a and cols_b:
+            continue  # two plain readings of a cell: compared by the cells they read
+        if target in disagree:
+            if bool(cols_a) == bool(cols_b) or len(cols_a or cols_b) != 1:
+                continue  # only a constant against one column can be settled by values
+        elif len(cols_a) != 1 or cols_a != cols_b:
+            continue
+        column = (cols_a or cols_b)[0]
+        reader = sources_a.get(src_a) if cols_a else sources_b.get(src_b)
+        profiled = columns_of(reader) if reader is not None else None
+        observed = next((c for c in profiled or [] if c.get("name") == column), None)
+        if observed is None:
+            continue
+        values = [str(v[0]) for v in observed.get("top_values") or [] if v]
+        if not values or int(observed.get("unique_count") or 0) > len(values):
+            continue  # the profile does not hold every value: nothing is settled or asked
+        out_a = _outputs(fa.expr, src_a, column, values)
+        out_b = _outputs(fb.expr, src_b, column, values)
+        if out_a is None or out_b is None:
+            continue
+        if target in disagree:
+            if out_a == out_b:
+                agreement.setdefault("resolved_by_evidence", {})[target] = {
+                    **disagree.pop(target),
+                    "basis": f"both readings write the same value for each of the {len(values)} values "
+                    f"of '{column}'",
+                    "scope": "this_delivery",
+                }
+            continue
+        for value, x, y in zip(values, out_a, out_b, strict=True):
+            if x == y or x is None or y is None:
+                continue
+            questions.append(
+                {
+                    "id": target + ":value:" + stable_hash(value, 12),
+                    "target": target,
+                    "action": "value_map",
+                    "kind": "text",
+                    "source_value": value,
+                    "options": [x, y],
+                    "question": f"ค่า '{value}' ในคอลัมน์ {column} ให้ส่งออกในช่อง {spec.name} ว่าอะไร: "
+                    f"ระบบอ่านเป็น '{x}' ส่วน AI ส่งออกเป็น '{y}'",
+                    "why": f"FORMA's matcher writes '{x}' for '{value}' and the model's mapping writes '{y}'",
+                    "scope": "source_value",
+                    "allow_custom": True,
+                }
+            )
+    return questions
 
 
 def _agreement(

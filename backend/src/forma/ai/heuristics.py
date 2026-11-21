@@ -83,9 +83,13 @@ HINT_BOOST: dict[str, dict[str, float]] = {
     "promo.end_date": {"thai_date": 0.2},
     "price.effective_from": {"thai_date": 0.15},
     "price.effective_to": {"thai_date": 0.15},
-    "unit.sell": {"unit_like": 0.3},
+    # SAP labels the currency of an amount "Unit": a column of THB is never the selling unit (ADR-076)
+    "unit.sell": {"unit_like": 0.3, "currency_code": -0.6},
     "stock.qty": {"price_like": -0.1},
 }
+# A column whose every value is a currency code is the currency, whatever its header says. Above
+# CURRENCY_MATCH: the file's own codes overrule the contract's default currency.
+CURRENCY_BY_VALUE = 0.9
 TYPE_COMPAT: dict[str, set[str]] = {
     "number": {"int", "float", "mixed", "string"},
     "integer": {"int", "float", "mixed", "string"},
@@ -164,11 +168,25 @@ class HeuristicProposal:
         }
 
 
+# A header that is only a connecting word names nothing. SAP's price list has a column ``per`` (the number
+# of units the amount is for); as a word inside "qty per pack" it was taken for the pack size (ADR-076).
+_CONNECTING_WORDS = frozenset(
+    {"per", "of", "to", "in", "by", "for", "at", "on", "a", "an", "the", "ต่อ", "ของ"}
+)
+# Column headings an ERP shortens to fit a list, read as the words they stand for. SAP's condition
+# lists write "CnTy" for the condition type, which the contract names as a price list (ADR-076).
+SHORT_LABELS = {"cnty": "condition type", "crcy": "currency"}
+
+
 # --------------------------------------------------------------------------------------------
 def score_header(header: str, f: FieldSpec) -> tuple[float, str | None]:
     h = norm(header)
     if not h:
         return 0.0, None
+    long = SHORT_LABELS.get(h)
+    if long is not None:
+        score, why = score_header(long, f)
+        return score, (f"header '{header}' is short for '{long}'; {why}" if why else None)
     candidates = [*f.synonyms_en, *f.synonyms_th, f.name.replace("_", " ")]
     best, why = 0.0, None
     for c in candidates:
@@ -177,6 +195,8 @@ def score_header(header: str, f: FieldSpec) -> tuple[float, str | None]:
             continue
         if h == cn:
             return 1.0, f"header '{header}' == synonym '{c}'"
+        if h in _CONNECTING_WORDS:
+            continue  # only a synonym that is that very word names such a column
         # containment both ways (short synonyms must be whole-word to avoid 'id' in 'width')
         if len(cn) >= 3 and (cn in h or h in cn):
             s = 0.85 if cn in h.split() or h in cn.split() else 0.75
@@ -201,6 +221,9 @@ def match_columns(
                 pairs.append(Match(c, f, 1.1, [f"header '{c.name}' → {f.pointer}: {taught}"]))
                 continue
             s, why = score_header(c.name, f)
+            if f.semantic == "currency" and "currency_code" in c.hints and s < CURRENCY_BY_VALUE:
+                codes = ", ".join(c.samples[:3])
+                s, why = CURRENCY_BY_VALUE, f"every value of '{c.name}' is a currency code ({codes})"
             if s < 0.55:
                 continue
             ev = [why] if why else []
@@ -565,7 +588,18 @@ def _row_dimension(root: TableProfile, key: ColumnProfile, used: set[str]) -> Co
 
 
 VAT_ASSUMED_TEXT = "no VAT marker in headers; assumed VAT-inclusive (Thai retail convention) — confirm"
-VAT_ASSUMED_QUESTION_RE = re.compile(r"(?:Price column|Pricing table) '.+': " + re.escape(VAT_ASSUMED_TEXT))
+# the same doubt once a mapping leaves the flag empty instead of assuming (ADR-076)
+VAT_OPEN_TEXT = "no VAT marker in headers; nothing is assumed — say whether the price includes VAT"
+VAT_ASSUMED_QUESTION_RE = re.compile(
+    r"(?:Price column|Pricing table) '.+': (?:"
+    + re.escape(VAT_ASSUMED_TEXT)
+    + "|"
+    + re.escape(VAT_OPEN_TEXT)
+    + ")"
+)
+WAREHOUSE_QUESTION_RE = re.compile(
+    r"Stock in '.+' is given per '(.+)': it is used as the warehouse — confirm"
+)
 
 
 def _vat_included_guess(headers: list[str]) -> tuple[bool, str]:
@@ -851,7 +885,29 @@ def propose_mapping(
             vat_inc, why = _vat_included_guess([amount.column.name])
             items: list[FieldMapping] = []
             plist, vat = item("pricing", "price.list_name"), item("pricing", "price.vat_included")
-            if plist is not None and (
+            # only a header that is a name of the price list: NetSuite's item "Type" also contains a word
+            # of "condition type", and its values are item kinds
+            listed = next(
+                (
+                    m
+                    for m in root_price
+                    if m.field.semantic == "price.list_name"
+                    and score_header(m.column.name, m.field)[0] >= 1.0
+                ),
+                None,
+            )
+            if listed is not None:
+                # the rows say which price list (SAP's condition type): read it, the contract's default
+                # stands only for a file that does not say (ADR-076)
+                items.append(
+                    FieldMapping(
+                        target=listed.field.pointer,
+                        expr=_expr_for(listed.column, listed.field, day_first=day_first),
+                        confidence=round(listed.score, 2),
+                        evidence=listed.evidence,
+                    )
+                )
+            elif plist is not None and (
                 fixed := _contract_constant(plist, "single price column, no price-list column", 0.8)
             ):
                 items.append(fixed)

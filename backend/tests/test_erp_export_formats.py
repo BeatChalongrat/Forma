@@ -204,7 +204,21 @@ def otbi_excel() -> bytes:
 
 
 def otbi_web_archive() -> bytes:
-    return sap_mhtml().replace(b"Mappe1", b"analysis")
+    """The same view saved as Web Archive: an HTML table where the item's own cells span its rows."""
+    rows = ["<tr>" + "".join(f"<th>{escape(h)}</th>" for h in OTBI_LABELS) + "</tr>"]
+    for i in range(N):
+        item = [SKU[i], NAME[i], "Ea", f"{PRICE[i]:,.2f}", "THB"]
+        for k, org in enumerate(ORGS):
+            own = "".join(f'<td rowspan="{len(ORGS)}">{escape(v)}</td>' for v in item) if k == 0 else ""
+            rows.append(f"<tr>{own}<td>{org}</td><td>{STOCK[org][i]:,.0f}</td></tr>")
+    return (
+        "MIME-Version: 1.0\r\n"
+        'Content-Type: multipart/related; boundary="----=_NextPart_OTBI"\r\n\r\n'
+        "------=_NextPart_OTBI\r\nContent-Location: file:///C:/analysis.htm\r\n"
+        'Content-Transfer-Encoding: 8bit\r\nContent-Type: text/html; charset="utf-8"\r\n\r\n'
+        "<html><body><h1>Item Price and On-Hand</h1><table>" + "".join(rows) + "</table></body></html>\r\n"
+        "------=_NextPart_OTBI--\r\n"
+    ).encode()
 
 
 def _send(c: TestClient, name: str, data: bytes) -> dict[str, Any]:
@@ -318,17 +332,22 @@ def test_text_that_is_not_one_of_those_exports_is_still_refused_with_the_reason(
     ],
     ids=["alv-xlsx", "text-with-tabs", "unconverted"],
 )
-def test_a_sap_pricing_list_is_read_and_its_currency_column_is_asked_about(
+def test_a_sap_pricing_list_is_read_with_its_currency_unit_and_condition_type(
     client: TestClient, name: str, make: Any
 ) -> None:
     out = _send(client, name, make())
     assert out["stage"] == "card" and out["decision"] == "review"
     assert _products_right(out["records"]), _products(out["records"])
-    # SAP labels the currency of the amount "Unit" and the unit of measure "UoM". FORMA takes "Unit" for
-    # the selling unit, and asks what the unit THB means: wrong, and not silent.
-    assert {r["unit"]["sell_unit"] for r in out["records"]} == {"THB"}
-    assert any("THB" in line for line in out["said"]), out["said"]
-    assert all(r["attributes"]["UoM"] == "PC" for r in out["records"])
+    # SAP labels the currency of the amount "Unit", the unit of measure "UoM" and the condition type
+    # "CnTy". FORMA once took "Unit" for the selling unit and asked what the unit THB means (ADR-076).
+    assert {r["unit"]["sell_unit"] for r in out["records"]} == {"PCS"}
+    assert {r["currency"] for r in out["records"]} == {"THB"}
+    assert {p["price_list"] for r in out["records"] for p in r["prices"]} == {"standard"}  # ZPR0
+    assert not any("THB" in line for line in out["said"]), out["said"]
+    assert "pack_size" not in out["records"][0]["unit"]  # "per" is the pricing unit
+    fields = {f["target"]: f for f in out["document"]["fields"]}
+    assert fields["/currency"]["expr"]["args"][0]["name"] == "Unit"
+    assert fields["/unit/sell_unit"]["expr"]["args"][0]["name"] == "UoM"
 
 
 def test_the_rules_of_an_unconverted_list_are_not_rows(client: TestClient) -> None:
@@ -364,8 +383,12 @@ def test_netsuite_name_is_the_item_number_and_the_card_asks(client: TestClient, 
 # ---- Oracle OTBI ---------------------------------------------------------------------------------
 @pytest.mark.parametrize(
     ("name", "make", "merged"),
-    [("analysis.csv", otbi_data_csv, False), ("analysis.xlsx", otbi_excel, True)],
-    ids=["data-csv", "excel-view"],
+    [
+        ("analysis.csv", otbi_data_csv, False),
+        ("analysis.xlsx", otbi_excel, True),
+        ("analysis.mht", otbi_web_archive, True),
+    ],
+    ids=["data-csv", "excel-view", "web-archive"],
 )
 def test_otbi_rows_per_organization_give_one_product_with_stock_in_each(
     client: TestClient, name: str, make: Any, merged: bool

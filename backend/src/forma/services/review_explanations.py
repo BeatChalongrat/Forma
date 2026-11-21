@@ -65,6 +65,14 @@ def explain(ctx: ServiceContext, reasons: list[str], target: str | None) -> list
                 f"{match[1]} rows that look like data come after a blank gap, starting at sheet row {match[2]}, and were not read. Confirm the table really ends before them.",
                 f"มี {match[1]} แถวที่ดูเหมือนข้อมูลอยู่หลังช่วงแถวว่าง เริ่มที่แถว {match[2]} ของชีต และระบบไม่ได้อ่าน ตรวจว่าตารางจบก่อนแถวเหล่านี้จริงหรือไม่",
             )
+        elif match := re.search(
+            r"(\d+) rows that look like data follow the last row this mapping reads \(from sheet row (\d+)\)",
+            reason,
+        ):
+            pair = (
+                f"{match[1]} rows that look like data come after the last row this mapping reads, starting at sheet row {match[2]}, and were not read. The mapping was written for a shorter file. Confirm the table really ends before them.",
+                f"มี {match[1]} แถวที่ดูเหมือนข้อมูลอยู่หลังแถวสุดท้ายที่การจับคู่นี้อ่าน เริ่มที่แถว {match[2]} ของชีต และระบบไม่ได้อ่าน การจับคู่นี้ทำไว้กับไฟล์ที่สั้นกว่า ตรวจว่าตารางจบก่อนแถวเหล่านี้จริงหรือไม่",
+            )
         elif "no published values from an earlier round" in reason:
             pair = (
                 f"{en}: this file uses a mapping approved before, but no published round exists to compare its values with. Check a few values against the file, then approve.",
@@ -99,6 +107,16 @@ def explain(ctx: ServiceContext, reasons: list[str], target: str | None) -> list
             pair = (
                 f"The row count changed by {match[1]}% from the previously approved data. Confirm that the delivery is complete.",
                 f"จำนวนแถวต่างจากข้อมูลที่เคยอนุมัติ {match[1]}% ตรวจว่ารอบนี้ส่งข้อมูลครบตามที่ต้องการ",
+            )
+        elif "its own review step failed" in reason:
+            pair = (
+                "AI wrote this mapping, but its own review step did not finish. Nothing has checked what the columns mean yet, so check the mapping against the file before approving.",
+                "AI ทำการจับคู่นี้แล้ว แต่ขั้นตรวจทานของ AI ไม่สำเร็จ ยังไม่มีการตรวจความหมายของคอลัมน์ ตรวจการจับคู่กับไฟล์ก่อนอนุมัติ",
+            )
+        elif "heuristic draft used" in reason:
+            pair = (
+                "AI could not produce a mapping, so the one shown comes from FORMA's fixed rules. Check it against the file before approving.",
+                "AI ทำการจับคู่ไม่สำเร็จ การจับคู่ที่เห็นมาจากกฎตายตัวของระบบ ตรวจกับไฟล์ก่อนอนุมัติ",
             )
         elif "first time" in reason:
             pair = (

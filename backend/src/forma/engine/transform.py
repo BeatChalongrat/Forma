@@ -159,7 +159,13 @@ def load_source_frame(
                 )
                 positions.clear()
                 frame = extract_table(
-                    raw, alt, rename=spec.rename, positions=positions, audit=audit, merges=merges
+                    raw,
+                    alt,
+                    rename=spec.rename,
+                    positions=positions,
+                    audit=audit,
+                    merges=merges,
+                    detected=True,
                 )
     as_markup = markup.kind(bound.path) == "markup"
     if expected_columns is not None and (as_markup or bound.path.suffix.lower() in {".xlsx", ".xlsm"}):
@@ -642,10 +648,7 @@ class TransformEngine:
             elif "boolean" in types:
                 exprs.append(col.cast(pl.Boolean, strict=False).alias(t))
             elif "string" in types and f.fmt == "date":
-                if out.schema[t] in (pl.Date, pl.Datetime):
-                    exprs.append(col.cast(pl.Date, strict=False).dt.strftime("%Y-%m-%d").alias(t))
-                else:
-                    exprs.append(col.cast(pl.String, strict=False).alias(t))
+                exprs.append(_date_text(col, out.schema[t]).alias(t))
             elif "string" in types and "array" not in types:
                 e = col.cast(pl.String, strict=False) if out.schema[t] != pl.List(pl.String) else col
                 if "null" not in types and not f.required:
@@ -804,6 +807,8 @@ class TransformEngine:
                 coerce.append(_num(c).alias(rel))
             elif "boolean" in types:
                 coerce.append(c.cast(pl.Boolean, strict=False).alias(rel))
+            elif f.fmt == "date" and "string" in types and items.schema[rel] != pl.List(pl.String):
+                coerce.append(_date_text(c, items.schema[rel]).alias(rel))
             elif f.fmt == "date" and items.schema[rel] in (pl.Date, pl.Datetime):
                 coerce.append(c.cast(pl.Date, strict=False).dt.strftime("%Y-%m-%d").alias(rel))
             elif "string" in types and "array" not in types and items.schema[rel] != pl.List(pl.String):
@@ -1171,6 +1176,21 @@ def ROW_COL_OF(frame: pl.DataFrame) -> str:
         if c.endswith(f".{ROW_COL}") or c == ROW_COL:
             return c
     return frame.columns[0]
+
+
+def _date_text(col: pl.Expr, dtype: Any) -> pl.Expr:
+    """A date field's value as text. A year from ``OPEN_ENDED_YEAR`` on is an ERP writing "no end date"
+    (SAP's 31.12.9999) and leaves as null however the mapping produced it: ``parse_date_th`` already reads
+    it so, and a constant or a conditional written around it must not bring the sentinel back (ADR-057)."""
+    from forma.engine.thai import OPEN_ENDED_YEAR
+
+    text = (
+        col.cast(pl.Date, strict=False).dt.strftime("%Y-%m-%d")
+        if dtype in (pl.Date, pl.Datetime)
+        else col.cast(pl.String, strict=False)
+    )
+    year = text.str.extract(r"^(\d{4})-\d{2}-\d{2}", 1).cast(pl.Int32, strict=False)
+    return pl.when(year >= OPEN_ENDED_YEAR).then(None).otherwise(text)
 
 
 def _num(col: pl.Expr) -> pl.Expr:

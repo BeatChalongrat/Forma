@@ -346,6 +346,7 @@ class PolicyEngine:
         reused_approved: bool = False,
         other_customer: dict[str, Any] | None = None,
         llm_fallback: bool = False,
+        ai_review_failed: bool = False,
         sandbox: dict[str, Any] | None = None,
         field_checks: list[dict[str, Any]] | None = None,
         open_questions: list[Any] | None = None,
@@ -365,6 +366,19 @@ class PolicyEngine:
             sandbox=sandbox,
             field_checks=field_checks,
         )
+        d.checks["ai_review_failed"] = ai_review_failed
+        if ai_review_failed and d.decision != "block":
+            # The mapping on the card is the model's. Its reviewer failed or answered in a shape the
+            # guard rejected, so nothing has checked the mapping's meaning yet: a person does.
+            if d.decision == "auto_approve":
+                d.decision = "review"
+                d.reasons = []
+            d.reasons.append(
+                "AI wrote this mapping but its own review step failed (provider failure or rejected "
+                "output); check the mapping by hand"
+            )
+            d.priority += self.policy["review"]["priority_weights"]["new_customer"]
+            d.risk_score = min(1.0, d.risk_score + 0.2)
         if open_questions:
             d.checks["unresolved_questions"] = len(open_questions)
             if d.decision == "auto_approve":

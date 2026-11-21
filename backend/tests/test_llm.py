@@ -83,6 +83,12 @@ def test_usage_cost_and_add() -> None:
     assert u.cost_usd == pytest.approx(0.4 + 0.8)
     unknown = Usage(input_tokens=1_000_000, output_tokens=0, model="some-model")
     assert unknown.cost_usd == 1.0  # fallback pricing
+    # the model the pilot runs on has its own rate, and is not offered as an OpenAI model in the picker
+    deepseek = Usage(input_tokens=1_000_000, output_tokens=1_000_000, model="deepseek-flash")
+    assert deepseek.cost_usd == pytest.approx(0.3 + 1.2)
+    from forma.ai.llm import model_catalogue
+
+    assert not any(m.startswith("deepseek") for models in model_catalogue().values() for m in models)
     total = Usage()
     total.add(u)
     total.add(Usage(input_tokens=10, output_tokens=5, calls=2, latency_ms=1.5, model="other"))

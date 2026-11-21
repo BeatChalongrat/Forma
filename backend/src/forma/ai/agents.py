@@ -13,16 +13,23 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from forma.ai import guard
-from forma.ai.clarifications import QUESTION_SCHEMA
+from forma.ai.clarifications import QUESTION_SCHEMA, answered_for_trial, pending_answers
 from forma.ai.heuristics import HeuristicProposal
 from forma.ai.llm import LLMClient, LLMError, Usage, set_agent
-from forma.ai.workbench import INSPECT_KINDS, MAX_INSPECT_REQUESTS, RunReport, Workbench, inspect_problems
+from forma.ai.workbench import (
+    INSPECT_KINDS,
+    MAX_INSPECT_REQUESTS,
+    MAX_PROBLEMS,
+    RunReport,
+    Workbench,
+    inspect_problems,
+)
 from forma.mapping_dsl.models import OP_ARITY, OP_PARAMS, MappingDocument, Op
 from forma.mapping_dsl.validate import validate_mapping
 from forma.profiling.profile import WorkbookProfile
 from forma.schema_registry import TargetSchema
 
-PROMPT_VERSION = "2026.11.14.1"
+PROMPT_VERSION = "2026.11.21.1"
 
 SYSTEM_BASE = """You are FORMA's mapping intelligence. FORMA converts messy ERP exports (Excel/CSV, Thai and English,
 multi-sheet) into the target JSON contract supplied for this request. There is no fixed product contract.
@@ -108,11 +115,18 @@ Rules you must follow:
   specify the missing file/sheet/cells. This creates a repair request, NOT a confirm-value button.
   A constant answer replaces the whole target field; it cannot fill an operand inside a calculation.
 - Prefer explicit Thai-aware ops: parse_number_th for any number (commas, ฿, Thai digits, %),
-  parse_date_th for any date (Buddhist-era years like 2569 or 69 mean 2026; Thai month names),
+  parse_date_th for any date (Buddhist-era years like 2569 or 69 mean 2026; Thai month names;
+  an ERP's "no end date" such as 31.12.9999 already reads as null, so write no condition, null_if or
+  constant around it and ask no question about it),
   unit_normalize / pack_size for units like 'ลัง(12)', vat_adjust when prices are VAT-exclusive but the
   target requires vat_included=true semantics to be stated explicitly.
 - Do not infer VAT inclusion, rate, currency, units or other business facts from retail conventions.
   Use explicit source evidence, contract defaults or confirmed operator decisions. Otherwise ask.
+- An ERP price list often puts four columns side by side: the amount, the currency of the amount (SAP
+  labels it 'Unit'), the number of units the amount is for (SAP 'per', a pricing unit) and the unit of
+  measure (SAP 'UoM'). The pricing unit is not a pack size: never map it to one. When every value is 1
+  leave it unmapped and say so in changes_from_draft. When some value is not 1 the amount covers that
+  many units: ask the operator whether the price of one unit is the amount divided by it; do not guess.
 - Every field mapping must carry confidence (0-1) and evidence (why: header, samples, rules).
 - Infer from values AND the surrounding columns, sheets and target descriptions. Column observations
   and relationships are measured hypotheses, not labels. Decimals alone do not prove price; integers
@@ -556,7 +570,9 @@ def _agent_loop(
             payload = {**payload, "engine_review_decisions": baseline.decision_questions}
         if baseline.complete and baseline.errors == 0 and baseline.rows_out > 0:
             baseline_coverage = baseline.coverage
-    best: tuple[tuple[int, int, int], MappingDocument, dict[str, Any], RunReport] | None = None
+    best: (
+        tuple[tuple[int, int, int], MappingDocument, dict[str, Any], RunReport, RunReport, set[str]] | None
+    ) = None
     while True:
         may_inspect = workbench is not None and inspections < inspect_rounds
 
@@ -691,6 +707,19 @@ def _agent_loop(
             report.problems.extend(regressions(baseline_coverage, report.coverage))
         if best is not None and best[3].complete and report.complete and best[3].errors == 0:
             report.problems.extend(regressions(best[3].coverage, report.coverage))
+        # A field left empty for a person fails the contract on every record until the answer. That is
+        # the state the model was told to produce, not a problem to fix: judged as it stands, the
+        # mapping that guesses scores better than the one that asks, and the model is sent round again
+        # with nothing to change. So the same mapping is run with the answers filled in, and what is
+        # still wrong there is what is wrong with the mapping (ADR-076).
+        waiting = pending_answers(doc, d.get("clarifications"))
+        settled = report
+        if waiting and not report.clean:
+            settled = (verify if callable(verify) and report.complete else workbench.run)(
+                answered_for_trial(doc, schema, waiting)
+            )
+            if baseline_coverage is not None and settled.complete:
+                settled.problems.extend(regressions(baseline_coverage, settled.coverage))
         history.append(
             {
                 "turn": "mapping",
@@ -698,36 +727,55 @@ def _agent_loop(
                 "problems": report.problems[:6],
                 "complete": report.complete,
                 "coverage": report.coverage,
+                **(
+                    {"waiting_for": sorted(waiting), "problems_if_answered": settled.problems[:6]}
+                    if waiting
+                    else {}
+                ),
             }
         )
-        if best is None or report.score < best[0]:
-            best = (report.score, doc, d, report)
+        if best is None or settled.score < best[0]:
+            best = (settled.score, doc, d, report, settled, waiting)
         if report.source_decision_pending:
             # The full-file engine has an executable source decision. Keep this
             # mapping/key, rather than incentivizing removal of the conflicting rows.
-            best = (report.score, doc, d, report)
+            best = (settled.score, doc, d, report, settled, waiting)
             break
-        if report.clean or checks >= check_rounds:
+        if settled.clean or checks >= check_rounds:
             break
         checks += 1
         turns.append(
             {
                 "your_mapping": d["mapping"],
                 "forma_ran_it_on_the_first_rows": report.to_prompt(),
+                **(
+                    {
+                        "fields_waiting_for_an_operator": sorted(waiting),
+                        "problems_once_they_are_answered": settled.problems[:MAX_PROBLEMS],
+                    }
+                    if waiting
+                    else {}
+                ),
                 "do": "Fix causes using source evidence. Do not silence diagnostics by dropping fields, rows or"
                 " collections. Read raw cells or use the sandbox if extraction is wrong. If business intent is"
-                " missing, retain the evidence and ask a specific question. Explain legitimate exclusions.",
+                " missing, retain the evidence and ask a specific question. Explain legitimate exclusions."
+                + (
+                    " Errors caused only by the fields waiting for an operator are expected: keep them empty"
+                    " and keep their questions; fix only problems_once_they_are_answered."
+                    if waiting
+                    else ""
+                ),
             }
         )
     assert best is not None
-    _, doc, d, report = best
+    _, doc, d, report, settled, waiting = best
     self_check = {
         "rows_checked": report.rows_in,
         "rows_out": report.rows_out,
         "fix_rounds": checks,
         "inspections": inspections,
         "grounded": grounded,
-        "problems_left": report.problems[:10],
+        "problems_left": settled.problems[:10],
         "history": history,
         "complete": report.complete,
         "coverage": report.coverage,
@@ -735,6 +783,13 @@ def _agent_loop(
         "python_turns": python_turns,
         "candidate_turns": candidate_turns,
     }
+    if waiting:
+        self_check["pending_answers"] = {
+            "targets": sorted(waiting),
+            "errors_until_answered": report.errors,
+            "errors_if_answered": settled.errors,
+            "problems_until_answered": report.problems[:10],
+        }
     return _Loop(doc, d, usage, attempts, self_check)
 
 

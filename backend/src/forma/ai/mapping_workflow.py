@@ -17,7 +17,7 @@ from langgraph.graph import END, START, StateGraph
 from pydantic import BaseModel, ConfigDict, Field
 
 from forma.ai import agents, budget
-from forma.ai.clarifications import QUESTION_SCHEMA
+from forma.ai.clarifications import QUESTION_SCHEMA, answered_for_trial, pending_answers
 from forma.ai.clarifications import validate as validate_questions
 from forma.ai.heuristics import HeuristicProposal
 from forma.ai.llm import LLMClient, LLMError, Usage, set_agent
@@ -29,7 +29,7 @@ from forma.mapping_dsl.models import MappingDocument
 from forma.profiling.profile import WorkbookProfile
 from forma.schema_registry import TargetSchema
 
-WORKFLOW_VERSION = "2026.11.17.3"
+WORKFLOW_VERSION = "2026.11.21.2"
 
 
 class EvidenceRef(BaseModel):
@@ -147,6 +147,40 @@ def _mapper_observations(data: dict[str, Any]) -> list[dict[str, Any]]:
                 {"tool": "sandbox_python", "code": turn.get("code"), "result": turn.get("result")}
             )
     return observations
+
+
+def dates_without_an_end(
+    doc: MappingDocument, schema: TargetSchema, profile: WorkbookProfile
+) -> list[dict[str, Any]]:
+    """Date fields that read a column of an ERP's "no end date" (SAP's 31.12.9999). FORMA reads it as null
+    on purpose (ADR-057), so such a field is empty on every record while its source cells are full. A
+    reviewer shown only the empty field calls it a mapping error and orders a repair that cannot change
+    anything; this names the columns so it is shown the reason too (ADR-076)."""
+    from forma.ai.workbench import _col_leaves
+    from forma.engine.thai import is_open_ended_date
+
+    seen: dict[str, list[str]] = {}
+    for table in profile.tables:
+        for column in table.columns:
+            values = [str(v[0]) for v in column.top_values if v] or [str(v) for v in column.samples]
+            if values and column.name not in seen:
+                seen[column.name] = values
+    found = []
+    for fm in [*doc.fields, *(f for c in doc.collections for f in c.fields)]:
+        if not schema.has_field(fm.target) or schema.field(fm.target).fmt != "date":
+            continue
+        for name in _col_leaves(fm.expr):
+            sentinels = [v for v in seen.get(name, []) if is_open_ended_date(v)]
+            if sentinels:
+                found.append(
+                    {
+                        "target": fm.target,
+                        "column": name,
+                        "no_end_values": sentinels[:3],
+                        "every_profiled_value": len(sentinels) == len(seen[name]),
+                    }
+                )
+    return found
 
 
 def _references(value: Analysis | Review, profile: WorkbookProfile, schema: TargetSchema) -> list[str]:
@@ -295,8 +329,30 @@ def build_workflow(
         budget.progress("ตรวจผลลัพธ์กับข้อมูลทั้งไฟล์")
         doc = MappingDocument.model_validate(state["mapping"])
         verify = getattr(workbench, "verify", None)
-        report = verify(doc) if callable(verify) else workbench.run(doc)
-        return {"execution": report.to_prompt()}
+        check = verify if callable(verify) else workbench.run
+        report = check(doc)
+        execution = report.to_prompt()
+        waiting = pending_answers(doc, state["mapper_data"].get("clarifications", []))
+        if waiting and report.errors:
+            # An empty answer fails the contract on every record. Whether anything else is wrong shows only
+            # with the answer filled in, so the reviewer is not left to guess and order a repair (ADR-076).
+            trial = check(answered_for_trial(doc, schema, waiting))
+            execution["pending_answers"] = {
+                "targets": sorted(waiting),
+                "errors_if_answered": trial.errors,
+                "problems_if_answered": trial.problems[:8],
+                "note": "Each target is left empty for a person and has an existing question. The errors "
+                "it causes are expected until that answer; they are not mapping errors.",
+            }
+        open_ended = dates_without_an_end(doc, schema, profile)
+        if open_ended:
+            execution["dates_without_an_end"] = {
+                "fields": open_ended,
+                "note": "A year from 9000 on (SAP 31.12.9999) is the ERP's way to write 'no end date'. "
+                "FORMA reads it as null by design, however the mapping is written. Such a field being "
+                "empty while its source cells are full is correct, not a mapping error.",
+            }
+        return {"execution": execution}
 
     def reviewer(state: State) -> dict[str, Any]:
         budget.progress("ตรวจความหมายของ mapping และข้อมูลที่ยังต้องถาม")
@@ -307,6 +363,15 @@ def build_workflow(
             if state["execution"].get("complete")
             else {}
         )
+        # questions the mapper already put on the card: a reviewer names one by its target to say
+        # "this concern is asked", which no ID of an engine decision could express
+        asked = {q["target"] for q in state["mapper_data"].get("clarifications", []) if q.get("target")}
+        waiting = set((state["execution"].get("pending_answers") or {}).get("targets") or [])
+        no_end = {
+            d["target"]
+            for d in (state["execution"].get("dates_without_an_end") or {}).get("fields", [])
+            if d.get("every_profiled_value")
+        }
 
         def validate(data: dict[str, Any]) -> list[str]:
             if bool(data.get("inspect")) == bool(data.get("review")):
@@ -326,14 +391,39 @@ def build_workflow(
                 return [str(exc)[:1500]]
             errors = _references(review, profile, schema)
             errors.extend(validate_questions(review.clarifications, doc, schema))
-            if set(review.covered_questions) - decisions.keys():
-                errors.append("covered_questions must contain only IDs from execution.decision_questions")
+            if set(review.covered_questions) - decisions.keys() - asked:
+                errors.append(
+                    "covered_questions must contain only IDs from execution.decision_questions or targets "
+                    f"of existing_questions. Allowed: {sorted({*decisions, *asked})}"
+                )
             covered_targets = {
                 p
                 for key in review.covered_questions
                 if key in decisions
                 for p in decisions[key].get("affected_fields", [decisions[key]["target"]])
-            }
+            } | (set(review.covered_questions) & asked)
+            if (
+                review.verdict == "repair"
+                and review.concerns
+                and all(
+                    (c.target in waiting and c.kind != "mapping_error") or c.target in no_end
+                    for c in review.concerns
+                )
+            ):
+                # the costliest wrong answer: the mapper is run again and can only return the same mapping
+                if any(c.target in waiting for c in review.concerns):
+                    errors.append(
+                        f"{sorted(waiting)} await an operator's answer through existing questions "
+                        "(execution.pending_answers). That is not a repair. Return pass when you have no "
+                        "other concern, or ask with those targets in covered_questions."
+                    )
+                if any(c.target in no_end for c in review.concerns):
+                    errors.append(
+                        f"{sorted(no_end)} read a column of the ERP's 'no end date' "
+                        "(execution.dates_without_an_end). FORMA reads it as null by design, so the field "
+                        "is empty on purpose. That is not a repair. Return pass when you have no other "
+                        "concern."
+                    )
             source_decision_targets = {
                 decisions[key]["target"]
                 for key in review.covered_questions
@@ -380,6 +470,7 @@ def build_workflow(
                     f"covered_questions={review.covered_questions}. "
                     "Available source decisions="
                     f"{[(k, d['target'], d.get('action')) for k, d in decisions.items()]}. "
+                    f"Existing question targets={sorted(asked)}. "
                     "For an existing question use its exact ID and target; missing_business_fact or "
                     "source_problem describes a pending source decision, mapping_error requires repair."
                 )
@@ -417,7 +508,17 @@ def build_workflow(
             "an unresolved business choice into a mapping error just because execution awaits it. "
             "execution.decision_questions are executable questions already built from full-file conflicts. "
             "For a business concern covered by one, return ask with its ID in covered_questions and no "
-            "duplicate clarification. Choosing source rows is NOT a numeric answer, constant or value_map. "
+            "duplicate clarification. existing_questions are already on the operator's card: name one in "
+            "covered_questions by its target pointer, never by repeating its question. "
+            "execution.pending_answers lists fields the mapper left empty on purpose, each with such a "
+            "question: every record fails the contract until a person answers, which is the intended "
+            "state and NOT a mapping error. errors_if_answered is what remains once answered; judge the "
+            "mapping on that. If those fields are your only concern return pass, or ask with their targets "
+            "in covered_questions; never repair, and never replace the empty value with a guess. "
+            "execution.dates_without_an_end lists date fields whose source column holds an ERP's 'no end "
+            "date' (a year from 9000 on, SAP 31.12.9999). FORMA reads it as null by design: such a field "
+            "empty while its source cells are full is correct and is not a concern. "
+            "Choosing source rows is NOT a numeric answer, constant or value_map. "
             "Never invent proxy codes (e.g. 1 for A, 2 for B) or source_value tokens to select a price list. "
             "Covered questions still require a human response and do not pass verification. "
             "Execution semantics: source_identity compares ALL raw source columns and collapses exact "
@@ -577,7 +678,15 @@ def run_workflow(
     elif not review:
         problems.append("Semantic review did not complete")
     execution = state.get("execution") or {}
-    if not execution.get("complete") or execution.get("errors") or not execution.get("rows_out"):
+    waiting = execution.get("pending_answers") or {}
+    # Records that fail only because a person has not answered yet are not a failed workflow: the trial
+    # with the answers filled in ran clean. Nothing is approved by this; the policy still sees the errors.
+    only_waiting = bool(waiting.get("targets")) and waiting.get("errors_if_answered") == 0
+    if (
+        not execution.get("complete")
+        or not execution.get("rows_out")
+        or (execution.get("errors") and not only_waiting)
+    ):
         problems.append("Full execution must pass before approval")
     checks["problems_left"] = list(dict.fromkeys(problems))
     data["self_check"] = checks
@@ -602,5 +711,13 @@ def run_workflow(
         else "verified_proposal",
         "human_resume": "existing versioned question preview/apply service; no automatic approval",
     }
-    notes = ["llm_failed: " + state["failure"]] if state.get("failure") else []
+    # A failure before the mapper finished leaves FORMA's own draft in use. One after it leaves the
+    # model's mapping without its review: a different fact for the card, and never an approval.
+    notes = (
+        []
+        if not state.get("failure")
+        else ["review_failed: " + state["failure"]]
+        if state.get("mapping")
+        else ["llm_failed: " + state["failure"]]
+    )
     return doc, agents.AgentResult("mapping_workflow", data, usage, used, notes)

@@ -125,16 +125,19 @@ def _validate_answer_results(
             if spec.pointer in targets:
                 continue
             # Validation can stop before filling optional defaults on an invalid
-            # record. Repairing a quantity may expose those contract defaults.
-            # Only absent, non-collection values becoming the exact schema default
-            # are exempt; an existing value or an arbitrary status remains protected.
+            # record. Repairing a quantity may expose those contract defaults, and
+            # answering a VAT flag left empty exposes the default VAT rate of each
+            # price row. Only values absent before that are now exactly the schema
+            # default are exempt; an existing value or an arbitrary status remains
+            # protected.
+            was, now = list(values_at(rec, spec.pointer)), list(values_at(new[key], spec.pointer))
             if (
                 old_record_errors
                 and not new_record_errors
-                and "*" not in spec.pointer
                 and spec.default is not None
-                and not list(values_at(rec, spec.pointer))
-                and list(values_at(new[key], spec.pointer)) == [spec.default]
+                and not was
+                and now
+                and all(v == spec.default for v in now)
             ):
                 continue
             if any(

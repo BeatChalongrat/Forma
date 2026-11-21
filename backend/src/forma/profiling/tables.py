@@ -429,8 +429,12 @@ def extract_table(
     positions: dict[str, int] | None = None,
     audit: dict[str, Any] | None = None,
     merges: list[tuple[int, int, int]] | None = None,
+    detected: bool = False,
 ) -> pl.DataFrame:
     """Turn a raw grid into a header-named frame according to ``spec`` (all columns stay strings).
+
+    ``detected`` says the spec was found in this very grid (``TableCandidate.to_spec``), so its last row is
+    where this file's table ends, not a limit a mapping carried over from another file.
 
     For lineage, ``row_numbers`` adds a ``__sheet_row__`` column (the raw grid row each data row came
     from) and ``positions`` is filled with header → raw grid column. ``audit`` is filled with what each
@@ -444,6 +448,7 @@ def extract_table(
         raise ValueError(
             "fill_merged needs the sheet's merged ranges: pass merges=vertical_merges(path, sheet)"
         )
+    fixed_end = spec.data_end is not None and not detected  # written in the mapping, not found here
     if spec.header_row == "auto":
         cands = detect_tables(df)
         if not cands:
@@ -491,6 +496,7 @@ def extract_table(
             positions=positions,
             audit=audit,
             merges=merges,
+            detected=True,
         )
     headers = merge_header_rows(header_rows)
     data_start = spec.data_start if spec.data_start is not None else header_row + spec.header_rows
@@ -510,6 +516,19 @@ def extract_table(
         body = body.with_columns(pl.int_range(data_start, data_start + body.height).alias(AUDIT_ROW))
     # every column unless lineage or the audit asked for rows
     data = [c for c in body.columns if c not in (SHEET_ROW, AUDIT_ROW)]
+    if audit is not None and fixed_end and data_end < df.height and data:
+        # a mapping written for a shorter file: next month's extra rows sit past its last row (ADR-076)
+        from forma.engine.accounting import after_stop
+
+        tail = df.slice(data_end).select(cols)
+        tail.columns = headers
+        audit["after_data_end"] = after_stop(
+            tail.with_columns(pl.int_range(data_end, df.height).alias(AUDIT_ROW)),
+            body,
+            data,
+            AUDIT_ROW,
+            TOTAL_LABEL_RE,
+        )
     # before the blank-row stop: the blanks between two pages must not end the table
     if spec.drop_repeated_headers and body.height:
         before = body.height

@@ -335,6 +335,13 @@ def for_mapping(
         )
     if llm_fallback:
         ev("ai", "AI was unavailable; the deterministic draft is in use", "AI ใช้งานไม่ได้ ใช้ร่างจากกฎแทน", None)
+    if checks_d.get("ai_review_failed"):
+        ev(
+            "ai",
+            "AI wrote this mapping; its own review step did not finish, so check it by hand",
+            "AI ทำการจับคู่นี้แล้ว แต่ขั้นตรวจทานของ AI ไม่สำเร็จ ต้องตรวจด้วยตนเอง",
+            None,
+        )
     self_check = policy.get("self_check") or {}
     if self_check:
         left = len(self_check.get("problems_left") or [])

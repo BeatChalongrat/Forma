@@ -37,14 +37,22 @@ PRICING: dict[str, tuple[float, float]] = {
     "claude-sonnet-4-5": (3.0, 15.0),
     "claude-haiku-4-5": (1.0, 5.0),
     "claude-opus-4-1": (15.0, 75.0),
+    # DeepSeek's own page (api-docs.deepseek.com/quick_start/pricing, read 2026-11-21): peak rate, cache
+    # miss. Off-peak is half and a cache hit is 1/50 of the input rate; FORMA records neither the hour nor
+    # the cached share, so this is the most a call can cost, not what the bill will say.
+    "deepseek-flash": (0.3, 1.2),
+    "deepseek-v4-pro": (1.32, 3.96),
 }
+# reached through the OpenAI-compatible provider with their own base URL: priced, not offered in a picker
+_OTHER_ENDPOINTS = ("deepseek",)
 
 
 def model_catalogue() -> dict[str, list[str]]:
     """Models FORMA knows per provider (the Settings model picker); any other name can still be typed."""
     out: dict[str, list[str]] = {"anthropic": [], "openai": []}
     for m in PRICING:
-        out["anthropic" if m.startswith("claude") else "openai"].append(m)
+        if not m.startswith(_OTHER_ENDPOINTS):
+            out["anthropic" if m.startswith("claude") else "openai"].append(m)
     return out
 
 

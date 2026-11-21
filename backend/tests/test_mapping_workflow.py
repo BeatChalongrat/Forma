@@ -201,6 +201,147 @@ def test_reviewer_asks_actionable_question_without_approval(tmp_path, schema):
     assert not res.data["self_check"]["problems_left"]
 
 
+VAT = "/prices/*/vat_included"
+ASK_VAT = {
+    "target": VAT,
+    "question": "ราคารวม VAT แล้วหรือไม่",
+    "why": "ไฟล์ไม่มีคำว่า VAT",
+    "kind": "boolean",
+    "action": "constant",
+}
+
+
+class WaitingBench(Bench):
+    """The contract fails on every record while the VAT flag is empty, and on nothing once it is filled."""
+
+    def run(self, doc):
+        flag = next(f for c in doc.collections for f in c.fields if f.target == VAT)
+        if flag.expr.value is None:
+            return RunReport(
+                12, 12, problems=["validation: prices[0] must contain ['vat_included']"], errors=12
+            )
+        return RunReport(12, 12)
+
+    verify = run
+
+
+def waiting_mapper(review):
+    """A mapper that leaves the VAT flag empty and asks, the way it is told to (ADR-073)."""
+
+    def responder(system, user, output):
+        if "Evidence Analyst" in system or "Semantic Reviewer" in system:
+            return response(review)(system, user, output)
+        doc = _doc()
+        flag = next(f for c in doc.collections for f in c.fields if f.target == VAT)
+        flag.expr = flag.expr.model_copy(update={"value": None})
+        return {"mapping": doc.model_dump(mode="json"), "open_questions": [], "clarifications": [ASK_VAT]}
+
+    return responder
+
+
+@pytest.mark.parametrize(
+    "review",
+    [
+        None,  # pass: no concern beyond the one already asked
+        {
+            "verdict": "ask",
+            "checked": ["VAT"],
+            "concerns": [{**concern("missing_business_fact"), "target": VAT}],
+            "clarifications": [],
+            "covered_questions": [VAT],  # the mapper's own question, named by its target
+        },
+    ],
+    ids=["pass", "ask-covered-by-the-mappers-question"],
+)
+def test_a_field_waiting_for_an_answer_is_not_fixed_repaired_or_failed(tmp_path, schema, review):
+    client, doc, res = run(tmp_path, schema, bench=WaitingBench(), responder=waiting_mapper(review))
+    # analyst, mapper, reviewer: the mapper is not sent round again to "fix" the question it asked
+    assert len(client.provider.calls) == 3 and not res.notes
+    check = res.data["self_check"]
+    assert check["fix_rounds"] == 0 and check["problems_left"] == []
+    assert check["pending_answers"]["targets"] == [VAT]
+    assert check["pending_answers"]["errors_until_answered"] == 12
+    assert check["pending_answers"]["errors_if_answered"] == 0
+    workflow = res.data["workflow"]
+    assert workflow["status"] == "awaiting_human" and workflow["repairs"] == 0
+    assert res.data["clarifications"] == [ASK_VAT]
+    flag = next(f for c in doc.collections for f in c.fields if f.target == VAT)
+    assert flag.expr.value is None  # the trial value never reaches the mapping
+    seen = json.loads(client.provider.calls[-1]["user"])["execution"]
+    assert seen["errors"] == 12 and seen["pending_answers"]["errors_if_answered"] == 0
+
+
+def test_reviewer_cannot_order_a_repair_for_a_field_that_only_waits_for_an_answer(tmp_path, schema):
+    repair = {
+        "verdict": "repair",
+        "checked": ["VAT"],
+        "concerns": [{**concern("missing_business_fact"), "target": VAT}],
+    }
+    client, _, res = run(tmp_path, schema, bench=WaitingBench(), responder=waiting_mapper(repair), retries=1)
+    assert res.notes[0].startswith("review_failed") and "That is not a repair" in res.notes[0]
+    assert res.data["workflow"]["repairs"] == 0  # the mapper was not run again
+    assert (
+        sum("Mapping Agent" in c["system"] or "draft_mapping" in c["user"] for c in client.provider.calls)
+        == 1
+    )
+
+
+def test_an_error_that_remains_once_answered_is_still_a_problem(tmp_path, schema):
+    class StillBroken(WaitingBench):
+        def run(self, doc):
+            return RunReport(12, 12, problems=["validation: /sku is empty on 3 records"], errors=3)
+
+        verify = run
+
+    _, _, res = run(tmp_path, schema, bench=StillBroken(), responder=waiting_mapper(None))
+    assert res.data["self_check"]["problems_left"] == [
+        "validation: /sku is empty on 3 records",
+        "Full execution must pass before approval",
+    ]
+    assert res.data["self_check"]["pending_answers"]["errors_if_answered"] == 3
+    assert res.data["workflow"]["status"] == "failed"
+
+
+def test_reviewer_cannot_order_a_repair_for_a_date_the_erp_wrote_as_no_end(tmp_path, schema):
+    """SAP writes "no end date" as 31.12.9999 and FORMA reads it as null (ADR-057). The field is then empty
+    on every record while its source cells are full, which looks like a broken mapping to a reviewer."""
+    from forma.mapping_dsl.models import FieldMapping, call, col
+
+    END = "/prices/*/effective_to"
+    sheet = {
+        "สินค้า": [("รหัสสินค้า", "string"), ("ชื่อสินค้า", "string"), ("ราคาขาย", "float"), ("Valid to", "date")]
+    }
+    with_end = _profile(sheet)
+    with_end.tables[0].columns[3].samples = ["31.12.9999"]
+
+    def mapped() -> dict:
+        doc = _doc()
+        doc.collections[0].fields.append(
+            FieldMapping(target=END, expr=call("parse_date_th", col("Valid to")), confidence=0.9)
+        )
+        return doc.model_dump(mode="json")
+
+    def responder(system, user, output):
+        if "Evidence Analyst" in system:
+            return response()(system, user, output)
+        if "Semantic Reviewer" in system:
+            empty = {**concern(), "target": END, "issue": "effective_to is empty on 12 of 12 records"}
+            return {"review": {"verdict": "repair", "checked": ["dates"], "concerns": [empty]}}
+        return {"mapping": mapped(), "open_questions": [], "clarifications": []}
+
+    client = LLMClient(MockProvider(responder), "test", max_retries=1)
+    _, res = run_workflow(
+        client, with_end, schema, _draft(), Bench(), settings(tmp_path), snapshot={"t": "end"}
+    )
+    assert res.notes[0].startswith("review_failed") and "no end date" in res.notes[0]
+    assert res.data["workflow"]["repairs"] == 0  # the mapper was not run again
+    first_review = next(c for c in client.provider.calls if "Semantic Reviewer" in c["system"])
+    seen = json.loads(first_review["user"])["execution"]["dates_without_an_end"]
+    assert seen["fields"] == [
+        {"target": END, "column": "Valid to", "no_end_values": ["31.12.9999"], "every_profiled_value": True}
+    ]
+
+
 @pytest.mark.parametrize("complete,errors", [(False, 0), (True, 1)])
 def test_reviewer_pass_never_overrides_execution(tmp_path, schema, complete, errors):
     _, _, res = run(tmp_path, schema, bench=Bench(complete=complete, errors=errors))
@@ -213,9 +354,23 @@ def test_invalid_evidence_reference_fails_closed(tmp_path, schema):
         "checked": ["id"],
         "concerns": [{**concern(), "sources": [{"table_index": 999, "location": "A2"}]}],
     }
-    _, _, res = run(tmp_path, schema, responder=response(review))
-    assert res.notes and "llm_failed" in res.notes[0]
+    _, doc, res = run(tmp_path, schema, responder=response(review))
+    # the mapper finished: the mapping is the model's, only its review is missing
+    assert res.notes and res.notes[0].startswith("review_failed")
+    assert doc.meta.created_by == "ai"
     assert res.data["workflow"]["status"] == "failed"
+    assert any(p.startswith("workflow: ") for p in res.data["self_check"]["problems_left"])
+
+
+def test_a_failure_before_the_mapper_finishes_leaves_formas_own_draft(tmp_path, schema):
+    def responder(system, user, output):
+        if "Evidence Analyst" in system:
+            return response()(system, user, output)
+        raise LLMError("provider down")
+
+    _, doc, res = run(tmp_path, schema, responder=responder)
+    assert res.notes and res.notes[0].startswith("llm_failed")
+    assert doc.model_dump() == _draft().mapping.model_dump()
 
 
 def test_budget_is_shared_across_roles_and_durable(tmp_path, schema):
@@ -382,6 +537,46 @@ def test_graph_is_used_by_real_upload_profile_propose_api(isolated_env, monkeypa
         reused = c.get(f"/api/mappings/{result['result']['mapping_version_id']}").json()
         assert any(e["agent"] == "memory" and e["result"] == "reuse" for e in reused["agent_log"])
         assert len(get_context().llm.provider.calls) == calls
+
+
+def test_card_says_the_mapping_is_the_models_when_only_its_review_failed(isolated_env, monkeypatch):
+    from fastapi.testclient import TestClient
+    from tests.conftest import clear_forma_caches
+    from tests.test_api import _upload, make_workbook
+
+    from forma.api.app import create_app
+    from forma.services.context import get_context
+    from forma.services.review_explanations import explain
+
+    monkeypatch.setenv("FORMA_MAPPING_WORKFLOW", "graph")
+    clear_forma_caches()
+
+    def responder(system, user, output):
+        if "Semantic Reviewer" in system:  # a shape the guard rejects, every time
+            bad = {**concern(), "target": "/sku (record.dedupe)"}
+            return {"review": {"verdict": "repair", "checked": ["identity"], "concerns": [bad]}}
+        if "Evidence Analyst" in system:
+            return response()(system, user, output)
+        return {"mapping": json.loads(user)["draft_mapping"], "clarifications": [], "open_questions": []}
+
+    with TestClient(create_app()) as c:
+        get_context().llm = LLMClient(MockProvider(responder), "test")
+        cust = c.post("/api/customers", json={"code": "NOREVIEW", "name": "Review fails"}).json()
+        rnd = c.post("/api/rounds", json={"customer_id": cust["id"]}).json()
+        _upload(c, rnd["id"], make_workbook(isolated_env / "input.xlsx"))
+        c.post(f"/api/rounds/{rnd['id']}/profile", params={"sync": True})
+        job = c.post(f"/api/rounds/{rnd['id']}/propose", json={"sync": True, "use_llm": True}).json()
+        result = c.get(f"/api/jobs/{job['job_id']}").json()
+        assert result["status"] == "done", result.get("error")
+        mapping = c.get(f"/api/mappings/{result['result']['mapping_version_id']}").json()
+    policy = mapping["policy"]
+    assert policy["source"] == "ai" and mapping["created_by"] == "ai"
+    assert policy["checks"]["ai_review_failed"] is True and policy["checks"]["llm_fallback"] is False
+    assert policy["decision"] == "review" and mapping["status"] == "proposed"
+    assert not any("heuristic draft used" in r for r in policy["reasons"])
+    (reason,) = [r for r in policy["reasons"] if "its own review step failed" in r]
+    assert "ขั้นตรวจทานของ AI ไม่สำเร็จ" in explain(None, [reason], None)[0]["th"]  # type: ignore[arg-type]
+    assert "agreement" in policy["checks"]  # the two readings are still compared
 
 
 def test_reviewer_receives_tool_receipts_and_scoped_decisions_not_mapper_opinions(
@@ -559,7 +754,7 @@ def test_reviewer_invalid_pointer_is_not_silently_coerced_or_approved(tmp_path, 
     review = {"verdict": "repair", "checked": ["id"], "concerns": [{**concern(), "target": pointer}]}
     client, _, result = run(tmp_path, schema, responder=response(review), retries=1)
     assert len(client.provider.calls) == result.data["workflow"]["provider_attempts"] == 4
-    assert "llm_failed" in result.notes[0]
+    assert result.notes[0].startswith("review_failed")
     assert result.data["workflow"]["status"] == "failed"
     assert "Unknown target" in result.notes[0]
     assert not result.data["workflow"]["review"]

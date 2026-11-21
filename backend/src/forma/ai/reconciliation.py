@@ -43,6 +43,7 @@ def row_accounting(stats: dict[str, Any]) -> dict[str, Any] | None:
         for reason, count in (audit.get("dropped") or {}).items():
             dropped[reason] = dropped.get(reason, 0) + int(count)
         unread += int((audit.get("after_blank_stop") or {}).get("data_like") or 0)
+        unread += int((audit.get("after_data_end") or {}).get("data_like") or 0)
     return {
         "complete": bool(ledger.get("complete")),
         "root": ledger.get("root"),

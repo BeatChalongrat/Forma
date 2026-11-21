@@ -2,7 +2,8 @@
 
 The engine fills a ledger while it runs; nothing here changes a record. Two facts about the *file* (not the
 mapping) become ``source_review`` findings, so a reused mapping cannot wave them through: a total row whose
-numbers match no sum of the rows read, and rows that look like data after the blank-row stop.
+numbers match no sum of the rows read, and rows that look like data after the blank-row stop or after the
+last row a mapping was told to read.
 A matching total is evidence the table was read whole, not proof that a column means what the mapping says.
 """
 
@@ -166,6 +167,18 @@ def source_findings(source_id: str, audit: dict[str, Any]) -> list[dict[str, Any
                     "confirm the table ends there"
                 ),
                 "details": {"check": "rows_after_blank_stop", "source": source_id, **cut},
+            }
+        )
+    past = audit.get("after_data_end") or {}
+    if past.get("data_like"):
+        out.append(
+            {
+                "message": (
+                    f"{source_id}: {past['data_like']} rows that look like data follow the last row this "
+                    f"mapping reads (from sheet row {past['first_sheet_row']}) and were not read; "
+                    "confirm the table ends there"
+                ),
+                "details": {"check": "rows_after_data_end", "source": source_id, **past},
             }
         )
     return out
