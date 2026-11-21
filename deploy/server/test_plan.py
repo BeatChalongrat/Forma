@@ -50,6 +50,34 @@ class CapacityTests(unittest.TestCase):
             )
             self.assertAlmostEqual(total, result["selected"]["ram_limits_gib"])
 
+    def test_every_model_caller_shares_caps_sized_for_the_jobs(self):
+        for cpus, ram, jobs, rpm, connections in (
+            (18, 48, 8, 60, 150),
+            (32, 80, 16, 76, 200),
+            (48, 128, 32, 140, 300),
+        ):
+            a = arguments(max_jobs=jobs)
+            a.cpus, a.ram_gib = cpus, ram
+            result = plan.calculate(a)
+            p = result["selected"]
+            self.assertEqual(p["jobs"], jobs)
+            services = plan.compose(result)["services"]
+            # mapping jobs plus 2 chat and 1 report slot, the same caps in every caller
+            for name in ("api", "worker", "assistant-worker", "report-worker"):
+                env = services[name]["environment"]
+                self.assertEqual(env["FORMA_LLM_SHARED_CONCURRENCY"], str(jobs + 3))
+                self.assertEqual(env["FORMA_LLM_SHARED_RPM"], str(rpm))
+                self.assertEqual(env["FORMA_LLM_SHARED_LIMITER"], "redis")
+            workers = services["worker"]["deploy"]["replicas"]
+            slots = int(services["worker"]["environment"]["FORMA_WORKERS"])
+            self.assertEqual(workers * slots, jobs)
+            # enough Postgres connections for every worker container, and memory for them
+            command = services["postgres"]["command"]
+            self.assertEqual(command, ["postgres", "-c", f"max_connections={connections}"])
+            self.assertGreaterEqual(connections, 100 + 22 * workers)
+            self.assertGreater(p["postgres_ram_gib"], 2.0)
+            self.assertLessEqual(p["ram_limits_gib"], result["allocatable"]["ram_gib"])
+
     def test_all_limits_fit_and_no_unrequested_scale_up(self):
         for cpus in (4, 8, 12, 16, 32):
             for ram in (12, 16, 24, 32, 48, 64, 128):

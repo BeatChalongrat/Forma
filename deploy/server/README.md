@@ -32,13 +32,27 @@ python3 deploy/server/plan.py --probe --data-path /var/lib/docker \
 - `compose.capacity.json`: สร้างเฉพาะเมื่อ CPU, RAM และดิสก์ผ่านพร้อมกัน
 - exit code `2`: ทรัพยากรไม่พอ/ข้อมูลไม่ถูกต้อง **ไม่มี config ให้ฝืน deploy**
 
-ระบบเลือกได้ 2, 4, 8, 16 หรือ 32 งาน ไม่เกิน `--max-jobs` ซึ่งค่าเริ่มต้นเป็น **8** ต้องระบุ `--max-jobs 16` หรือ `--max-jobs 32` จึงจะเลือกขนาดใหญ่ขึ้นได้ ลดขนาดได้ในแผนเท่านั้น ไม่ไปเปลี่ยนค่าที่ dev ใช้อยู่ คง shared RPM ที่ 60 ไม่ปรับ provider/key/model/timeout/กฎอนุมัติ โปรไฟล์ server ใช้ `FORMA_KNOWLEDGE_POLICY=strict` เพื่อเรียกใช้เฉพาะความรู้ที่ตรวจและอนุญาตแล้ว
+ระบบเลือกได้ 2, 4, 8, 16 หรือ 32 งาน ไม่เกิน `--max-jobs` ซึ่งค่าเริ่มต้นเป็น **8** ต้องระบุ `--max-jobs 16` หรือ `--max-jobs 32` จึงจะเลือกขนาดใหญ่ขึ้นได้ ลดขนาดได้ในแผนเท่านั้น ไม่ไปเปลี่ยนค่าที่ dev ใช้อยู่ ไม่ปรับ provider/key/model/timeout/กฎอนุมัติ โปรไฟล์ server ใช้ `FORMA_KNOWLEDGE_POLICY=strict` เพื่อเรียกใช้เฉพาะความรู้ที่ตรวจและอนุญาตแล้ว
 
-| งานพร้อมกัน | Worker containers × slots | Sandbox | ตัวอย่าง CPU / RAM | ยอด RAM limits รวม |
-|---|---|---|---|---|
-| 8 (ค่าเริ่มต้น) | 2 × 4 | 2 | 18 vCPU / 48 GiB | 32.625 GiB |
-| 16 (เลือกเพิ่ม) | 4 × 4 | 4 | 32 vCPU / 80 GiB | 53.625 GiB |
-| 32 (เลือกเพิ่ม) | 8 × 4 | 8 | 48 vCPU / 128 GiB | 95.625 GiB |
+| งานพร้อมกัน | Worker containers × slots | Sandbox | เรียก AI พร้อมกัน / ต่อนาที | Postgres connections | ตัวอย่าง CPU / RAM | ยอด RAM limits รวม |
+|---|---|---|---|---|---|---|
+| 8 (ค่าเริ่มต้น) | 2 × 4 | 2 | 11 / 60 | 150 | 18 vCPU / 48 GiB | 33.113 GiB |
+| 16 (เลือกเพิ่ม) | 4 × 4 | 4 | 19 / 76 | 200 | 32 vCPU / 80 GiB | 54.602 GiB |
+| 32 (เลือกเพิ่ม) | 8 × 4 | 8 | 35 / 140 | 300 | 48 vCPU / 128 GiB | 97.578 GiB |
+
+### เรียก AI พร้อมกัน, ต่อนาที และ connections ของ Postgres
+
+- **เรียกพร้อมกัน** (`FORMA_LLM_SHARED_CONCURRENCY`) = จำนวนงาน mapping + 3 (แชต 2 + รายงาน 1) งาน mapping ไม่ต้องรอ slot ในงบ 600 วินาที และแชตยังใช้ได้ระหว่าง batch ใหญ่
+- **ต่อนาที** (`FORMA_LLM_SHARED_RPM`) = 4 × จำนวนที่เรียกพร้อมกัน ไม่ต่ำกว่า 60 การเรียกหนึ่งครั้งใช้เฉลี่ย 29 วินาที (ADR-077) คือราว 2 ครั้งต่อนาทีต่อ slot เผื่อการเรียกสั้น 5 วินาทีไว้อีกเท่าตัว DeepSeek เองจำกัดแค่จำนวนพร้อมกัน (2,500 ต่อบัญชีสำหรับ `deepseek-flash`) ไม่ได้ประกาศเพดานต่อนาที
+- **ทุก process ที่เรียก AI ได้ค่าเดียวกัน** (api, worker, assistant-worker, report-worker) เพราะตัวจำกัดใน Redis ใช้ค่าที่แต่ละ process ส่งมาเทียบ ถ้าตัวไหนยังเป็นค่า dev (4) จะไม่ได้ slot เลยระหว่างที่มีงานเกิน 4
+- **Postgres** ได้ `max_connections` = 100 + 25 × worker containers worker หนึ่งตัว (4 งาน) ถือได้ราว 22 connections ตอนพีก: session ของงาน, heartbeat, checkpoint และ ledger ของ AI อย่างละหนึ่งต่องาน, activity log และ recovery loop ค่าเริ่มต้นของ image คือ 100 ซึ่งไม่พอตั้งแต่ 16 งาน แผนเพิ่ม RAM ให้ Postgres 10 MiB ต่อ connection ที่เกิน 100
+- ค่าเหล่านี้คำนวณจากโค้ดและเวลาที่วัดได้ ยังไม่ได้ load test ถ้าเจอ 429 จาก provider บ่อย ให้ลดจำนวนงาน ไม่ใช่เพิ่ม RPM
+
+**บน AWS** (ECS Fargate + RDS PostgreSQL + ElastiCache Redis + S3) ใช้ตัวเลขชุดเดียวกัน:
+- ECS service ของ worker ตั้ง desired count = worker containers, `FORMA_WORKERS=4`
+- ใส่ `FORMA_LLM_SHARED_CONCURRENCY`, `FORMA_LLM_SHARED_RPM` และ `FORMA_LLM_SHARED_LIMITER=redis` ใน task definition ของ api, worker, assistant-worker และ report-worker ให้เหมือนกัน
+- ตรวจ `max_connections` ของ RDS parameter group ให้ไม่ต่ำกว่าตาราง (ค่าเริ่มต้นของ RDS ขึ้นกับขนาดเครื่อง)
+- ส่วน sandbox ใช้ socket ในเครื่องเดียวกับ worker ต้องออกแบบใหม่สำหรับ ECS ก่อน ดูย่อหน้าแรก
 
 ตัวเลขเป็นสมมติฐาน capacity ของไฟล์ซับซ้อน ไม่ใช่ผล load test หรือการรับประกัน throughput การเพิ่มงานไม่ได้เพิ่มโควตาของผู้ให้บริการ LLM อัตโนมัติ เมื่อชน RPM/TPM หรือ sandbox จะยังต้องรอ ตัวอย่างที่สร้างไว้ตรวจได้ใน `examples/server-48g`, `examples/server-64g-16jobs` (ชื่อโฟลเดอร์เดิม แต่ปรับสมมติฐานเป็น 80 GiB แล้ว) และ `examples/server-128g-32jobs`
 
@@ -53,11 +67,11 @@ python3 deploy/server/plan.py --probe --data-path /var/lib/docker \
 - รวม **hard limit ทุก replica** ต้องไม่เกินส่วนที่เหลือ ไม่คิดว่า swap คือ RAM เพิ่ม
 - Worker เผื่อฐาน 0.5 GiB + `slots × --ram-per-job-gib` (เริ่มต้น **1.5 GiB/งาน**) และ 0.5 CPU/slot
 - Assistant worker แยกคิวแชต: 0.75 GiB / 0.5 CPU, เริ่มต้น 2 งานแชตพร้อมกัน เพิ่มจาก mapping workers โดยไม่ลด 8 งานใน config dev
-- API 1.5 GiB, PostgreSQL 2 GiB, Redis 0.5 GiB, MinIO 1 GiB, เว็บ 0.25 GiB, backup 0.75 GiB รวมถึง migration 1 GiB และ init 0.125 GiB เพื่อเผื่อช่วงเริ่มระบบด้วย
+- API 1.5 GiB, PostgreSQL 2 GiB + 10 MiB ต่อ connection ที่เกิน 100, Redis 0.5 GiB, MinIO 1 GiB, เว็บ 0.25 GiB, backup 0.75 GiB รวมถึง migration 1 GiB และ init 0.125 GiB เพื่อเผื่อช่วงเริ่มระบบด้วย
 - Sandbox ตัวละ 4 GiB / 2 CPU; 2–4 งานใช้หนึ่งตัว, 8/16/32 งานใช้ 2/4/8 ตัว Python ยังคง virtual-address limit 2560 MiB เดิม ส่วนที่เพิ่มเผื่อ tmpfs/runner/ผลลัพธ์ ไม่ได้ทำให้โปรแกรมใช้ RAM 4 GiB ได้ทั้งหมด
 - `FORMA_FILE_WORKERS=1` และจำกัด thread ของไลบรารีคำนวณ เพื่อลดการซ้อนขนานภายในแต่ละงาน ยังไม่มี memory-aware scheduler ที่กันทุก job ให้โดยอัตโนมัติ
 
-ภายใต้สมมติฐานนี้ ตัวอย่าง 18 vCPU / 48 GiB เลือก 8 งาน ใช้ยอดเพดาน RAM รวม **32.625 GiB**, CPU รวม **14.5 vCPU** เหลือจาก capacity ทั้งหมด 15.375 GiB / 3.5 vCPU (รวมส่วนเผื่อแล้ว อย่าหักซ้ำ) ตัวอย่างเครื่อง 16 vCPU / 48 GiB จะเลือก 4 งานตามนโยบายเผื่อ CPU นี้; ถ้าต้องการ 8 งานให้ประเมินสเปกจริงใหม่ เครื่อง 32 GiB อาจแนะนำ 4 งานในนโยบายนี้ แม้เคยรัน 8 งานเล็กได้ เพราะกัน RAM ต่อไฟล์ซับซ้อนไว้มากกว่าเดิม ไม่ใช่ข้อพิสูจน์ว่า 32 GiB ใช้ 8 งานไม่ได้
+ภายใต้สมมติฐานนี้ ตัวอย่าง 18 vCPU / 48 GiB เลือก 8 งาน ใช้ยอดเพดาน RAM รวม **33.113 GiB**, CPU รวม **14.5 vCPU** เหลือจาก capacity ทั้งหมด 14.887 GiB / 3.5 vCPU (รวมส่วนเผื่อแล้ว อย่าหักซ้ำ) ตัวอย่างเครื่อง 16 vCPU / 48 GiB จะเลือก 4 งานตามนโยบายเผื่อ CPU นี้; ถ้าต้องการ 8 งานให้ประเมินสเปกจริงใหม่ เครื่อง 32 GiB อาจแนะนำ 4 งานในนโยบายนี้ แม้เคยรัน 8 งานเล็กได้ เพราะกัน RAM ต่อไฟล์ซับซ้อนไว้มากกว่าเดิม ไม่ใช่ข้อพิสูจน์ว่า 32 GiB ใช้ 8 งานไม่ได้
 
 ดิสก์คำนวณจากข้อมูลใหม่ที่จะเก็บเพิ่ม:
 
@@ -115,7 +129,7 @@ python3 deploy/server/test_compose.py
 
 ชุดนี้ตรวจเลขงบทุก replica, insufficient capacity, disk reserve, backup staging, isolation และ CLI โดยไม่รัน API ค่าใช้จ่าย การ merge กับ Compose จริงตรวจได้ด้วย `config --quiet` ไม่ต้องเปิด containers
 
-ผลตรวจตอนเตรียมชุดนี้: unit tests 7 ข้อผ่าน (รวมไล่สเปก CPU/RAM 35 คู่), และ Compose merge test ผ่านทั้ง 2/4/8/16/32 งาน โดยใช้ env จำลองแยกต่างหาก ยืนยันชื่อ project/volumes แยก, strict knowledge, OIDC, replica, socket/healthcheck และ sandbox ไม่ได้รับ secrets ของแอป ตัวอย่างทั้งหมดใช้สมมติฐานดิสก์ 1000 GiB ว่าง 900 GiB / ไฟล์เฉลี่ย 5 MiB ไม่ได้ start หรือ deploy config นี้ และยังไม่ได้ทำ load test บน server
+ผลตรวจล่าสุด (2026-11-21, หลังเพิ่มค่าเรียก AI และ connections): unit tests 9 ข้อผ่าน ส่วน Compose merge test ยังไม่ได้รันซ้ำ เพราะเครื่องที่แก้ไม่มี Docker ต้องรัน `test_compose.py` บนเครื่องที่มี Docker ก่อนใช้ ผลตรวจตอนเตรียมชุดนี้ครั้งแรก: unit tests 7 ข้อผ่าน (รวมไล่สเปก CPU/RAM 35 คู่), และ Compose merge test ผ่านทั้ง 2/4/8/16/32 งาน โดยใช้ env จำลองแยกต่างหาก ยืนยันชื่อ project/volumes แยก, strict knowledge, OIDC, replica, socket/healthcheck และ sandbox ไม่ได้รับ secrets ของแอป ตัวอย่างทั้งหมดใช้สมมติฐานดิสก์ 1000 GiB ว่าง 900 GiB / ไฟล์เฉลี่ย 5 MiB ไม่ได้ start หรือ deploy config นี้ และยังไม่ได้ทำ load test บน server
 
 แนวคิดอ้างอิง: [Kubernetes Node Allocatable / reserve](https://kubernetes.io/docs/tasks/administer-cluster/reserve-compute-resources/), [Docker memory/CPU limits](https://docs.docker.com/engine/containers/resource_constraints/), [tmpfs นับเป็น RAM ของ container](https://docs.docker.com/engine/storage/tmpfs/), [Compose override merge](https://docs.docker.com/compose/how-tos/multiple-compose-files/merge/). นำหลัก reserve-before-scheduling มาใช้กับ Compose แบบคงที่ ไม่ได้อ้างว่าได้ระบบ scheduler ของ Kubernetes มาแล้ว
 

@@ -30,6 +30,23 @@ BASE = {
     "assistant-worker": (0.75, 0.5),
     "report-sandbox": (3.0, 2.0),
 }
+# Every process that calls the model shares one Redis limiter and sends its own caps
+# with each request, so all of them get the same numbers. Chat and reports have slots
+# of their own on top of the mapping jobs (Settings: assistant_workers=2,
+# report_workers=1): a full batch never shuts chat out, and a mapping job never waits
+# for a slot inside its 600 s AI budget.
+CHAT_AND_REPORT_SLOTS = 3
+# A model call averaged 29 s in the real runs (ADR-077): about 2 calls a minute per
+# slot. Short calls (an analyst's look at the file) take 5 s; 4 a minute leaves room.
+CALLS_PER_SLOT_MINUTE = 4
+MIN_RPM = 60
+# Postgres connections one worker container (4 jobs) holds at peak: a session per job,
+# heartbeats and progress writes, two checkpoint/ledger connections per AI workflow,
+# the activity log and the recovery loop, about 22. The image's default of 100 covers
+# the API and the other services.
+CONNECTIONS_PER_WORKER = 25
+BASE_CONNECTIONS = 100
+MIB_PER_CONNECTION = 10  # Postgres memory per extra connection, on its 2 GiB budget
 
 
 def limit(memory: float, cpu: float) -> dict:
@@ -67,7 +84,16 @@ def calculate(a: argparse.Namespace) -> dict:
         sandboxes = max(1, jobs // 4)
         worker_ram = math.ceil((0.5 + slots * a.ram_per_job_gib) * 1024) / 1024
         worker_cpu = max(1.0, slots * 0.5)
-        ram = sum(v[0] for v in BASE.values()) + replicas * worker_ram + 4 * sandboxes
+        llm_concurrency = jobs + CHAT_AND_REPORT_SLOTS
+        connections = BASE_CONNECTIONS + CONNECTIONS_PER_WORKER * replicas
+        extra_connections = connections - BASE_CONNECTIONS
+        postgres_ram = BASE["postgres"][0] + extra_connections * MIB_PER_CONNECTION / 1024
+        ram = (
+            sum(v[0] for v in BASE.values())
+            + (postgres_ram - BASE["postgres"][0])
+            + replicas * worker_ram
+            + 4 * sandboxes
+        )
         cpu = sum(v[1] for v in BASE.values()) + replicas * worker_cpu + 2 * sandboxes
         candidates.append(
             {
@@ -77,6 +103,10 @@ def calculate(a: argparse.Namespace) -> dict:
                 "sandboxes": sandboxes,
                 "worker_ram_gib": worker_ram,
                 "worker_cpus": worker_cpu,
+                "llm_concurrency": llm_concurrency,
+                "llm_rpm": max(MIN_RPM, CALLS_PER_SLOT_MINUTE * llm_concurrency),
+                "postgres_max_connections": connections,
+                "postgres_ram_gib": postgres_ram,
                 "ram_limits_gib": ram,
                 "cpu_limits": cpu,
                 "fits": jobs <= a.max_jobs
@@ -131,12 +161,15 @@ def compose(plan: dict) -> dict:
     sockets.extend(
         f"/run/sandbox/runner-{i}.sock" for i in range(2, p["sandboxes"] + 1)
     )
+    llm = {
+        "FORMA_LLM_SHARED_CONCURRENCY": str(p["llm_concurrency"]),
+        "FORMA_LLM_SHARED_RPM": str(p["llm_rpm"]),
+        "FORMA_LLM_SHARED_LIMITER": "redis",
+    }
     runtime = {
         "FORMA_WORKERS": str(p["slots_per_worker"]),
         "FORMA_FILE_WORKERS": "1",
-        "FORMA_LLM_SHARED_CONCURRENCY": str(p["jobs"]),
-        "FORMA_LLM_SHARED_RPM": "60",
-        "FORMA_LLM_SHARED_LIMITER": "redis",
+        **llm,
         "FORMA_KNOWLEDGE_POLICY": "strict",
         "FORMA_MAPPING_LAB_SOCKETS": json.dumps(sockets),
         "POLARS_MAX_THREADS": "2",
@@ -145,6 +178,12 @@ def compose(plan: dict) -> dict:
     }
     services = {name: limit(*budget) for name, budget in BASE.items()}
     services["api"]["environment"] = runtime.copy()
+    for name in ("assistant-worker", "report-worker"):  # the same limiter caps
+        services[name]["environment"] = llm.copy()
+    connections = f"max_connections={p['postgres_max_connections']}"
+    services["postgres"] = limit(p["postgres_ram_gib"], BASE["postgres"][1]) | {
+        "command": ["postgres", "-c", connections]
+    }
     services["worker"] = limit(p["worker_ram_gib"], p["worker_cpus"]) | {
         "deploy": {"replicas": p["worker_replicas"]},
         "environment": runtime.copy(),

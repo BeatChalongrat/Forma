@@ -14,7 +14,7 @@
       "environment": {
         "FORMA_WORKERS": "4",
         "FORMA_FILE_WORKERS": "1",
-        "FORMA_LLM_SHARED_CONCURRENCY": "8",
+        "FORMA_LLM_SHARED_CONCURRENCY": "11",
         "FORMA_LLM_SHARED_RPM": "60",
         "FORMA_LLM_SHARED_LIMITER": "redis",
         "FORMA_KNOWLEDGE_POLICY": "strict",
@@ -33,8 +33,8 @@
       }
     },
     "postgres": {
-      "mem_limit": "2048m",
-      "memswap_limit": "2048m",
+      "mem_limit": "2548m",
+      "memswap_limit": "2548m",
       "cpus": 0.75,
       "logging": {
         "driver": "json-file",
@@ -42,7 +42,12 @@
           "max-size": "10m",
           "max-file": "3"
         }
-      }
+      },
+      "command": [
+        "postgres",
+        "-c",
+        "max_connections=150"
+      ]
     },
     "redis": {
       "mem_limit": "512m",
@@ -138,6 +143,11 @@
           "max-size": "10m",
           "max-file": "3"
         }
+      },
+      "environment": {
+        "FORMA_LLM_SHARED_CONCURRENCY": "11",
+        "FORMA_LLM_SHARED_RPM": "60",
+        "FORMA_LLM_SHARED_LIMITER": "redis"
       }
     },
     "assistant-worker": {
@@ -150,6 +160,11 @@
           "max-size": "10m",
           "max-file": "3"
         }
+      },
+      "environment": {
+        "FORMA_LLM_SHARED_CONCURRENCY": "11",
+        "FORMA_LLM_SHARED_RPM": "60",
+        "FORMA_LLM_SHARED_LIMITER": "redis"
       }
     },
     "report-sandbox": {
@@ -181,7 +196,7 @@
       "environment": {
         "FORMA_WORKERS": "4",
         "FORMA_FILE_WORKERS": "1",
-        "FORMA_LLM_SHARED_CONCURRENCY": "8",
+        "FORMA_LLM_SHARED_CONCURRENCY": "11",
         "FORMA_LLM_SHARED_RPM": "60",
         "FORMA_LLM_SHARED_LIMITER": "redis",
         "FORMA_KNOWLEDGE_POLICY": "strict",

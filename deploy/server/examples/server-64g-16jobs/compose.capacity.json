@@ -14,8 +14,8 @@
       "environment": {
         "FORMA_WORKERS": "4",
         "FORMA_FILE_WORKERS": "1",
-        "FORMA_LLM_SHARED_CONCURRENCY": "16",
-        "FORMA_LLM_SHARED_RPM": "60",
+        "FORMA_LLM_SHARED_CONCURRENCY": "19",
+        "FORMA_LLM_SHARED_RPM": "76",
         "FORMA_LLM_SHARED_LIMITER": "redis",
         "FORMA_KNOWLEDGE_POLICY": "strict",
         "FORMA_MAPPING_LAB_SOCKETS": "[\"/run/sandbox/runner.sock\", \"/run/sandbox/runner-2.sock\", \"/run/sandbox/runner-3.sock\", \"/run/sandbox/runner-4.sock\"]",
@@ -39,8 +39,8 @@
       }
     },
     "postgres": {
-      "mem_limit": "2048m",
-      "memswap_limit": "2048m",
+      "mem_limit": "3048m",
+      "memswap_limit": "3048m",
       "cpus": 0.75,
       "logging": {
         "driver": "json-file",
@@ -48,7 +48,12 @@
           "max-size": "10m",
           "max-file": "3"
         }
-      }
+      },
+      "command": [
+        "postgres",
+        "-c",
+        "max_connections=200"
+      ]
     },
     "redis": {
       "mem_limit": "512m",
@@ -144,6 +149,11 @@
           "max-size": "10m",
           "max-file": "3"
         }
+      },
+      "environment": {
+        "FORMA_LLM_SHARED_CONCURRENCY": "19",
+        "FORMA_LLM_SHARED_RPM": "76",
+        "FORMA_LLM_SHARED_LIMITER": "redis"
       }
     },
     "assistant-worker": {
@@ -156,6 +166,11 @@
           "max-size": "10m",
           "max-file": "3"
         }
+      },
+      "environment": {
+        "FORMA_LLM_SHARED_CONCURRENCY": "19",
+        "FORMA_LLM_SHARED_RPM": "76",
+        "FORMA_LLM_SHARED_LIMITER": "redis"
       }
     },
     "report-sandbox": {
@@ -187,8 +202,8 @@
       "environment": {
         "FORMA_WORKERS": "4",
         "FORMA_FILE_WORKERS": "1",
-        "FORMA_LLM_SHARED_CONCURRENCY": "16",
-        "FORMA_LLM_SHARED_RPM": "60",
+        "FORMA_LLM_SHARED_CONCURRENCY": "19",
+        "FORMA_LLM_SHARED_RPM": "76",
         "FORMA_LLM_SHARED_LIMITER": "redis",
         "FORMA_KNOWLEDGE_POLICY": "strict",
         "FORMA_MAPPING_LAB_SOCKETS": "[\"/run/sandbox/runner.sock\", \"/run/sandbox/runner-2.sock\", \"/run/sandbox/runner-3.sock\", \"/run/sandbox/runner-4.sock\"]",
