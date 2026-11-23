@@ -1,0 +1,62 @@
+# Local trial of the production stack on Podman (Windows, WSL machine), on top of docker-compose.prod.yml.
+# Easiest: .\scripts\dev.ps1 podman-up (and podman-down / podman-status). By hand:
+#   $env:CONTAINER_CONNECTION = "podman-machine-default-root"
+#   podman-compose -f docker-compose.prod.yml -f deploy/podman/compose.local.yml --env-file .env.production up -d
+#
+# It runs on Podman's ROOT connection: rootless Podman on WSL has no cgroup controllers, so the sandboxes'
+# memory, CPU and process limits (ADR-048) could not be applied. Build or copy the images there too.
+#
+# MinIO no longer publishes its images on Docker Hub or quay.io, so this trial keeps files on the shared
+# `formadata` volume instead (FORMA_STORAGE=local): the API, workers and backups all mount it at /data.
+# `minio` and `minio-init` become stand-ins (one stays up and healthy, one exits successfully at once), so
+# the production file's startup order and health conditions stay exactly as they are. Everything else
+# (PostgreSQL, Redis/arq workers, the code and report sandboxes, the web) runs as in production.
+#
+# podman-compose 1.6 drops `dockerfile:` on Windows, so build the images first, under the names it uses:
+#   podman build -f backend/Dockerfile -t forma_api .
+#   podman build -f deploy/sandbox/Dockerfile -t forma_sandbox .
+#   podman build -t forma_web frontend
+# then tag forma_api as forma_worker, forma_migrate, forma_report-worker, forma_assistant-worker,
+# forma_backup-nightly and forma_backup, and forma_sandbox as forma_report-sandbox.
+x-local-storage: &local-storage
+  FORMA_STORAGE: local
+
+services:
+  minio:
+    image: docker.io/library/busybox:1.37
+    command: ["tail", "-f", "/dev/null"]
+    healthcheck:
+      test: !override ["CMD", "true"]  # without !override podman-compose appends this to MinIO's test
+      interval: 10s
+      timeout: 3s
+      retries: 3
+  minio-init:
+    image: docker.io/library/busybox:1.37
+    entrypoint: ["true"]
+  # podman-compose turns depends_on into Podman `--requires` links, transitive ones included, and Podman
+  # refuses to start a container whose required one-shot jobs (migrate, minio-init) have already exited.
+  # The web only proxies to the API by name, so it needs no link at all.
+  # nginx.conf asks Docker's embedded DNS (127.0.0.11) for `api`; Podman's DNS answers on the network
+  # gateway named in /etc/resolv.conf. Point the resolver there at start, then run nginx as the image does.
+  web:
+    depends_on: !override []
+    entrypoint:
+      - /bin/sh
+      - -c
+      - >-
+        sed -i "s/resolver 127.0.0.11/resolver $$(awk '/^nameserver/{print $$2; exit}' /etc/resolv.conf)/"
+        /etc/nginx/conf.d/default.conf && exec /docker-entrypoint.sh nginx -g 'daemon off;'
+  migrate:
+    environment: *local-storage
+  api:
+    environment: *local-storage
+  worker:
+    environment: *local-storage
+  report-worker:
+    environment: *local-storage
+  assistant-worker:
+    environment: *local-storage
+  backup-nightly:
+    environment: *local-storage
+  backup:
+    environment: *local-storage
