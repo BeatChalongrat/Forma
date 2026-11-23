@@ -283,3 +283,14 @@ def test_the_attempt_ledger_reads_rows_written_before_reasoning_tokens(tmp_path:
             ),
         )
         assert ledger.usage().output_tokens == 7 and ledger.usage().reasoning_tokens == 0
+
+
+def test_an_empty_reasoning_effort_in_the_env_file_means_unset(monkeypatch: pytest.MonkeyPatch) -> None:
+    # .env.production.example writes FORMA_LLM_REASONING_EFFORT= ; the API must still start
+    monkeypatch.setenv("FORMA_LLM_REASONING_EFFORT", "")
+    assert Settings().llm_reasoning_effort is None
+    monkeypatch.setenv("FORMA_LLM_REASONING_EFFORT", "low")
+    assert Settings().llm_reasoning_effort == "low"
+    monkeypatch.setenv("FORMA_LLM_REASONING_EFFORT", "fast")
+    with pytest.raises(ValueError):
+        Settings()

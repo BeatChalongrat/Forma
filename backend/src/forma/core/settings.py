@@ -4,7 +4,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any, Literal
 
-from pydantic import Field
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 SECRET_FIELDS = {
@@ -355,6 +355,12 @@ class Settings(BaseSettings):
             abs_path.parent.mkdir(parents=True, exist_ok=True)
             return f"sqlite:///{abs_path.as_posix()}"
         return url
+
+    @field_validator("llm_reasoning_effort", mode="before")
+    @classmethod
+    def _empty_effort_is_unset(cls, value: Any) -> Any:
+        # .env.production.example writes the setting empty (FORMA_LLM_REASONING_EFFORT=): that means unset
+        return None if isinstance(value, str) and not value.strip() else value
 
     @property
     def is_prod(self) -> bool:
